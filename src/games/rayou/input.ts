@@ -5,6 +5,8 @@ export interface Input {
 	camDrag: { x: number; y: number };
 	camTouchedAt: number;
 	jumpHeld: boolean;
+	// The last jump press was a tap on the on-screen button.
+	jumpTap: boolean;
 	// Keys are only taken while a game runs, so the page still scrolls before Play.
 	enabled: boolean;
 	consumeAction(): boolean;
@@ -52,6 +54,7 @@ export function createInput(stage: HTMLElement, joyBase: HTMLElement, joyKnob: H
 		camDrag: { x: 0, y: 0 },
 		camTouchedAt: -1e9,
 		jumpHeld: false,
+		jumpTap: false,
 		enabled: false,
 		consumeAction: take('action'),
 		consumeJump: take('jump'),
@@ -93,7 +96,10 @@ export function createInput(stage: HTMLElement, joyBase: HTMLElement, joyKnob: H
 		if (!input.enabled || isTypingTarget(e.target)) return;
 		const c = e.code;
 		if (c === 'Space') {
-			if (!e.repeat) latch.jump = true;
+			if (!e.repeat) {
+				latch.jump = true;
+				input.jumpTap = false;
+			}
 			held.add(c);
 		} else if (c === 'KeyE' || c === 'Enter') {
 			if (!e.repeat) latch.action = true;
@@ -247,12 +253,39 @@ export function createInput(stage: HTMLElement, joyBase: HTMLElement, joyKnob: H
 		btn.jump,
 		() => {
 			latch.jump = true;
+			input.jumpTap = true;
 			touchJump = true;
 		},
 		() => (touchJump = false),
 	);
 	bind(btn.roll, () => (latch.roll = true));
 	bind(btn.menu, () => (latch.menu = true));
+
+	// A thumb sliding from Rouler onto Sauter jumps out of the roll without lifting.
+	const slid = new Set<number>();
+	const overJump = (t: Touch) => {
+		const r = btn.jump.getBoundingClientRect(), pad = 8;
+		return t.clientX > r.left - pad && t.clientX < r.right + pad && t.clientY > r.top - pad && t.clientY < r.bottom + pad;
+	};
+	btn.roll.addEventListener(
+		'touchmove',
+		(e) => {
+			e.preventDefault();
+			for (const t of Array.from(e.changedTouches)) {
+				if (slid.has(t.identifier) || !overJump(t)) continue;
+				slid.add(t.identifier);
+				latch.jump = true;
+				input.jumpTap = true;
+				btn.jump.classList.add('ry-down');
+			}
+		},
+		{ passive: false },
+	);
+	const slideEnd = (e: TouchEvent) => {
+		for (const t of Array.from(e.changedTouches)) if (slid.delete(t.identifier)) btn.jump.classList.remove('ry-down');
+	};
+	btn.roll.addEventListener('touchend', slideEnd);
+	btn.roll.addEventListener('touchcancel', slideEnd);
 
 	return input;
 }

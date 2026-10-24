@@ -68,7 +68,7 @@ export interface Zones {
 	update(dt: number, time: number, standing: Solid | null): void;
 }
 
-type Mover = (t: number, standing: Solid | null) => void;
+type Mover = (t: number, standing: Solid | null, dt: number) => void;
 
 const clear: { x: number; z: number; r: number }[] = [];
 const keepClear = (x: number, z: number, r: number) => clear.push({ x, z, r });
@@ -847,13 +847,14 @@ function buildLake(root: THREE.Group, r: () => number, out: Partial<Zones>, move
 		const s = addCyl(x, z, rad, top - 0.3, top, { moving: true, mesh: m });
 		const seed = r() * 6;
 		let sink = 0;
-		movers.push((t, standing) => {
+		movers.push((t, standing, dt) => {
 			let px = x, pz = z;
 			if (kind === 'drift') {
 				px = cx + Math.cos(t * 0.45 + seed) * 1.6;
 				pz = cz + Math.sin(t * 0.45 + seed) * 1.6;
 			}
-			if (kind === 'sink') sink = Math.max(0, Math.min(1, sink + (standing === s ? 0.006 : -0.02)));
+			// Per second, as it was at 60 fps: sinks in 2.8 s, comes back up in 0.8 s.
+			if (kind === 'sink') sink = Math.max(0, Math.min(1, sink + (standing === s ? 0.36 : -1.2) * dt));
 			const y = top + Math.sin(t * 1.6 + seed) * 0.025 - sink * 0.45;
 			moveSolid(s, px, y, pz);
 			m.position.set(px, y - 0.04, pz);
@@ -1301,7 +1302,7 @@ export function buildZones(scene: THREE.Scene, lite = false): Zones {
 	return {
 		...(out as Zones),
 		update(dt, time, standing) {
-			for (const m of movers) m(time, standing);
+			for (const m of movers) m(time, standing, dt);
 			out.dam!.update(dt);
 			for (const b of out.bouncers!) {
 				b.squash = Math.max(0, b.squash - dt * 3);

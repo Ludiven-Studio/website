@@ -27,3 +27,5 @@ Une ligne par ticket : date · id · résumé · décision.
 - 2026-10-03 · 0025-0027 · 36 icônes cartoon (entretien, mécanique, électricité, menuiserie, textile, marine, 5 générateurs ; Codex, 2,9 M jetons) · intégrées avec l'essai 0024, 42 icônes au total
 - 2026-10-03 · 0028 · essai cartoon : Morel, Jeanne, atelier, montre (Codex) · validé par l'utilisateur, référence des lots 0029-0033
 - 2026-10-03 · 0029-0033 · 10 portraits, 3 décors (atelier poussiéreux, bureau, photo de 1961), 24 objets d'histoire abîmés/restaurés (Codex) · intégrés ; les objets passent de l'image abîmée à la restaurée en fondu
+- 2026-10-24 · 0034 · avis sur les sauts de Rayou au téléphone (Codex) · retenus : saut entier au tap, glissé Rouler→Sauter, test élargi ; sous-pas variables au lieu de l'accumulateur ; « roulades serrées » était une erreur de mesure
+- 2026-10-24 · 0035 · relecture du diff des sauts de Rayou (Codex) · deux défauts du test corrigés : départs identiques comptés plusieurs fois, profil téléphone en échec masqué

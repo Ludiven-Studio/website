@@ -26,8 +26,13 @@ export interface Command {
 	dirZ: number;
 	jump: boolean;
 	jumpHeld: boolean;
+	// The press was a tap on the on-screen button: a tap has no length to read, so its jump is never cut.
+	fullJump?: boolean;
 	roll: boolean;
 }
+
+// The checks step the physics at 1/60 s: a longer frame is split, so no frame rate jumps lower or shorter.
+export const physicsSteps = (dt: number): number => Math.max(1, Math.ceil(dt * 60 - 1e-6));
 
 export type PlayerEvent = 'jump' | 'land' | 'tumble' | 'roll' | 'splash' | 'bounce' | 'break' | 'respawn';
 
@@ -67,6 +72,9 @@ export class Player {
 
 	private coyote = 0;
 	private jumpBuf = 0;
+	private jumpBufFull = false;
+	// A bounce or a touch jump: letting go does not cut it.
+	private fullArc = false;
 	private rollCool = 0;
 	private airRolled = false;
 	private keepSpeed = false;
@@ -184,13 +192,17 @@ export class Player {
 		}
 		this.turnRate += (turn / Math.max(dt, 1e-4) - this.turnRate) * (1 - Math.exp(-10 * dt));
 
-		this.jumpBuf = cmd.jump ? BUFFER : this.jumpBuf - dt;
+		if (cmd.jump) {
+			this.jumpBuf = BUFFER;
+			this.jumpBufFull = !!cmd.fullJump;
+		} else this.jumpBuf -= dt;
 		if (this.jumpBuf > 0 && ((this.grounded && !this.steep) || this.coyote > 0)) {
 			this.jumpBuf = 0;
 			this.coyote = 0;
 			this.grounded = false;
 			this.support = null;
 			this.vy = JUMP_V;
+			this.fullArc = this.jumpBufFull;
 			this.apexY = this.pos.y;
 			// A jump out of a roll keeps the roll's speed: the long jump.
 			this.keepSpeed = this.rollT > 0;
@@ -198,7 +210,7 @@ export class Player {
 			this.onEvent('jump', this.keepSpeed);
 		}
 		// Letting go early cuts the jump.
-		if (!this.grounded && this.vy > 2 && !cmd.jumpHeld) this.vy -= GRAVITY * 1.4 * dt;
+		if (!this.grounded && this.vy > 2 && !cmd.jumpHeld && !this.fullArc) this.vy -= GRAVITY * 1.4 * dt;
 	}
 
 	private terrainBlocked(fromX: number, fromZ: number, x: number, z: number): boolean {
@@ -378,6 +390,7 @@ export class Player {
 				this.grounded = false;
 				this.support = null;
 				this.vy = f.s.bouncy;
+				this.fullArc = true;
 				this.apexY = p.y;
 				this.onEvent('bounce', f.s);
 				return;

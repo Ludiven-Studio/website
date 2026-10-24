@@ -569,3 +569,26 @@
   forme. Pas de build (fichier statique hors précache)
 - 10:30 : commité et poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé.
   Réservations libérées.
+
+## 2026-10-24 — Rayou : sauts sur mobile (session website)
+- Statut : en cours (2026-10-24T11:48+02:00). Demande de l'utilisateur : améliorer les sauts de Rayou sur mobile, en
+  autonomie, avec l'avis de Codex
+- Réservations actives : `src/games/rayou/input.ts`, `src/games/rayou/main.ts`, `src/games/rayou/player.ts`,
+  `src/pages/jeux/rayou.astro`, `scripts/check-rayou.ts`, `.collab/tickets/0034-rayou-sauts-mobile.md`,
+  `.collab/LOG.md`.
+- Ressources : serveur de dev sur le port 4472 ; eslint, `astro check`. Build annoncé ici avant.
+- 11:53 : réservation ajoutée : `src/games/rayou/tutorial.ts` (textes tactiles du saut). Codex consulté (ticket 0034,
+  répondu).
+- 12:00 : réservation ajoutée : `src/games/rayou/zones.ts` (le nénuphar qui coule s'enfonçait par appel, pas par
+  seconde).
+- 12:10 : réservations ajoutées : `scripts/check-rayou-touch.mjs` (gestes tactiles dans Chromium),
+  `.collab/tickets/0035-revue-sauts-rayou.md` (relecture du diff par Codex, en cours). check-rayou.ts complet OK,
+  eslint OK, astro check 0 erreur.
+- 12:16 : fait et vérifié : saut entier au tap, rebonds jamais coupés, physique en sous-pas de 1/60 s, nénuphar qui
+  coule par seconde, glissé Rouler→Sauter, boutons +8 px ; check-rayou.ts (profils téléphone, plage continue) et
+  check-rayou-touch.mjs passent, contre-épreuves en échec comme attendu ; tickets 0034-0035 clos. Pas de build ni de
+  commit : en attente du feu vert de l'utilisateur.
+- 16:29 : Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 16:31 : build complet OK : astro check 0 erreur, 152 pages, précache 308 entrées, liens OK
+- 16:31 : commité et poussé à la demande de l'utilisateur : mes 12 fichiers et cette section seulement. Statut :
+  terminé. Réservations libérées.

@@ -3,17 +3,40 @@
    Rayou stays stuck. Usage: npx tsx scripts/check-rayou.ts [--fuzz-minutes N] */
 import * as THREE from 'three';
 import { buildZones } from '../src/games/rayou/zones';
-import { Player, RUN, type Command } from '../src/games/rayou/player';
+import { Player, RUN, physicsSteps, type Command } from '../src/games/rayou/player';
 import { groundHeight, mountPoint, ringLevel, riverX, ISLETS, BANK, OAK, OAK_GATE, MILL, MOUNT, BOUNDS, waterAt, WATER_Y, START } from '../src/games/rayou/terrain';
 import { query, inside, solids } from '../src/games/rayou/colliders';
 
 const scene = new THREE.Scene();
 const zones = buildZones(scene);
-const DT = 1 / 60;
 let clock = 0;
 
 type P = { x: number; z: number; y?: number };
 const events: string[] = [];
+
+// How a jump is played: frame rate (with uneven frames), how long the press lasts, keyboard or touch.
+type Play = { name: string; frame: number; jitter?: number; hold: number; touch: boolean };
+const KEY: Play = { name: 'key held 60 fps', frame: 1 / 60, hold: Infinity, touch: false };
+const PHONE: Play[] = [
+	{ name: 'tap 100 ms 30 fps', frame: 1 / 30, hold: 0.1, touch: true },
+	{ name: 'tap 60 ms 20 fps', frame: 1 / 20, hold: 0.06, touch: true },
+	{ name: 'tap 60 ms 60 fps', frame: 1 / 60, hold: 0.06, touch: true },
+	{ name: 'tap 100 ms uneven 45 fps', frame: 1 / 45, jitter: 0.4, hold: 0.1, touch: true },
+];
+// The most generous play, for the jumps that must stay impossible: a 240 Hz screen takes the finest steps.
+const FINE: Play = { name: 'touch 240 fps', frame: 1 / 240, hold: Infinity, touch: true };
+let play = KEY;
+let frameSeed = 7;
+const frameRnd = () => ((frameSeed = (frameSeed * 1664525 + 1013904223) >>> 0) / 4294967296);
+function as<T>(p: Play, f: () => T): T {
+	const was = play;
+	play = p;
+	try {
+		return f();
+	} finally {
+		play = was;
+	}
+}
 
 function mk(at: P, yaw: number): Player {
 	const p = new Player();
@@ -22,10 +45,16 @@ function mk(at: P, yaw: number): Player {
 	return p;
 }
 
-function step(p: Player, cmd: Command) {
-	clock += DT;
-	zones.update(DT, clock, p.grounded ? p.support : null);
-	p.update(DT, cmd);
+// One frame the way main.ts runs it: split into physics steps, presses on the first step only.
+function step(p: Player, cmd: Command): number {
+	const dt = play.frame * (1 + (play.jitter ?? 0) * (frameRnd() * 2 - 1));
+	const n = physicsSteps(dt);
+	for (let k = 1; k <= n; k++) {
+		clock += dt / n;
+		zones.update(dt / n, clock, p.grounded ? p.support : null);
+		p.update(dt / n, k > 1 ? { ...cmd, jump: false, roll: false } : cmd);
+	}
+	return dt;
 }
 
 const toward = (p: Player, t: P, mag = 1): Command => {
@@ -35,11 +64,16 @@ const toward = (p: Player, t: P, mag = 1): Command => {
 };
 
 // Runs from `from` toward `to`, jumping (or roll-jumping) when `at` metres remain to the target.
-function tryJump(from: P, to: P, opts: { roll?: boolean; at: number; settle?: number; runup?: number }): Player {
+// `pressedAt` is the distance left when the press went in (frames make it a little less than `at`), or
+// null when Rayou never got that close: a step or a wall held him back, or he fell first.
+function tryJump(from: P, to: P, opts: { roll?: boolean; at: number; settle?: number; runup?: number }): { p: Player; pressedAt: number | null; y0: number } {
 	const yaw = Math.atan2(to.x - from.x, to.z - from.z);
 	const p = mk(from, yaw);
-	let jumped = false, rolled = false;
-	for (let i = 0; i < 60 * 6; i++) {
+	const y0 = p.pos.y;
+	let pressedAt: number | null = null;
+	const out = () => ({ p, pressedAt, y0 });
+	let jumped = false, rolled = false, since = 0;
+	for (let t = 0; t < 6; ) {
 		const c = toward(p, to);
 		const d = Math.hypot(to.x - p.pos.x, to.z - p.pos.z);
 		if (opts.roll && !rolled && d < opts.at + (opts.runup ?? 2.2)) {
@@ -49,31 +83,53 @@ function tryJump(from: P, to: P, opts: { roll?: boolean; at: number; settle?: nu
 		if (!jumped && d < opts.at) {
 			c.jump = true;
 			jumped = true;
+			pressedAt = d;
 		}
-		c.jumpHeld = jumped && i % 1 === 0;
+		c.jumpHeld = jumped && since < play.hold;
+		c.fullJump = play.touch;
 		// Like a player: let go of the stick once over the target.
 		if ((d < 0.25 && p.grounded) || (!p.grounded && jumped && d < 0.45)) {
 			c.dirX = c.dirZ = 0;
 		}
-		step(p, c);
-		if (p.respawnT > 0) return p;
-		if (jumped && p.grounded && d < 0.6 && i > 20) {
-			for (let k = 0; k < (opts.settle ?? 20); k++) step(p, { dirX: 0, dirZ: 0, jump: false, jumpHeld: false, roll: false });
-			return p;
+		const dt = step(p, c);
+		t += dt;
+		if (jumped) since += dt;
+		if (p.respawnT > 0) return out();
+		if (jumped && p.grounded && d < 0.6 && t > 1 / 3) {
+			for (let s = 0; s < (opts.settle ?? 20) / 60; ) s += step(p, { dirX: 0, dirZ: 0, jump: false, jumpHeld: false, roll: false });
+			return out();
 		}
 	}
-	return p;
+	return out();
 }
 
 function landed(p: Player, to: P, tol = 0.75): boolean {
 	return p.respawnT <= 0 && p.grounded && Math.hypot(p.pos.x - to.x, p.pos.z - to.z) < tol + 0.6 && (to.y === undefined || Math.abs(p.pos.y - to.y) < 0.15);
 }
 
-// How many jump-timing choices work: 0 = impossible, a handful = tight, many = easy.
-function jumpWindow(from: P, to: P, roll = false): number {
-	let ok = 0;
-	for (let at = 0.2; at <= 5; at += 0.1) if (landed(tryJump(from, to, { roll, at }), to)) ok++;
-	return ok;
+// The longest stretch of take-off ground that lands, in 10 cm spots: 0 = impossible, a handful = tight,
+// many = easy. A stretch, not a count: a child aims at one stretch of ground, not at scattered lucky spots.
+// Spots go from the target back to the start, not beyond (a roll jump takes off up to 7 m away). A spot
+// Rayou cannot reach, held back by the step he jumps up, is no spot; spots whose press lands on the same
+// frame are one take-off. `reach` counts the distinct take-offs.
+type Window = { run: number; reach: number };
+function jumpWindow(from: P, to: P, roll = false): Window {
+	const offs: { d: number; ok: boolean }[] = [];
+	const far = Math.min(8, Math.hypot(to.x - from.x, to.z - from.z));
+	for (let at = 0.2; at <= far + 0.05; at += 0.1) {
+		const { p, pressedAt, y0 } = tryJump(from, to, { roll, at });
+		if (pressedAt === null && p.respawnT <= 0 && Math.abs(p.pos.y - y0) < 0.3) continue;
+		const d = pressedAt ?? at;
+		if (offs.length && Math.abs(offs[offs.length - 1].d - d) < 1e-3) continue;
+		offs.push({ d, ok: landed(p, to) });
+	}
+	let best = 0, first = -1;
+	offs.forEach((o, i) => {
+		if (!o.ok) return void (first = -1);
+		if (first < 0) first = i;
+		best = Math.max(best, Math.round((o.d - offs[first].d) / 0.1) + 1);
+	});
+	return { run: best, reach: offs.length };
 }
 
 const top = (x: number, z: number) => {
@@ -87,11 +143,23 @@ function expect(name: string, cond: boolean, detail = '') {
 	console.log(`${cond ? 'ok  ' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
 	if (!cond) fails.push(name);
 }
+// A jump to do: wide enough on the keyboard and on every phone play, or every reachable spot lands
+// (a hop up a step can only start right against it).
+function doable(name: string, from: P, to: P, roll = false, min = 3) {
+	const wide = (v: Window) => v.run >= Math.max(1, Math.min(min, v.reach));
+	const key = jumpWindow(from, to, roll);
+	const phones = PHONE.map((p) => ({ name: p.name, w: as(p, () => jumpWindow(from, to, roll)) }));
+	const bad = phones.filter((ph) => !wide(ph.w));
+	const shown = bad[0] ?? phones.reduce((a, b) => (b.w.run < a.w.run ? b : a));
+	expect(name, wide(key) && !bad.length, `window ${key.run}/${key.reach}, phone ${shown.w.run}/${shown.w.reach} (${shown.name})`);
+}
+// A jump that must stay impossible, even with the finest physics steps.
+function impossible(name: string, from: P, to: P, roll = false) {
+	const key = jumpWindow(from, to, roll).run, fine = as(FINE, () => jumpWindow(from, to, roll).run);
+	expect(name, key === 0 && fine === 0, `window ${key}, at 240 fps ${fine}`);
+}
 function chain(name: string, pts: P[], roll: boolean[] = []) {
-	for (let i = 0; i < pts.length - 1; i++) {
-		const w = jumpWindow(pts[i], pts[i + 1], roll[i]);
-		expect(`${name} ${i}→${i + 1}`, w >= 3, `window ${w}`);
-	}
+	for (let i = 0; i < pts.length - 1; i++) doable(`${name} ${i}→${i + 1}`, pts[i], pts[i + 1], roll[i]);
 }
 
 // — Oak gate: walking is blocked, rolling passes. —
@@ -107,14 +175,23 @@ function chain(name: string, pts: P[], roll: boolean[] = []) {
 		step(roll, c);
 	}
 	expect('trunk lets rolling through', roll.pos.z < OAK_GATE.z - 1, `z ${roll.pos.z.toFixed(2)}`);
-	const jump = mk(from, Math.PI);
-	for (let i = 0; i < 180; i++) {
-		const c = toward(jump, { x: from.x, z: OAK_GATE.z - 4 });
-		if (i % 30 === 10) c.jump = true;
-		c.jumpHeld = true;
-		step(jump, c);
-	}
-	expect('trunk cannot be jumped', jump.pos.z > OAK_GATE.z + 0.3, `z ${jump.pos.z.toFixed(2)}`);
+	const jumpZ = () => {
+		const jump = mk(from, Math.PI);
+		let next = 1 / 6;
+		for (let t = 0; t < 3; ) {
+			const c = toward(jump, { x: from.x, z: OAK_GATE.z - 4 });
+			if (t >= next) {
+				c.jump = true;
+				next += 0.5;
+			}
+			c.jumpHeld = true;
+			c.fullJump = play.touch;
+			t += step(jump, c);
+		}
+		return jump.pos.z;
+	};
+	const [zKey, zFine] = [jumpZ(), as(FINE, jumpZ)];
+	expect('trunk cannot be jumped', Math.min(zKey, zFine) > OAK_GATE.z + 0.3, `z ${zKey.toFixed(2)}, at 240 fps ${zFine.toFixed(2)}`);
 }
 
 // — No tree grows in the water (trees are the only tall thin colliders). —
@@ -130,18 +207,26 @@ function chain(name: string, pts: P[], roll: boolean[] = []) {
 		['world rim', { x: BOUNDS.x0 + 6, z: 0 }, { x: BOUNDS.x0 - 10, z: 0 }],
 	];
 	for (const [name, from, to] of tries) {
-		const p = mk(from, 0);
-		let maxClimb = 0;
-		for (let i = 0; i < 60 * 12; i++) {
-			const c = toward(p, to);
-			if (i % 12 === 0) c.jump = true;
-			c.jumpHeld = true;
-			step(p, c);
-			maxClimb = Math.max(maxClimb, p.pos.y);
+		for (const pl of [KEY, FINE]) {
+			as(pl, () => {
+				const p = mk(from, 0);
+				let maxClimb = 0, next = 0;
+				for (let t = 0; t < 12; ) {
+					const c = toward(p, to);
+					if (t >= next) {
+						c.jump = true;
+						next += 0.2;
+					}
+					c.jumpHeld = true;
+					c.fullJump = pl.touch;
+					t += step(p, c);
+					maxClimb = Math.max(maxClimb, p.pos.y);
+				}
+				// Never over the top: the oak ridge is 5 m, the rim 9 m.
+				const inside = name === 'oak ridge' ? Math.hypot(p.pos.x - OAK.x, p.pos.z - OAK.z) < OAK.valley - 1 : p.pos.x < BOUNDS.x0 - 2;
+				expect(`${name}: jump spam does not climb over (${pl.name})`, maxClimb < 4 && !inside, `max y ${maxClimb.toFixed(2)}, inside ${inside}`);
+			});
 		}
-		// Never over the top: the oak ridge is 5 m, the rim 9 m.
-		const inside = name === 'oak ridge' ? Math.hypot(p.pos.x - OAK.x, p.pos.z - OAK.z) < OAK.valley - 1 : p.pos.x < BOUNDS.x0 - 2;
-		expect(`${name}: jump spam does not climb over`, maxClimb < 4 && !inside, `max y ${maxClimb.toFixed(2)}, inside ${inside}`);
 	}
 }
 
@@ -183,18 +268,13 @@ function chain(name: string, pts: P[], roll: boolean[] = []) {
 	chain('islet A', [at(bankA - 1.2, a.z - 1.1), at(bankA + 1.1, a.z - 1.1), at(bankA + 2.4, a.z + 0.6), at(a.x, a.z)]);
 	const c = ISLETS[2];
 	const bankC = riverX(c.z) - BANK;
-	const jettyEnd = at(bankC + 0.6, c.z);
 	const startC = at(bankC - 3.5, c.z);
-	expect('islet C needs the roll jump', jumpWindow(startC, at(c.x, c.z)) === 0, `plain ${jumpWindow(startC, at(c.x, c.z))}`);
-	expect('islet C roll jump works', jumpWindow(startC, at(c.x, c.z), true) >= 3, `roll ${jumpWindow(startC, at(c.x, c.z), true)}`);
-	expect('islet C back with a roll jump', jumpWindow(at(c.x + 0.8, c.z), at(bankC - 1.5, c.z), true) >= 2, `back ${jumpWindow(at(c.x + 0.8, c.z), at(bankC - 1.5, c.z), true)}`);
-	void jettyEnd;
+	impossible('islet C needs the roll jump', startC, at(c.x, c.z));
+	doable('islet C roll jump works', startC, at(c.x, c.z), true);
+	doable('islet C back with a roll jump', at(c.x + 0.8, c.z), at(bankC - 1.5, c.z), true, 2);
 	const b = ISLETS[1];
-	expect('islet B reachable by roll jump', jumpWindow(at(riverX(b.z) - BANK - 2.5, b.z), at(b.x, b.z), true) >= 2);
-	for (const i of ISLETS) {
-		const east = at(riverX(i.z) + BANK + 1.5, i.z);
-		expect(`east bank out of reach from islet ${i.z}`, jumpWindow(at(i.x - 0.6, i.z), east, true) === 0);
-	}
+	doable('islet B reachable by roll jump', at(riverX(b.z) - BANK - 2.5, b.z), at(b.x, b.z), true, 2);
+	for (const i of ISLETS) impossible(`east bank out of reach from islet ${i.z}`, at(i.x - 0.6, i.z), at(riverX(i.z) + BANK + 1.5, i.z), true);
 }
 
 // — Hazel rock: hop up the stair of rocks; the third rock is out of reach from the grass. —
@@ -206,7 +286,69 @@ function chain(name: string, pts: P[], roll: boolean[] = []) {
 	const start = at(p0.x + (away.x / len) * 2.4, p0.z + (away.z / len) * 2.4);
 	chain('hazel rocks', [start, ...steps.map((s) => ({ x: s.x, z: s.z, y: s.y }))]);
 	const s2 = steps[2];
-	expect('hazel rock 3 is not reachable from the grass', jumpWindow(at(s2.x + 2.2, s2.z + 0.5), { x: s2.x, z: s2.z, y: s2.y }) === 0);
+	impossible('hazel rock 3 is not reachable from the grass', at(s2.x + 2.2, s2.z + 0.5), { x: s2.x, z: s2.z, y: s2.y });
+}
+
+// Hop onto a mushroom, bounce, steer to the goal: how many run-up lengths land there. A bounce is never
+// cut, so a tap that let go long before works as well as a held key.
+type Bounce = { start: P; yaw: number; mush: P; goal: P; goalY: number; tol: number };
+function bounceTo({ start, yaw, mush, goal, goalY, tol }: Bounce): number {
+	let ok = 0;
+	for (let lead = 0.6; lead <= 2.6; lead += 0.2) {
+		const p = mk(start, yaw);
+		let phase = 0, since = 0;
+		for (let t = 0; t < 400 / 60; ) {
+			const c = toward(p, phase === 0 ? mush : goal);
+			if (phase === 0 && Math.hypot(mush.x - p.pos.x, mush.z - p.pos.z) < lead) {
+				c.jump = true;
+				phase = 1;
+			}
+			c.jumpHeld = phase === 1 && since < play.hold;
+			c.fullJump = play.touch;
+			const dt = step(p, c);
+			t += dt;
+			if (phase === 1) since += dt;
+		}
+		if (Math.abs(p.pos.y - goalY) < tol && p.grounded) ok++;
+	}
+	return ok;
+}
+function bounces(name: string, b: Bounce, min: number) {
+	// The key is let go once Rayou is up on the cap, before the bounce.
+	const tap: Play = { ...KEY, name: 'key let go before the bounce', hold: 0.25 };
+	const [key, keyTap, phone] = [bounceTo(b), as(tap, () => bounceTo(b)), as(PHONE[0], () => bounceTo(b))];
+	expect(name, Math.min(key, keyTap, phone) >= min, `${key} leads work, ${tap.name} ${keyTap}, ${PHONE[0].name} ${phone}`);
+}
+
+// — Jump height: a touch jump stays whole even when the tap ends during the landing buffer, a key let go
+// early still cuts it, and the frame rate changes nothing. —
+{
+	const ground = at(START.x, START.z);
+	const apex = (pl: Play, tapBeforeLanding: boolean) =>
+		as(pl, () => {
+			const p = mk(tapBeforeLanding ? { ...ground, y: ground.y! + 2 } : ground, 0);
+			p.grounded = !tapBeforeLanding;
+			events.length = 0;
+			let pressed = false, since = 0, top = -Infinity;
+			for (let t = 0; t < 2.5; ) {
+				const c: Command = { dirX: 0, dirZ: 0, jump: false, jumpHeld: false, fullJump: pl.touch, roll: false };
+				// From 2 m up, 0.8 m above the ground is about 0.1 s before landing: inside the 0.14 s buffer.
+				if (!pressed && (tapBeforeLanding ? !p.grounded && p.pos.y - ground.y! < 0.8 : t > 0.2)) c.jump = pressed = true;
+				c.jumpHeld = pressed && since < pl.hold;
+				const dt = step(p, c);
+				t += dt;
+				if (pressed) since += dt;
+				if (events.includes('jump')) top = Math.max(top, p.pos.y);
+			}
+			return top - ground.y!;
+		});
+	const held = apex(KEY, false);
+	const tapTouch = apex({ ...PHONE[0], frame: 1 / 60 }, true);
+	const tapKey = apex({ ...KEY, hold: 0.1 }, false);
+	const at20 = apex({ ...KEY, frame: 1 / 20 }, false);
+	expect('a touch tap in the landing buffer jumps as high as a held key', Math.abs(tapTouch - held) < 0.02, `${tapTouch.toFixed(2)} m vs ${held.toFixed(2)} m`);
+	expect('a key let go early still cuts the jump', tapKey < held - 0.1, `${tapKey.toFixed(2)} m vs ${held.toFixed(2)} m`);
+	expect('20 fps jumps as high as 60 fps', Math.abs(at20 - held) < 0.005, `${at20.toFixed(3)} m vs ${held.toFixed(3)} m`);
 }
 
 // — Mushrooms: walking or jumping onto one never puts Rayou inside the cap, and a jump bounces. —
@@ -243,26 +385,7 @@ for (const b of zones.bouncers) {
 	pts.push(at(cx, cz));
 	chain('stump spiral', pts);
 	const px = -62, pz = -22;
-	const mush = at(px + 2.6, pz + 1.0);
-	// Hop onto the mushroom, bounce, steer onto the pillar.
-	let best = 0;
-	for (let lead = 0.6; lead <= 2.6; lead += 0.2) {
-		const p = mk(at(px + 5.5, pz + 1.0), -Math.PI / 2);
-		let phase = 0;
-		for (let i = 0; i < 400; i++) {
-			const target = phase === 0 ? mush : { x: px, z: pz };
-			const c = toward(p, target);
-			const d = Math.hypot(mush.x - p.pos.x, mush.z - p.pos.z);
-			if (phase === 0 && d < lead) {
-				c.jump = true;
-				phase = 1;
-			}
-			c.jumpHeld = true;
-			step(p, c);
-		}
-		if (Math.abs(p.pos.y - (groundHeight(px, pz) + 4.0)) < 0.2 && p.grounded) best++;
-	}
-	expect('forest bounce to pillar', best >= 2, `${best} leads work`);
+	bounces('forest bounce to pillar', { start: at(px + 5.5, pz + 1.0), yaw: -Math.PI / 2, mush: at(px + 2.6, pz + 1.0), goal: { x: px, z: pz }, goalY: groundHeight(px, pz) + 4.0, tol: 0.2 }, 2);
 
 	// Hollow log and corral: crawl under by rolling.
 	const log = mk(at(-42.8, -15.5), 0);
@@ -307,7 +430,8 @@ for (const b of zones.bouncers) {
 		at(shedX - 1.5, shedZ + 0.9),
 		{ x: MILL.x + 2.95, z: MILL.z + 0.4, y: G + 5.0 },
 		...([[-0.55, 5.8], [-1.3, 6.6], [-2.05, 7.4]] as const).map(([a, t]) => ({ x: MILL.x + Math.cos(a) * 2.85, z: MILL.z + Math.sin(a) * 2.85, y: G + t })),
-		{ x: MILL.x - 1.45, z: MILL.z + 0.4, y: G + 8 },
+		// Onto the tower top, beside the last ledge: the kite is a walk from there.
+		{ x: MILL.x + Math.cos(-2.05) * 1.7, z: MILL.z + Math.sin(-2.05) * 1.7, y: G + 8 },
 	];
 	// The balcony walk between the barrel landing and the first ledge.
 	route.splice(7, 0, { x: MILL.x + Math.cos(-0.1) * 2.95, z: MILL.z + Math.sin(-0.1) * 2.95, y: G + 5.0 });
@@ -328,28 +452,11 @@ chain('lake west', [at(4.6, 49.6), at(3.0, 50.9), at(0.6, 52.6), at(-2.3, 52.0),
 	expect('peak entrance ramp', Math.abs(ramp.pos.y - ringLevel(0)) < 0.05, `y ${ramp.pos.y.toFixed(2)}`);
 	chain('peak crates', [onRing(24.6, -1.75, 0), { ...mountPoint(24.6, -1.56), y: 2.8 }, { ...mountPoint(24.0, -1.475), y: 3.6 }, { ...mountPoint(23.5, -1.395), y: 4.4 }, onRing(22.2, -1.395, 1)]);
 	// Chasms: plain jumps on rings 2 and 4, roll jump on ring 6.
-	expect('ring 2 chasm', jumpWindow(onRing(18.5, 1.3, 2), onRing(18.5, 1.72, 2)) >= 3);
-	expect('ring 4 chasm', jumpWindow(onRing(12.5, -0.85, 4), onRing(12.5, -0.35, 4)) >= 3);
-	expect('ring 6 chasm needs a roll jump', jumpWindow(onRing(6.5, 2.4, 6), onRing(6.5, -2.75, 6)) === 0);
-	expect('ring 6 chasm roll jump', jumpWindow(onRing(6.5, 2.2, 6), onRing(6.5, -2.75, 6), true) >= 2, `${jumpWindow(onRing(6.5, 2.2, 6), onRing(6.5, -2.75, 6), true)}`);
-	// Mushroom bounce from ring 2 to ring 3.
-	let ok = 0;
-	for (let lead = 0.6; lead <= 2.6; lead += 0.2) {
-		const m = mountPoint(18.6, 2.4);
-		const p = mk(onRing(19.6, 2.25, 2), 0);
-		let phase = 0;
-		for (let i = 0; i < 400; i++) {
-			const c = toward(p, phase === 0 ? m : mountPoint(15.5, 2.4));
-			if (phase === 0 && Math.hypot(m.x - p.pos.x, m.z - p.pos.z) < lead) {
-				c.jump = true;
-				phase = 1;
-			}
-			c.jumpHeld = true;
-			step(p, c);
-		}
-		if (Math.abs(p.pos.y - ringLevel(3)) < 0.1) ok++;
-	}
-	expect('peak mushroom to ring 3', ok >= 3, `${ok} leads`);
+	doable('ring 2 chasm', onRing(18.5, 1.3, 2), onRing(18.5, 1.72, 2));
+	doable('ring 4 chasm', onRing(12.5, -0.85, 4), onRing(12.5, -0.35, 4));
+	impossible('ring 6 chasm needs a roll jump', onRing(6.5, 2.4, 6), onRing(6.5, -2.75, 6));
+	doable('ring 6 chasm roll jump', onRing(6.5, 2.2, 6), onRing(6.5, -2.75, 6), true, 2);
+	bounces('peak mushroom to ring 3', { start: onRing(19.6, 2.25, 2), yaw: 0, mush: mountPoint(18.6, 2.4), goal: mountPoint(15.5, 2.4), goalY: ringLevel(3), tol: 0.1 }, 3);
 	// Slab: walking blocked, rolling passes onto the ramp, ramp reaches ring 4.
 	const s0 = onRing(15.5, -2.35, 3);
 	const walk = mk(s0, 0);

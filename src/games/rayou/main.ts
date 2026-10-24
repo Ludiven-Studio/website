@@ -4,7 +4,7 @@ import { buildZones, type P3, type ClimbSpot } from './zones';
 import { createTiger } from './tiger';
 import { createFeuille, createOwl, createBeaver, createHedgehog, createRabbit, createFrog, type Npc, type Mood } from './critters';
 import { createInput } from './input';
-import { Player, RUN, type Command } from './player';
+import { Player, RUN, physicsSteps, type Command } from './player';
 import { createFx } from './fx';
 import { Audio } from './audio';
 import { Hud, type Objective, type MapMarker, type BagItem } from './hud';
@@ -1416,7 +1416,6 @@ export function start(): void {
 			pressed.action = pressed.jump = false;
 		}
 
-		zones.update(dt, time, player.grounded ? player.support : null);
 		const locked = !playing || !!dialog || !!finale;
 		let cmd: Command = { dirX: 0, dirZ: 0, jump: false, jumpHeld: false, roll: false };
 		if (!locked) {
@@ -1428,11 +1427,13 @@ export function start(): void {
 			// Away from platforms the frame drifts back to the screen, so a long hold stays intuitive.
 			else if (!platformingNow) steerYaw += Math.atan2(Math.sin(camYaw - steerYaw), Math.cos(camYaw - steerYaw)) * Math.min(1, dt * 1.5);
 			const sy = steerYaw;
+			const jumped = input.consumeJump();
 			cmd = {
 				dirX: -Math.sin(sy) * my + Math.cos(sy) * mx,
 				dirZ: -Math.cos(sy) * my - Math.sin(sy) * mx,
-				jump: input.consumeJump() || pressed.jump,
+				jump: jumped || pressed.jump,
 				jumpHeld: input.jumpHeld || pressed.jump || holdJump,
+				fullJump: jumped && input.jumpTap,
 				roll: input.consumeRoll() || pressed.roll,
 			};
 			if (drive) {
@@ -1441,8 +1442,12 @@ export function start(): void {
 			}
 			pressed.jump = pressed.roll = false;
 		} else input.consumeRoll();
+		const n = physicsSteps(dt);
+		for (let k = 1; k <= n; k++) {
+			zones.update(dt / n, time - dt + (k * dt) / n, player.grounded ? player.support : null);
+			if (!climb) player.update(dt / n, k > 1 ? { ...cmd, jump: false, roll: false } : cmd);
+		}
 		if (climb) updateClimb(dt);
-		else player.update(dt, cmd);
 		updateFinale(dt);
 
 		if (playing) {

@@ -90,9 +90,9 @@ import GamePage from '../../layouts/GamePage.astro';
 						<ul class="ry-controls ry-mob">
 							<li><span>Pouce à gauche</span>Courir</li>
 							<li><span>Doigt à droite</span>Tourner la caméra</li>
-							<li><span><b class="ry-ico-btn">⤒</b></span>Sauter (garder appuyé : plus haut)</li>
+							<li><span><b class="ry-ico-btn">⤒</b></span>Sauter</li>
 							<li><span><b class="ry-ico-btn">⟳</b></span>Rouler en boule : passer sous les obstacles bas, casser ce qui est fendu</li>
-							<li><span><b class="ry-ico-btn">⟳</b> puis <b class="ry-ico-btn">⤒</b></span>Saut roulé : sauter bien plus loin</li>
+							<li><span><b class="ry-ico-btn">⟳</b> puis <b class="ry-ico-btn">⤒</b></span>Saut roulé : sauter bien plus loin (le pouce peut glisser de l’un à l’autre)</li>
 							<li><span><b class="ry-ico-btn ry-yellow">Parler</b></span>Le bouton jaune : parler, ramasser, grimper</li>
 							<li><span>Bandeau ★</span>Toucher pour changer d’objectif suivi</li>
 						</ul>
@@ -545,6 +545,14 @@ import GamePage from '../../layouts/GamePage.astro';
 		background: rgba(255, 250, 240, 0.88);
 		box-shadow: 0 4px 14px rgba(80, 50, 20, 0.25);
 		touch-action: none;
+	}
+
+	/* A thumb landing just off a button still presses it instead of turning the camera. */
+	.ry-touch-btn::before {
+		content: '';
+		position: absolute;
+		inset: -8px;
+		border-radius: 50%;
 	}
 
 	.ry-touch-btn small {
