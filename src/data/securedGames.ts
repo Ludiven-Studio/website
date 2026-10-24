@@ -62,6 +62,7 @@ export const SECURED_GAMES: Record<string, Metric> = {
 	'angry-t': 'time',
 	'billard-t': 'time',
 	'bulles-t': 'time',
+	'eclats-t': 'time',
 	'flechettes-t': 'time',
 	'reussite-t': 'time',
 	'souffle-t': 'time',

@@ -17,9 +17,11 @@ interface Props {
 	/** Shown as the shared popup (title, close, scroll) rather than laid in the page. The close
 	    goes back to what the grid was opened over: see useLevels().close. */
 	onClose?: () => void;
+	/** Optional headings over runs of levels (a game's worlds), each placed before level `from`. */
+	sections?: { from: number; title: string }[];
 }
 
-function LevelSelectInner({ progress, onPick, title, lang = 'fr' }: Props) {
+function LevelSelectInner({ progress, onPick, title, lang = 'fr', sections }: Props) {
 	const count = progress.count ?? LEVEL_COUNT;
 	const unlocked = unlockedUpTo(progress);
 	const totalStars = Object.values(progress.stars).reduce((a, b) => a + b, 0);
@@ -33,7 +35,8 @@ function LevelSelectInner({ progress, onPick, title, lang = 'fr' }: Props) {
 					const level = i + 1;
 					const stars: 0 | 1 | 2 | 3 = progress.stars[level] ?? 0;
 					const locked = level > unlocked;
-					return (
+					const section = sections?.find((x) => x.from === level);
+					const tile = (
 						<button
 							key={level}
 							role="listitem"
@@ -58,6 +61,7 @@ function LevelSelectInner({ progress, onPick, title, lang = 'fr' }: Props) {
 							)}
 						</button>
 					);
+					return section ? [<h3 key={`s${level}`} className="ls-section">{section.title}</h3>, tile] : tile;
 				})}
 			</div>
 		</div>
@@ -111,5 +115,7 @@ const CSS = `
 .ls-lock { font-size: 17px; opacity: 0.7; }
 .ls-stars { display: inline-flex; gap: 1px; font-size: 10px; line-height: 1; color: var(--gray-600); }
 .ls-stars .on { color: #f5a623; }
+.ls-section { grid-column: 1 / -1; margin: 10px 0 0; font-family: var(--font-brand); font-size: 14px; font-weight: 700; color: var(--gray-100); }
+.ls-section:first-child { margin-top: 0; }
 @media (prefers-reduced-motion: reduce) { .ls-tile { transition: none; } }
 `;

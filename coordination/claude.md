@@ -612,3 +612,29 @@
   build (fichier statique hors précache)
 - 17:19 : commité et poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé.
   Réservations libérées.
+
+## 2026-10-25 — Éclats : nouveau mini-jeu (session website)
+- Statut : en cours (2026-10-25T00:13+02:00). Demande de l'utilisateur : nouveau mini-jeu « Éclats » : pièces qui
+  tombent (Tetris), alignements de 3 (Candy Crush), trésors à déduire sous le sol (Démineur) ; mondes, gemmes
+  spéciales, boosters, étoiles, défi du jour, mode infini
+- Réservations actives : `src/games/eclats/` (nouveau), `src/pages/jeux/eclats.astro` (nouveau), `src/data/games.ts`,
+  `src/data/dailyLb.ts`, `src/data/securedGames.ts`, `src/data/tutorials.ts`, `src/components/IconPaths.ts`,
+  `src/components/LevelSelect.tsx` (sections de mondes, option), `src/games/levels.stress.test.ts`,
+  `supabase/migrations/20261025120000_eclats.sql` (nouveau), `scripts/check-eclats.mjs` (nouveau),
+  `.collab/tickets/0036-eclats-regles.md` (nouveau), `.collab/LOG.md`.
+- Ressources : serveur de dev sur le port 4473 ; eslint, `astro check`. Build annoncé ici avant.
+- 00:42 : moteur + robot + 200 niveaux (picks.ts) + écran faits ; vitest 346/346, check-eclats.mjs OK hors image
+  manquante. Réservations ajoutées pour l'image du jeu : `scripts/generate-og.mjs` (une entrée DRIVES),
+  `scripts/thumb-themes.mjs` (une ligne), `scripts/eclats-levels.ts` (nouveau), `public/assets/jeux/eclats.jpg`,
+  `public/assets/jeux/og/eclats.jpg`, `public/assets/jeux/art/eclats.jpg`, `public/assets/jeux/tile/eclats.jpg`
+  (nouveaux). ComfyUI lancé en local pour le décor.
+- 00:42 : Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 00:49 : image du jeu faite (capture + décor ComfyUI, ComfyUI arrêté) ; check-eclats.mjs passe sans erreur. Lancement
+  du build complet (écrit dist/, .astro/, public/vendor/)…
+- 00:50 : build complet OK : astro check 0 erreur, 153 pages, précache 310 entrées, liens OK. Fait et vérifié, pas de
+  commit : en attente du feu vert de l'utilisateur (et de son accord pour pousser la migration Supabase `eclats` /
+  `eclats-t`).
+- 00:55 : migration Supabase `20261025120000_eclats.sql` poussée en production à la demande de l'utilisateur (dry-run :
+  elle seule en attente) ; migration list : appliquée.
+- 00:55 : commité et poussé à la demande de l'utilisateur : mes 25 fichiers et cette section seulement. Statut :
+  terminé. Réservations libérées.

@@ -123,6 +123,14 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '💡', title: 'Astuce', body: 'Commence par les bords : un tuyau ne peut pas sortir de la grille, donc les tuiles du contour n\'ont souvent qu\'une seule orientation possible. Puis remonte le courant depuis le générateur.' },
 		{ emoji: '🔁', title: 'Expert', body: 'En Expert et à partir du niveau 101, les bords bouclent : un tuyau qui sort à droite ressort à gauche. Les indices du contour disparaissent — tout se déduit du réseau lui-même.' },
 	],
+	eclats: [
+		{ emoji: '💎', title: 'Le but', body: 'Des gemmes tombent sur le plateau, et sous le plateau le sol cache des trésors. Déterre-les tous avant que la pile n’atteigne le haut.' },
+		{ emoji: '👆', title: 'Comment jouer', body: 'Glisse le doigt sur le plateau pour déplacer la pièce, touche-le pour la tourner, glisse vite vers le bas pour la lâcher. Ou les boutons ◀ ⟳ ▶ ⤓ ; au clavier, les flèches, ↑ pour tourner, Espace pour lâcher. L’ombre montre où la pièce tombera.' },
+		{ emoji: '⛏️', title: 'Creuser', body: 'Trois gemmes de la même couleur alignées éclatent. Chaque gemme qui éclate creuse une case du sol sous sa colonne : une ligne couchée creuse trois colonnes, une ligne debout creuse trois cases d’une même colonne.' },
+		{ emoji: '🔢', title: 'Les chiffres', body: 'Une case creusée montre combien de trésors se cachent dans les 8 cases autour d’elle, ceux déjà trouvés compris. Touche une case du sol pour y planter un drapeau.' },
+		{ emoji: '💣', title: 'Gemmes spéciales', body: '4 gemmes alignées laissent une bombe, qui emporte tout autour d’elle. 5 laissent un arc-en-ciel : il remplace n’importe quelle couleur, et quand il éclate, toutes les gemmes de cette couleur éclatent avec lui.' },
+		{ emoji: '🎁', title: 'Les bonus', body: 'Chaque trésor donne un bonus : ⛏️ la pioche creuse la case de ton choix, 📡 le radar montre une case sans la creuser, ⏳ le sablier ralentit la chute. Tu commences avec une pioche : garde-la pour le trésor que tu as deviné.' },
+	],
 	bulles: [
 		{ emoji: '🫧', title: 'Le but', body: 'Un radeau de bulles de couleur est accroché en haut de l\'écran. Vide-le entièrement, en un minimum de tirs.' },
 		{ emoji: '👆', title: 'Comment jouer', body: 'Glisse le doigt (ou la souris) pour orienter le canon, relâche pour tirer. La bulle part, se colle où elle arrive, et le tir suivant se charge tout seul.' },

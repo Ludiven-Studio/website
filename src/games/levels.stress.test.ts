@@ -24,6 +24,7 @@ import { cocottesRenardsLevels } from './cocottes-renards/levels';
 import { codecolorLevels } from './codecolor/levels';
 import { colorgrammeLevels } from './colorgramme/levels';
 import { cordesLevels } from './cordes/levels';
+import { eclatsLevels } from './eclats/levels';
 import { demineurLevels } from './demineur/levels';
 import { driftLevels } from './drift/levels';
 import { esquiveLevels } from './esquive/levels';
@@ -82,6 +83,7 @@ const PLANS: [string, LevelPlan<any>][] = [
 	['colorgramme', colorgrammeLevels],
 	['cordes', cordesLevels],
 	['demineur', demineurLevels],
+	['eclats', eclatsLevels],
 	['drift', driftLevels],
 	['esquive', esquiveLevels],
 	['flappy', flappyLevels],
@@ -151,7 +153,7 @@ afterAll(() => vi.unstubAllGlobals());
 describe('level plans, Expert pack on', () => {
 	it('covers every game that ships a plan', () => {
 		expect(new Set(PLANS.map(([id]) => id)).size).toBe(PLANS.length);
-		expect(PLANS.length).toBe(54);
+		expect(PLANS.length).toBe(55);
 	});
 
 	for (const [id, plan] of PLANS) {

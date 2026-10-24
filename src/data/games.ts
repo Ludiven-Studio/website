@@ -178,6 +178,15 @@ export const games: GameTile[] = [
 		category: 'adresse',
 	},
 	{
+		id: 'eclats',
+		title: 'Éclats',
+		pitch: 'Place les gemmes qui tombent, aligne-en trois pour les faire éclater et creuse le sol : ses chiffres disent combien de trésors se cachent autour. Déterre-les tous avant que la pile touche le haut.',
+		icon: 'eclats',
+		href: '/jeux/eclats/',
+		status: 'play',
+		category: 'adresse',
+	},
+	{
 		id: 'suite',
 		title: 'Suite mystère',
 		pitch: 'Devine la règle cachée et complète la séquence. En choix multiple.',

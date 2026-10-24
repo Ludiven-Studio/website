@@ -1,0 +1,14 @@
+---
+import GamePage from '../../layouts/GamePage.astro';
+import EclatsGame from '../../games/eclats/EclatsGame.tsx';
+---
+
+<GamePage
+	title="Éclats | Jeux Ludiven Studio"
+	description="Éclats : place les gemmes qui tombent, aligne-en trois pour les faire éclater et creuse le sol. Ses chiffres disent combien de trésors se cachent autour : déterre-les tous avant que la pile touche le haut. Cinq mondes, 100 niveaux, un défi du jour et un mode infini. Un jeu signé Ludiven Studio."
+	heading="Éclats"
+	tagline="Aligne, fais éclater, creuse : trouve les trésors"
+	gameId="eclats"
+>
+	<EclatsGame client:only="react" gameId="eclats" />
+</GamePage>
