@@ -549,3 +549,13 @@
 - 03:43 : build OK (152 pages), précache 308 entrées, liens 164 pages
 - 03:43 : commité à la demande de l'utilisateur : mon fichier et cette section seulement. Push en attente : main porte
   aussi le commit non poussé de la session Petanque AR (e9f5228). Statut : terminé. Réservations libérées.
+
+## 2026-10-24 — Pétanque Meet : 0.1.6 sur Google Play, version.json (session PetanqueMeet)
+- Statut : en cours (2026-10-24T09:57+02:00). Demande de l'utilisateur : la 0.1.6 est validée sur Google Play, pas
+  encore sur l'App Store : passer latest_android à 0.1.6
+- Réservations actives : `public/petanque-meet/version.json`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 09:58 : latest_android 0.1.5 → 0.1.6 ; latest_ios et min restent à 0.1.5 (App Store pas encore validé). JSON valide,
+  même forme. Pas de build (fichier statique hors précache)
+- 09:58 : commité et poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé.
+  Réservations libérées.
