@@ -559,3 +559,13 @@
   même forme. Pas de build (fichier statique hors précache)
 - 09:58 : commité et poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé.
   Réservations libérées.
+
+## 2026-10-24 — Pétanque Scanner : 1.2.12 sur Google Play, version.json (session Petanque AR)
+- Statut : en cours (2026-10-24T10:30+02:00). Demande de l'utilisateur : la 1.2.12 est disponible sur Google Play, pas
+  encore sur l'App Store : passer latest_android à 1.2.12
+- Réservations actives : `public/petanque-scanner/version.json`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 10:30 : latest_android 1.2.11 → 1.2.12 ; latest_ios et min inchangés (App Store pas encore validé). JSON valide, même
+  forme. Pas de build (fichier statique hors précache)
+- 10:30 : commité et poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé.
+  Réservations libérées.
