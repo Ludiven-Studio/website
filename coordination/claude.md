@@ -531,3 +531,21 @@
   dist/petanque-scanner/promo/ contient les 6 fichiers, identiques aux sources
 - 03:39 : commité à la demande de l'utilisateur, non poussé : mes 6 fichiers et cette section seulement. Statut :
   terminé. Réservations libérées.
+
+## 2026-10-24 — Pétanque Meet : confidentialité, statistiques Umami et bandeau Scanner (0.1.6) (session PetanqueMeet)
+- Statut : en cours (2026-10-24T01:29+02:00). Demande de l'utilisateur : corriger la politique de confidentialité de
+  l'appli avant la sortie de la 0.1.6
+- Réservations actives : `src/pages/petanque-meet/confidentialite.astro`.
+- Ressources : serveur de dev sur le port 4493 ; eslint, `astro check`. Build annoncé ici avant.
+- 01:32 : §8 : statistiques reliées ni au compte ni à l'identité, IP vue et ville déduite, regroupement d'un mois au
+  plus, même compte que Pétanque Scanner ; §9 : bandeau Pétanque Scanner quand Google ne sert rien ; §4 et §11 « sans
+  compte ni identifiant » au lieu d'« anonymes » ; date au 24 octobre. eslint OK, astro check 0 erreur, capture bureau
+  sans erreur console (serveur 4493 arrêté). Lancement du build complet (écrit dist/, .astro/, public/vendor/), puis
+  check-precache et check-links
+- 01:33 : build OK, précache et liens OK. Statut : terminé, non commité (en attente de l'utilisateur). Réservation
+  gardée jusqu'au commit.
+- 03:41 : §12 : statistiques d'usage effacées par Umami au bout de 6 mois (offre gratuite Hobby, umami.is/pricing).
+  Lancement du build complet (écrit dist/, .astro/, public/vendor/), puis check-precache et check-links
+- 03:43 : build OK (152 pages), précache 308 entrées, liens 164 pages
+- 03:43 : commité à la demande de l'utilisateur : mon fichier et cette section seulement. Push en attente : main porte
+  aussi le commit non poussé de la session Petanque AR (e9f5228). Statut : terminé. Réservations libérées.

@@ -18,7 +18,7 @@ import Hero from '../../components/Hero.astro';
 			Cette politique concerne <strong>l'application mobile Pétanque Meet</strong>
 			(<code>com.ludivenstudio.petanquemeet</code>) et la carte des rencontres qu'elle partage avec le site
 			(<a href="/petanque-meet/">ludiven-studio.fr/petanque-meet</a>). Le reste du site a sa
-			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 22 octobre 2026.
+			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 24 octobre 2026.
 		</p>
 
 		<div class="summary">
@@ -153,7 +153,7 @@ import Hero from '../../components/Hero.astro';
 							<td>IGN (Géoplateforme) et komoot (Photon)&nbsp;: chaque recherche part aux deux</td>
 						</tr>
 						<tr>
-							<td>Statistiques d'usage anonymes (voir §8)</td>
+							<td>Statistiques d'usage, sans compte ni identifiant (voir §8)</td>
 							<td>Savoir quelles fonctions servent et améliorer l'application</td>
 							<td>Intérêt légitime</td>
 							<td>Umami Cloud</td>
@@ -241,9 +241,17 @@ import Hero from '../../components/Hero.astro';
 				l'écran et le modèle de téléphone.
 			</p>
 			<p>
-				<strong>Aucun</strong> prénom, identifiant de compte, adresse mail, position, texte de recherche ni
-				identifiant d'annonce n'y figure. Ces statistiques ne permettent pas de te reconnaître ni de te suivre
-				d'un jour à l'autre.
+				<strong>Aucun</strong> prénom, identifiant de compte, adresse mail, position GPS, texte de recherche ni
+				identifiant d'annonce n'y figure. Ces statistiques ne sont reliées ni à ton compte ni à ton identité.
+			</p>
+			<p>
+				Comme tout service web, Umami voit l'adresse IP de ton téléphone. Il ne la conserve pas, mais en
+				déduit le pays, la région et la ville. Pour compter les visiteurs, il regroupe les actions faites
+				depuis une même connexion et un même modèle de téléphone, pendant un mois calendaire au plus.
+			</p>
+			<p>
+				Ces statistiques sont rangées dans le même compte que celles de Pétanque Scanner, notre autre
+				application, chaque application à part.
 			</p>
 		</section>
 
@@ -251,7 +259,10 @@ import Hero from '../../components/Hero.astro';
 			<h2>9. Publicité</h2>
 			<p>
 				L'application affiche une <strong>bannière publicitaire</strong> en haut de l'écran. Elle est fournie
-				par <strong>Google AdMob</strong> et finance le service, qui reste gratuit.
+				par <strong>Google AdMob</strong> et finance le service, qui reste gratuit. Quand Google ne fournit
+				aucune annonce, la bannière présente à la place Pétanque Scanner, notre autre application&nbsp;: la
+				toucher ouvre sa fiche sur le store. Rien d'autre n'est envoyé, sinon le fait que la bannière a été
+				touchée (voir §8).
 			</p>
 			<p>
 				Pour afficher les annonces, les mesurer et lutter contre la fraude, le module de Google reçoit
@@ -311,7 +322,7 @@ import Hero from '../../components/Hero.astro';
 				<li><strong>komoot</strong> (service Photon, Allemagne) — recherche de lieux dans le monde&nbsp;: chaque recherche lui est envoyée, avec le centre de la carte affichée arrondi à une dizaine de kilomètres et la langue de l'application.</li>
 				<li><strong>Fondation OpenStreetMap</strong> — nom d'un nouveau terrain (service Nominatim). Seules les coordonnées du terrain lui sont envoyées, par notre serveur.</li>
 				<li><strong>Resend</strong> — envoi des e-mails de modération et des réponses aux demandes «&nbsp;C'est mon club&nbsp;».</li>
-				<li><strong>Umami Software, Inc.</strong> — statistiques d'usage anonymes.</li>
+				<li><strong>Umami Software, Inc.</strong> — statistiques d'usage, sans compte ni identifiant (voir §8).</li>
 			</ul>
 			<p>
 				Le bouton «&nbsp;Itinéraire&nbsp;» ouvre Google Maps ou Plans (Apple) avec l'adresse du terrain. Le
@@ -335,6 +346,7 @@ import Hero from '../../components/Hero.astro';
 				<li><strong>Demandes «&nbsp;C'est mon club&nbsp;»</strong>&nbsp;: gardées avec ton compte, effacées quand tu le supprimes.</li>
 				<li><strong>Compteurs anti-abus</strong>&nbsp;: effacés au bout de 30 jours.</li>
 				<li><strong>Suspension d'un compte</strong>&nbsp;: l'identifiant technique est conservé tant que la suspension dure.</li>
+				<li><strong>Statistiques d'usage</strong>&nbsp;: effacées par Umami au bout de <strong>6 mois</strong>.</li>
 				<li><strong>Compte</strong>&nbsp;: jusqu'à ce que tu le supprimes.</li>
 			</ul>
 		</section>
