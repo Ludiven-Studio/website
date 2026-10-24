@@ -592,3 +592,13 @@
 - 16:31 : build complet OK : astro check 0 erreur, 152 pages, précache 308 entrées, liens OK
 - 16:31 : commité et poussé à la demande de l'utilisateur : mes 12 fichiers et cette section seulement. Statut :
   terminé. Réservations libérées.
+
+## 2026-10-24 — Pétanque Meet : 0.1.6 sur l'App Store, version.json (session PetanqueMeet)
+- Statut : en cours (2026-10-24T17:18+02:00). Demande de l'utilisateur : Apple a validé la 0.1.6 : passer latest_ios à
+  0.1.6
+- Réservations actives : `public/petanque-meet/version.json`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 17:18 : latest_ios 0.1.5 → 0.1.6 ; min reste à 0.1.5. JSON valide, même forme. Pas de build (fichier statique hors
+  précache)
+- 17:18 : commité et poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé.
+  Réservations libérées.
