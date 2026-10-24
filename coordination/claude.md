@@ -602,3 +602,13 @@
   précache)
 - 17:18 : commité et poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé.
   Réservations libérées.
+
+## 2026-10-24 — Pétanque Scanner : 1.2.12 sur l'App Store, version.json (session PetanqueMeet)
+- Statut : en cours (2026-10-24T17:19+02:00). Demande de l'utilisateur : Apple a validé les versions de Scanner et de
+  Meet : passer latest_ios de Scanner à 1.2.12
+- Réservations actives : `public/petanque-scanner/version.json`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 17:19 : latest_ios 1.2.11 → 1.2.12 ; latest_android déjà à 1.2.12, min inchangé. JSON valide, même forme. Pas de
+  build (fichier statique hors précache)
+- 17:19 : commité et poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé.
+  Réservations libérées.
