@@ -809,3 +809,14 @@
 - Ressources : eslint, `astro check`. Build annoncé ici avant.
 - 20:35 : les 2 images retenues et intégrées dans l'app Unity ; commité et poussé à la demande de l'utilisateur : le
   ticket, la ligne du LOG et cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-10-25 — Dragon's Gems Swipe : page de test de l'APK Android (session website)
+- Statut : en cours (2026-10-25T20:42+01:00). Demande de l'utilisateur : le mettre à disposition comme Pétanque Game,
+  pour le recharger depuis une page du site
+- Réservations actives : `src/pages/jeux/eclats/test.astro` (nouveau).
+- Ressources : serveur de dev sur le port 4474 ; eslint, `astro check`. Build annoncé ici avant.
+- 20:45 : page écrite (copie de celle de Pétanque Game, manifeste builds/dragonsgems/latest.json), eslint et astro
+  check OK, capture téléphone OK (elle propose la 0.1.1 publiée). Lancement du build complet (écrit dist/, .astro/,
+  public/vendor/)…
+- 20:46 : build complet OK ; APK 0.1.1 publié (builds/dragonsgems) ; commité et poussé à la demande de l'utilisateur :
+  mon fichier et cette section seulement. Statut : terminé. Réservations libérées.
