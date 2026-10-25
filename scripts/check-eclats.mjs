@@ -107,6 +107,15 @@ try {
 			s.status === 'won' ? s.hoard === s.butin && s.hoard > 0 : s.status === 'lost' && s.hoard === 0,
 			`${s.status}, loot ${s.butin}, treasure ${s.hoard}`,
 		);
+		if (s.status === 'won') {
+			// Bijou's two dance steps take turns: two at once looked like two dragons.
+			const seen = [];
+			for (let k = 0; k < 12; k++) {
+				seen.push(await page.evaluate(() => [...document.querySelectorAll('.ec-dance img')].filter((im) => getComputedStyle(im).display !== 'none' && Number(getComputedStyle(im).opacity) > 0.5).length));
+				await page.waitForTimeout(53);
+			}
+			check('Bijou dances as one dragon', seen.every((n) => n === 1), `visible steps per sample: ${seen.join('')}`);
+		}
 		await page.screenshot({ path: `${OUT}/desk-play.png` });
 		check('desktop: no page error', errors.length === 0, errors.slice(0, 3).join(' | ') || 'none');
 		await page.context().close();

@@ -1462,7 +1462,9 @@ const CSS = `
   margin-inline: auto; transform-origin: 50% 100%;
 }
 .ec-dance img { position: absolute; inset: 0; width: 100%; height: 100%; }
-.ec-dance img:nth-child(2) { animation: ec-swap 0.5s steps(1) infinite; }
+/* The two steps take turns: one shows while the other hides, never both. */
+.ec-dance img:nth-child(1) { animation: ec-step-a 0.5s steps(1) infinite; }
+.ec-dance img:nth-child(2) { animation: ec-step-b 0.5s steps(1) infinite; }
 .ec-hoardtag {
   position: absolute; left: 50%; bottom: 1px; transform: translateX(-50%); white-space: nowrap;
   background: rgba(16, 20, 30, 0.82); color: #ffe27a; border-radius: 999px; padding: 0 7px;
@@ -1628,11 +1630,14 @@ const CSS = `
 @keyframes ec-fly-up { 0% { transform: translateY(0); } 25% { transform: translateY(-22px) rotate(-6deg); } 50% { transform: translateY(-16px) rotate(5deg); } 75% { transform: translateY(-22px) rotate(-3deg); } 100% { transform: translateY(0); } }
 @keyframes ec-shiver { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-1.5px); } 75% { transform: translateX(1.5px); } }
 @keyframes ec-sway { from { transform: rotate(-6deg); } to { transform: rotate(6deg); } }
-@keyframes ec-swap { 0% { opacity: 0; } 50% { opacity: 1; } }
+@keyframes ec-step-a { 0% { opacity: 1; } 50% { opacity: 0; } 100% { opacity: 0; } }
+@keyframes ec-step-b { 0% { opacity: 0; } 50% { opacity: 1; } 100% { opacity: 1; } }
 @keyframes ec-grew { 0% { transform: scale(0.8); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) {
   .ec-cell { transition: none; }
   .ec-in, .ec-drop, .ec-grow, .ec-glow, .ec-pop, .ec-burst, .ec-sparkfly, .ec-shard, .ec-coin, .ec-fly, .ec-zone, .ec-wave, .ec-bolt, .ec-born, .ec-chain, .ec-label { animation-duration: 0.01s; }
   .ec-core, .ec-charged, .ec-rank.r2 > g > path, .ec-rank.r2 > g > circle:first-child, .ec-twinkle, .ec-halo, .ec-orbit, .ec-rays, .ec-comet-star, .ec-chest, .ec-preview, .ec-boardwrap.shake-a, .ec-boardwrap.shake-b, .ec-nudge, .ec-drake, .ec-dance img, .ec-pile { animation: none; }
+  .ec-dance img:nth-child(1) { animation: none; }
+  .ec-dance img:nth-child(2) { display: none; }
 }
 `;

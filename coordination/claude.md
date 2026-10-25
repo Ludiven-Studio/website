@@ -735,3 +735,12 @@
 - 12:49 : nom final « Dragon's Gems Swipe » (choix de l'utilisateur) ; commité et poussé à la demande de l'utilisateur
   : mes 34 fichiers et cette section seulement ; migration de remise à zéro poussée sur Supabase juste après la mise en
   ligne. Statut : terminé. Réservations libérées.
+
+## 2026-10-25 — Dragon's Gems Swipe : un seul dragon pendant la danse (session website)
+- Statut : en cours (2026-10-25T14:06+01:00). Demande de l'utilisateur : on dirait qu'il y a 2 dragons quand on finit
+  sur le site web
+- Réservations actives : `src/games/eclats/EclatsGame.tsx` (CSS de la danse).
+- Ressources : serveur de dev sur le port 4473 ; eslint, `astro check`. Build annoncé ici avant.
+- 14:13 : les deux pas de danse alternent (et un seul en mouvement réduit) ; check-eclats.mjs le vérifie (témoin : il
+  échoue sur le site en ligne, 2 dragons) ; commité, en attente du feu vert pour pousser : mes 2 fichiers et cette
+  section. Statut : terminé. Réservations libérées.
