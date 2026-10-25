@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import {
 	CENTRE_ORDER,
 	MAX_RANK,
@@ -56,8 +56,6 @@ const ARRIVE_MS = 150;
 const GLOW_MS = 120;
 const POP_MS = 300;
 const COMET_MS = 380;
-const HITSTOP_MS = 90; // the freeze before a slow-motion beat
-const SLOW = 2.5; // how much a slow-motion beat stretches time
 const SWIPE_PX = 16;
 const LB_ID = (gameId: string): string => `${gameId}-t`;
 const recordKey = (t: TierKey): string => `eclats-score-${t}`;
@@ -136,11 +134,71 @@ function unpackRun(saved: unknown, cfg: EclatsCfg): State | null {
 	return s;
 }
 
+/* ---------- Sprites ---------- */
+
+// Drawn by Codex (scripts/eclats-sprites.mjs). The flat drawings below stay as the fallback: while the
+// sprites load, offline (images are not precached), or if one is missing.
+const art = (name: string): string => `/assets/jeux/eclats/${name}.webp`;
+const SPRITES = [
+	...[0, 1, 2, 3, 4].flatMap((c) => [`gem-${c}`, `gem-${c}-r2`, `gem-${c}-r3`, `gem-${c}-r4`]),
+	'chest', 'chest-locked', 'rock', 'coin', 'fx-burst', 'fx-sparkle', 'fx-ring', 'fx-comet',
+];
+let spritesLoaded = false;
+const ArtCtx = createContext(false);
+
+/** True once every sprite has loaded; never switches halfway, so the board is all art or all flat. */
+function useSprites(): boolean {
+	const [ok, setOk] = useState(spritesLoaded);
+	useEffect(() => {
+		if (spritesLoaded) return;
+		let alive = true;
+		const load = (name: string): Promise<void> =>
+			new Promise((res, rej) => {
+				const im = new Image();
+				im.onload = () => res();
+				im.onerror = rej;
+				im.src = art(name);
+			});
+		Promise.all(SPRITES.map(load)).then(
+			() => {
+				spritesLoaded = true;
+				if (alive) setOk(true);
+			},
+			() => { /* keep the flat drawings */ },
+		);
+		return () => { alive = false; };
+	}, []);
+	return ok;
+}
+
+const gemSprite = (color: number, rank: number): string => art(rank >= 2 ? `gem-${color % 5}-r${Math.min(MAX_RANK, rank)}` : `gem-${color % 5}`);
+
 /* ---------- Drawing ---------- */
 
-/** A gem; each rank adds its mark (rim, halo, crown) so the rank reads still and without colour. */
+/** A gem; each rank adds its mark (glow, gold setting, crown) so the rank reads still and without colour. */
 function Gem({ color, rank }: { color: number; rank: number }) {
+	const withArt = useContext(ArtCtx);
 	const c = GEMS[color % GEMS.length];
+	if (withArt) {
+		return (
+			<g className={rank >= 2 ? `ec-rank r${rank}` : undefined}>
+				{rank >= 3 && <circle r={6.4} className="ec-halo art" fill="url(#ec-halo)" />}
+				{rank >= MAX_RANK && <path d={RAYS} className="ec-rays" />}
+				<image href={gemSprite(color, rank)} x={-5.4} y={-5.4} width={10.8} height={10.8} className={rank === 2 ? 'ec-charged' : undefined} />
+				{rank === 2 && (
+					<>
+						<image href={art('fx-sparkle')} x={1.8} y={-5.6} width={3.6} height={3.6} className="ec-twinkle" />
+						<image href={art('fx-sparkle')} x={-5.4} y={1.8} width={3} height={3} className="ec-twinkle t2" />
+					</>
+				)}
+				{rank === 3 && (
+					<g className="ec-orbit">
+						{[0, 1, 2].map((k) => <circle key={k} r={0.6} cx={Math.cos((k * Math.PI * 2) / 3) * 5.4} cy={Math.sin((k * Math.PI * 2) / 3) * 5.4} />)}
+					</g>
+				)}
+			</g>
+		);
+	}
 	const cut = CUTS[color % CUTS.length];
 	const rim = rank >= 2 ? '#fff' : c.dark;
 	const scale = [1, 1, 1.06, 1.1, 1.06][Math.min(MAX_RANK, rank)];
@@ -174,6 +232,14 @@ function Gem({ color, rank }: { color: number; rank: number }) {
 }
 
 function Piece({ b, small = false }: { b: Pick<Block, 'kind' | 'color' | 'ice' | 'lock' | 'rank'>; small?: boolean }) {
+	const withArt = useContext(ArtCtx);
+	if (withArt && b.kind !== 'gem') {
+		return (
+			<g className={b.kind === 'chest' && !small ? 'ec-chest' : undefined}>
+				<image href={art(b.kind === 'rock' ? 'rock' : b.lock ? 'chest-locked' : 'chest')} x={-5} y={-5} width={10} height={10} />
+			</g>
+		);
+	}
 	if (b.kind === 'rock') {
 		return (
 			<g>
@@ -220,7 +286,6 @@ const CENTRE = CENTRE_ORDER[0];
 
 interface Fx {
 	id: number;
-	t: number; // time stretch of this beat: 1, or SLOW in slow motion
 	pops: { cell: number; color: number; kind: Kind; rank: number; delay: number; into: number }[];
 	zones: { cell: number; rank: number; delay: number }[]; // charged gems going off
 	bolts: { from: number; to: number; delay: number }[]; // a crown striking every gem of its colour
@@ -229,7 +294,7 @@ interface Fx {
 }
 
 /** When each thing of a wave goes: the group from its leading cell outward, blasts by distance, a comet's catch once it lands. */
-function timeFx(step: Burst, t: number): Omit<Fx, 'id'> {
+function timeFx(step: Burst): Omit<Fx, 'id'> {
 	const order = new Map<number, number>();
 	step.groups.forEach((g) => g.forEach((cell, k) => order.set(cell, Math.min(6, k) * 28)));
 	const near = (cell: number, late: boolean): number => {
@@ -238,21 +303,20 @@ function timeFx(step: Burst, t: number): Omit<Fx, 'id'> {
 		const d = Math.min(...from.map((z) => Math.max(Math.abs((z.cell % N) - (cell % N)), Math.abs(Math.floor(z.cell / N) - Math.floor(cell / N)))));
 		return 60 + d * 35;
 	};
-	const delayOf = (cell: number, late: boolean): number => ((late ? COMET_MS : 0) + (order.get(cell) ?? near(cell, late))) * t;
+	const delayOf = (cell: number, late: boolean): number => (late ? COMET_MS : 0) + (order.get(cell) ?? near(cell, late));
 	const zones = [
 		...step.releases.map((z) => ({ cell: z.cell, rank: z.rank, delay: delayOf(z.cell, z.late) })),
-		...step.comets.map((c) => ({ cell: c.to, rank: 2, delay: COMET_MS * t })),
+		...step.comets.map((c) => ({ cell: c.to, rank: 2, delay: COMET_MS })),
 	];
 	const bolts = step.releases
 		.filter((z) => z.rank >= MAX_RANK)
 		.flatMap((z) => step.popped.filter((p) => p.kind === 'gem' && p.color === z.color && p.cell !== z.cell).map((p) => ({ from: z.cell, to: p.cell, delay: delayOf(z.cell, z.late) })));
 	return {
-		t,
-		pops: step.popped.map((p) => ({ cell: p.cell, color: p.color, kind: p.kind, rank: p.rank, into: p.into, delay: p.into >= 0 ? (order.get(p.cell) ?? 0) * 0.6 * t : delayOf(p.cell, p.late) })),
+		pops: step.popped.map((p) => ({ cell: p.cell, color: p.color, kind: p.kind, rank: p.rank, into: p.into, delay: p.into >= 0 ? (order.get(p.cell) ?? 0) * 0.6 : delayOf(p.cell, p.late) })),
 		zones,
 		bolts,
 		comets: step.comets,
-		fused: step.fused.map((f) => ({ cell: f.cell, rank: f.rank, delay: 200 * t })),
+		fused: step.fused.map((f) => ({ cell: f.cell, rank: f.rank, delay: 200 })),
 	};
 }
 
@@ -272,7 +336,6 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 	const [preview, setPreview] = useState<number[]>([]); // block ids the swipe being drawn would explode
 	const [enter, setEnter] = useState<{ ids: Set<number>; centre: number; dir: Dir }>({ ids: new Set(), centre: -1, dir: 'up' });
 	const [fx, setFx] = useState<Fx | null>(null);
-	const [slow, setSlow] = useState(false); // a slow-motion beat is playing
 	const [label, setLabel] = useState<{ id: number; cell: number; text: string } | null>(null);
 	const [chain, setChain] = useState<{ id: number; wave: number } | null>(null);
 	const [shake, setShake] = useState(0);
@@ -301,6 +364,7 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 	modeRef.current = mode;
 
 	const lv = useLevels(gameId, eclatsLevels);
+	const sprites = useSprites();
 	menuRef.current = lv.menu;
 	const s = sRef.current;
 
@@ -320,7 +384,6 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 		setGlow([]);
 		setPreview([]);
 		setFx(null);
-		setSlow(false);
 		setLabel(null);
 		setChain(null);
 		setToast(null);
@@ -443,11 +506,8 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 		setPhase('busy');
 		const st = sRef.current!;
 		const pointsBefore = st.score - steps.reduce((t, x) => t + (x.t === 'burst' ? x.points : 0), 0);
-		const lastBurst = steps.reduce((k, x, i) => (x.t === 'burst' ? i : k), -1);
 		let waves = 0;
 		let opened = 0;
-		let slowDone = false; // one slow-motion beat per swipe at most, so a long chain never drags
-		let after = 1; // the step after a slow beat eases back to speed
 		let shown = steps[0].cells;
 		const show = (c: (Block | null)[]): void => {
 			shown = c;
@@ -455,35 +515,22 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 		};
 		// Later waves play quicker, and a finger held on the board quicker still.
 		const pace = (wave: number): number => Math.max(0.4, 1 - 0.12 * Math.max(0, wave - 1)) * (fastRef.current ? 0.45 : 1);
-		for (let k = 0; k < steps.length; k++) {
-			const step = steps[k];
+		for (const step of steps) {
 			if (runRef.current !== my) return;
 			if (step.t === 'slide') {
 				show(step.cells);
-				await wait(SLIDE_MS * pace(waves) * after);
-				after = 1;
+				await wait(SLIDE_MS * pace(waves));
 			} else if (step.t === 'arrive') {
 				setEnter({ ids: new Set(step.ids), centre: step.centre, dir });
 				show(step.cells);
 				await wait(ARRIVE_MS * pace(waves));
 			} else {
 				waves = step.wave;
-				// Slow motion for the big moments only: a jewel or a crown going off, a comet, the 5th
-				// wave, the last chest. A finger held on the board skips it.
-				const big = !slowDone && !fastRef.current
-					&& (step.releases.some((z) => z.rank >= 3) || step.comets.length > 0 || step.wave === 5 || (k === lastBurst && st.status === 'won'));
-				const t = big ? SLOW : 1;
 				setGlow(step.groups.flat());
 				await wait(GLOW_MS * pace(waves));
 				if (runRef.current !== my) return;
-				if (big) {
-					slowDone = true;
-					await wait(HITSTOP_MS);
-					if (runRef.current !== my) return;
-					setSlow(true);
-				}
 				setGlow([]);
-				setFx({ id: ++fxId.current, ...timeFx(step, t) });
+				setFx({ id: ++fxId.current, ...timeFx(step) });
 				// What a comet catches stays on the board until it lands.
 				const late = step.popped.filter((p) => p.late);
 				if (late.length) {
@@ -496,7 +543,7 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 				if (top) sfx.blast(top);
 				if (step.fused.length) {
 					const r = Math.max(...step.fused.map((f) => f.rank));
-					setTimeout(() => sfx.fuse(r), 200 * t);
+					setTimeout(() => sfx.fuse(r), 200);
 				}
 				if (step.comets.length) sfx.comet();
 				if (step.opened.length > late.filter((p) => p.kind === 'chest').length) sfx.chest();
@@ -508,22 +555,17 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 				bump();
 				if (late.length) {
 					// The flight is not sped up: the screen must show the comet land before its catch goes.
-					await wait(COMET_MS * t);
+					await wait(COMET_MS);
 					if (runRef.current !== my) return;
 					show(step.cells);
 					const lateTop = Math.max(0, ...step.releases.filter((z) => z.late).map((z) => z.rank));
 					sfx.blast(Math.max(2, lateTop));
 					if (late.some((p) => p.kind === 'chest')) sfx.chest();
 				}
-				await wait(POP_MS * pace(waves) * t + (big ? 160 : 0));
-				if (big) {
-					setSlow(false);
-					after = 1.6;
-				}
+				await wait(POP_MS * pace(waves));
 			}
 		}
 		if (runRef.current !== my) return;
-		setSlow(false);
 		setEnter({ ids: new Set(), centre: -1, dir });
 		const gained = st.score - pointsBefore;
 		if (waves >= 2 || opened) {
@@ -701,6 +743,7 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 	const inFrom = { up: [0, U], down: [0, -U], left: [U, 0], right: [-U, 0] }[enter.dir];
 
 	return (
+		<ArtCtx.Provider value={sprites}>
 		<div className="ec-root">
 			<style>{CSS}</style>
 
@@ -760,7 +803,7 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 
 			<div
 				ref={boardRef}
-				className={`ec-boardwrap ${shake % 2 ? 'shake-a' : shake ? 'shake-b' : ''} ${slow ? 'ec-slow' : ''}`}
+				className={`ec-boardwrap ${shake % 2 ? 'shake-a' : shake ? 'shake-b' : ''}`}
 				onPointerDown={swipe.onPointerDown}
 			>
 				{cells.length > 0 ? (
@@ -770,6 +813,20 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 						role="application"
 						aria-label="Plateau d'Éclats : glisse pour tout faire glisser"
 					>
+						<defs>
+							<radialGradient id="ec-halo">
+								<stop offset="0" stopColor="#fff6c8" stopOpacity="0.95" />
+								<stop offset="0.45" stopColor="#ffd24a" stopOpacity="0.45" />
+								<stop offset="1" stopColor="#ffd24a" stopOpacity="0" />
+							</radialGradient>
+							{[...GEMS.map((g) => g.fill), '#ffd24a', '#b9bec7'].map((fill, k) => (
+								<radialGradient key={k} id={`ec-pop-${k}`}>
+									<stop offset="0" stopColor="#fff" stopOpacity="0.95" />
+									<stop offset="0.35" stopColor={fill} stopOpacity="0.75" />
+									<stop offset="1" stopColor={fill} stopOpacity="0" />
+								</radialGradient>
+							))}
+						</defs>
 						<rect x={-1.5} y={-1.5} width={N * U + 3} height={N * U + 3} rx={3} className="ec-tray" />
 						{Array.from({ length: N * N }, (_, i) => (
 							<rect key={`s${i}`} x={(i % N) * U + 0.5} y={Math.floor(i / N) * U + 0.5} width={U - 1} height={U - 1} rx={1.8} className="ec-slot" />
@@ -799,7 +856,7 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 						</g>
 
 						{fx && (
-							<g key={fx.id} style={{ ['--ec-t' as string]: fx.t }}>
+							<g key={fx.id}>
 								{fx.zones.map((z, k) => {
 									const rad = z.rank >= MAX_RANK ? N : z.rank - 1;
 									const [r, c] = [Math.floor(z.cell / N), z.cell % N];
@@ -809,7 +866,11 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 									return (
 										<g key={`z${k}`}>
 											<rect x={x0 * U} y={y0 * U} width={(x1 - x0 + 1) * U} height={(y1 - y0 + 1) * U} rx={3} className={`ec-zone r${z.rank}`} style={d} />
-											<circle cx={cx(z.cell)} cy={cy(z.cell)} r={(Math.min(rad, 3) + 0.6) * U} className={`ec-wave r${z.rank}`} style={d} />
+											{sprites ? (
+												<image href={art('fx-ring')} x={cx(z.cell) - (Math.min(rad, 3) + 0.8) * U} y={cy(z.cell) - (Math.min(rad, 3) + 0.8) * U} width={(Math.min(rad, 3) + 0.8) * 2 * U} height={(Math.min(rad, 3) + 0.8) * 2 * U} className={`ec-wave r${z.rank}`} style={d} />
+											) : (
+												<circle cx={cx(z.cell)} cy={cy(z.cell)} r={(Math.min(rad, 3) + 0.6) * U} className={`ec-wave r${z.rank}`} style={d} />
+											)}
 										</g>
 									);
 								})}
@@ -829,11 +890,16 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 										) : (
 											<>
 												<circle
-													r={4.2}
+													r={sprites ? 5.6 : 4.2}
 													className={`ec-pop ${p.kind}`}
-													fill={p.kind === 'gem' ? GEMS[p.color % GEMS.length].fill : p.kind === 'chest' ? '#ffd24a' : '#9aa0aa'}
+													fill={
+														sprites
+															? `url(#ec-pop-${p.kind === 'gem' ? p.color % GEMS.length : p.kind === 'chest' ? GEMS.length : GEMS.length + 1})`
+															: p.kind === 'gem' ? GEMS[p.color % GEMS.length].fill : p.kind === 'chest' ? '#ffd24a' : '#9aa0aa'
+													}
 													style={{ animationDelay: `${p.delay}ms` }}
 												/>
+												{sprites && <image href={art('fx-burst')} x={-6} y={-6} width={12} height={12} className="ec-burst" style={{ animationDelay: `${p.delay}ms` }} />}
 												{[0, 1, 2, 3, 4, 5].slice(0, p.rank >= 2 ? 6 : 4).map((k2) => (
 													<path
 														key={k2}
@@ -843,9 +909,13 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 														style={{ animationDelay: `${p.delay}ms`, ['--sx' as string]: `${[5, -5, 4, -4, 0, 1][k2] * (p.rank >= 2 ? 1.4 : 1)}px`, ['--sy' as string]: `${[-4, -3, 5, 4, -6, 6][k2] * (p.rank >= 2 ? 1.4 : 1)}px` }}
 													/>
 												))}
-												{p.kind === 'chest' && [0, 1, 2, 3, 4].map((k2) => (
-													<circle key={`c${k2}`} r={1} className="ec-coin" style={{ animationDelay: `${p.delay + k2 * 40}ms`, ['--sx' as string]: `${(k2 - 2) * 2.4}px` }} />
-												))}
+												{p.kind === 'chest' && [0, 1, 2, 3, 4].map((k2) =>
+													sprites ? (
+														<image key={`c${k2}`} href={art('coin')} x={-1.6} y={-1.6} width={3.2} height={3.2} className="ec-coin art" style={{ animationDelay: `${p.delay + k2 * 40}ms`, ['--sx' as string]: `${(k2 - 2) * 2.4}px` }} />
+													) : (
+														<circle key={`c${k2}`} r={1} className="ec-coin" style={{ animationDelay: `${p.delay + k2 * 40}ms`, ['--sx' as string]: `${(k2 - 2) * 2.4}px` }} />
+													),
+												)}
 											</>
 										)}
 									</g>
@@ -855,18 +925,46 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 										key={`c${k}`}
 										className="ec-comet"
 										style={{
-											animationDuration: `${COMET_MS * fx.t}ms`,
+											animationDuration: `${COMET_MS}ms`,
 											['--fx' as string]: `${cx(c.from)}px`, ['--fy' as string]: `${cy(c.from)}px`,
 											['--tx' as string]: `${cx(c.to)}px`, ['--ty' as string]: `${cy(c.to)}px`,
 										}}
 									>
-										{[3, 2, 1].map((tail) => <circle key={tail} r={2.2 - tail * 0.45} cx={0} cy={0} className="ec-comet-tail" style={{ transform: `translate(${(cx(c.from) - cx(c.to)) * tail * 0.06}px, ${(cy(c.from) - cy(c.to)) * tail * 0.06}px)` }} />)}
-										<circle r={2.8} className="ec-comet-head" />
-										<path d={starPath(4, 4, 1)} className="ec-comet-star" />
+										{sprites ? (
+											<image
+												href={art('fx-comet')}
+												x={-13}
+												y={-8}
+												width={16}
+												height={16}
+												transform={`rotate(${(Math.atan2(cy(c.to) - cy(c.from), cx(c.to) - cx(c.from)) * 180) / Math.PI})`}
+											/>
+										) : (
+											<>
+												{[3, 2, 1].map((tail) => <circle key={tail} r={2.2 - tail * 0.45} cx={0} cy={0} className="ec-comet-tail" style={{ transform: `translate(${(cx(c.from) - cx(c.to)) * tail * 0.06}px, ${(cy(c.from) - cy(c.to)) * tail * 0.06}px)` }} />)}
+												<circle r={2.8} className="ec-comet-head" />
+												<path d={starPath(4, 4, 1)} className="ec-comet-star" />
+											</>
+										)}
 									</g>
 								))}
 								{fx.fused.map((f, k) => (
-									<circle key={`f${k}`} cx={cx(f.cell)} cy={cy(f.cell)} r={5} className={`ec-born r${f.rank}`} style={{ animationDelay: `${f.delay}ms` }} />
+									<g key={`f${k}`}>
+										<circle cx={cx(f.cell)} cy={cy(f.cell)} r={5} className={`ec-born r${f.rank}`} style={{ animationDelay: `${f.delay}ms` }} />
+										{sprites && [0, 1, 2, 3].slice(0, f.rank).map((k2) => (
+											<g key={k2} transform={`translate(${cx(f.cell)} ${cy(f.cell)})`}>
+												<image
+													href={art('fx-sparkle')}
+													x={-2}
+													y={-2}
+													width={4}
+													height={4}
+													className="ec-sparkfly"
+													style={{ animationDelay: `${f.delay}ms`, ['--sx' as string]: `${[6, -6, 5, -5][k2]}px`, ['--sy' as string]: `${[-5, -4, 6, 5][k2]}px` }}
+												/>
+											</g>
+										))}
+									</g>
 								))}
 							</g>
 						)}
@@ -875,7 +973,6 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 					<div className="ec-loading">Préparation…</div>
 				)}
 
-				<div className={`ec-vignette ${slow ? 'on' : ''}`} aria-hidden="true" />
 				{chain && <div key={chain.id} className={`ec-chain w${Math.min(5, chain.wave)}`}>Chaîne ×{chain.wave}</div>}
 				{label && (
 					<div
@@ -968,6 +1065,7 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 			)}
 			{mode === 'free' && <LeaderboardCorner game={LB_ID(gameId)} metric="time" format={fmtPacked} side="right" />}
 		</div>
+		</ArtCtx.Provider>
 	);
 }
 
@@ -1019,14 +1117,6 @@ const CSS = `
 .ec-tray { fill: #1b2337; stroke: #2c3854; stroke-width: 0.4; }
 .ec-slot { fill: #232d45; }
 .ec-centre-mark { fill: none; stroke: #3a4870; stroke-width: 0.5; stroke-dasharray: 1 0.8; }
-.ec-svg { transition: transform 0.25s ease, filter 0.25s ease; }
-.ec-slow .ec-svg { transform: scale(1.025); filter: saturate(1.3) contrast(1.06); }
-.ec-vignette {
-  position: absolute; inset: 0; z-index: 3; pointer-events: none; border-radius: 14px; opacity: 0;
-  background: radial-gradient(ellipse at center, transparent 55%, rgba(6, 8, 16, 0.6) 100%);
-  transition: opacity 0.2s ease;
-}
-.ec-vignette.on { opacity: 1; }
 
 .ec-cell { transition: transform 0.14s ease-out; }
 .ec-in { animation: ec-in 0.16s ease-out both; }
@@ -1044,32 +1134,36 @@ const CSS = `
 .ec-rank.r2 > g > path, .ec-rank.r2 > g > circle:first-child { animation: ec-rim 1.2s ease-in-out infinite alternate; }
 .ec-twinkle { fill: #fff; animation: ec-twinkle 1.1s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: center; }
 .ec-twinkle.t2 { animation-delay: -0.55s; }
+.ec-charged { animation: ec-rim 1.2s ease-in-out infinite alternate; }
+.ec-burst { opacity: 0; pointer-events: none; transform-box: fill-box; transform-origin: center; animation: ec-burst 0.36s ease-out forwards; }
+.ec-sparkfly { opacity: 0; pointer-events: none; transform-box: fill-box; transform-origin: center; animation: ec-shard 0.6s ease-out forwards; }
 .ec-halo { opacity: 0.35; animation: ec-halo 1.4s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: center; }
 .ec-orbit { fill: #fff; animation: ec-spin 2.4s linear infinite; }
 .ec-rays { fill: none; stroke: #ffe27a; stroke-width: 0.7; stroke-linecap: round; animation: ec-spin 6s linear infinite, ec-rays 0.8s ease-in-out infinite alternate; }
 .ec-crown { fill: #ffd24a; stroke: #a56d09; stroke-width: 0.35; stroke-linejoin: round; }
 .ec-rank.r4 .ec-halo { animation: ec-halo 1.4s ease-in-out infinite alternate, ec-hue 3s linear infinite; opacity: 0.5; }
+.ec-rank .ec-halo.art { animation: ec-halo 1.4s ease-in-out infinite alternate; opacity: 0.75; }
+.ec-rank.r4 .ec-halo.art { opacity: 1; }
 .ec-chest { animation: ec-shine 1.6s ease-in-out infinite alternate; }
 
-/* Every effect stretches with --ec-t: 1, or the slow-motion factor on a big beat. */
-.ec-pop { pointer-events: none; transform-box: fill-box; transform-origin: center; opacity: 0; animation: ec-pop calc(0.3s * var(--ec-t, 1)) ease-out forwards; }
-.ec-shard { pointer-events: none; opacity: 0; animation: ec-shard calc(0.42s * var(--ec-t, 1)) ease-out forwards; }
-.ec-coin { fill: #ffd24a; stroke: #a56d09; stroke-width: 0.3; opacity: 0; animation: ec-coin calc(0.7s * var(--ec-t, 1)) ease-out forwards; }
-.ec-fly { pointer-events: none; animation: ec-fly calc(0.22s * var(--ec-t, 1)) ease-in both; }
-.ec-zone { pointer-events: none; opacity: 0; fill: rgba(255, 150, 60, 0.5); animation: ec-flash calc(0.36s * var(--ec-t, 1)) ease-out forwards; }
-.ec-zone.r3 { fill: rgba(255, 110, 70, 0.6); animation-duration: calc(0.5s * var(--ec-t, 1)); }
-.ec-zone.r4 { fill: rgba(255, 245, 210, 0.75); animation-duration: calc(0.6s * var(--ec-t, 1)); }
-.ec-wave { fill: none; stroke: #ffd9a0; stroke-width: 0.8; opacity: 0; pointer-events: none; transform-box: fill-box; transform-origin: center; animation: ec-wave calc(0.45s * var(--ec-t, 1)) ease-out forwards; }
+.ec-pop { pointer-events: none; transform-box: fill-box; transform-origin: center; opacity: 0; animation: ec-pop 0.3s ease-out forwards; }
+.ec-shard { pointer-events: none; opacity: 0; animation: ec-shard 0.42s ease-out forwards; }
+.ec-coin { fill: #ffd24a; stroke: #a56d09; stroke-width: 0.3; opacity: 0; animation: ec-coin 0.7s ease-out forwards; }
+.ec-fly { pointer-events: none; animation: ec-fly 0.22s ease-in both; }
+.ec-zone { pointer-events: none; opacity: 0; fill: rgba(255, 150, 60, 0.5); animation: ec-flash 0.36s ease-out forwards; }
+.ec-zone.r3 { fill: rgba(255, 110, 70, 0.6); animation-duration: 0.5s; }
+.ec-zone.r4 { fill: rgba(255, 245, 210, 0.75); animation-duration: 0.6s; }
+.ec-wave { fill: none; stroke: #ffd9a0; stroke-width: 0.8; opacity: 0; pointer-events: none; transform-box: fill-box; transform-origin: center; animation: ec-wave 0.45s ease-out forwards; }
 .ec-wave.r3 { stroke: #ffb37a; stroke-width: 1.2; }
 .ec-wave.r4 { stroke: #fff; stroke-width: 1.5; }
-.ec-bolt { fill: none; stroke: #fff6c8; stroke-width: 0.7; stroke-linejoin: round; opacity: 0; pointer-events: none; animation: ec-bolt calc(0.4s * var(--ec-t, 1)) ease-out forwards; }
+.ec-bolt { fill: none; stroke: #fff6c8; stroke-width: 0.7; stroke-linejoin: round; opacity: 0; pointer-events: none; animation: ec-bolt 0.4s ease-out forwards; }
 .ec-comet { pointer-events: none; animation-name: ec-comet; animation-timing-function: cubic-bezier(.4, 0, .9, .6); animation-fill-mode: both; }
 .ec-comet-head { fill: #fff; }
 .ec-comet-tail { fill: #9fd2ff; opacity: 0.55; }
 .ec-comet-star { fill: #e9f6ff; opacity: 0.8; animation: ec-spin 0.4s linear infinite; transform-box: fill-box; transform-origin: center; }
-.ec-born { fill: none; stroke: #fff; stroke-width: 0.7; opacity: 0; pointer-events: none; transform-box: fill-box; transform-origin: center; animation: ec-ring calc(0.5s * var(--ec-t, 1)) ease-out forwards; }
+.ec-born { fill: none; stroke: #fff; stroke-width: 0.7; opacity: 0; pointer-events: none; transform-box: fill-box; transform-origin: center; animation: ec-ring 0.5s ease-out forwards; }
 .ec-born.r3 { stroke: #ffe27a; stroke-width: 1; }
-.ec-born.r4 { stroke: #ffe27a; stroke-width: 1.4; animation-duration: calc(0.8s * var(--ec-t, 1)); }
+.ec-born.r4 { stroke: #ffe27a; stroke-width: 1.4; animation-duration: 0.8s; }
 .ec-label {
   position: absolute; z-index: 4; pointer-events: none; transform: translate(-50%, -50%); white-space: nowrap;
   font-family: var(--font-brand); font-weight: 800; font-size: 18px; color: #ffe27a;
@@ -1079,7 +1173,6 @@ const CSS = `
 
 .ec-boardwrap.shake-a { animation: ec-shake-a 0.32s ease-out; }
 .ec-boardwrap.shake-b { animation: ec-shake-b 0.32s ease-out; }
-.ec-boardwrap.ec-slow.shake-a, .ec-boardwrap.ec-slow.shake-b { animation-duration: 0.75s; }
 
 .ec-chain {
   position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); z-index: 4; pointer-events: none;
@@ -1126,6 +1219,7 @@ const CSS = `
 @keyframes ec-shard { 0% { opacity: 1; transform: translate(0, 0) rotate(0); } 100% { opacity: 0; transform: translate(var(--sx), var(--sy)) rotate(160deg); } }
 @keyframes ec-coin { 0% { opacity: 1; transform: translate(0, 0); } 45% { opacity: 1; transform: translate(var(--sx), -7px); } 100% { opacity: 0; transform: translate(var(--sx), -3px); } }
 @keyframes ec-flash { from { opacity: 1; } to { opacity: 0; } }
+@keyframes ec-burst { 0% { opacity: 1; transform: scale(0.3) rotate(0deg); } 55% { opacity: 1; } 100% { opacity: 0; transform: scale(1.35) rotate(25deg); } }
 @keyframes ec-drop { from { transform: translateY(-6px) scale(0.3); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
 @keyframes ec-grow { from { transform: scale(0.55); } to { transform: scale(1); } }
 @keyframes ec-fly { from { transform: translate(0, 0) scale(1); opacity: 1; } to { transform: translate(var(--dx), var(--dy)) scale(0.45); opacity: 0.2; } }
@@ -1149,9 +1243,7 @@ const CSS = `
 @keyframes ec-shake-b { 0%, 100% { transform: translate(0, 0); } 20% { transform: translate(3px, -2px); } 40% { transform: translate(-3px, 2px); } 60% { transform: translate(2px, 1px); } 80% { transform: translate(-1px, -2px); } }
 @media (prefers-reduced-motion: reduce) {
   .ec-cell { transition: none; }
-  .ec-in, .ec-drop, .ec-grow, .ec-glow, .ec-pop, .ec-shard, .ec-coin, .ec-fly, .ec-zone, .ec-wave, .ec-bolt, .ec-born, .ec-chain, .ec-label { animation-duration: 0.01s; }
-  .ec-core, .ec-rank.r2 > g > path, .ec-rank.r2 > g > circle:first-child, .ec-twinkle, .ec-halo, .ec-orbit, .ec-rays, .ec-comet-star, .ec-chest, .ec-preview, .ec-boardwrap.shake-a, .ec-boardwrap.shake-b, .ec-nudge { animation: none; }
-  .ec-svg { transition: none; }
-  .ec-slow .ec-svg { transform: none; }
+  .ec-in, .ec-drop, .ec-grow, .ec-glow, .ec-pop, .ec-burst, .ec-sparkfly, .ec-shard, .ec-coin, .ec-fly, .ec-zone, .ec-wave, .ec-bolt, .ec-born, .ec-chain, .ec-label { animation-duration: 0.01s; }
+  .ec-core, .ec-charged, .ec-rank.r2 > g > path, .ec-rank.r2 > g > circle:first-child, .ec-twinkle, .ec-halo, .ec-orbit, .ec-rays, .ec-comet-star, .ec-chest, .ec-preview, .ec-boardwrap.shake-a, .ec-boardwrap.shake-b, .ec-nudge { animation: none; }
 }
 `;

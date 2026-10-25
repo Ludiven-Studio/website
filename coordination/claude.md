@@ -693,3 +693,20 @@
   pas de commit : en attente du feu vert de l'utilisateur. Aucun changement Supabase.
 - 08:27 : commité et poussé à la demande de l'utilisateur : mes 17 fichiers et cette section seulement. Statut :
   terminé. Réservations libérées.
+
+## 2026-10-25 — Éclats : gemmes et effets plus jolis (Codex), sans ralentis (session website)
+- Statut : en cours (2026-10-25T09:04+01:00). Demande de l'utilisateur : utiliser Codex pour de plus jolies gemmes et
+  de plus jolis effets ; retirer les ralentis
+- Réservations actives : `src/games/eclats/`, `public/assets/jeux/eclats/` (nouveau), `scripts/eclats-sprites.mjs`
+  (nouveau), `scripts/check-eclats.mjs`, `.collab/tickets/0041-*`, `.collab/LOG.md`.
+- Ressources : serveur de dev sur le port 4473 ; eslint, `astro check`. Build annoncé ici avant.
+- 09:39 : ralentis retirés ; 28 images de Codex (tickets 0041-0042 : 20 gemmes par rang, coffres, rocher, pièce, éclat,
+  étincelle, onde, comète) passées en WebP par scripts/eclats-sprites.mjs dans public/assets/jeux/eclats/ (412 ko) ; le
+  jeu garde les dessins plats tant qu'elles ne sont pas toutes chargées ; check-eclats.mjs OK. Réservation ajoutée :
+  vignettes `public/assets/jeux/eclats.jpg`, `og/`, `tile/`. Lancement du build complet (écrit dist/, .astro/,
+  public/vendor/)…
+- 09:42 : build complet OK (astro check 0 erreur, 153 pages, précache 310 entrées, liens OK) ; check-eclats.mjs vérifie
+  aussi que les gemmes dessinées s'affichent ; vignettes refaites (capture + décor sans GPU) ; tickets 0041-0042 clos.
+  Fait et vérifié, pas de commit : en attente du feu vert de l'utilisateur.
+- 09:58 : commité et poussé à la demande de l'utilisateur : mes fichiers (dont les 28 images) et cette section
+  seulement. Statut : terminé. Réservations libérées.

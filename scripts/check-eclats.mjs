@@ -1,7 +1,7 @@
-// Éclats in a real browser: the level opens on its ready gate, the arrow keys swipe the board, a
-// finger swipe does too (CDP touch events on a phone-sized page), the blocks a swipe would explode
-// light up while the finger is still down, and a run of swipes explodes blocks without a page
-// error. Screenshots go to --out (default D:/tmp/eclats-shots).
+// Éclats in a real browser: the level opens on its ready gate, its drawn gems load, the arrow keys
+// swipe the board, a finger swipe does too (CDP touch events on a phone-sized page), the blocks a
+// swipe would explode light up while the finger is still down, and a run of swipes explodes blocks
+// without a page error. Screenshots go to --out (default D:/tmp/eclats-shots).
 // Usage: node scripts/check-eclats.mjs [--out <dir>] [--url https://www.ludiven-studio.fr]
 import { mkdirSync } from 'node:fs';
 import { chromium } from 'playwright';
@@ -58,6 +58,8 @@ try {
 		await until(page, (s) => s.mode === 'levels');
 		let s = await state(page);
 		check('opens on level 1, behind its ready gate', s.mode === 'levels' && s.phase === 'ready', `${s.mode} / ${s.phase}`);
+		const art = await page.waitForFunction(() => !!document.querySelector('.ec-svg image[href*="/eclats/gem-"]'), null, { timeout: 15000 }).then(() => true, () => false);
+		check('the drawn gems replace the flat ones once loaded', art, art ? 'sprites on' : 'still flat after 15 s');
 		await page.screenshot({ path: `${OUT}/desk-ready.png` });
 		await page.click('.ec-start');
 		await until(page, (x) => x.phase === 'idle');
