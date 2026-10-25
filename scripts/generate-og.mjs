@@ -127,7 +127,7 @@ async function main() {
 			await freeze();
 		},
 		// Free play, swipes through the test hook until a charged gem or better is on the board, then
-		// one more swipe so the shot catches a group popping.
+		// one more swipe so the shot catches a group lit up, just before it pops and empties the board.
 		eclats: async () => {
 			await page.evaluate(() => {
 				Array.from(document.querySelectorAll('[role="tab"]')).find((b) => /libre/i.test(b.textContent || ''))?.click();
@@ -148,7 +148,7 @@ async function main() {
 			}
 			const b = await best();
 			await page.evaluate((d) => window.__eclats.swipe(d), b.n ? b.dir : 'up');
-			await sleep(300);
+			await sleep(190);
 		},
 		// Dig a short tunnel so the board shows the hen at work.
 		'cocotte-mineuse': async () => {

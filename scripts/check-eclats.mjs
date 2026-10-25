@@ -1,7 +1,9 @@
-// Éclats in a real browser: the level opens on its ready gate, its drawn gems load, the arrow keys
-// swipe the board, a finger swipe does too (CDP touch events on a phone-sized page), the blocks a
-// swipe would explode light up while the finger is still down, and a run of swipes explodes blocks
-// without a page error. Screenshots go to --out (default D:/tmp/eclats-shots).
+// Dragon's Gems Swipe (gameId eclats) in a real browser: the level opens on its ready gate, its drawn gems
+// and Bijou load, the arrow keys swipe the board, a finger swipe does too (CDP touch events on a
+// phone-sized page), the blocks a swipe would explode light up while the finger is still down, a run of
+// swipes explodes blocks and opens chests big, their coins fill the loot, Bijou reacts, and the loot
+// goes to his treasure on a win (or is lost with the level), without a page error. Screenshots go to
+// --out (default D:/tmp/eclats-shots).
 // Usage: node scripts/check-eclats.mjs [--out <dir>] [--url https://www.ludiven-studio.fr]
 import { mkdirSync } from 'node:fs';
 import { chromium } from 'playwright';
@@ -60,6 +62,8 @@ try {
 		check('opens on level 1, behind its ready gate', s.mode === 'levels' && s.phase === 'ready', `${s.mode} / ${s.phase}`);
 		const art = await page.waitForFunction(() => !!document.querySelector('.ec-svg image[href*="/eclats/gem-"]'), null, { timeout: 15000 }).then(() => true, () => false);
 		check('the drawn gems replace the flat ones once loaded', art, art ? 'sprites on' : 'still flat after 15 s');
+		const bijou = await page.waitForFunction(() => !!document.querySelector('.ec-bijou .ec-drake'), null, { timeout: 15000 }).then(() => true, () => false);
+		check('Bijou sits on his treasure at the board corner', bijou, bijou ? 'drawn' : 'missing after 15 s');
 		await page.screenshot({ path: `${OUT}/desk-ready.png` });
 		await page.click('.ec-start');
 		await until(page, (x) => x.phase === 'idle');
@@ -72,14 +76,37 @@ try {
 		}
 		check('an arrow key swipes the board', s.moves === 1, `${s.moves} move`);
 		await idle(page);
+		// Did a chest ever pop out big in the flying layer? A mutation observer sees it even between polls.
+		await page.evaluate(() => {
+			window.__bigChest = false;
+			new MutationObserver(() => { if (document.querySelector('.ec-flylayer .ec-bigchest')) window.__bigChest = true; })
+				.observe(document.querySelector('.ec-flylayer'), { childList: true });
+		});
+		const moods = new Set();
 		let score = (await state(page)).score;
-		for (let k = 0; k < 12 && (await state(page)).phase === 'idle'; k++) {
+		for (let k = 0; k < 30 && (await state(page)).phase === 'idle'; k++) {
 			await page.evaluate((d) => window.__eclats.swipe(d), DIRS[k % 4]);
 			await page.waitForTimeout(40);
-			await idle(page);
+			await until(page, (x) => {
+				moods.add(x.mood);
+				return x.phase === 'idle' || x.phase === 'over';
+			});
 		}
 		s = await state(page);
 		check('swipes make blocks explode and open chests', s.score > score && s.opened >= 1, `score ${score} → ${s.score}, chests ${s.opened}/${s.goal}, ${s.status}`);
+		const big = await page.evaluate(() => window.__bigChest);
+		check('an opening chest pops out big and its coins fill the loot', big && s.butin > 0, `big chest ${big ? 'seen' : 'never seen'}, loot ${s.butin}`);
+		await page.waitForTimeout(3000);
+		s = await state(page);
+		check('the counters catch up once the coins and chests land', s.flying === 0 && s.shown.opened === s.opened && s.shown.butin === s.butin, `chests ${s.shown.opened}/${s.opened}, loot ${s.shown.butin}/${s.butin}, ${s.flying} flying`);
+		const reacted = [...moods].filter((m) => ['wow', 'cheer', 'fly'].includes(m));
+		check('Bijou reacts to chests and chains', reacted.length > 0, [...moods].join(', '));
+		// Either way a rule is checked: a won level pays the loot into the treasure, a lost one loses it.
+		check(
+			s.status === 'won' ? 'a won level pays the loot into the treasure' : 'a lost level loses its loot',
+			s.status === 'won' ? s.hoard === s.butin && s.hoard > 0 : s.status === 'lost' && s.hoard === 0,
+			`${s.status}, loot ${s.butin}, treasure ${s.hoard}`,
+		);
 		await page.screenshot({ path: `${OUT}/desk-play.png` });
 		check('desktop: no page error', errors.length === 0, errors.slice(0, 3).join(' | ') || 'none');
 		await page.context().close();

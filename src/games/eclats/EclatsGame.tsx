@@ -40,10 +40,11 @@ import { usePointerDrag } from '../usePointerDrag';
 import { withExpert } from '../../lib/difficulty';
 
 /* =====================================================
-   ÉCLATS — « Glisse et explose ». React island (SVG).
+   DRAGON'S GEMS SWIPE (gameId eclats) — « Glisse et explose ». React island (SVG).
    Swipe: every block slides to the wall; three of a colour touching explode, four or more fuse
    into a stronger gem, the board slides again and refills from the edge and the centre, wave
-   after wave. Open the chests. Engine: ./engine (pure, tested). Each move comes back as a
+   after wave. Open the chests: each pops out big and pours its coins into the loot, which goes
+   to Bijou's treasure at the end. Engine: ./engine (pure, tested). Each move comes back as a
    timeline of steps that this file plays one by one.
    ===================================================== */
 
@@ -60,6 +61,11 @@ const SWIPE_PX = 16;
 const LB_ID = (gameId: string): string => `${gameId}-t`;
 const recordKey = (t: TierKey): string => `eclats-score-${t}`;
 const RANK_NAMES = ['', '', 'Gemme chargée', 'Joyau', 'Couronne'];
+const HOARD_KEY = 'ludiven-eclats-hoard';
+const CHEST_GOLD = 10; // a chest's coins, times the wave that opened it, doubled if it had a padlock
+const HOARD_TIERS = [500, 2000, 5000]; // the pile under Bijou grows a size at each
+const BIG = 2.2; // how much an opening chest grows
+const REACT_MS = 1500;
 
 /** Gem colours, each with its own cut so they read without the colours. */
 const GEMS = [
@@ -97,7 +103,7 @@ const RAYS = Array.from({ length: 8 }, (_, k) => {
 
 /* ---------- Daily save ---------- */
 
-const GEN_V = 3;
+const GEN_V = 4;
 const KINDS: Kind[] = ['gem', 'chest', 'rock'];
 
 interface SavedRun {
@@ -108,9 +114,10 @@ interface SavedRun {
 	centred: number;
 	opened: number;
 	score: number;
+	butin: number;
 }
 
-const packRun = (s: State): SavedRun => ({
+const packRun = (s: State, butin: number): SavedRun => ({
 	v: GEN_V,
 	cells: s.cells.map((b) => (b ? [KINDS.indexOf(b.kind), b.color, b.ice ? 1 : 0, b.lock ? 1 : 0, b.rank] : null)),
 	moves: s.moves,
@@ -118,7 +125,10 @@ const packRun = (s: State): SavedRun => ({
 	centred: s.centred,
 	opened: s.opened,
 	score: s.score,
+	butin,
 });
+
+const isCurrentRun = (saved: unknown): boolean => (saved as SavedRun | null)?.v === GEN_V;
 
 /** Rebuild a saved attempt. Null if it belongs to another version. */
 function unpackRun(saved: unknown, cfg: EclatsCfg): State | null {
@@ -172,6 +182,84 @@ function useSprites(): boolean {
 }
 
 const gemSprite = (color: number, rank: number): string => art(rank >= 2 ? `gem-${color % 5}-r${Math.min(MAX_RANK, rank)}` : `gem-${color % 5}`);
+
+// Bijou and his treasure (tickets 0043-0044). Each drawing counts on its own: a missing pose falls back
+// to the idle one, and without that one Bijou stays hidden.
+const EXTRA = [
+	'bijou-idle', 'bijou-blink', 'bijou-cheer', 'bijou-wow', 'bijou-fly', 'bijou-scared', 'bijou-sad', 'bijou-dance-1', 'bijou-dance-2', 'bijou-sleep',
+	'chest-open', 'fx-rays', 'hoard-1', 'hoard-2', 'hoard-3', 'hoard-4',
+];
+const extraLoaded = new Set<string>();
+
+function useExtraArt(): Set<string> {
+	const [got, setGot] = useState(() => new Set(extraLoaded));
+	useEffect(() => {
+		let alive = true;
+		for (const name of EXTRA) {
+			if (extraLoaded.has(name)) continue;
+			const im = new Image();
+			im.onload = () => {
+				extraLoaded.add(name);
+				if (alive) setGot(new Set(extraLoaded));
+			};
+			im.src = art(name);
+		}
+		return () => { alive = false; };
+	}, []);
+	return got;
+}
+
+type Mood = 'idle' | 'wow' | 'cheer' | 'fly' | 'scared' | 'sad' | 'dance' | 'sleep';
+const POSE: Record<Mood, string> = {
+	idle: 'bijou-idle', wow: 'bijou-wow', cheer: 'bijou-cheer', fly: 'bijou-fly', scared: 'bijou-scared', sad: 'bijou-sad', dance: 'bijou-dance-1', sleep: 'bijou-sleep',
+};
+const MOOD_RANK: Partial<Record<Mood, number>> = { wow: 1, cheer: 2, fly: 3 };
+const hoardTier = (gold: number): number => 1 + HOARD_TIERS.filter((t) => gold >= t).length;
+const noteLocked = (seen: Set<number>, cells: (Block | null)[]): void => {
+	for (const b of cells) if (b?.kind === 'chest' && b.lock) seen.add(b.id);
+};
+const fmtGold = (n: number): string => n.toLocaleString('fr-FR');
+
+/** Bijou on his pile of gold, at the board's corner. He blinks at rest; the game sets his mood. */
+function Bijou({ mood, hoard, got, grew }: { mood: Mood; hoard: number; got: Set<string>; grew: number }) {
+	const [blink, setBlink] = useState(false);
+	useEffect(() => {
+		if (mood !== 'idle') return;
+		let t = 0;
+		const loop = (): void => {
+			t = window.setTimeout(() => {
+				setBlink(true);
+				t = window.setTimeout(() => {
+					setBlink(false);
+					loop();
+				}, 150);
+			}, 2400 + Math.random() * 2600);
+		};
+		loop();
+		return () => {
+			clearTimeout(t);
+			setBlink(false);
+		};
+	}, [mood]);
+	if (!got.has('bijou-idle')) return null;
+	const pose = (name: string): string => art(got.has(name) ? name : 'bijou-idle');
+	const tier = hoardTier(hoard);
+	const pile = `hoard-${tier}`;
+	return (
+		<div className={`ec-bijou m-${mood} t${tier}`} role="img" aria-label={`Bijou, le bébé dragon, sur son trésor de ${fmtGold(hoard)} pièces`}>
+			{got.has(pile) && <img key={`p${grew}`} src={art(pile)} alt="" className={`ec-pile${grew ? ' grew' : ''}`} />}
+			{mood === 'dance' && got.has('bijou-dance-2') ? (
+				<span className="ec-drake ec-dance">
+					<img src={pose('bijou-dance-1')} alt="" />
+					<img src={pose('bijou-dance-2')} alt="" />
+				</span>
+			) : (
+				<img src={pose(blink && mood === 'idle' ? 'bijou-blink' : POSE[mood])} alt="" className="ec-drake" />
+			)}
+			<span className="ec-hoardtag">🪙 {fmtGold(hoard)}</span>
+		</div>
+	);
+}
 
 /* ---------- Drawing ---------- */
 
@@ -349,6 +437,11 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 	const [newRecord, setNewRecord] = useState(false);
 	const [round, setRound] = useState(0); // one per deal: block ids restart, their keys must not
 	const [sound, setSound] = useState(true);
+	const [react, setReact] = useState<Mood | null>(null); // Bijou's reaction to the last big moment
+	const [sleepy, setSleepy] = useState(false);
+	const [hoard, setHoard] = useState(0);
+	const [grew, setGrew] = useState(0);
+	const [endGain, setEndGain] = useState(0);
 
 	const sRef = useRef<State | null>(null);
 	const phaseRef = useRef<Phase>('idle');
@@ -361,10 +454,22 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const boardRef = useRef<HTMLDivElement>(null);
 	const onEndRef = useRef<(s: State) => void>(() => {});
+	const rootRef = useRef<HTMLDivElement>(null);
+	const flyRef = useRef<HTMLDivElement>(null); // the layer the opening chests and their coins fly in
+	const chestChip = useRef<HTMLSpanElement>(null);
+	const goldChip = useRef<HTMLSpanElement>(null);
+	const butinRef = useRef(0); // the run's loot, counted as soon as a chest opens
+	const shownRef = useRef({ opened: 0, butin: 0 }); // what the counters show: they move as things land
+	const showsRef = useRef({ token: 0, pending: 0, started: 0 }); // a new deal bumps the token: old flights stop counting
+	const lockedRef = useRef(new Set<number>()); // chests that had a padlock: worth double
+	const reactRef = useRef<{ mood: Mood; until: number; timer: number }>({ mood: 'idle', until: 0, timer: 0 });
+	const hoardRef = useRef(0);
+	const moodRef = useRef<Mood>('idle');
 	modeRef.current = mode;
 
 	const lv = useLevels(gameId, eclatsLevels);
 	const sprites = useSprites();
+	const extra = useExtraArt();
 	menuRef.current = lv.menu;
 	const s = sRef.current;
 
@@ -374,12 +479,181 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 	}, []);
 
 	useEffect(() => { setSound(sfx.isEnabled()); }, []);
+	useEffect(() => {
+		try { hoardRef.current = Number(localStorage.getItem(HOARD_KEY) || 0); } catch { /* private mode */ }
+		setHoard(hoardRef.current);
+	}, []);
+
+	/* ---------- Bijou, the chests and the loot ---------- */
+
+	/** Bijou reacts to a moment, unless a bigger one is still showing. */
+	const reactTo = useCallback((mood: Mood) => {
+		const r = reactRef.current;
+		if (Date.now() < r.until && (MOOD_RANK[r.mood] ?? 0) > (MOOD_RANK[mood] ?? 0)) return;
+		clearTimeout(r.timer);
+		r.mood = mood;
+		r.until = Date.now() + REACT_MS;
+		r.timer = window.setTimeout(() => setReact(null), REACT_MS);
+		setReact(mood);
+	}, []);
+
+	/** Once nothing is flying any more, the counters show the true values. */
+	const settleShows = useCallback(() => {
+		if (showsRef.current.pending > 0) return;
+		shownRef.current = { opened: sRef.current?.opened ?? 0, butin: butinRef.current };
+		bump();
+	}, [bump]);
+
+	/** A new board: the flights of the old one are dropped and the counters start from `opened` / `butin`. */
+	const resetShows = useCallback((opened: number, butin: number) => {
+		showsRef.current.token++;
+		showsRef.current.pending = 0;
+		flyRef.current?.replaceChildren();
+		butinRef.current = butin;
+		shownRef.current = { opened, butin };
+		lockedRef.current.clear();
+		clearTimeout(reactRef.current.timer);
+		reactRef.current.until = 0;
+		setReact(null);
+	}, []);
+
+	const bounce = (el: HTMLElement | null): void => {
+		el?.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.28)' }, { transform: 'scale(1)' }], { duration: 240, easing: 'ease-out' });
+	};
+
+	/**
+	 * A chest pops out of its cell, grows and opens; its coins fountain up and fly into the loot counter,
+	 * then the open chest drops into the chest counter. Drawn in an HTML layer over the whole game, so the
+	 * next swipe can play underneath. Without the drawings or with reduced motion, the counters just move.
+	 */
+	const chestShow = (cell: number, gold: number, token: number): void => {
+		const shows = showsRef.current;
+		let landed = false;
+		const land = (): void => {
+			if (landed) return;
+			landed = true;
+			shows.pending = Math.max(0, shows.pending - 1);
+			settleShows();
+		};
+		const counts = (): boolean => token === shows.token && !landed;
+		const layer = flyRef.current;
+		const root = rootRef.current;
+		const board = boardRef.current;
+		if (token !== shows.token) return;
+		if (!layer || !root || !board || !spritesLoaded || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+			land();
+			return;
+		}
+		shows.started++;
+		const rr = root.getBoundingClientRect();
+		const br = board.getBoundingClientRect();
+		const k = br.width / (N * U + 3);
+		const size = U * k;
+		const x = br.left - rr.left + (cx(cell) + 1.5) * k;
+		const y = br.top - rr.top + (cy(cell) + 1.5) * k;
+		const half = (size * BIG) / 2;
+		const bx = Math.min(br.right - rr.left - half, Math.max(br.left - rr.left + half, x));
+		const by = Math.min(br.bottom - rr.top - half, Math.max(br.top - rr.top + half, y - size * 0.35));
+		const centre = (el: HTMLElement | null): [number, number] | null => {
+			if (!el) return null;
+			const r = el.getBoundingClientRect();
+			return [r.left - rr.left + r.width / 2, r.top - rr.top + r.height / 2];
+		};
+		const at = (px: number, py: number, w: number, more = ''): string => `translate(${px - w / 2}px, ${py - w / 2}px) ${more}`;
+		const img = (name: string, w: number, cls: string): HTMLImageElement => {
+			const im = document.createElement('img');
+			im.src = art(name);
+			im.alt = '';
+			im.className = cls;
+			im.style.width = `${w}px`;
+			layer.appendChild(im);
+			return im;
+		};
+		let parts = 0;
+		const done = (el: HTMLElement): void => {
+			el.remove();
+			if (--parts === 0) land();
+		};
+		// A throttled or interrupted animation must not leave the counters behind.
+		window.setTimeout(land, 3500);
+
+		if (extraLoaded.has('fx-rays')) {
+			const w = size * 3.4;
+			const rays = img('fx-rays', w, 'ec-flyer ec-bigrays');
+			parts++;
+			rays.animate(
+				[
+					{ transform: at(bx, by, w, 'scale(0.3) rotate(0deg)'), opacity: 0 },
+					{ transform: at(bx, by, w, 'scale(1) rotate(25deg)'), opacity: 1, offset: 0.3 },
+					{ transform: at(bx, by, w, 'scale(1.1) rotate(70deg)'), opacity: 0 },
+				],
+				{ duration: 1000, easing: 'ease-out', fill: 'both' },
+			).onfinish = () => done(rays);
+		}
+
+		const chest = img('chest', size, 'ec-flyer ec-bigchest');
+		const toChest = centre(chestChip.current);
+		parts++;
+		// Easings go on the keyframes: an overshooting easing on the whole effect would fling the chest past its target.
+		chest.animate(
+			[
+				{ transform: at(x, y, size, 'scale(1)'), easing: 'cubic-bezier(.3, 1.6, .5, 1)' },
+				{ transform: at(bx, by, size, `scale(${BIG})`), offset: 0.2 },
+				{ transform: at(bx, by, size, `scale(${BIG})`), offset: 0.68, easing: 'cubic-bezier(.5, 0, .8, .4)' },
+				toChest
+					? { transform: at(toChest[0], toChest[1], size, 'scale(0.45)'), opacity: 0.9 }
+					: { transform: at(bx, by, size, `scale(${BIG * 1.15})`), opacity: 0 },
+			],
+			{ duration: 1250, fill: 'both' },
+		).onfinish = () => {
+			if (counts() && toChest) {
+				shownRef.current.opened++;
+				bounce(chestChip.current);
+				sfx.stash();
+				bump();
+			}
+			done(chest);
+		};
+		window.setTimeout(() => {
+			if (extraLoaded.has('chest-open')) chest.src = art('chest-open');
+		}, 260);
+
+		const toGold = centre(goldChip.current);
+		const n = Math.min(10, 3 + Math.round(gold / 10));
+		for (let i = 0; i < n; i++) {
+			const w = size * 0.42;
+			const coin = img('coin', w, 'ec-flyer ec-bigcoin');
+			const share = i < n - 1 ? Math.floor(gold / n) : gold - Math.floor(gold / n) * (n - 1);
+			const sx = bx + (i - (n - 1) / 2) * size * 0.32;
+			const sy = by - size * (1.3 + (i % 3) * 0.25);
+			const [tx, ty] = toGold ?? [bx, by - size * 2];
+			parts++;
+			coin.animate(
+				[
+					{ transform: at(bx, by - size * 0.4, w, 'scale(0.4)'), opacity: 0, easing: 'ease-out' },
+					{ transform: at(sx, sy, w, 'scale(1.1) rotate(160deg)'), opacity: 1, offset: 0.38, easing: 'cubic-bezier(.5, 0, .9, .6)' },
+					{ transform: at(tx, ty, w, 'scale(0.7) rotate(360deg)'), opacity: toGold ? 1 : 0 },
+				],
+				{ duration: 760, delay: 300 + i * 50, fill: 'both' },
+			).onfinish = () => {
+				if (counts()) {
+					shownRef.current.butin += share;
+					sfx.coin(i);
+					if (i % 2 === 0 || i === n - 1) bounce(goldChip.current);
+					bump();
+				}
+				done(coin);
+			};
+		}
+	};
 
 	/** Deal a fresh game on `cfg`. `go` starts it at once (free play); else the ready gate. */
 	const deal = useCallback((cfg: EclatsCfg, go: boolean) => {
 		runRef.current++;
 		const st = createGame(cfg);
 		sRef.current = st;
+		resetShows(0, 0);
+		noteLocked(lockedRef.current, st.cells);
 		setCells(st.cells.map((b) => (b ? { ...b } : null)));
 		setGlow([]);
 		setPreview([]);
@@ -389,12 +663,13 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 		setToast(null);
 		setGaveUp(false);
 		setNewRecord(false);
+		setEndGain(0);
 		setElapsed(0);
 		setRound((r) => r + 1);
 		startRef.current = Date.now();
 		setPhase(go ? 'idle' : 'ready');
 		bump();
-	}, [bump, setPhase]);
+	}, [bump, setPhase, resetShows]);
 
 	/* Free play: endless, scored in points. */
 	const newFree = useCallback((t: TierKey) => {
@@ -435,7 +710,9 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 		modeRef.current = 'daily';
 		setGaveUp(false);
 		const tierOf = (i: number): TierKey => TIER_ORDER[i] ?? 'facile';
-		const run = loadDailyRun(gameId);
+		// A run saved by another version of the game is dropped, finished or not: the day starts over.
+		const saved = loadDailyRun(gameId);
+		const run = saved && isCurrentRun(saved.state) ? saved : null;
 		if (run && run.seed != null) {
 			const diffIndex = run.diffIndex ?? 0;
 			dailySeedRef.current = { seed: run.seed, diffIndex };
@@ -447,6 +724,8 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 			const back = unpackRun(run.state, cfg);
 			if (back) {
 				sRef.current = back;
+				resetShows(back.opened, (run.state as SavedRun).butin ?? 0);
+				noteLocked(lockedRef.current, back.cells);
 				setCells(back.cells.map((b) => (b ? { ...b } : null)));
 			}
 			if (run.done) {
@@ -472,7 +751,7 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 		setTierKey(t);
 		deal({ ...DAILY[t].cfg, seed }, false);
 		setDailyLoading(false);
-	}, [gameId, deal, bump, setPhase]);
+	}, [gameId, deal, bump, setPhase, resetShows]);
 
 	/* ▶ Commencer: starts the chrono; in the daily it spends the attempt. */
 	const begin = useCallback(() => {
@@ -485,7 +764,7 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 		trackGame(gameId, 'game_started');
 		if (modeRef.current === 'daily') {
 			const sd = dailySeedRef.current;
-			saveDailyRun(gameId, { startedAt: startRef.current, done: false, seed: sd?.seed, diffIndex: sd?.diffIndex, state: packRun(st) });
+			saveDailyRun(gameId, { startedAt: startRef.current, done: false, seed: sd?.seed, diffIndex: sd?.diffIndex, state: packRun(st, butinRef.current) });
 		}
 	}, [gameId, setPhase]);
 
@@ -496,6 +775,15 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 		const id = setInterval(() => setElapsed(Math.round((Date.now() - startRef.current) / 10)), 100);
 		return () => clearInterval(id);
 	}, [ticking, mode]);
+
+	// Bijou dozes off when nobody swipes for a while.
+	const movesNow = sRef.current?.moves ?? 0;
+	useEffect(() => {
+		setSleepy(false);
+		if (phase !== 'idle') return;
+		const t = window.setTimeout(() => setSleepy(true), 15000);
+		return () => clearTimeout(t);
+	}, [phase, movesNow]);
 
 	/* ---------- Playing a move's timeline ---------- */
 
@@ -511,8 +799,10 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 		let shown = steps[0].cells;
 		const show = (c: (Block | null)[]): void => {
 			shown = c;
+			noteLocked(lockedRef.current, c);
 			setCells(c);
 		};
+		const token = showsRef.current.token;
 		// Later waves play quicker, and a finger held on the board quicker still.
 		const pace = (wave: number): number => Math.max(0.4, 1 - 0.12 * Math.max(0, wave - 1)) * (fastRef.current ? 0.45 : 1);
 		for (const step of steps) {
@@ -548,9 +838,19 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 				if (step.comets.length) sfx.comet();
 				if (step.opened.length > late.filter((p) => p.kind === 'chest').length) sfx.chest();
 				opened += step.opened.length;
+				// Each chest pays its coins now; the show of it opening plays on its own, one after another.
+				step.popped.filter((p) => p.kind === 'chest').forEach((p, k) => {
+					const gold = CHEST_GOLD * step.wave * (lockedRef.current.has(p.id) ? 2 : 1);
+					butinRef.current += gold;
+					showsRef.current.pending++;
+					window.setTimeout(() => chestShow(p.cell, gold, token), (p.late ? COMET_MS : 40) + k * 200);
+				});
 				const named = step.fused.filter((f) => f.rank >= 3).sort((a, b) => b.rank - a.rank)[0];
 				if (named) setLabel({ id: fxId.current, cell: named.cell, text: `${RANK_NAMES[named.rank]} !` });
 				if (step.wave >= 2) setChain({ id: fxId.current, wave: step.wave });
+				if (step.wave >= 5 || step.releases.some((z) => z.rank >= MAX_RANK) || step.fused.some((f) => f.rank >= MAX_RANK)) reactTo('fly');
+				else if (step.wave >= 3) reactTo('cheer');
+				else if (step.opened.length) reactTo('wow');
 				if (step.wave >= 3 || step.releases.length >= 2 || top >= 3 || step.comets.length) setShake((x) => x + 1);
 				bump();
 				if (late.length) {
@@ -572,6 +872,7 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 			const parts = [waves >= 2 ? `Chaîne ×${waves}` : '', modeRef.current === 'free' ? `+${gained} points` : '', opened ? `🎁 ${opened} coffre${opened > 1 ? 's' : ''}` : ''].filter(Boolean);
 			setToast({ id: ++fxId.current, text: parts.join(' · ') });
 		}
+		settleShows();
 		if (st.status !== 'playing') {
 			setPhase('over');
 			onEndRef.current(st);
@@ -579,11 +880,13 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 			setPhase('idle');
 			if (modeRef.current === 'daily') {
 				const sd = dailySeedRef.current;
-				saveDailyRun(gameId, { startedAt: startRef.current, done: false, seed: sd?.seed, diffIndex: sd?.diffIndex, state: packRun(st) });
+				saveDailyRun(gameId, { startedAt: startRef.current, done: false, seed: sd?.seed, diffIndex: sd?.diffIndex, state: packRun(st, butinRef.current) });
 			}
 		}
 		bump();
-	}, [bump, gameId, setPhase]);
+		// chestShow only reads refs and module state.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [bump, gameId, setPhase, settleShows, reactTo]);
 
 	const doMove = useCallback((dir: Dir) => {
 		const st = sRef.current;
@@ -664,6 +967,17 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 		setElapsed(centis);
 		const m = modeRef.current;
 		if (st.status === 'won') sfx.win(); else sfx.lose();
+		// The loot goes to Bijou's treasure; a lost level loses it.
+		const gain = m === 'levels' && st.status !== 'won' ? 0 : butinRef.current;
+		setEndGain(gain);
+		if (gain > 0) {
+			hoardRef.current += gain;
+			try { localStorage.setItem(HOARD_KEY, String(hoardRef.current)); } catch { /* private mode */ }
+			window.setTimeout(() => {
+				setHoard(hoardRef.current);
+				setGrew((g) => g + 1);
+			}, 1300);
+		}
 		if (m === 'levels') {
 			lv.finish({ won: st.status === 'won', score: st.moves, raw: { points: st.score, centis } });
 		} else if (m === 'daily') {
@@ -675,7 +989,7 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 				abandoned: st.status !== 'won',
 				seed: sd?.seed,
 				diffIndex: sd?.diffIndex,
-				state: packRun(st),
+				state: packRun(st, butinRef.current),
 			};
 			saveDailyRun(gameId, snapshot);
 			setAlreadyPlayed(true);
@@ -715,6 +1029,8 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 					mode: modeRef.current, phase: phaseRef.current, status: st.status, moves: st.moves, opened: st.opened,
 					goal: st.cfg.goal, score: st.score, empty: st.cells.filter((b) => !b).length,
 					ranks: [2, 3, 4].map((r) => st.cells.filter((b) => b?.kind === 'gem' && b.rank === r).length),
+					butin: butinRef.current, shown: { ...shownRef.current }, shows: showsRef.current.started, flying: showsRef.current.pending,
+					hoard: hoardRef.current, mood: moodRef.current,
 				};
 			},
 			swipe(dir: Dir) { doMove(dir); },
@@ -741,11 +1057,19 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 	const toNext = s ? STEP_MOVES - (s.moves % STEP_MOVES) : 0;
 	const nudgeDir = nudge ? { up: [0, -1.2], down: [0, 1.2], left: [-1.2, 0], right: [1.2, 0] }[nudge.dir] : [0, 0];
 	const inFrom = { up: [0, U], down: [0, -U], left: [U, 0], right: [-U, 0] }[enter.dir];
+	const crowded = phase !== 'ready' && cells.length > 0 && cells.filter((b) => !b).length <= 5;
+	const mood: Mood = over ? (won ? 'dance' : 'sad') : react ?? (crowded ? 'scared' : sleepy ? 'sleep' : 'idle');
+	moodRef.current = mood;
+	const shownOpened = shownRef.current.opened;
+	const goldChipEl = (
+		<span ref={goldChip} className="ec-chip gold" title="Le butin des coffres ouverts">🪙 <strong>{fmtGold(shownRef.current.butin)}</strong></span>
+	);
 
 	return (
 		<ArtCtx.Provider value={sprites}>
-		<div className="ec-root">
+		<div className="ec-root" ref={rootRef}>
 			<style>{CSS}</style>
+			<div ref={flyRef} className="ec-flylayer" aria-hidden="true" />
 
 			<ModeToggle
 				daily={mode === 'daily'}
@@ -780,24 +1104,31 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 						<>
 							<span className="ec-chip">⭐ <strong>{s.score}</strong>{record ? <small> · record {record}</small> : null}</span>
 							<span className="ec-chip" title="Tous les quelques coups, un peu plus de la cinquième couleur">Palier {step + 1}<small> · {toNext} coup{toNext > 1 ? 's' : ''}</small></span>
+							{goldChipEl}
 						</>
 					) : (
 						<>
-							<span className="ec-chip">🎁 <strong>{s.opened}</strong>/{s.cfg.goal}</span>
+							<span ref={chestChip} className="ec-chip">🎁 <strong>{shownOpened}</strong>/{s.cfg.goal}</span>
 							<span className="ec-chip">👆 <strong>{s.moves}</strong> coup{s.moves > 1 ? 's' : ''}</span>
-							<span className="ec-chip chrono">{fmtCentis(elapsed)}</span>
+							{mode === 'daily' && <span className="ec-chip chrono">{fmtCentis(elapsed)}</span>}
+							{goldChipEl}
 						</>
 					)}
 					<button className="ec-sound" onClick={toggleSound} aria-label={sound ? 'Couper le son' : 'Remettre le son'}>{sound ? '🔊' : '🔇'}</button>
 				</div>
 			)}
 
-			{next.length > 0 && s && (
-				<div className="ec-next" aria-label="Prochains blocs">
-					<span>À venir</span>
-					{next.map((a, i) => <ArrivalChip key={i} a={a} />)}
-					<span className="ec-next-mid">au centre</span>
-					<ArrivalChip a={{ kind: 'gem', color: nextCentre(s) }} />
+			{s && (
+				<div className="ec-perch">
+					{next.length > 0 ? (
+						<div className="ec-next" aria-label="Prochains blocs">
+							<span>À venir</span>
+							{next.map((a, i) => <ArrivalChip key={i} a={a} />)}
+							<span className="ec-next-mid">au centre</span>
+							<ArrivalChip a={{ kind: 'gem', color: nextCentre(s) }} />
+						</div>
+					) : <span />}
+					<Bijou mood={mood} hoard={hoard} got={extra} grew={grew} />
 				</div>
 			)}
 
@@ -811,7 +1142,7 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 						viewBox={`-1.5 -1.5 ${N * U + 3} ${N * U + 3}`}
 						className={`ec-svg ${phase === 'ready' ? 'blurred' : ''} ${over && mode !== 'levels' ? 'dimmed' : ''}`}
 						role="application"
-						aria-label="Plateau d'Éclats : glisse pour tout faire glisser"
+						aria-label="Plateau de Dragon's Gems Swipe : glisse pour tout faire glisser"
 					>
 						<defs>
 							<radialGradient id="ec-halo">
@@ -909,13 +1240,10 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 														style={{ animationDelay: `${p.delay}ms`, ['--sx' as string]: `${[5, -5, 4, -4, 0, 1][k2] * (p.rank >= 2 ? 1.4 : 1)}px`, ['--sy' as string]: `${[-4, -3, 5, 4, -6, 6][k2] * (p.rank >= 2 ? 1.4 : 1)}px` }}
 													/>
 												))}
-												{p.kind === 'chest' && [0, 1, 2, 3, 4].map((k2) =>
-													sprites ? (
-														<image key={`c${k2}`} href={art('coin')} x={-1.6} y={-1.6} width={3.2} height={3.2} className="ec-coin art" style={{ animationDelay: `${p.delay + k2 * 40}ms`, ['--sx' as string]: `${(k2 - 2) * 2.4}px` }} />
-													) : (
-														<circle key={`c${k2}`} r={1} className="ec-coin" style={{ animationDelay: `${p.delay + k2 * 40}ms`, ['--sx' as string]: `${(k2 - 2) * 2.4}px` }} />
-													),
-												)}
+												{/* With the drawings, the chest's coins fly in the layer above (chestShow). */}
+												{p.kind === 'chest' && !sprites && [0, 1, 2, 3, 4].map((k2) => (
+													<circle key={`c${k2}`} r={1} className="ec-coin" style={{ animationDelay: `${p.delay + k2 * 40}ms`, ['--sx' as string]: `${(k2 - 2) * 2.4}px` }} />
+												))}
 											</>
 										)}
 									</g>
@@ -1000,6 +1328,7 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 							<div className="ec-mark">{newRecord ? '🏅' : '💥'}</div>
 							<h2>{s.score} points</h2>
 							<p className="ec-sub">{newRecord ? 'Nouveau record !' : record ? `Record ${record}` : ''} · {s.moves} coups · palier {step + 1} · {TIERS[tierKey].label}</p>
+							{endGain > 0 && <p className="ec-sub">🪙 +{fmtGold(endGain)} au trésor de Bijou</p>}
 							<button className="ec-start sm" onClick={() => newFree(tierKey)}>Rejouer</button>
 						</div>
 					</div>
@@ -1011,6 +1340,7 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 							<div className="ec-mark">{won ? '🎁' : '🧱'}</div>
 							<h2>{won ? `${s.cfg.goal} coffres en ${s.moves} coups` : gaveUp ? 'Défi abandonné' : 'Le plateau est plein'}</h2>
 							{won && <p className="ec-sub">{fmtCentis(elapsed)}</p>}
+							{endGain > 0 && <p className="ec-sub">🪙 +{fmtGold(endGain)} au trésor de Bijou</p>}
 							<DailyDone />
 						</div>
 					</div>
@@ -1022,7 +1352,11 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 						lastLevel={eclatsLevels.count}
 						won={lv.won}
 						stars={lv.stars}
-						detail={lv.won ? `${s?.moves ?? 0} coups${cfgLv ? ` · ★★★ ≤ ${cfgLv.three}, ★★ ≤ ${cfgLv.two}` : ''}` : 'Le plateau est plein'}
+						detail={
+							lv.won
+								? `${s?.moves ?? 0} coups${cfgLv ? ` · ★★★ ≤ ${cfgLv.three}, ★★ ≤ ${cfgLv.two}` : ''}${endGain ? ` · 🪙 +${fmtGold(endGain)} au trésor` : ''}`
+								: `Le plateau est plein${butinRef.current ? ` · le butin (${fmtGold(butinRef.current)}) est perdu` : ''}`
+						}
 						onNext={() => startLevel(lv.level + 1)}
 						onReplay={() => startLevel(lv.level)}
 						onMenu={lv.backToMenu}
@@ -1040,7 +1374,9 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 				(chargée, joyau, couronne) qui explose plus fort quand elle saute avec sa couleur : 3×3, 5×5, puis
 				toute sa couleur. Un carré de 4 lance une comète vers un coffre. Après chaque coup, de nouveaux blocs
 				entrent par le bord opposé et une gemme tombe au centre : les explosions s'enchaînent. Une explosion
-				à côté d'un coffre l'ouvre. Garde le doigt appuyé pour accélérer une longue chaîne.
+				à côté d'un coffre l'ouvre : ses pièces vont au butin, d'autant plus nombreuses que la chaîne est
+				longue (le double pour un coffre cadenassé). En fin de partie, le butin rejoint le trésor de Bijou, le
+				bébé dragon ; un niveau perdu le perd. Garde le doigt appuyé pour accélérer une longue chaîne.
 			</p>
 
 			{lv.active && lv.menu && (
@@ -1073,10 +1409,14 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 
 const CSS = `
 .ec-root {
-  width: 100%; max-width: 460px; margin-inline: auto;
+  position: relative; width: 100%; max-width: 460px; margin-inline: auto;
   color: var(--gray-0); font-family: var(--font-body);
   display: flex; flex-direction: column; align-items: center;
 }
+.ec-flylayer { position: absolute; inset: 0; z-index: 8; pointer-events: none; }
+.ec-flyer { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform; }
+.ec-bigchest { filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.35)); }
+.ec-bigcoin { filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.3)); }
 .ec-tag { text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500; margin-bottom: 0.6rem; }
 .ec-novelty {
   margin: 0 0 0.6rem; max-width: 420px; text-align: center; font-size: 12.5px; line-height: 1.45;
@@ -1096,8 +1436,49 @@ const CSS = `
   font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums;
 }
 .ec-chip strong { color: var(--accent-regular); }
+.ec-chip.gold strong { color: #d99a0b; }
 .ec-chip small { color: var(--gray-300); font-weight: 500; }
 .ec-sound { border: none; background: var(--gray-900); border-radius: 999px; width: 32px; height: 28px; cursor: pointer; font-size: 14px; }
+
+/* The arrivals on the left; Bijou on his pile at the board's top corner, over its frame but never a cell. */
+.ec-perch {
+  width: 100%; max-width: min(440px, 62vh); display: flex; align-items: flex-end; justify-content: space-between; gap: 6px;
+}
+.game-page:fullscreen .ec-perch { max-width: min(560px, calc(100dvh - 290px)); }
+.game-page:-webkit-full-screen .ec-perch { max-width: min(560px, calc(100dvh - 290px)); }
+/* Per pile size: the box height, the pile's offset (its drawing has empty space below), and how high Bijou sits on it. */
+.ec-bijou {
+  --k: 1; --h: 86px; --pb: -17px; --db: 12px;
+  position: relative; flex: none; width: calc(104px * var(--k)); height: calc(var(--h) * var(--k));
+  margin-bottom: -6px; margin-right: -4px; z-index: 3; pointer-events: none;
+}
+.ec-bijou.t1 { --h: 80px; --pb: -16px; --db: 6px; }
+.ec-bijou.t3 { --h: 104px; --pb: -14px; --db: 30px; }
+.ec-bijou.t4 { --h: 110px; --pb: -11px; --db: 36px; }
+.ec-pile { position: absolute; left: 0; bottom: calc(var(--pb) * var(--k)); width: 100%; transform-origin: 50% 85%; }
+.ec-pile.grew { animation: ec-grew 0.6s cubic-bezier(.3, 1.6, .5, 1); }
+.ec-drake {
+  position: absolute; left: 0; right: 0; bottom: calc(var(--db) * var(--k)); width: calc(74px * var(--k)); height: calc(74px * var(--k));
+  margin-inline: auto; transform-origin: 50% 100%;
+}
+.ec-dance img { position: absolute; inset: 0; width: 100%; height: 100%; }
+.ec-dance img:nth-child(2) { animation: ec-swap 0.5s steps(1) infinite; }
+.ec-hoardtag {
+  position: absolute; left: 50%; bottom: 1px; transform: translateX(-50%); white-space: nowrap;
+  background: rgba(16, 20, 30, 0.82); color: #ffe27a; border-radius: 999px; padding: 0 7px;
+  font-size: 10.5px; font-weight: 700; line-height: 16px; font-variant-numeric: tabular-nums;
+}
+.m-idle .ec-drake { animation: ec-breathe 1.7s ease-in-out infinite alternate; }
+.m-sleep .ec-drake { animation: ec-breathe 2.8s ease-in-out infinite alternate; }
+.m-wow .ec-drake { animation: ec-wow 0.45s cubic-bezier(.3, 1.6, .5, 1); }
+.m-cheer .ec-drake { animation: ec-hop 0.36s ease-in-out 4 alternate; }
+.m-fly .ec-drake { animation: ec-fly-up 1.5s ease-in-out; }
+.m-scared .ec-drake { animation: ec-shiver 0.14s linear infinite; }
+.m-sad .ec-drake { transform: translateY(3px) scale(0.97); }
+.m-dance .ec-drake { animation: ec-sway 0.5s ease-in-out infinite alternate; }
+@media (min-width: 600px) {
+  .ec-bijou { --k: 1.23; }
+}
 
 .ec-next { display: flex; align-items: center; gap: 3px; margin-bottom: 0.45rem; color: var(--gray-300); font-size: 11.5px; font-weight: 600; }
 .ec-next span { margin-right: 4px; }
@@ -1108,8 +1489,8 @@ const CSS = `
   position: relative; width: 100%; max-width: min(440px, 62vh); aspect-ratio: 1;
   touch-action: none; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; cursor: grab;
 }
-.game-page:fullscreen .ec-boardwrap { max-width: min(560px, calc(100dvh - 230px)); }
-.game-page:-webkit-full-screen .ec-boardwrap { max-width: min(560px, calc(100dvh - 230px)); }
+.game-page:fullscreen .ec-boardwrap { max-width: min(560px, calc(100dvh - 290px)); }
+.game-page:-webkit-full-screen .ec-boardwrap { max-width: min(560px, calc(100dvh - 290px)); }
 .ec-svg { display: block; width: 100%; height: 100%; }
 .ec-svg.blurred { filter: blur(4px); opacity: 0.55; }
 .ec-svg.dimmed { filter: brightness(0.55) saturate(0.8); }
@@ -1241,9 +1622,17 @@ const CSS = `
 @keyframes ec-toast { 0% { opacity: 0; transform: translate(-50%, 6px); } 10% { opacity: 1; transform: translate(-50%, 0); } 80% { opacity: 1; } 100% { opacity: 0; } }
 @keyframes ec-shake-a { 0%, 100% { transform: translate(0, 0); } 20% { transform: translate(-3px, 2px); } 40% { transform: translate(3px, -2px); } 60% { transform: translate(-2px, -1px); } 80% { transform: translate(1px, 2px); } }
 @keyframes ec-shake-b { 0%, 100% { transform: translate(0, 0); } 20% { transform: translate(3px, -2px); } 40% { transform: translate(-3px, 2px); } 60% { transform: translate(2px, 1px); } 80% { transform: translate(-1px, -2px); } }
+@keyframes ec-breathe { from { transform: scale(1, 1); } to { transform: scale(1.025, 0.97); } }
+@keyframes ec-wow { 0% { transform: scale(1); } 50% { transform: translateY(-5px) scale(1.12); } 100% { transform: scale(1); } }
+@keyframes ec-hop { from { transform: translateY(0) scale(1.02, 0.96); } to { transform: translateY(-9px) scale(0.98, 1.04); } }
+@keyframes ec-fly-up { 0% { transform: translateY(0); } 25% { transform: translateY(-22px) rotate(-6deg); } 50% { transform: translateY(-16px) rotate(5deg); } 75% { transform: translateY(-22px) rotate(-3deg); } 100% { transform: translateY(0); } }
+@keyframes ec-shiver { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-1.5px); } 75% { transform: translateX(1.5px); } }
+@keyframes ec-sway { from { transform: rotate(-6deg); } to { transform: rotate(6deg); } }
+@keyframes ec-swap { 0% { opacity: 0; } 50% { opacity: 1; } }
+@keyframes ec-grew { 0% { transform: scale(0.8); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) {
   .ec-cell { transition: none; }
   .ec-in, .ec-drop, .ec-grow, .ec-glow, .ec-pop, .ec-burst, .ec-sparkfly, .ec-shard, .ec-coin, .ec-fly, .ec-zone, .ec-wave, .ec-bolt, .ec-born, .ec-chain, .ec-label { animation-duration: 0.01s; }
-  .ec-core, .ec-charged, .ec-rank.r2 > g > path, .ec-rank.r2 > g > circle:first-child, .ec-twinkle, .ec-halo, .ec-orbit, .ec-rays, .ec-comet-star, .ec-chest, .ec-preview, .ec-boardwrap.shake-a, .ec-boardwrap.shake-b, .ec-nudge { animation: none; }
+  .ec-core, .ec-charged, .ec-rank.r2 > g > path, .ec-rank.r2 > g > circle:first-child, .ec-twinkle, .ec-halo, .ec-orbit, .ec-rays, .ec-comet-star, .ec-chest, .ec-preview, .ec-boardwrap.shake-a, .ec-boardwrap.shake-b, .ec-nudge, .ec-drake, .ec-dance img, .ec-pile { animation: none; }
 }
 `;

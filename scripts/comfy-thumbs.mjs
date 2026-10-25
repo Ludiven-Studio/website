@@ -1,6 +1,7 @@
 /*
  * Game card thumbnails: themed key art (local SDXL via ComfyUI), the Ludiven
- * cocotte on the left, and the real gameplay capture on a screen on the right.
+ * cocotte (or the game's own mascot, MASCOTS) on the left, and the real gameplay
+ * capture on a screen on the right.
  *
  *   npm run build && npm run og      # refresh the raw captures first
  *   node scripts/comfy-thumbs.mjs [id ...] [--no-gen]
@@ -243,6 +244,24 @@ export async function contentBox(shotPath, W, H) {
 	};
 }
 
+// A game with its own mascot shows it instead of the cocotte. Dragon's Gems: Bijou on a heap of gold, from
+// Codex's drawings in the local drop zone (tickets 0043-0044, gitignored like the art cache).
+const MASCOTS = {
+	eclats: async (w, h) => {
+		const pile = await sharp('.collab/out/0044/hoard-3.png').resize(w).png().toBuffer();
+		const d = Math.round(h * 0.6);
+		const drake = await sharp('.collab/out/0043/bijou-cheer.png').resize(d).png().toBuffer();
+		return sharp({ create: { width: w, height: h, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+			.composite([
+				// The heap's drawing ends 13.5 % above its frame's bottom: that line goes on the ground.
+				{ input: pile, top: h - Math.round(w * 0.865), left: 0 },
+				{ input: drake, top: Math.round(h * 0.02), left: Math.round((w - d) / 2) },
+			])
+			.png()
+			.toBuffer();
+	},
+};
+
 /** Compose one canvas: themed art + the capture shown on a screen standing in the scene. */
 async function compose(id, artPath, shotPath, W, H, outPath) {
 	const sw = Math.round(W * 0.44);
@@ -274,7 +293,7 @@ async function compose(id, artPath, shotPath, W, H, outPath) {
 	const mw = Math.round((mh * 110) / 116);
 	const my = Math.round(H - H * 0.045 - mh);
 	const mx = Math.round(W * 0.06);
-	const hen = await sharp(mascot(mw, mh)).png().toBuffer();
+	const hen = MASCOTS[id] ? await MASCOTS[id](mh, mh) : await sharp(mascot(mw, mh)).png().toBuffer();
 
 	await sharp(artPath)
 		.resize(W, H, { fit: 'cover' })

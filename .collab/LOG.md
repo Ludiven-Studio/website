@@ -36,3 +36,5 @@ Une ligne par ticket : date · id · résumé · décision.
 - 2026-10-25 · 0040 · fusions, carrés et grille plus grande (Codex) · retenus : 7×7, une gemme au centre en plus du bord (le centre seul tue les chaînes), effets par rang ; tranchés par l'utilisateur contre l'avis de Codex : gemmes de pouvoir (fusion à 4+, chargée → joyau → couronne) et comète sur carré 2×2 ; ralentis sur les gros moments
 - 2026-10-25 · 0041 · essai de gemmes et d'effets d'Éclats (Codex, images) · 12 images ; retenus les 5 gemmes, le joyau rouge et 4 effets ; rang 2 (cœur) et couronne refaits en 0042
 - 2026-10-25 · 0042 · série des gemmes par rang et pièces d'Éclats (Codex, images) · 18 images intégrées en WebP (scripts/eclats-sprites.mjs), dessins plats gardés en repli
+- 2026-10-25 · 0043 · essai de Bijou, le bébé dragon de Dragon's Gems (Codex, images) · 4 images retenues : Bijou au repos et qui applaudit, coffre ouvert, tas d'or moyen
+- 2026-10-25 · 0044 · série de Bijou, des tas d'or et des rayons (Codex, images) · 12 images retenues ; clignement aligné à 1-2 px ; Bijou remplace la cocotte sur la carte du jeu

@@ -156,12 +156,31 @@ export function comet(): void {
 	tone(c, 'sine', 600, 1800, 0.08, 0.3);
 }
 
-/** A chest opens: a chime and a little rain of coins. */
+/** A chest flies open: the lid swooshes up, then a chime and a little rain of coins. */
 export function chest(): void {
 	const c = gate('chest', 120);
 	if (!c) return;
-	[784, 988, 1175].forEach((f, i) => tone(c, 'triangle', f, f, 0.2, 0.25, i * 0.07));
-	for (let k = 0; k < 4; k++) tone(c, 'square', 2600 + k * 230, 2600 + k * 230, 0.025, 0.05, 0.18 + k * 0.05);
+	tone(c, 'sine', 220, 660, 0.14, 0.16);
+	noise(c, 'bandpass', 900, 1, 0.08, 0.16, 0, 3);
+	[784, 988, 1175, 1568].forEach((f, i) => tone(c, 'triangle', f, f, 0.2, 0.28, 0.1 + i * 0.07));
+	for (let k = 0; k < 4; k++) tone(c, 'square', 2600 + k * 230, 2600 + k * 230, 0.025, 0.05, 0.3 + k * 0.05);
+}
+
+/** A coin lands in the loot: a short ting, a little higher for each coin of the same chest. */
+export function coin(k: number): void {
+	const c = gate('coin', 25);
+	if (!c) return;
+	const f = 1760 * Math.pow(2, Math.min(12, k) / 24);
+	tone(c, 'sine', f, f, 0.07, 0.09);
+	tone(c, 'triangle', f * 2, f * 2, 0.025, 0.05);
+}
+
+/** An open chest drops into the counter. */
+export function stash(): void {
+	const c = gate('stash', 60);
+	if (!c) return;
+	tone(c, 'triangle', 392, 294, 0.14, 0.12);
+	noise(c, 'lowpass', 900, 0.7, 0.06, 0.08);
 }
 
 /** Level won: a rising arpeggio. */

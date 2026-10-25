@@ -179,8 +179,8 @@ export const games: GameTile[] = [
 	},
 	{
 		id: 'eclats',
-		title: 'Éclats',
-		pitch: 'Glisse tout le plateau comme dans 2048 : trois gemmes de la même couleur explosent, quatre fusionnent en une gemme plus forte, jusqu’à la couronne, et les explosions s’enchaînent. Fais sauter les coffres en un minimum de coups.',
+		title: 'Dragon’s Gems Swipe',
+		pitch: 'Aide Bijou, le bébé dragon, à remplir son trésor : glisse tout le plateau comme dans 2048, trois gemmes de la même couleur explosent, quatre fusionnent en une gemme plus forte, et les explosions s’enchaînent. Chaque coffre ouvert remplit le butin.',
 		icon: 'eclats',
 		href: '/jeux/eclats/',
 		status: 'play',

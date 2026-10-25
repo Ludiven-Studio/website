@@ -1,5 +1,6 @@
-// Éclats sprites: Codex's drawings (tickets 0041-0042, drop zone .collab/out/, gitignored) resized and
-// written as WebP to public/assets/jeux/eclats/. Same framing for a gem and its ranks, so no trim.
+// Éclats sprites: Codex's drawings (tickets 0041-0044, drop zone .collab/out/, gitignored) resized and
+// written as WebP to public/assets/jeux/eclats/. Same framing for a gem and its ranks, and for Bijou's
+// poses, so no trim.
 // Usage: node scripts/eclats-sprites.mjs
 import { mkdirSync, existsSync } from 'node:fs';
 import sharp from 'sharp';
@@ -11,8 +12,14 @@ const SOURCES = {
 		...[0, 1, 2, 3, 4].flatMap((c) => [2, 3, 4].map((r) => `gem-${c}-r${r}`)).filter((n) => n !== 'gem-0-r3'),
 		'chest', 'chest-locked', 'rock', 'coin',
 	],
+	'.collab/out/0043': ['bijou-idle', 'bijou-cheer', 'chest-open', 'hoard-2'],
+	'.collab/out/0044': [
+		'bijou-blink', 'bijou-wow', 'bijou-fly', 'bijou-scared', 'bijou-sad', 'bijou-dance-1', 'bijou-dance-2', 'bijou-sleep',
+		'hoard-1', 'hoard-3', 'hoard-4', 'fx-rays',
+	],
 };
-const SIZE = (name) => (name.startsWith('fx-') ? 256 : 192);
+// Bijou, his piles and the open chest show bigger than a cell.
+const SIZE = (name) => (/^(fx-|bijou-|hoard-|chest-open)/.test(name) ? 256 : 192);
 
 mkdirSync(OUT, { recursive: true });
 let n = 0;

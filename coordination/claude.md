@@ -710,3 +710,28 @@
   Fait et vérifié, pas de commit : en attente du feu vert de l'utilisateur.
 - 09:58 : commité et poussé à la demande de l'utilisateur : mes fichiers (dont les 28 images) et cette section
   seulement. Statut : terminé. Réservations libérées.
+
+## 2026-10-25 — Éclats : Dragon's Gems, le bébé dragon, les grands coffres et le butin (session website)
+- Statut : en cours (2026-10-25T12:07+01:00). Demande de l'utilisateur : habiller le jeu en kawaii pour une version
+  mobile : nom anglais Dragon's Gems, mascotte bébé dragon, coffres qui s'ouvrent en grand et remplissent le butin,
+  puis remise à zéro du défi du jour d'Éclats après la mise à jour
+- Réservations actives : `src/games/eclats/`, `public/assets/jeux/eclats/`, `public/assets/jeux/eclats.jpg`,
+  `public/assets/jeux/og/eclats.jpg`, `public/assets/jeux/tile/eclats.jpg`, `src/data/games.ts` (entrée eclats),
+  `src/data/tutorials.ts` (cartes eclats), `src/pages/jeux/eclats.astro`, `scripts/eclats-sprites.mjs`,
+  `scripts/check-eclats.mjs`, `scripts/generate-og.mjs` (DRIVE eclats), `.collab/tickets/0043-*`,
+  `.collab/tickets/0044-*`, `.collab/LOG.md`, `supabase/migrations/*_eclats_daily_reset.sql` (nouveau).
+- Ressources : serveur de dev sur le port 4473 ; eslint, `astro check`. Build annoncé ici avant.
+- 12:24 : essai Codex 0043 (Bijou au repos et qui applaudit, coffre ouvert, tas d'or) intégré ; grands coffres en
+  couche HTML (pièces vers la pastille 🪙, coffre vers 🎁), butin, trésor de Bijou, humeurs ; GEN_V 4 (un défi gardé par
+  l'ancienne version repart de zéro) ; nom Dragon's Gems (games.ts, eclats.astro, tutoriel) ; migration
+  20261025130000_eclats_daily_reset.sql écrite, pas poussée ; vitest 347/347, eslint et tsc OK. Série Codex 0044
+  lancée.
+- 12:42 : série Codex 0044 intégrée (16 nouvelles images WebP, 784 ko au total pour le jeu) ; check-eclats.mjs passe
+  (Bijou, grands coffres, compteurs, réactions, trésor). Réservation ajoutée : `scripts/comfy-thumbs.mjs` (Bijou à la
+  place de la cocotte sur la carte d'eclats). Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 12:45 : build complet OK (astro check 0 erreur, 153 pages, précache 310 entrées, liens OK) ; image du jeu refaite
+  (capture plus tôt dans scripts/generate-og.mjs, Bijou sur son tas à la place de la cocotte) ; en attente du feu vert
+  de l'utilisateur. Migration de remise à zéro à pousser seulement après la mise en ligne.
+- 12:49 : nom final « Dragon's Gems Swipe » (choix de l'utilisateur) ; commité et poussé à la demande de l'utilisateur
+  : mes 34 fichiers et cette section seulement ; migration de remise à zéro poussée sur Supabase juste après la mise en
+  ligne. Statut : terminé. Réservations libérées.
