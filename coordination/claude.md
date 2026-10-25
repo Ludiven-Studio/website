@@ -744,3 +744,21 @@
 - 14:13 : les deux pas de danse alternent (et un seul en mouvement réduit) ; check-eclats.mjs le vérifie (témoin : il
   échoue sur le site en ligne, 2 dragons) ; commité, en attente du feu vert pour pousser : mes 2 fichiers et cette
   section. Statut : terminé. Réservations libérées.
+
+## 2026-10-25 — Dragon's Gems Swipe : la jauge de Bijou et sa pluie de feu (session website)
+- Statut : en cours (2026-10-25T15:44+01:00). Demande de l'utilisateur : une jauge qui se remplit vers le dragon quand
+  on détruit des gemmes ; pleine, un clic déclenche un méga bonus dans la grille (choisi : pluie de feu, 3 boules de
+  feu)
+- Réservations actives : `src/games/eclats/`, `public/assets/jeux/eclats/`, `scripts/check-eclats.mjs`,
+  `scripts/eclats-sprites.mjs`, `src/data/tutorials.ts` (carte Éclats).
+- Ressources : serveur de dev sur le port 4473 ; eslint, `astro check`. Build annoncé ici avant.
+- 16:14 : moteur : jauge (40 gemmes, mesurée au robot : pleine dans 100 % des niveaux, vers la moitié), souffle = 3
+  boules de feu (coffres d'abord, puis le 3×3 le plus rempli), pas un coup, plateau plein non perdu tant que la jauge
+  est pleine ; picks.ts inchangé (le robot ne souffle pas). Écran : jauge sous le HUD vers Bijou, braises, Bijou
+  prêt/qui crache, boules de feu. Images Codex ticket 0045 (4). Réservations ajoutées :
+  `.collab/tickets/0045-dragons-gems-souffle.md`, `.collab/LOG.md`. vitest 352/352, eslint, astro check 0 erreur,
+  check-eclats.mjs OK. Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 16:15 : build complet OK (astro check 0 erreur, 153 pages, précache 310 entrées, liens OK). Non commité : en attente
+  du feu vert de l'utilisateur.
+- 16:41 : commité et poussé à la demande de l'utilisateur, avec la correction de la danse (7ebeee0) : mes 13 fichiers
+  et cette section seulement. Statut : terminé. Réservations libérées.

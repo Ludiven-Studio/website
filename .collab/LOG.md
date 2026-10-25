@@ -38,3 +38,4 @@ Une ligne par ticket : date · id · résumé · décision.
 - 2026-10-25 · 0042 · série des gemmes par rang et pièces d'Éclats (Codex, images) · 18 images intégrées en WebP (scripts/eclats-sprites.mjs), dessins plats gardés en repli
 - 2026-10-25 · 0043 · essai de Bijou, le bébé dragon de Dragon's Gems (Codex, images) · 4 images retenues : Bijou au repos et qui applaudit, coffre ouvert, tas d'or moyen
 - 2026-10-25 · 0044 · série de Bijou, des tas d'or et des rayons (Codex, images) · 12 images retenues ; clignement aligné à 1-2 px ; Bijou remplace la cocotte sur la carte du jeu
+- 2026-10-25 · 0045 · le souffle de Bijou (Codex, images) · 4 images retenues : Bijou prêt et qui crache le feu, boule de feu, flamme de la jauge

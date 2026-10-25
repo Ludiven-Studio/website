@@ -1,4 +1,4 @@
-// Éclats sprites: Codex's drawings (tickets 0041-0044, drop zone .collab/out/, gitignored) resized and
+// Éclats sprites: Codex's drawings (tickets 0041-0045, drop zone .collab/out/, gitignored) resized and
 // written as WebP to public/assets/jeux/eclats/. Same framing for a gem and its ranks, and for Bijou's
 // poses, so no trim.
 // Usage: node scripts/eclats-sprites.mjs
@@ -17,6 +17,7 @@ const SOURCES = {
 		'bijou-blink', 'bijou-wow', 'bijou-fly', 'bijou-scared', 'bijou-sad', 'bijou-dance-1', 'bijou-dance-2', 'bijou-sleep',
 		'hoard-1', 'hoard-3', 'hoard-4', 'fx-rays',
 	],
+	'.collab/out/0045': ['bijou-ready', 'bijou-breath', 'fx-fireball', 'fx-flame'],
 };
 // Bijou, his piles and the open chest show bigger than a cell.
 const SIZE = (name) => (/^(fx-|bijou-|hoard-|chest-open)/.test(name) ? 256 : 192);

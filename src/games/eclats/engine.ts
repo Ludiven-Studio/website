@@ -6,7 +6,8 @@
 // chest. After each wave everything slides again the same way. Once nothing explodes, the entry
 // edge (opposite the swipe) refills from the arrival stream and one gem drops at the centre; if
 // they make a group, the cascade goes on. Chests slide like blocks and open when an explosion
-// touches them.
+// touches them. Every gem destroyed fills Bijou's gauge; once it is full he can breathe three
+// fireballs on the board, a 3×3 blast each, chests first, and a full board is not lost while he can.
 //
 // play() returns a timeline of steps, each with a snapshot of the board after it, so the screen can
 // animate a move one step at a time while the engine stays a plain function.
@@ -23,6 +24,10 @@ export const MAX_RANK = 4;
 /** A group this big fuses into one gem a rank up; LEAP_AT and more, two ranks up. */
 export const FUSE_AT = 4;
 export const LEAP_AT = 5;
+/** Gems to destroy to fill Bijou's gauge: the bot fills it about halfway through a level, every level. */
+export const FIRE_FULL = 40;
+/** Fireballs in one breath, each a 3×3 blast. */
+export const FIREBALLS = 3;
 
 export interface Block {
 	id: number;
@@ -56,6 +61,7 @@ export interface State {
 	centred: number; // gems dropped at the centre so far
 	opened: number;
 	score: number;
+	fire: number; // Bijou's gauge: gems destroyed since his last breath, up to FIRE_FULL
 	status: Status;
 }
 
@@ -87,7 +93,8 @@ export interface Burst {
 export type Step =
 	| { t: 'slide'; cells: (Block | null)[] }
 	| Burst
-	| { t: 'arrive'; ids: number[]; centre: number; cells: (Block | null)[] }; // centre: the id dropped there, or -1
+	| { t: 'arrive'; ids: number[]; centre: number; cells: (Block | null)[] } // centre: the id dropped there, or -1
+	| { t: 'breath'; balls: number[]; cells: (Block | null)[] }; // where Bijou's fireballs land, before they do
 
 /* ---------- Helpers ---------- */
 
@@ -172,7 +179,7 @@ function groupSize(s: State, i: number): number {
 }
 
 export function createGame(cfg: EclatsCfg): State {
-	const s: State = { cfg, cells: new Array(N * N).fill(null), nextId: 1, moves: 0, arrivals: 0, centred: 0, opened: 0, score: 0, status: 'playing' };
+	const s: State = { cfg, cells: new Array(N * N).fill(null), nextId: 1, moves: 0, arrivals: 0, centred: 0, opened: 0, score: 0, fire: 0, status: 'playing' };
 	const rng = mulberry32(hash2(cfg.seed, 0x51a7));
 	const free = (inner: boolean): number[] =>
 		s.cells.map((b, i) => (b || (inner && (rc(i)[0] % (N - 1) === 0 || rc(i)[1] % (N - 1) === 0)) ? -1 : i)).filter((i) => i >= 0);
@@ -348,10 +355,13 @@ const POINTS = { chest: 100, rock: 20 };
 /** A gem is worth three of the rank below it. */
 export const gemPoints = (rank: number): number => 10 * 3 ** (rank - 1);
 
-/** One wave: explode or fuse every group, with everything it sets off. Null when nothing bursts. */
-function burst(s: State, dir: Dir, wave: number): Burst | null {
-	const groups = findGroups(s, dir);
-	if (!groups.length) return null;
+/**
+ * One wave: explode or fuse every group, with everything it sets off. Null when nothing bursts.
+ * `strike`: the cells Bijou's fireballs hit instead, without any group.
+ */
+function burst(s: State, dir: Dir, wave: number, strike?: number[]): Burst | null {
+	const groups = strike ? [] : findGroups(s, dir);
+	if (!groups.length && !strike) return null;
 	const step: Burst = { t: 'burst', wave, groups, popped: [], fused: [], releases: [], comets: [], opened: [], thawed: [], unlocked: [], points: 0, cells: [] };
 
 	// A big group fuses into its leading cell: that gem stays, the others fly into it.
@@ -405,6 +415,7 @@ function burst(s: State, dir: Dir, wave: number): Burst | null {
 		}
 	};
 	for (const g of groups) for (const i of g) add(i);
+	for (const i of strike ?? []) add(i);
 	drain();
 	// A fusion explodes too: what sits beside the gem it leaves is touched as well.
 	for (const i of keep) {
@@ -503,6 +514,7 @@ export function play(s: State, dir: Dir): Step[] | null {
 			wave++;
 			burstNow = true;
 			steps.push(b);
+			s.fire = Math.min(FIRE_FULL, s.fire + b.popped.filter((p) => p.kind === 'gem').length);
 			if (won()) break; // the last chest ends the level at once
 			if (slide(s, dir)) steps.push({ t: 'slide', cells: snap(s) });
 		}
@@ -512,7 +524,61 @@ export function play(s: State, dir: Dir): Step[] | null {
 		steps.push({ t: 'arrive', ids: a.ids, centre: a.centre, cells: snap(s) });
 	}
 	if (won()) s.status = 'won';
-	else if (!s.cells.some((b) => !b)) s.status = 'lost';
+	else if (!s.cells.some((b) => !b) && !canBreathe(s)) s.status = 'lost';
+	return steps;
+}
+
+/* ---------- Bijou's breath ---------- */
+
+/** A cell and its neighbours, the 3×3 a fireball blows up. */
+function around(i: number): number[] {
+	const [r, c] = rc(i);
+	const out: number[] = [];
+	for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) if (inside(r + dr, c + dc)) out.push(at(r + dr, c + dc));
+	return out;
+}
+
+export const canBreathe = (s: State): boolean => s.status === 'playing' && s.fire >= FIRE_FULL;
+
+/** Where the fireballs land: on the chests first, nearest Bijou's corner (top right), then on the 3×3 with the most gems left. */
+export function fireTargets(s: State): number[] {
+	const dist = (i: number): number => rc(i)[0] + (N - 1 - rc(i)[1]);
+	const hit = new Set<number>();
+	const balls: number[] = [];
+	const take = (i: number): void => {
+		balls.push(i);
+		for (const j of around(i)) hit.add(j);
+	};
+	const chests = s.cells.map((b, i) => (b?.kind === 'chest' ? i : -1)).filter((i) => i >= 0).sort((a, b) => dist(a) - dist(b) || a - b);
+	for (const i of chests) if (balls.length < FIREBALLS && !hit.has(i)) take(i);
+	while (balls.length < FIREBALLS) {
+		let best = 0;
+		let most = -1;
+		for (let i = 0; i < N * N; i++) {
+			if (balls.includes(i)) continue;
+			const n = around(i).filter((j) => !hit.has(j) && s.cells[j]?.kind === 'gem').length;
+			if (n > most) {
+				most = n;
+				best = i;
+			}
+		}
+		take(best);
+	}
+	return balls;
+}
+
+/**
+ * Bijou breathes: his gauge empties and three fireballs blow up a 3×3 each, opening what they touch like
+ * any explosion. Not a swipe: nothing slides, nothing arrives, the move count stays. Null unless the
+ * gauge is full. The timeline: where the balls land, then their one wave.
+ */
+export function breathe(s: State): Step[] | null {
+	if (!canBreathe(s)) return null;
+	s.fire = 0;
+	const balls = fireTargets(s);
+	const steps: Step[] = [{ t: 'breath', balls, cells: snap(s) }];
+	steps.push(burst(s, 'down', 1, balls.flatMap(around))!);
+	if (s.cfg.goal > 0 && s.opened >= s.cfg.goal) s.status = 'won';
 	return steps;
 }
 

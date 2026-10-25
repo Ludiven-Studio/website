@@ -1,9 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import {
 	CENTRE_ORDER,
+	FIRE_FULL,
 	MAX_RANK,
 	N,
 	arrivalAt,
+	breathe,
+	canBreathe,
 	createGame,
 	endlessStep,
 	entryEdge,
@@ -359,6 +362,76 @@ describe('setup and the end', () => {
 		const steps = play(s, 'left');
 		// The swipe fills the board back up: unless something explodes, it is over.
 		if (steps && !bursts(steps).length) expect(s.status).toBe('lost');
+	});
+});
+
+describe("Bijou's breath", () => {
+	const gemsGone = (steps: Step[]): number => bursts(steps).reduce((t, b) => t + b.popped.filter((p) => p.kind === 'gem').length, 0);
+
+	it('every gem a move destroys fills the gauge, up to full', () => {
+		const s = blank();
+		for (const c of [0, 1, 2]) put(s, B, c, 'gem', 0);
+		put(s, 0, N - 1, 'gem', 3);
+		const steps = play(s, 'down')!;
+		expect(gemsGone(steps)).toBeGreaterThanOrEqual(3);
+		expect(s.fire).toBe(gemsGone(steps));
+
+		const t = blank();
+		for (const c of [0, 1, 2]) put(t, B, c, 'gem', 0);
+		t.fire = FIRE_FULL - 1;
+		swipeDown(t);
+		expect(t.fire).toBe(FIRE_FULL);
+	});
+
+	it('only a full gauge breathes, and a breath is not a swipe', () => {
+		const s = blank();
+		put(s, 3, 3, 'gem', 0);
+		s.fire = FIRE_FULL - 1;
+		expect(canBreathe(s)).toBe(false);
+		expect(breathe(s)).toBeNull();
+		s.fire = FIRE_FULL;
+		const steps = breathe(s)!;
+		expect(steps.map((x) => x.t)).toEqual(['breath', 'burst']);
+		expect(s.fire).toBe(0);
+		expect(s.moves).toBe(0);
+		expect(s.cells[at(3, 3)]).toBeNull();
+	});
+
+	it('the fireballs land on the chests first, nearest Bijou, then on the thickest 3×3', () => {
+		const s = blank({ goal: 5 });
+		put(s, 5, 1, 'chest');
+		put(s, 1, 5, 'chest');
+		for (let r = 4; r < N; r++) for (let c = 4; c < N; c++) put(s, r, c, 'gem', (r + c) % 4);
+		put(s, 0, 0, 'gem', 1);
+		s.fire = FIRE_FULL;
+		const steps = breathe(s)!;
+		expect(steps[0].t === 'breath' && steps[0].balls).toEqual([at(1, 5), at(5, 1), at(5, 5)]);
+		expect(s.opened).toBe(2);
+		expect(s.cells.filter((b) => b).length).toBe(1); // the gem no fireball reached
+		expect(s.status).toBe('playing');
+	});
+
+	it('opening the last chest with a breath wins', () => {
+		const s = blank({ goal: 1 });
+		put(s, 3, 3, 'chest');
+		s.fire = FIRE_FULL;
+		breathe(s);
+		expect(s.status).toBe('won');
+	});
+
+	it('a full board is not lost while Bijou can breathe, and his breath makes room', () => {
+		const s = blank();
+		for (let i = 0; i < N * N; i++) s.cells[i] = { id: s.nextId++, kind: 'gem', color: ((i % N) + Math.floor(i / N) * 2) % 4, rank: 1, ice: false, lock: false };
+		s.cells[0] = null;
+		s.fire = FIRE_FULL;
+		const steps = play(s, 'left')!;
+		// The swipe fills the board back up without a group (seed 7): a loss, but for the gauge.
+		expect(bursts(steps)).toEqual([]);
+		expect(s.cells.every((b) => b)).toBe(true);
+		expect(s.status).toBe('playing');
+		expect(play(s, 'right')).toBeNull();
+		expect(breathe(s)).not.toBeNull();
+		expect(s.cells.filter((b) => !b).length).toBeGreaterThanOrEqual(9);
 	});
 });
 

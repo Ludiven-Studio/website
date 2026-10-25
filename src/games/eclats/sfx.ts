@@ -1,7 +1,8 @@
 /**
  * ÉCLATS — procedural sound effects (WebAudio, no assets), on the model of billard/sfx.ts.
  * A swipe whooshes, every wave of a chain plucks one note higher up a pentatonic scale, a fusion
- * rings, a charged gem thumps, a comet hisses, a chest chimes. Muting is a per-device preference.
+ * rings, a charged gem thumps, a comet hisses, a chest chimes, Bijou roars his fireballs out. Muting is a
+ * per-device preference.
  */
 
 const KEY = 'eclats-sound';
@@ -181,6 +182,23 @@ export function stash(): void {
 	if (!c) return;
 	tone(c, 'triangle', 392, 294, 0.14, 0.12);
 	noise(c, 'lowpass', 900, 0.7, 0.06, 0.08);
+}
+
+/** Bijou's gauge is full: a warm rising call. */
+export function ready(): void {
+	const c = gate('ready', 400);
+	if (!c) return;
+	[392, 523.25, 659.25, 783.99].forEach((f, i) => tone(c, 'triangle', f, f, 0.14, 0.2, i * 0.06));
+	noise(c, 'bandpass', 1200, 1.2, 0.05, 0.3, 0.1, 2);
+}
+
+/** Bijou breathes: a low growl swelling into a roaring whoosh of flame. */
+export function breath(): void {
+	const c = gate('breath', 300);
+	if (!c) return;
+	tone(c, 'sawtooth', 110, 70, 0.08, 0.5);
+	noise(c, 'bandpass', 300, 0.8, 0.3, 0.7, 0.05, 5);
+	noise(c, 'lowpass', 1400, 0.5, 0.18, 0.6, 0.12, 0.4);
 }
 
 /** Level won: a rising arpeggio. */

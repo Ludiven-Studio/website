@@ -1,9 +1,12 @@
-import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, useCallback, type KeyboardEvent as KeyEvent, type RefObject } from 'react';
 import {
 	CENTRE_ORDER,
+	FIRE_FULL,
 	MAX_RANK,
 	N,
 	STEP_MOVES,
+	breathe,
+	canBreathe,
 	cloneState,
 	createGame,
 	endlessStep,
@@ -44,7 +47,8 @@ import { withExpert } from '../../lib/difficulty';
    Swipe: every block slides to the wall; three of a colour touching explode, four or more fuse
    into a stronger gem, the board slides again and refills from the edge and the centre, wave
    after wave. Open the chests: each pops out big and pours its coins into the loot, which goes
-   to Bijou's treasure at the end. Engine: ./engine (pure, tested). Each move comes back as a
+   to Bijou's treasure at the end. Every gem destroyed fills Bijou's gauge; full, a tap on him sends
+   three fireballs onto the board. Engine: ./engine (pure, tested). Each move comes back as a
    timeline of steps that this file plays one by one.
    ===================================================== */
 
@@ -66,6 +70,8 @@ const CHEST_GOLD = 10; // a chest's coins, times the wave that opened it, double
 const HOARD_TIERS = [500, 2000, 5000]; // the pile under Bijou grows a size at each
 const BIG = 2.2; // how much an opening chest grows
 const REACT_MS = 1500;
+const BALL_MS = 420; // a fireball's flight from Bijou to the board
+const BALL_GAP = 170; // between two fireballs
 
 /** Gem colours, each with its own cut so they read without the colours. */
 const GEMS = [
@@ -115,6 +121,7 @@ interface SavedRun {
 	opened: number;
 	score: number;
 	butin: number;
+	fire?: number; // absent from runs saved before the gauge
 }
 
 const packRun = (s: State, butin: number): SavedRun => ({
@@ -126,6 +133,7 @@ const packRun = (s: State, butin: number): SavedRun => ({
 	opened: s.opened,
 	score: s.score,
 	butin,
+	fire: s.fire,
 });
 
 const isCurrentRun = (saved: unknown): boolean => (saved as SavedRun | null)?.v === GEN_V;
@@ -141,6 +149,7 @@ function unpackRun(saved: unknown, cfg: EclatsCfg): State | null {
 	s.centred = o.centred;
 	s.opened = o.opened;
 	s.score = o.score;
+	s.fire = o.fire ?? 0;
 	return s;
 }
 
@@ -188,6 +197,7 @@ const gemSprite = (color: number, rank: number): string => art(rank >= 2 ? `gem-
 const EXTRA = [
 	'bijou-idle', 'bijou-blink', 'bijou-cheer', 'bijou-wow', 'bijou-fly', 'bijou-scared', 'bijou-sad', 'bijou-dance-1', 'bijou-dance-2', 'bijou-sleep',
 	'chest-open', 'fx-rays', 'hoard-1', 'hoard-2', 'hoard-3', 'hoard-4',
+	'bijou-ready', 'bijou-breath', 'fx-fireball', 'fx-flame',
 ];
 const extraLoaded = new Set<string>();
 
@@ -209,19 +219,25 @@ function useExtraArt(): Set<string> {
 	return got;
 }
 
-type Mood = 'idle' | 'wow' | 'cheer' | 'fly' | 'scared' | 'sad' | 'dance' | 'sleep';
+type Mood = 'idle' | 'wow' | 'cheer' | 'fly' | 'scared' | 'sad' | 'dance' | 'sleep' | 'ready' | 'breath';
 const POSE: Record<Mood, string> = {
 	idle: 'bijou-idle', wow: 'bijou-wow', cheer: 'bijou-cheer', fly: 'bijou-fly', scared: 'bijou-scared', sad: 'bijou-sad', dance: 'bijou-dance-1', sleep: 'bijou-sleep',
+	ready: 'bijou-ready', breath: 'bijou-breath',
 };
-const MOOD_RANK: Partial<Record<Mood, number>> = { wow: 1, cheer: 2, fly: 3 };
+// A pose not drawn yet borrows the nearest one: the round mouth of wonder blows well enough.
+const STAND_IN: Record<string, string> = { 'bijou-breath': 'bijou-wow' };
+const MOOD_RANK: Partial<Record<Mood, number>> = { wow: 1, cheer: 2, fly: 3, breath: 4 };
 const hoardTier = (gold: number): number => 1 + HOARD_TIERS.filter((t) => gold >= t).length;
 const noteLocked = (seen: Set<number>, cells: (Block | null)[]): void => {
 	for (const b of cells) if (b?.kind === 'chest' && b.lock) seen.add(b.id);
 };
 const fmtGold = (n: number): string => n.toLocaleString('fr-FR');
 
-/** Bijou on his pile of gold, at the board's corner. He blinks at rest; the game sets his mood. */
-function Bijou({ mood, hoard, got, grew }: { mood: Mood; hoard: number; got: Set<string>; grew: number }) {
+/**
+ * Bijou on his pile of gold, at the board's corner. He blinks at rest; the game sets his mood. With
+ * `onTap` (his gauge is full) he is a button: a tap and he breathes.
+ */
+function Bijou({ mood, hoard, got, grew, onTap, boxRef }: { mood: Mood; hoard: number; got: Set<string>; grew: number; onTap?: () => void; boxRef: RefObject<HTMLDivElement | null> }) {
 	const [blink, setBlink] = useState(false);
 	useEffect(() => {
 		if (mood !== 'idle') return;
@@ -242,11 +258,25 @@ function Bijou({ mood, hoard, got, grew }: { mood: Mood; hoard: number; got: Set
 		};
 	}, [mood]);
 	if (!got.has('bijou-idle')) return null;
-	const pose = (name: string): string => art(got.has(name) ? name : 'bijou-idle');
+	const pose = (name: string): string => art(got.has(name) ? name : got.has(STAND_IN[name]) ? STAND_IN[name] : 'bijou-idle');
 	const tier = hoardTier(hoard);
 	const pile = `hoard-${tier}`;
+	const role = onTap
+		? {
+			role: 'button',
+			tabIndex: 0,
+			'aria-label': 'Bijou est prêt : touche-le pour cracher trois boules de feu',
+			onClick: onTap,
+			onKeyDown: (e: KeyEvent) => {
+				if (e.key !== 'Enter' && e.key !== ' ') return;
+				e.preventDefault();
+				e.stopPropagation();
+				onTap();
+			},
+		}
+		: { role: 'img', 'aria-label': `Bijou, le bébé dragon, sur son trésor de ${fmtGold(hoard)} pièces` };
 	return (
-		<div className={`ec-bijou m-${mood} t${tier}`} role="img" aria-label={`Bijou, le bébé dragon, sur son trésor de ${fmtGold(hoard)} pièces`}>
+		<div ref={boxRef} className={`ec-bijou m-${mood} t${tier}${onTap ? ' tap' : ''}`} {...role}>
 			{got.has(pile) && <img key={`p${grew}`} src={art(pile)} alt="" className={`ec-pile${grew ? ' grew' : ''}`} />}
 			{mood === 'dance' && got.has('bijou-dance-2') ? (
 				<span className="ec-drake ec-dance">
@@ -381,15 +411,23 @@ interface Fx {
 	fused: { cell: number; rank: number; delay: number }[];
 }
 
-/** When each thing of a wave goes: the group from its leading cell outward, blasts by distance, a comet's catch once it lands. */
-function timeFx(step: Burst): Omit<Fx, 'id'> {
+const cheb = (a: number, b: number): number => Math.max(Math.abs((a % N) - (b % N)), Math.abs(Math.floor(a / N) - Math.floor(b / N)));
+
+/**
+ * When each thing of a wave goes: the group from its leading cell outward, blasts by distance, a comet's catch
+ * once it lands. `balls`: Bijou's fireballs, landing BALL_GAP apart; what each one hits goes when it lands.
+ */
+function timeFx(step: Burst, balls: number[] = []): Omit<Fx, 'id'> {
 	const order = new Map<number, number>();
 	step.groups.forEach((g) => g.forEach((cell, k) => order.set(cell, Math.min(6, k) * 28)));
+	balls.forEach((b, k) => {
+		for (let i = 0; i < N * N; i++) if (cheb(i, b) <= 1 && !order.has(i)) order.set(i, k * BALL_GAP + cheb(i, b) * 40);
+	});
 	const near = (cell: number, late: boolean): number => {
 		const from = step.releases.filter((z) => z.late === late);
 		if (!from.length) return 60;
-		const d = Math.min(...from.map((z) => Math.max(Math.abs((z.cell % N) - (cell % N)), Math.abs(Math.floor(z.cell / N) - Math.floor(cell / N)))));
-		return 60 + d * 35;
+		// A blast set off by a fireball starts when that fireball lands.
+		return Math.min(...from.map((z) => (balls.length ? order.get(z.cell) ?? 0 : 0) + 60 + cheb(z.cell, cell) * 35));
 	};
 	const delayOf = (cell: number, late: boolean): number => (late ? COMET_MS : 0) + (order.get(cell) ?? near(cell, late));
 	const zones = [
@@ -442,6 +480,7 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 	const [hoard, setHoard] = useState(0);
 	const [grew, setGrew] = useState(0);
 	const [endGain, setEndGain] = useState(0);
+	const [pour, setPour] = useState(false); // the gauge pours into Bijou as he breathes
 
 	const sRef = useRef<State | null>(null);
 	const phaseRef = useRef<Phase>('idle');
@@ -459,12 +498,14 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 	const chestChip = useRef<HTMLSpanElement>(null);
 	const goldChip = useRef<HTMLSpanElement>(null);
 	const butinRef = useRef(0); // the run's loot, counted as soon as a chest opens
-	const shownRef = useRef({ opened: 0, butin: 0 }); // what the counters show: they move as things land
+	const shownRef = useRef({ opened: 0, butin: 0, fire: 0 }); // what the counters and the gauge show: they move as things land
 	const showsRef = useRef({ token: 0, pending: 0, started: 0 }); // a new deal bumps the token: old flights stop counting
 	const lockedRef = useRef(new Set<number>()); // chests that had a padlock: worth double
 	const reactRef = useRef<{ mood: Mood; until: number; timer: number }>({ mood: 'idle', until: 0, timer: 0 });
 	const hoardRef = useRef(0);
 	const moodRef = useRef<Mood>('idle');
+	const bijouRef = useRef<HTMLDivElement>(null);
+	const fireTrack = useRef<HTMLSpanElement>(null); // the gauge: embers fly to its filled end
 	modeRef.current = mode;
 
 	const lv = useLevels(gameId, eclatsLevels);
@@ -497,20 +538,20 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 		setReact(mood);
 	}, []);
 
-	/** Once nothing is flying any more, the counters show the true values. */
+	/** Once the move is over and nothing flies any more, the counters show the true values. */
 	const settleShows = useCallback(() => {
-		if (showsRef.current.pending > 0) return;
-		shownRef.current = { opened: sRef.current?.opened ?? 0, butin: butinRef.current };
+		if (showsRef.current.pending > 0 || phaseRef.current === 'busy') return;
+		shownRef.current = { opened: sRef.current?.opened ?? 0, butin: butinRef.current, fire: sRef.current?.fire ?? 0 };
 		bump();
 	}, [bump]);
 
-	/** A new board: the flights of the old one are dropped and the counters start from `opened` / `butin`. */
-	const resetShows = useCallback((opened: number, butin: number) => {
+	/** A new board: the flights of the old one are dropped and the counters start from `opened` / `butin` / `fire`. */
+	const resetShows = useCallback((opened: number, butin: number, fire: number) => {
 		showsRef.current.token++;
 		showsRef.current.pending = 0;
 		flyRef.current?.replaceChildren();
 		butinRef.current = butin;
-		shownRef.current = { opened, butin };
+		shownRef.current = { opened, butin, fire };
 		lockedRef.current.clear();
 		clearTimeout(reactRef.current.timer);
 		reactRef.current.until = 0;
@@ -647,12 +688,137 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 		}
 	};
 
+	/** Embers fly from the gems a wave destroyed to Bijou's gauge, which fills as they land. */
+	const feedFire = (step: Burst, token: number): void => {
+		const gems = step.popped.filter((p) => p.kind === 'gem');
+		if (!gems.length) return;
+		const shows = showsRef.current;
+		const add = (n: number): void => {
+			shownRef.current.fire = Math.min(FIRE_FULL, shownRef.current.fire + n);
+			bump();
+		};
+		const layer = flyRef.current;
+		const root = rootRef.current;
+		const board = boardRef.current;
+		const track = fireTrack.current;
+		if (!layer || !root || !board || !track || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+			add(gems.length);
+			return;
+		}
+		const rr = root.getBoundingClientRect();
+		const br = board.getBoundingClientRect();
+		const tr = track.getBoundingClientRect();
+		const k = br.width / (N * U + 3);
+		const w = U * k * 0.55;
+		const tx = tr.left - rr.left + tr.width * Math.min(1, (shownRef.current.fire + gems.length / 2) / FIRE_FULL);
+		const ty = tr.top - rr.top + tr.height / 2;
+		const n = Math.min(4, gems.length);
+		for (let i = 0; i < n; i++) {
+			const p = gems[Math.floor((i * gems.length) / n)];
+			const share = Math.floor(gems.length / n) + (i < gems.length % n ? 1 : 0);
+			const x = br.left - rr.left + (cx(p.cell) + 1.5) * k;
+			const y = br.top - rr.top + (cy(p.cell) + 1.5) * k;
+			const el = document.createElement(extraLoaded.has('fx-flame') ? 'img' : 'span');
+			if (el instanceof HTMLImageElement) {
+				el.src = art('fx-flame');
+				el.alt = '';
+			}
+			el.className = 'ec-flyer ec-ember';
+			el.style.width = `${w}px`;
+			el.style.height = `${w}px`;
+			layer.appendChild(el);
+			shows.pending++;
+			let landed = false;
+			const land = (): void => {
+				if (landed) return;
+				landed = true;
+				el.remove();
+				if (token !== shows.token) return;
+				shows.pending = Math.max(0, shows.pending - 1);
+				add(share);
+				settleShows();
+			};
+			window.setTimeout(land, 2000);
+			el.animate(
+				[
+					{ transform: `translate(${x - w / 2}px, ${y - w / 2}px) scale(0.4)`, opacity: 0, easing: 'ease-out' },
+					{ transform: `translate(${x - w / 2}px, ${y - w * 1.5}px) scale(1)`, opacity: 1, offset: 0.25, easing: 'cubic-bezier(.5, 0, .9, .5)' },
+					{ transform: `translate(${tx - w / 2}px, ${ty - w / 2}px) scale(0.5)`, opacity: 0.9 },
+				],
+				{ duration: 560, delay: 140 + i * 60, fill: 'both' },
+			).onfinish = land;
+		}
+	};
+
+	/**
+	 * Bijou's fireballs leave his mouth one after another and land on their cells, each with a flash, a
+	 * thump and a shake. False when nothing can fly (no drawings, reduced motion): the blasts just go.
+	 */
+	const fireballs = (balls: number[], token: number): boolean => {
+		const layer = flyRef.current;
+		const root = rootRef.current;
+		const board = boardRef.current;
+		const drake = bijouRef.current?.querySelector('.ec-drake');
+		if (!layer || !root || !board || !drake || !spritesLoaded || matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
+		const rr = root.getBoundingClientRect();
+		const br = board.getBoundingClientRect();
+		const dr = drake.getBoundingClientRect();
+		const k = br.width / (N * U + 3);
+		const size = U * k;
+		// Where the flame of the breathing pose starts, left of his face.
+		const mx = dr.left - rr.left + dr.width * 0.2;
+		const my = dr.top - rr.top + dr.height * 0.6;
+		const drawn = extraLoaded.has('fx-fireball');
+		const angle = (x0: number, y0: number, x1: number, y1: number): number => (Math.atan2(y1 - y0, x1 - x0) * 180) / Math.PI;
+		const img = (name: string, w: number, cls: string): HTMLImageElement => {
+			const im = document.createElement('img');
+			im.src = art(name);
+			im.alt = '';
+			im.className = cls;
+			im.style.width = `${w}px`;
+			layer.appendChild(im);
+			return im;
+		};
+		balls.forEach((cell, i) => {
+			const tx = br.left - rr.left + (cx(cell) + 1.5) * k;
+			const ty = br.top - rr.top + (cy(cell) + 1.5) * k;
+			const w = size * 1.7;
+			// Until it is drawn, the comet dyed orange stands in for the fireball (both have the head on the right).
+			const ball = img(drawn ? 'fx-fireball' : 'fx-comet', w, `ec-flyer ec-fireball${drawn ? '' : ' dyed'}`);
+			const [ax, ay] = [(mx + tx) / 2 - size * 0.8, Math.min(my, ty) - size * 0.5]; // the arc bulges up and out
+			const place = (x: number, y: number, a: number, sc: number): string => `translate(${x - w / 2}px, ${y - w / 2}px) rotate(${a}deg) scale(${sc})`;
+			ball.animate(
+				[
+					{ transform: place(mx, my, angle(mx, my, ax, ay), 0.35), opacity: 0 },
+					{ transform: place(ax, ay, angle(mx, my, tx, ty), 0.9), opacity: 1, offset: 0.45 },
+					{ transform: place(tx, ty, angle(ax, ay, tx, ty), 1.15), opacity: 1 },
+				],
+				{ duration: BALL_MS, delay: i * BALL_GAP, easing: 'ease-in', fill: 'both' },
+			).onfinish = () => {
+				ball.remove();
+				if (token !== showsRef.current.token) return;
+				sfx.blast(2);
+				setShake((x) => x + 1);
+				const fw = size * 3.4;
+				const flash = img('fx-burst', fw, 'ec-flyer ec-fireflash');
+				flash.animate(
+					[
+						{ transform: `translate(${tx - fw / 2}px, ${ty - fw / 2}px) scale(0.3)`, opacity: 1 },
+						{ transform: `translate(${tx - fw / 2}px, ${ty - fw / 2}px) scale(1.25)`, opacity: 0 },
+					],
+					{ duration: 380, easing: 'ease-out', fill: 'both' },
+				).onfinish = () => flash.remove();
+			};
+		});
+		return true;
+	};
+
 	/** Deal a fresh game on `cfg`. `go` starts it at once (free play); else the ready gate. */
 	const deal = useCallback((cfg: EclatsCfg, go: boolean) => {
 		runRef.current++;
 		const st = createGame(cfg);
 		sRef.current = st;
-		resetShows(0, 0);
+		resetShows(0, 0, 0);
 		noteLocked(lockedRef.current, st.cells);
 		setCells(st.cells.map((b) => (b ? { ...b } : null)));
 		setGlow([]);
@@ -724,7 +890,7 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 			const back = unpackRun(run.state, cfg);
 			if (back) {
 				sRef.current = back;
-				resetShows(back.opened, (run.state as SavedRun).butin ?? 0);
+				resetShows(back.opened, (run.state as SavedRun).butin ?? 0, back.fire);
 				noteLocked(lockedRef.current, back.cells);
 				setCells(back.cells.map((b) => (b ? { ...b } : null)));
 			}
@@ -796,6 +962,7 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 		const pointsBefore = st.score - steps.reduce((t, x) => t + (x.t === 'burst' ? x.points : 0), 0);
 		let waves = 0;
 		let opened = 0;
+		let balls: number[] = []; // Bijou's fireballs, when this is his breath
 		let shown = steps[0].cells;
 		const show = (c: (Block | null)[]): void => {
 			shown = c;
@@ -814,13 +981,24 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 				setEnter({ ids: new Set(step.ids), centre: step.centre, dir });
 				show(step.cells);
 				await wait(ARRIVE_MS * pace(waves));
+			} else if (step.t === 'breath') {
+				// The gauge pours into Bijou, he roars, and the next wave goes off as his fireballs land.
+				balls = step.balls;
+				shownRef.current.fire = 0;
+				setPour(true);
+				window.setTimeout(() => setPour(false), 450);
+				reactTo('breath');
+				sfx.breath();
+				if (fireballs(balls, token)) await wait(BALL_MS);
 			} else {
 				waves = step.wave;
-				setGlow(step.groups.flat());
-				await wait(GLOW_MS * pace(waves));
-				if (runRef.current !== my) return;
-				setGlow([]);
-				setFx({ id: ++fxId.current, ...timeFx(step) });
+				if (!balls.length) {
+					setGlow(step.groups.flat());
+					await wait(GLOW_MS * pace(waves));
+					if (runRef.current !== my) return;
+					setGlow([]);
+				}
+				setFx({ id: ++fxId.current, ...timeFx(step, balls) });
 				// What a comet catches stays on the board until it lands.
 				const late = step.popped.filter((p) => p.late);
 				if (late.length) {
@@ -828,7 +1006,11 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 					for (const p of late) mid[p.cell] = shown[p.cell];
 					show(mid);
 				} else show(step.cells);
-				sfx.pop(step.wave, step.popped.filter((p) => p.kind === 'gem').length);
+				// A fireball thumps as it lands; its gems feed nothing, the gauge was just spent.
+				if (!balls.length) {
+					sfx.pop(step.wave, step.popped.filter((p) => p.kind === 'gem').length);
+					feedFire(step, token);
+				}
 				const top = Math.max(0, ...step.releases.filter((z) => !z.late).map((z) => z.rank));
 				if (top) sfx.blast(top);
 				if (step.fused.length) {
@@ -843,7 +1025,8 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 					const gold = CHEST_GOLD * step.wave * (lockedRef.current.has(p.id) ? 2 : 1);
 					butinRef.current += gold;
 					showsRef.current.pending++;
-					window.setTimeout(() => chestShow(p.cell, gold, token), (p.late ? COMET_MS : 40) + k * 200);
+					const landing = balls.length ? BALL_GAP * Math.max(0, balls.findIndex((b) => cheb(b, p.cell) <= 1)) + 40 : p.late ? COMET_MS : 40;
+					window.setTimeout(() => chestShow(p.cell, gold, token), landing + k * 200);
 				});
 				const named = step.fused.filter((f) => f.rank >= 3).sort((a, b) => b.rank - a.rank)[0];
 				if (named) setLabel({ id: fxId.current, cell: named.cell, text: `${RANK_NAMES[named.rank]} !` });
@@ -862,17 +1045,21 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 					sfx.blast(Math.max(2, lateTop));
 					if (late.some((p) => p.kind === 'chest')) sfx.chest();
 				}
-				await wait(POP_MS * pace(waves));
+				await wait(POP_MS * pace(waves) + Math.max(0, balls.length - 1) * BALL_GAP);
 			}
 		}
 		if (runRef.current !== my) return;
 		setEnter({ ids: new Set(), centre: -1, dir });
 		const gained = st.score - pointsBefore;
-		if (waves >= 2 || opened) {
-			const parts = [waves >= 2 ? `Chaîne ×${waves}` : '', modeRef.current === 'free' ? `+${gained} points` : '', opened ? `🎁 ${opened} coffre${opened > 1 ? 's' : ''}` : ''].filter(Boolean);
+		if (waves >= 2 || opened || balls.length) {
+			const parts = [
+				balls.length ? '🔥 Souffle de Bijou' : '',
+				waves >= 2 ? `Chaîne ×${waves}` : '',
+				modeRef.current === 'free' ? `+${gained} points` : '',
+				opened ? `🎁 ${opened} coffre${opened > 1 ? 's' : ''}` : '',
+			].filter(Boolean);
 			setToast({ id: ++fxId.current, text: parts.join(' · ') });
 		}
-		settleShows();
 		if (st.status !== 'playing') {
 			setPhase('over');
 			onEndRef.current(st);
@@ -883,8 +1070,9 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 				saveDailyRun(gameId, { startedAt: startRef.current, done: false, seed: sd?.seed, diffIndex: sd?.diffIndex, state: packRun(st, butinRef.current) });
 			}
 		}
+		settleShows();
 		bump();
-		// chestShow only reads refs and module state.
+		// chestShow, feedFire and fireballs only read refs and module state.
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [bump, gameId, setPhase, settleShows, reactTo]);
 
@@ -903,6 +1091,17 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 		if (st.moves === 1 && modeRef.current === 'free') trackGame(gameId, 'game_started');
 		void runSteps(steps, dir);
 	}, [gameId, runSteps]);
+
+	/** A tap on Bijou (or his gauge) once it is full: his fireballs. */
+	const doBreathe = useCallback(() => {
+		const st = sRef.current;
+		if (!st || phaseRef.current !== 'idle' || menuRef.current) return;
+		sfx.unlock();
+		const steps = breathe(st);
+		if (!steps) return;
+		setPreview([]);
+		void runSteps(steps, 'down');
+	}, [runSteps]);
 
 	/** The block ids a swipe would explode by itself: what the finger sees before letting go. */
 	const previewIds = (dir: Dir): number[] => {
@@ -951,6 +1150,13 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 				begin();
 				return;
 			}
+			// Space breathes once the gauge is full, unless it is pressing a focused button.
+			const onControl = e.target instanceof Element && !!e.target.closest('button, a, [role="button"], [role="tab"]');
+			if (e.key === ' ' && !onControl && sRef.current && canBreathe(sRef.current)) {
+				e.preventDefault();
+				doBreathe();
+				return;
+			}
 			const dir = DIR_KEYS[e.key.length === 1 ? e.key.toLowerCase() : e.key];
 			if (!dir) return;
 			e.preventDefault();
@@ -958,7 +1164,7 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 		};
 		window.addEventListener('keydown', onKey, { passive: false });
 		return () => window.removeEventListener('keydown', onKey);
-	}, [begin, doMove]);
+	}, [begin, doMove, doBreathe]);
 
 	/* ---------- End of a run ---------- */
 
@@ -1019,7 +1225,7 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 		setSound(on);
 	};
 
-	/* Test hook for scripts/check-eclats.mjs: read the run, swipe without a finger. */
+	/* Test hook for scripts/check-eclats.mjs: read the run, swipe or breathe without a finger. */
 	useEffect(() => {
 		const w = window as unknown as { __eclats?: unknown };
 		w.__eclats = {
@@ -1030,10 +1236,11 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 					goal: st.cfg.goal, score: st.score, empty: st.cells.filter((b) => !b).length,
 					ranks: [2, 3, 4].map((r) => st.cells.filter((b) => b?.kind === 'gem' && b.rank === r).length),
 					butin: butinRef.current, shown: { ...shownRef.current }, shows: showsRef.current.started, flying: showsRef.current.pending,
-					hoard: hoardRef.current, mood: moodRef.current,
+					hoard: hoardRef.current, mood: moodRef.current, fire: st.fire, fireFull: FIRE_FULL,
 				};
 			},
 			swipe(dir: Dir) { doMove(dir); },
+			breathe() { doBreathe(); },
 			previewCount(dir: Dir) { return previewIds(dir).length; },
 		};
 		return () => { delete w.__eclats; };
@@ -1058,7 +1265,11 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 	const nudgeDir = nudge ? { up: [0, -1.2], down: [0, 1.2], left: [-1.2, 0], right: [1.2, 0] }[nudge.dir] : [0, 0];
 	const inFrom = { up: [0, U], down: [0, -U], left: [U, 0], right: [-U, 0] }[enter.dir];
 	const crowded = phase !== 'ready' && cells.length > 0 && cells.filter((b) => !b).length <= 5;
-	const mood: Mood = over ? (won ? 'dance' : 'sad') : react ?? (crowded ? 'scared' : sleepy ? 'sleep' : 'idle');
+	const shownFire = shownRef.current.fire;
+	const fireFull = !!s && s.status === 'playing' && phase !== 'ready' && !pour && shownFire >= FIRE_FULL;
+	const canTap = fireFull && phase === 'idle' && !lv.menu && !!s && canBreathe(s);
+	useEffect(() => { if (fireFull) sfx.ready(); }, [fireFull]);
+	const mood: Mood = over ? (won ? 'dance' : 'sad') : react ?? (fireFull ? 'ready' : crowded ? 'scared' : sleepy ? 'sleep' : 'idle');
 	moodRef.current = mood;
 	const shownOpened = shownRef.current.opened;
 	const goldChipEl = (
@@ -1120,15 +1331,37 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 
 			{s && (
 				<div className="ec-perch">
-					{next.length > 0 ? (
-						<div className="ec-next" aria-label="Prochains blocs">
-							<span>À venir</span>
-							{next.map((a, i) => <ArrivalChip key={i} a={a} />)}
-							<span className="ec-next-mid">au centre</span>
-							<ArrivalChip a={{ kind: 'gem', color: nextCentre(s) }} />
-						</div>
-					) : <span />}
-					<Bijou mood={mood} hoard={hoard} got={extra} grew={grew} />
+					<div className="ec-perch-side">
+						{/* Bijou's gauge fills toward him; full, it is a button like him. */}
+						<button
+							type="button"
+							className={`ec-fire${fireFull ? ' full' : ''}`}
+							onClick={doBreathe}
+							disabled={!canTap}
+							aria-label={canTap ? 'Souffle de Bijou : la jauge est pleine, touche pour cracher trois boules de feu' : `Souffle de Bijou : ${shownFire} gemmes sur ${FIRE_FULL}`}
+						>
+							<span className="ec-fire-name">Souffle</span>
+							<span ref={fireTrack} className="ec-fire-track">
+								<span key={pour ? 'pour' : 'fill'} className={`ec-fire-fill${pour ? ' pour' : ''}`} style={{ width: `${pour ? 100 : (100 * shownFire) / FIRE_FULL}%` }} />
+								{fireFull && <span className="ec-fire-cta">Touche Bijou !</span>}
+							</span>
+							{extra.has('fx-flame') ? <img src={art('fx-flame')} alt="" className="ec-fire-tip" /> : <span className="ec-fire-tip">🔥</span>}
+						</button>
+						{next.length > 0 ? (
+							<div className="ec-next" aria-label="Prochains blocs">
+								<span>À venir</span>
+								{next.map((a, i) => <ArrivalChip key={i} a={a} />)}
+								<span className="ec-next-mid">au centre</span>
+								<ArrivalChip a={{ kind: 'gem', color: nextCentre(s) }} />
+							</div>
+						) : (
+							// The row keeps its place once the game is decided, so nothing jumps while the last move plays.
+							<div className="ec-next" aria-hidden="true" style={{ visibility: 'hidden' }}>
+								<ArrivalChip a={{ kind: 'gem', color: 0 }} />
+							</div>
+						)}
+					</div>
+					<Bijou mood={mood} hoard={hoard} got={extra} grew={grew} onTap={canTap ? doBreathe : undefined} boxRef={bijouRef} />
 				</div>
 			)}
 
@@ -1376,7 +1609,10 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 				entrent par le bord opposé et une gemme tombe au centre : les explosions s'enchaînent. Une explosion
 				à côté d'un coffre l'ouvre : ses pièces vont au butin, d'autant plus nombreuses que la chaîne est
 				longue (le double pour un coffre cadenassé). En fin de partie, le butin rejoint le trésor de Bijou, le
-				bébé dragon ; un niveau perdu le perd. Garde le doigt appuyé pour accélérer une longue chaîne.
+				bébé dragon ; un niveau perdu le perd. Chaque gemme détruite remplit la jauge de souffle de Bijou :
+				pleine, touche Bijou (ou la barre d'espace) et il crache trois boules de feu, d'abord sur les coffres,
+				sinon là où les gemmes s'entassent. Ça ne compte pas comme un coup, et tant que la jauge est pleine,
+				un plateau plein n'est pas perdu. Garde le doigt appuyé pour accélérer une longue chaîne.
 			</p>
 
 			{lv.active && lv.menu && (
@@ -1481,6 +1717,39 @@ const CSS = `
 @media (min-width: 600px) {
   .ec-bijou { --k: 1.23; }
 }
+
+.ec-perch-side { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+/* Bijou's gauge, over the arrivals: it fills toward him; full, it glows and is a button. */
+.ec-fire {
+  display: flex; align-items: center; gap: 6px; width: 100%; margin: 0; padding: 0; border: none; background: none;
+  font: inherit; color: var(--gray-300); cursor: default; -webkit-tap-highlight-color: transparent;
+}
+.ec-fire:not(:disabled) { cursor: pointer; }
+.ec-fire-name { flex: none; font-size: 11.5px; font-weight: 600; }
+.ec-fire-track {
+  position: relative; flex: 1; height: 14px; border-radius: 999px; background: #1d2638;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+.ec-fire-fill {
+  position: absolute; left: 0; top: 0; bottom: 0; border-radius: inherit;
+  background: linear-gradient(90deg, #ffcf4a, #ff8a1f 55%, #ff4a2b); transition: width 0.25s ease-out;
+}
+.ec-fire-fill.pour { animation: ec-pour 0.42s ease-in forwards; }
+.ec-fire.full .ec-fire-track { box-shadow: 0 0 0 1.5px #ffcf4a, 0 0 12px 2px rgba(255, 138, 31, 0.75); animation: ec-fire-glow 0.8s ease-in-out infinite alternate; }
+.ec-fire.full .ec-fire-fill { background: linear-gradient(90deg, #ffcf4a, #ff8a1f, #ff4a2b, #ff8a1f, #ffcf4a); background-size: 200% 100%; animation: ec-flow 1.2s linear infinite; }
+.ec-fire-cta {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; white-space: nowrap;
+  font-size: 10.5px; font-weight: 800; color: #fff; text-shadow: 0 1px 2px rgba(122, 30, 0, 0.9);
+}
+.ec-fire-tip { flex: none; width: 22px; height: 22px; object-fit: contain; font-size: 16px; line-height: 22px; text-align: center; }
+.ec-fire.full .ec-fire-tip { animation: ec-flicker 0.4s ease-in-out infinite alternate; }
+span.ec-ember { border-radius: 50%; background: radial-gradient(circle, #fff6c8 0, #ffb02e 40%, rgba(255, 74, 43, 0) 70%); }
+.ec-fireball { filter: drop-shadow(0 0 6px rgba(255, 140, 40, 0.8)); }
+.ec-fireball.dyed { filter: hue-rotate(180deg) saturate(1.8) brightness(1.1) drop-shadow(0 0 6px rgba(255, 140, 40, 0.8)); }
+.ec-bijou.tap { pointer-events: auto; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.ec-bijou.tap:focus-visible { outline: 2px solid #ffcf4a; outline-offset: 2px; border-radius: 12px; }
+.m-ready .ec-drake { animation: ec-ready 0.8s ease-in-out infinite alternate; }
+.m-breath .ec-drake { animation: ec-roar 0.9s ease-out; }
 
 .ec-next { display: flex; align-items: center; gap: 3px; margin-bottom: 0.45rem; color: var(--gray-300); font-size: 11.5px; font-weight: 600; }
 .ec-next span { margin-right: 4px; }
@@ -1633,11 +1902,19 @@ const CSS = `
 @keyframes ec-step-a { 0% { opacity: 1; } 50% { opacity: 0; } 100% { opacity: 0; } }
 @keyframes ec-step-b { 0% { opacity: 0; } 50% { opacity: 1; } 100% { opacity: 1; } }
 @keyframes ec-grew { 0% { transform: scale(0.8); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
+@keyframes ec-fire-glow { from { filter: brightness(1); } to { filter: brightness(1.2); } }
+@keyframes ec-flow { from { background-position: 0 0; } to { background-position: -200% 0; } }
+@keyframes ec-pour { from { clip-path: inset(0 0 0 0); } to { clip-path: inset(0 0 0 100%); } }
+@keyframes ec-flicker { from { transform: scale(1) rotate(-4deg); } to { transform: scale(1.18) rotate(4deg); } }
+@keyframes ec-ready { from { transform: scale(1); filter: drop-shadow(0 0 2px rgba(255, 138, 31, 0.5)); } to { transform: scale(1.04); filter: drop-shadow(0 0 9px rgba(255, 138, 31, 0.95)); } }
+@keyframes ec-roar { 0% { transform: none; } 18% { transform: translateX(-3px) rotate(-6deg) scale(1.08); } 75% { transform: translateX(-3px) rotate(-6deg) scale(1.08); } 100% { transform: none; } }
 @media (prefers-reduced-motion: reduce) {
   .ec-cell { transition: none; }
   .ec-in, .ec-drop, .ec-grow, .ec-glow, .ec-pop, .ec-burst, .ec-sparkfly, .ec-shard, .ec-coin, .ec-fly, .ec-zone, .ec-wave, .ec-bolt, .ec-born, .ec-chain, .ec-label { animation-duration: 0.01s; }
   .ec-core, .ec-charged, .ec-rank.r2 > g > path, .ec-rank.r2 > g > circle:first-child, .ec-twinkle, .ec-halo, .ec-orbit, .ec-rays, .ec-comet-star, .ec-chest, .ec-preview, .ec-boardwrap.shake-a, .ec-boardwrap.shake-b, .ec-nudge, .ec-drake, .ec-dance img, .ec-pile { animation: none; }
   .ec-dance img:nth-child(1) { animation: none; }
   .ec-dance img:nth-child(2) { display: none; }
+  .ec-fire-fill { transition: none; }
+  .ec-fire-fill.pour, .ec-fire.full .ec-fire-track, .ec-fire.full .ec-fire-fill, .ec-fire.full .ec-fire-tip { animation: none; }
 }
 `;

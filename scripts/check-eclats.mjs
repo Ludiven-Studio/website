@@ -2,7 +2,8 @@
 // and Bijou load, the arrow keys swipe the board, a finger swipe does too (CDP touch events on a
 // phone-sized page), the blocks a swipe would explode light up while the finger is still down, a run of
 // swipes explodes blocks and opens chests big, their coins fill the loot, Bijou reacts, and the loot
-// goes to his treasure on a win (or is lost with the level), without a page error. Screenshots go to
+// goes to his treasure on a win (or is lost with the level), and in free play the destroyed gems fill
+// Bijou's gauge until a tap on him sends his fireballs, without a page error. Screenshots go to
 // --out (default D:/tmp/eclats-shots).
 // Usage: node scripts/check-eclats.mjs [--out <dir>] [--url https://www.ludiven-studio.fr]
 import { mkdirSync } from 'node:fs';
@@ -118,6 +119,54 @@ try {
 		}
 		await page.screenshot({ path: `${OUT}/desk-play.png` });
 		check('desktop: no page error', errors.length === 0, errors.slice(0, 3).join(' | ') || 'none');
+		await page.context().close();
+	}
+
+	/* ---- Free play: the gauge fills, a tap on Bijou sends his fireballs ---- */
+	{
+		const { page, errors } = await open(browser, { viewport: { width: 1280, height: 900 } });
+		await page.getByRole('tab', { name: /Libre/ }).click();
+		await until(page, (s) => s.mode === 'free' && s.phase === 'idle');
+		await page.evaluate(() => {
+			window.__seen = { ember: false, ball: false };
+			new MutationObserver(() => {
+				if (document.querySelector('.ec-flylayer .ec-ember')) window.__seen.ember = true;
+				if (document.querySelector('.ec-flylayer .ec-fireball')) window.__seen.ball = true;
+			}).observe(document.querySelector('.ec-flylayer'), { childList: true });
+		});
+		let s = await state(page);
+		for (let k = 0; k < 40 && s.fire < s.fireFull && s.phase !== 'over'; k++) {
+			const counts = await page.evaluate((dirs) => dirs.map((d) => window.__eclats.previewCount(d)), DIRS);
+			await page.evaluate((d) => window.__eclats.swipe(d), DIRS[counts.indexOf(Math.max(...counts))]);
+			await page.waitForTimeout(40);
+			await idle(page);
+			s = await state(page);
+		}
+		const ember = await page.evaluate(() => window.__seen.ember);
+		check("destroyed gems fill Bijou's gauge, embers flying into it", s.fire === s.fireFull && ember, `gauge ${s.fire}/${s.fireFull} after ${s.moves} moves, embers ${ember ? 'seen' : 'never seen'}`);
+		const ready = await page
+			.waitForFunction(() => !!document.querySelector('.ec-fire.full:not(:disabled)') && !!document.querySelector('.ec-bijou.tap'), null, { timeout: 5000, polling: 100 })
+			.then(() => '', (e) => e.message.slice(0, 160));
+		const st = await state(page);
+		check('a full gauge glows and Bijou becomes a button', !ready, `mood ${st.mood}, shown ${st.shown.fire}/${st.fireFull}, ${st.flying} flying, ${st.phase}${ready ? ` — ${ready}` : ''}`);
+		await page.waitForTimeout(400); // the fill's last stretch is a 0.25 s transition
+		await page.screenshot({ path: `${OUT}/breath-ready.png` });
+		const before = await state(page);
+		await page.click('.ec-bijou.tap');
+		await page.waitForTimeout(330);
+		await page.screenshot({ path: `${OUT}/breath-flight.png` });
+		await idle(page);
+		const after = await state(page);
+		const ball = await page.evaluate(() => window.__seen.ball);
+		check(
+			'a tap on Bijou sends his fireballs: the gauge empties, the board makes room, no swipe spent',
+			ball && after.fire === 0 && after.moves === before.moves && after.empty >= before.empty + 5 && after.score > before.score,
+			`fireballs ${ball ? 'seen' : 'never seen'}, gauge ${before.fire} → ${after.fire}, moves ${before.moves} → ${after.moves}, empty ${before.empty} → ${after.empty}, score ${before.score} → ${after.score}`,
+		);
+		await page.waitForTimeout(800);
+		s = await state(page);
+		check('the gauge shows empty again, Bijou back to his perch', s.shown.fire === 0 && !(await page.$('.ec-bijou.tap')), `shown ${s.shown.fire}, mood ${s.mood}`);
+		check('breath: no page error', errors.length === 0, errors.slice(0, 3).join(' | ') || 'none');
 		await page.context().close();
 	}
 
