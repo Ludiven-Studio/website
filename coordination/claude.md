@@ -638,3 +638,27 @@
   elle seule en attente) ; migration list : appliquée.
 - 00:55 : commité et poussé à la demande de l'utilisateur : mes 25 fichiers et cette section seulement. Statut :
   terminé. Réservations libérées.
+
+## 2026-10-25 — Éclats : concept plus fun (avis Codex) (session website)
+- Statut : en cours (2026-10-25T01:12+02:00). Demande de l'utilisateur : pas assez fun, pas assez de réactions en
+  chaîne ni de moments satisfaisants, le Démineur est trop compliqué : discuter avec Codex d'un concept plus fun pour
+  améliorer le jeu
+- Réservations actives : `src/games/eclats/`, `.collab/tickets/0037-eclats-plus-fun.md` (nouveau), `.collab/LOG.md`.
+- Ressources : serveur de dev sur le port 4473 ; eslint, `astro check`. Build annoncé ici avant.
+- 01:17 : mesures au robot (prototype hors dépôt) : seul un sol en filons colorés qui comptent dans les groupes triple
+  les cascades ; ticket 0037 clos, réservation ajoutée : `.collab/tickets/0038-eclats-filons-revue.md` (relecture du
+  concept fusionné par Codex).
+- 01:30 : nouveau concept choisi par l'utilisateur : « Glisse et explose » (2048 + chaînes) ; prototype mesuré (bord
+  rempli après chaque vague : 48-62 % de chaînes) ; ticket 0038 clos ; réservations ajoutées :
+  `.collab/tickets/0039-eclats-glisse-explose.md`, `src/data/tutorials.ts`, `src/data/games.ts`, `src/data/dailyLb.ts`,
+  `src/pages/jeux/eclats.astro`, `scripts/check-eclats.mjs`, `scripts/eclats-levels.ts`, `scripts/generate-og.mjs`,
+  `scripts/thumb-themes.mjs`, `public/assets/jeux/eclats.jpg`, `public/assets/jeux/og/eclats.jpg`,
+  `public/assets/jeux/art/eclats.jpg`, `public/assets/jeux/tile/eclats.jpg`.
+- 01:47 : moteur, robot, niveaux (picks.ts régénéré), écran, sons faits ; vitest 337/337, check-eclats.mjs OK.
+  Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 01:50 : image du jeu refaite (capture + décor ComfyUI, ComfyUI arrêté), ticket 0039 clos. Lancement du build complet
+  (écrit dist/, .astro/, public/vendor/)…
+- 01:51 : build complet OK : astro check 0 erreur, 153 pages, précache 310 entrées, liens OK. Fait et vérifié, pas de
+  commit : en attente du feu vert de l'utilisateur. Aucun changement Supabase.
+- 07:20 : commité et poussé à la demande de l'utilisateur : mes 24 fichiers et cette section seulement. Statut :
+  terminé. Réservations libérées.

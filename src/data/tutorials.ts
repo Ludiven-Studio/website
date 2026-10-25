@@ -124,12 +124,11 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '🔁', title: 'Expert', body: 'En Expert et à partir du niveau 101, les bords bouclent : un tuyau qui sort à droite ressort à gauche. Les indices du contour disparaissent — tout se déduit du réseau lui-même.' },
 	],
 	eclats: [
-		{ emoji: '💎', title: 'Le but', body: 'Des gemmes tombent sur le plateau, et sous le plateau le sol cache des trésors. Déterre-les tous avant que la pile n’atteigne le haut.' },
-		{ emoji: '👆', title: 'Comment jouer', body: 'Glisse le doigt sur le plateau pour déplacer la pièce, touche-le pour la tourner, glisse vite vers le bas pour la lâcher. Ou les boutons ◀ ⟳ ▶ ⤓ ; au clavier, les flèches, ↑ pour tourner, Espace pour lâcher. L’ombre montre où la pièce tombera.' },
-		{ emoji: '⛏️', title: 'Creuser', body: 'Trois gemmes de la même couleur alignées éclatent. Chaque gemme qui éclate creuse une case du sol sous sa colonne : une ligne couchée creuse trois colonnes, une ligne debout creuse trois cases d’une même colonne.' },
-		{ emoji: '🔢', title: 'Les chiffres', body: 'Une case creusée montre combien de trésors se cachent dans les 8 cases autour d’elle, ceux déjà trouvés compris. Touche une case du sol pour y planter un drapeau.' },
-		{ emoji: '💣', title: 'Gemmes spéciales', body: '4 gemmes alignées laissent une bombe, qui emporte tout autour d’elle. 5 laissent un arc-en-ciel : il remplace n’importe quelle couleur, et quand il éclate, toutes les gemmes de cette couleur éclatent avec lui.' },
-		{ emoji: '🎁', title: 'Les bonus', body: 'Chaque trésor donne un bonus : ⛏️ la pioche creuse la case de ton choix, 📡 le radar montre une case sans la creuser, ⏳ le sablier ralentit la chute. Tu commences avec une pioche : garde-la pour le trésor que tu as deviné.' },
+		{ emoji: '👆', title: 'Glisse', body: 'Glisse le doigt sur le plateau (ou les flèches du clavier) : tous les blocs glissent jusqu’au bout, comme dans 2048. Pendant que tu glisses, les blocs qui vont exploser brillent.' },
+		{ emoji: '💥', title: 'Explose', body: '3 blocs de la même couleur qui se touchent explosent. Tout reglisse dans le même sens, et de nouveaux blocs entrent par le bord opposé : les explosions s’enchaînent toutes seules.' },
+		{ emoji: '🎁', title: 'Les coffres', body: 'Une explosion juste à côté d’un coffre l’ouvre. Ouvre le nombre de coffres demandé, en le moins de coups possible pour les 3 étoiles. La bande « À venir » annonce les prochains blocs, coffres compris.' },
+		{ emoji: '💣', title: 'Bombes et étoiles', body: '4 blocs d’un coup laissent une bombe : une explosion à côté la fait sauter, avec tout son carré, et les bombes voisines suivent. 6 blocs laissent une étoile, qui fait sauter toute sa couleur.' },
+		{ emoji: '⚡', title: 'Astuce', body: 'Garde le doigt appuyé sur le plateau pour accélérer une longue chaîne. En mode Libre, le plateau finit par se remplir : la cinquième couleur arrive petit à petit, à chaque palier.' },
 	],
 	bulles: [
 		{ emoji: '🫧', title: 'Le but', body: 'Un radeau de bulles de couleur est accroché en haut de l\'écran. Vide-le entièrement, en un minimum de tirs.' },

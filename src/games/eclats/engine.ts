@@ -1,126 +1,88 @@
-// Éclats engine — pure, no DOM. Falling pieces of 2-3 gems over a 7×12 board, three of a colour
-// in a line burst, and every column a burst touches digs one cell of the ground below. Dug cells
-// show how many treasures hide around them, Minesweeper style; unearth them all before the pile
-// reaches the top.
+// Éclats engine — « Glisse et explose ». Pure, no DOM.
+// A swipe slides every block to the wall (2048, no merging). Three or more of a colour touching by
+// their sides explode; in a fixed order the specials appear and everything slides again the same
+// way, wave after wave. Once nothing explodes, the entry edge (opposite the swipe) refills from the
+// arrival stream, and if the arrivals make a group, the cascade goes on. Chests slide like blocks
+// and open when an explosion touches them.
 //
-// Every gem that bursts digs one cell in its own column: a flat line of three digs three columns
-// one cell each, an upright one drills one column three cells deep.
-//
-// The board is row-major, row 0 at the top. The ground sits under the board, row 0 just below the
-// floor. Gems never enter the ground, so its numbers stay readable.
-//
-// The UI drives one turn as: steer the piece → lockPiece() → resolveWave() until it returns null
-// (it animates each wave) → endTurn(). settle() runs the same waves without pauses (tests, bot).
+// play() returns a timeline of steps, each with a snapshot of the board after it, so the screen can
+// animate a move one step at a time while the engine stays a plain function.
 
-import { mulberry32, type Rng } from '../prng';
+import { mulberry32 } from '../prng';
 
-export const COLS = 7;
-export const ROWS = 12;
+export const N = 6;
+export type Dir = 'up' | 'right' | 'down' | 'left';
+export const DIRS: Dir[] = ['up', 'right', 'down', 'left'];
+export type Kind = 'gem' | 'bomb' | 'star' | 'chest' | 'rock';
 
-export type GemKind = 'gem' | 'bomb' | 'rainbow' | 'stone';
-export type Booster = 'pioche' | 'radar' | 'sablier';
-export const BOOSTERS: Booster[] = ['pioche', 'radar', 'sablier'];
-export type Shape = 'I2' | 'I3' | 'L3';
-
-export interface Gem {
+export interface Block {
 	id: number;
-	color: number; // meaningless on a stone or a rainbow
-	kind: GemKind;
-	ice: boolean; // the first hit only breaks the ice
-	lock: boolean; // pinned: does not fall and cannot line up until a neighbour bursts
+	kind: Kind;
+	color: number; // gems and stars only
+	ice: boolean; // a frozen gem stays put until an explosion beside it thaws it
+	lock: boolean; // a locked chest takes two explosions
 }
 
 export interface EclatsCfg {
 	seed: number;
-	colors: number; // 3..5
-	depth: number; // ground layers
-	treasures: number;
-	traps: number; // a dug trap pushes a row of stones under the pile
-	hard: number; // share of ground cells that take two digs
-	pile: number; // rows of gems already on the board
-	ice: number; // frozen gems in that starting pile
-	locks: number; // locked gems in that starting pile
-	fallMs: number; // one row per fallMs
-	trios: number; // share of 3-gem pieces
-	clues: number; // top-layer cells already open at the start
-	bonusEvery: number; // a booster every this many treasures
-	floorOnly?: boolean; // experiment: only gems resting on the ground dig
-}
-
-export interface Ground {
-	cols: number;
-	depth: number;
-	treasure: Uint8Array;
-	trap: Uint8Array;
-	hard: Uint8Array; // digs still needed before the cell opens, minus one
-	dug: Uint8Array;
-	seen: Uint8Array; // shown by the radar without being dug
-	flag: Uint8Array; // marked by the player as a likely treasure
-}
-
-export interface Piece {
-	shape: Shape;
-	rot: number;
-	x: number; // pivot column
-	y: number; // pivot row
-	colors: number[];
-}
-
-export interface Pos {
-	r: number;
-	c: number;
+	fifth: number; // share of gems in the fifth colour (0 = four colours)
+	goal: number; // chests to open (0 = endless, scored in points)
+	chests: number; // chests on the board at the start
+	locked: number; // how many of them are locked
+	chestEvery: number; // every this many arrivals, a chest (0 = none): announced in the preview
+	rocks: number; // fixed rocks at the start
+	ice: number; // frozen gems at the start
+	fill: number; // share of the board filled at the start
+	bombAt: number; // group size that leaves a bomb
+	starAt: number; // group size that leaves a star (0 = never)
 }
 
 export type Status = 'playing' | 'won' | 'lost';
 
 export interface State {
 	cfg: EclatsCfg;
-	board: (Gem | null)[];
-	ground: Ground;
-	piece: Piece | null;
-	pieceIndex: number; // pieces dealt so far, the current one included
+	cells: (Block | null)[];
 	nextId: number;
-	found: number;
+	moves: number;
+	arrivals: number; // blocks dealt from the stream so far
+	opened: number;
 	score: number;
-	chain: number; // waves in the current turn
-	boosters: Record<Booster, number>;
-	boosterBag: number; // treasures paid out so far: walks the booster order
-	pendingStones: number;
-	moved: Set<number>; // gem ids that landed or fell this wave: a special forms on one of them
 	status: Status;
-	lockMs: number; // time the piece has rested on something
-	lockResets: number;
-	fallAcc: number;
-	field: number; // endless mode: grounds cleared so far
-	endless: boolean;
 }
 
-export interface Dig {
-	c: number;
-	r: number;
-	opened: boolean; // false when it only cracked a hard cell
-	treasure: boolean;
-	trap: boolean;
-	booster: Booster | null;
+export interface Popped {
+	id: number;
+	cell: number;
+	kind: Kind;
+	color: number;
 }
 
-export interface Wave {
-	popped: { id: number; r: number; c: number; color: number; kind: GemKind }[];
-	cracked: Pos[]; // ice broken in place
-	unlocked: Pos[];
-	specials: { id: number; r: number; c: number; kind: 'bomb' | 'rainbow' }[];
-	blasts: Pos[]; // bomb centres
-	digs: Dig[];
-	chain: number;
+export interface Burst {
+	t: 'burst';
+	wave: number;
+	groups: number[][]; // each in flood order from its leading cell
+	popped: Popped[]; // everything gone in this wave
+	opened: number[]; // chest cells opened
+	blasts: number[]; // bomb cells that went off
+	stars: number[]; // star cells that went off
+	thawed: number[];
+	unlocked: number[];
+	specials: { id: number; cell: number; kind: 'bomb' | 'star' }[];
 	points: number;
+	cells: (Block | null)[];
 }
+
+export type Step = { t: 'slide'; cells: (Block | null)[] } | Burst | { t: 'arrive'; ids: number[]; cells: (Block | null)[] };
 
 /* ---------- Helpers ---------- */
 
-const idx = (r: number, c: number): number => r * COLS + c;
-export const inBoard = (r: number, c: number): boolean => r >= 0 && r < ROWS && c >= 0 && c < COLS;
+export const rc = (i: number): [number, number] => [Math.floor(i / N), i % N];
+const at = (r: number, c: number): number => r * N + c;
+const inside = (r: number, c: number): boolean => r >= 0 && r < N && c >= 0 && c < N;
+const STEP: Record<Dir, [number, number]> = { up: [-1, 0], right: [0, 1], down: [1, 0], left: [0, -1] };
+const NEIGH: [number, number][] = [[-1, 0], [1, 0], [0, -1], [0, 1]];
 
-/** Stable 32-bit mix of a seed and a counter, so piece n is the same whatever came before it. */
+/** Stable 32-bit mix of a seed and a counter. */
 export function hash2(a: number, b: number): number {
 	let x = (Math.imul(a | 0, 0x9e3779b1) ^ Math.imul(b + 0x7f4a7c15, 0x85ebca6b)) >>> 0;
 	x = Math.imul(x ^ (x >>> 16), 0x7feb352d) >>> 0;
@@ -128,662 +90,342 @@ export function hash2(a: number, b: number): number {
 	return (x ^ (x >>> 16)) >>> 0;
 }
 
-/* ---------- Pieces ---------- */
+const movable = (b: Block | null): boolean => !!b && b.kind !== 'rock' && !b.ice;
+const colourOf = (b: Block | null): number => (b && (b.kind === 'gem' || b.kind === 'star') ? b.color : -1);
+const snap = (s: State): (Block | null)[] => s.cells.map((b) => (b ? { ...b } : null));
 
-/** Cell offsets of each shape at rotation 0; index 0 is the pivot. y grows downward. */
-const SHAPES: Record<Shape, [number, number][]> = {
-	I2: [[0, 0], [0, -1]],
-	I3: [[0, 0], [0, -1], [0, 1]],
-	L3: [[0, 0], [0, -1], [1, 0]],
-};
+/** A gem colour: one of four, or the fifth with probability `fifth`. */
+const gemColour = (rng: () => number, fifth: number): number => (rng() < fifth ? 4 : Math.floor(rng() * 4));
 
-/** Offsets after `rot` clockwise quarter turns. */
-export function offsets(shape: Shape, rot: number): [number, number][] {
-	return SHAPES[shape].map(([dx, dy]) => {
-		let x = dx;
-		let y = dy;
-		for (let k = 0; k < ((rot % 4) + 4) % 4; k++) [x, y] = [-y, x];
-		return [x || 0, y || 0]; // no -0
-	});
+/* ---------- The arrival stream ---------- */
+
+export interface Arrival {
+	kind: 'gem' | 'chest';
+	color: number;
 }
 
-export function pieceCells(p: Piece): (Pos & { color: number })[] {
-	return offsets(p.shape, p.rot).map(([dx, dy], i) => ({ r: p.y + dy, c: p.x + dx, color: p.colors[i] }));
+/** Endless mode climbs in announced steps: every STEP_MOVES moves, a little more of the fifth colour. */
+export const STEP_MOVES = 25;
+const STEP_FIFTH = 0.04;
+const MAX_FIFTH = 0.3;
+export const endlessStep = (s: State): number => (s.cfg.goal > 0 ? 0 : Math.floor(s.moves / STEP_MOVES));
+export const fifthNow = (s: State): number => (s.cfg.goal > 0 ? s.cfg.fifth : Math.min(MAX_FIFTH, s.cfg.fifth + endlessStep(s) * STEP_FIFTH));
+
+/** Arrival n of a game: the same for everyone on the same seed, whatever was played before. */
+export function arrivalAt(cfg: EclatsCfg, n: number, fifth = cfg.fifth): Arrival {
+	if (cfg.chestEvery && (n + 1) % cfg.chestEvery === 0) return { kind: 'chest', color: 0 };
+	return { kind: 'gem', color: gemColour(mulberry32(hash2(cfg.seed, n)), fifth) };
 }
 
-/** Piece n of a game: shape and colours come from (seed, n) alone. */
-export function pieceAt(cfg: EclatsCfg, n: number): Piece {
-	const rng = mulberry32(hash2(cfg.seed, n));
-	const shape: Shape = rng() < cfg.trios ? (rng() < 0.5 ? 'I3' : 'L3') : 'I2';
-	const len = SHAPES[shape].length;
-	const colors: number[] = [];
-	for (let i = 0; i < len; i++) colors.push(Math.floor(rng() * cfg.colors));
-	// Three alike would burst on landing for free.
-	if (len === 3 && colors[0] === colors[1] && colors[1] === colors[2]) colors[2] = (colors[2] + 1 + Math.floor(rng() * (cfg.colors - 1))) % cfg.colors;
-	return { shape, rot: 0, x: Math.floor(COLS / 2), y: 1, colors };
-}
-
-export function fits(s: State, p: Piece): boolean {
-	for (const { r, c } of pieceCells(p)) {
-		if (c < 0 || c >= COLS || r >= ROWS) return false;
-		if (r >= 0 && s.board[idx(r, c)]) return false;
-	}
-	return true;
-}
-
-/* ---------- Ground ---------- */
-
-export function makeGround(cfg: EclatsCfg, rng: Rng): Ground {
-	const n = COLS * cfg.depth;
-	const g: Ground = {
-		cols: COLS,
-		depth: cfg.depth,
-		treasure: new Uint8Array(n),
-		trap: new Uint8Array(n),
-		hard: new Uint8Array(n),
-		dug: new Uint8Array(n),
-		seen: new Uint8Array(n),
-		flag: new Uint8Array(n),
-	};
-	// Treasures lean deep: the top layer is what blind digging finds anyway.
-	const cells = Array.from({ length: n }, (_, i) => i);
-	const weight = (i: number): number => (Math.floor(i / COLS) === 0 ? 0.35 : 1);
-	const pick = (count: number, mark: Uint8Array, avoid: Uint8Array[]): void => {
-		for (let k = 0; k < count; k++) {
-			const free = cells.filter((i) => !mark[i] && avoid.every((a) => !a[i]));
-			if (!free.length) return;
-			const total = free.reduce((t, i) => t + weight(i), 0);
-			let x = rng() * total;
-			let chosen = free[free.length - 1];
-			for (const i of free) {
-				x -= weight(i);
-				if (x <= 0) { chosen = i; break; }
-			}
-			mark[chosen] = 1;
-		}
-	};
-	pick(Math.min(cfg.treasures, n - 1), g.treasure, []);
-	pick(Math.min(cfg.traps, Math.floor(n / 4)), g.trap, [g.treasure]);
-	for (let i = 0; i < n; i++) if (!g.treasure[i] && !g.trap[i] && rng() < cfg.hard) g.hard[i] = 1;
-	// A few surface cells start open, so the first bursts are not blind: ones that point at
-	// something first.
-	const top = Array.from({ length: COLS }, (_, c) => c).filter((c) => !g.treasure[c] && !g.trap[c]);
-	top.sort((a, b) => around(g, 0, b).treasures - around(g, 0, a).treasures || rng() - 0.5);
-	for (const c of top.slice(0, cfg.clues)) {
-		g.dug[c] = 1;
-		g.hard[c] = 0;
-	}
-	return g;
-}
-
-const gi = (g: Ground, r: number, c: number): number => r * g.cols + c;
-
-/** Treasures and traps among the 8 neighbours — found ones count, as in Minesweeper. */
-export function around(g: Ground, r: number, c: number): { treasures: number; traps: number } {
-	let treasures = 0;
-	let traps = 0;
-	for (let dr = -1; dr <= 1; dr++) {
-		for (let dc = -1; dc <= 1; dc++) {
-			if (!dr && !dc) continue;
-			const rr = r + dr;
-			const cc = c + dc;
-			if (rr < 0 || rr >= g.depth || cc < 0 || cc >= g.cols) continue;
-			treasures += g.treasure[gi(g, rr, cc)];
-			traps += g.trap[gi(g, rr, cc)];
-		}
-	}
-	return { treasures, traps };
-}
-
-/** Topmost cell of a column still to dig, or -1. */
-export function digRow(g: Ground, c: number): number {
-	for (let r = 0; r < g.depth; r++) if (!g.dug[gi(g, r, c)]) return r;
-	return -1;
-}
-
-export const isHidden = (g: Ground, r: number, c: number): boolean => !g.dug[gi(g, r, c)];
-export const groundAt = (g: Ground, r: number, c: number): number => gi(g, r, c);
+/** The next k arrivals, for the preview. */
+export const upcoming = (s: State, k: number): Arrival[] => Array.from({ length: k }, (_, i) => arrivalAt(s.cfg, s.arrivals + i, fifthNow(s)));
 
 /* ---------- Setup ---------- */
 
-function newGem(s: State, color: number, kind: GemKind = 'gem'): Gem {
-	return { id: s.nextId++, color, kind, ice: false, lock: false };
+function block(s: State, kind: Kind, color = 0, extra: Partial<Block> = {}): Block {
+	return { id: s.nextId++, kind, color, ice: false, lock: false, ...extra };
 }
 
-/** Starting pile: `rows` bottom rows, gaps near the top, no line of three already formed. */
-function dealPile(s: State, rng: Rng): void {
-	const { cfg } = s;
-	if (cfg.pile <= 0) return;
-	for (let k = 0; k < cfg.pile; k++) {
-		const r = ROWS - 1 - k;
-		for (let c = 0; c < COLS; c++) {
-			// The top pile row is ragged, and nothing floats: a cell needs one below it.
-			if (k === cfg.pile - 1 && rng() < 0.4) continue;
-			if (k > 0 && !s.board[idx(r + 1, c)]) continue;
-			let color = Math.floor(rng() * cfg.colors);
-			for (let t = 0; t < cfg.colors && makesLine(s, r, c, color); t++) color = (color + 1) % cfg.colors;
-			s.board[idx(r, c)] = newGem(s, color);
+function groupSize(s: State, i: number): number {
+	const k = colourOf(s.cells[i]);
+	if (k < 0) return 0;
+	const seen = new Set([i]);
+	const stack = [i];
+	while (stack.length) {
+		const [r, c] = rc(stack.pop()!);
+		for (const [dr, dc] of NEIGH) {
+			if (!inside(r + dr, c + dc)) continue;
+			const j = at(r + dr, c + dc);
+			if (!seen.has(j) && colourOf(s.cells[j]) === k) {
+				seen.add(j);
+				stack.push(j);
+			}
 		}
 	}
-	const filled = s.board.map((g, i) => (g ? i : -1)).filter((i) => i >= 0);
-	const shuffle = filled.slice().sort(() => rng() - 0.5);
-	let ice = cfg.ice;
-	let locks = cfg.locks;
-	for (const i of shuffle) {
-		const g = s.board[i]!;
-		if (ice > 0) { g.ice = true; ice--; } else if (locks > 0) { g.lock = true; locks--; } else break;
-	}
+	return seen.size;
 }
 
-function makesLine(s: State, r: number, c: number, color: number): boolean {
-	const same = (rr: number, cc: number): boolean => {
-		if (!inBoard(rr, cc)) return false;
-		const g = s.board[idx(rr, cc)];
-		return !!g && g.kind === 'gem' && g.color === color;
-	};
-	return (same(r, c - 1) && same(r, c - 2)) || (same(r + 1, c) && same(r + 2, c));
-}
-
-export function createGame(cfg: EclatsCfg, opts: { endless?: boolean } = {}): State {
+export function createGame(cfg: EclatsCfg): State {
+	const s: State = { cfg, cells: new Array(N * N).fill(null), nextId: 1, moves: 0, arrivals: 0, opened: 0, score: 0, status: 'playing' };
 	const rng = mulberry32(hash2(cfg.seed, 0x51a7));
-	const s: State = {
-		cfg,
-		board: new Array(COLS * ROWS).fill(null),
-		ground: makeGround(cfg, rng),
-		piece: null,
-		pieceIndex: 0,
-		nextId: 1,
-		found: 0,
-		score: 0,
-		chain: 0,
-		boosters: { pioche: 1, radar: 0, sablier: 0 }, // one pickaxe from the start: a way out of a bad guess
-		boosterBag: 0,
-		pendingStones: 0,
-		moved: new Set(),
-		status: 'playing',
-		lockMs: 0,
-		lockResets: 0,
-		fallAcc: 0,
-		field: 0,
-		endless: !!opts.endless,
+	const free = (inner: boolean): number[] =>
+		s.cells.map((b, i) => (b || (inner && (rc(i)[0] % (N - 1) === 0 || rc(i)[1] % (N - 1) === 0)) ? -1 : i)).filter((i) => i >= 0);
+	const place = (count: number, make: (k: number) => Block, inner: boolean): void => {
+		for (let k = 0; k < count; k++) {
+			const spots = free(inner);
+			if (!spots.length) return;
+			s.cells[spots[Math.floor(rng() * spots.length)]] = make(k);
+		}
 	};
-	dealPile(s, rng);
-	spawn(s);
+	// Rocks and chests away from the walls, so a slide can bring gems on every side of them.
+	place(cfg.rocks, () => block(s, 'rock'), true);
+	place(cfg.chests, (k) => block(s, 'chest', 0, { lock: k < cfg.locked }), true);
+	for (let i = 0; i < N * N; i++) {
+		if (s.cells[i] || rng() > cfg.fill) continue;
+		s.cells[i] = block(s, 'gem', gemColour(rng, cfg.fifth));
+		// Nothing explodes before the first swipe.
+		for (let t = 0; t < 5 && groupSize(s, i) >= 3; t++) s.cells[i]!.color = (s.cells[i]!.color + 1) % (cfg.fifth > 0 ? 5 : 4);
+		if (groupSize(s, i) >= 3) s.cells[i] = null;
+	}
+	const gems = s.cells.map((b, i) => (b?.kind === 'gem' ? i : -1)).filter((i) => i >= 0);
+	for (let k = 0; k < cfg.ice && gems.length; k++) s.cells[gems.splice(Math.floor(rng() * gems.length), 1)[0]]!.ice = true;
 	return s;
 }
 
 export function cloneState(s: State): State {
-	return {
-		...s,
-		board: s.board.map((g) => (g ? { ...g } : null)),
-		ground: {
-			...s.ground,
-			treasure: s.ground.treasure.slice(),
-			trap: s.ground.trap.slice(),
-			hard: s.ground.hard.slice(),
-			dug: s.ground.dug.slice(),
-			seen: s.ground.seen.slice(),
-			flag: s.ground.flag.slice(),
-		},
-		piece: s.piece ? { ...s.piece, colors: s.piece.colors.slice() } : null,
-		boosters: { ...s.boosters },
-		moved: new Set(s.moved),
-	};
+	return { ...s, cells: snap(s) };
 }
 
-/** Deal the next piece. A piece that cannot appear ends the game. */
-export function spawn(s: State): boolean {
-	const p = pieceAt(s.cfg, s.pieceIndex);
-	s.pieceIndex++;
-	s.lockMs = 0;
-	s.lockResets = 0;
-	s.fallAcc = 0;
-	if (!fits(s, p)) {
-		s.piece = null;
-		s.status = 'lost';
-		return false;
-	}
-	s.piece = p;
-	return true;
-}
+/* ---------- Sliding ---------- */
 
-export const nextPiece = (s: State): Piece => pieceAt(s.cfg, s.pieceIndex);
-
-/* ---------- Steering ---------- */
-
-/** Lock-delay resets a resting piece allows, so it cannot be slid forever. */
-const MAX_LOCK_RESETS = 12;
-export const LOCK_MS = 480;
-export const SOFT_MS = 38;
-
-function rested(s: State): boolean {
-	return !!s.piece && !fits(s, { ...s.piece, y: s.piece.y + 1 });
-}
-
-function touched(s: State): void {
-	if (s.lockMs > 0 && s.lockResets < MAX_LOCK_RESETS) {
-		s.lockMs = 0;
-		s.lockResets++;
-	}
-}
-
-export function move(s: State, dx: number): boolean {
-	if (!s.piece || s.status !== 'playing') return false;
-	const p = { ...s.piece, x: s.piece.x + dx };
-	if (!fits(s, p)) return false;
-	s.piece = p;
-	touched(s);
-	return true;
-}
-
-/** Quarter turn clockwise, with kicks: sideways, then up. */
-export function rotate(s: State): boolean {
-	if (!s.piece || s.status !== 'playing') return false;
-	const base = { ...s.piece, rot: (s.piece.rot + 1) % 4 };
-	for (const [dx, dy] of [[0, 0], [-1, 0], [1, 0], [0, -1], [-2, 0], [2, 0]]) {
-		const p = { ...base, x: base.x + dx, y: base.y + dy };
-		if (fits(s, p)) {
-			s.piece = p;
-			touched(s);
-			return true;
+/** The cells of each line along dir, ordered from the wall the blocks slide to. */
+function lines(dir: Dir): number[][] {
+	const out: number[][] = [];
+	for (let k = 0; k < N; k++) {
+		const line: number[] = [];
+		for (let t = 0; t < N; t++) {
+			if (dir === 'up') line.push(at(t, k));
+			else if (dir === 'down') line.push(at(N - 1 - t, k));
+			else if (dir === 'left') line.push(at(k, t));
+			else line.push(at(k, N - 1 - t));
 		}
+		out.push(line);
 	}
-	return false;
+	return out;
 }
 
-/** Rows the piece would fall if dropped now. */
-export function dropDistance(s: State): number {
-	if (!s.piece) return 0;
-	let d = 0;
-	while (fits(s, { ...s.piece, y: s.piece.y + d + 1 })) d++;
-	return d;
-}
-
-export function hardDrop(s: State): number {
-	if (!s.piece) return 0;
-	const d = dropDistance(s);
-	s.piece = { ...s.piece, y: s.piece.y + d };
-	return d;
-}
-
-/**
- * Advance the falling piece by `ms` of play. Returns true once it has locked in place (the
- * caller then resolves the turn). `soft` is the held ↓.
- */
-export function fall(s: State, ms: number, soft = false, slow = 1): boolean {
-	if (!s.piece || s.status !== 'playing') return false;
-	const rowMs = soft ? SOFT_MS : s.cfg.fallMs * slow;
-	if (rested(s)) {
-		s.lockMs += ms;
-		return s.lockMs >= (soft ? LOCK_MS / 3 : LOCK_MS);
-	}
-	s.fallAcc += ms;
-	while (s.fallAcc >= rowMs) {
-		s.fallAcc -= rowMs;
-		if (rested(s)) break;
-		s.piece = { ...s.piece, y: s.piece.y + 1 };
-	}
-	return false;
-}
-
-/* ---------- Turn resolution ---------- */
-
-/** Write the piece into the board. Its gems then fall on their own in the first wave. */
-export function lockPiece(s: State): void {
-	if (!s.piece) return;
-	s.moved.clear();
-	s.chain = 0;
-	for (const { r, c, color } of pieceCells(s.piece)) {
-		if (r < 0) {
-			// Part of the piece sticks out over the top: the pile has reached it.
-			s.status = 'lost';
-			continue;
-		}
-		const g = newGem(s, color);
-		s.board[idx(r, c)] = g;
-		s.moved.add(g.id);
-	}
-	s.piece = null;
-	gravity(s);
-}
-
-/** Loose gems fall straight down; a locked gem stays put and holds what sits on it. */
-export function gravity(s: State): boolean {
-	let any = false;
-	for (let c = 0; c < COLS; c++) {
-		let write = ROWS - 1;
-		for (let r = ROWS - 1; r >= 0; r--) {
-			const g = s.board[idx(r, c)];
-			if (!g) continue;
-			if (g.lock) {
-				write = r - 1;
+/** Slide every movable block toward dir; rocks and frozen gems split a line. True if anything moved. */
+export function slide(s: State, dir: Dir): boolean {
+	let moved = false;
+	for (const line of lines(dir)) {
+		let write = 0;
+		for (let k = 0; k < line.length; k++) {
+			const b = s.cells[line[k]];
+			if (!b) continue;
+			if (!movable(b)) {
+				write = k + 1;
 				continue;
 			}
-			if (write !== r) {
-				s.board[idx(write, c)] = g;
-				s.board[idx(r, c)] = null;
-				s.moved.add(g.id);
-				any = true;
+			if (write !== k) {
+				s.cells[line[write]] = b;
+				s.cells[line[k]] = null;
+				moved = true;
 			}
-			write--;
+			write++;
 		}
 	}
-	return any;
+	return moved;
 }
 
-interface Run {
-	color: number;
-	cells: number[];
+export const canSlide = (s: State, dir: Dir): boolean => slide(cloneState(s), dir);
+
+/** The edge new blocks enter by: the one opposite the swipe, in a fixed order. */
+export function entryEdge(dir: Dir): number[] {
+	const k = Array.from({ length: N }, (_, i) => i);
+	if (dir === 'up') return k.map((c) => at(N - 1, c));
+	if (dir === 'down') return k.map((c) => at(0, c));
+	if (dir === 'left') return k.map((r) => at(r, N - 1));
+	return k.map((r) => at(r, 0));
 }
 
-const canLine = (g: Gem | null): g is Gem => !!g && g.kind !== 'stone' && !g.lock;
-const isColour = (g: Gem, k: number): boolean => g.kind === 'rainbow' || g.color === k;
+/** Fill every empty cell of the entry edge from the stream. */
+function refill(s: State, dir: Dir): number[] {
+	const ids: number[] = [];
+	for (const i of entryEdge(dir)) {
+		if (s.cells[i]) continue;
+		const a = arrivalAt(s.cfg, s.arrivals++, fifthNow(s));
+		const b = block(s, a.kind, a.color);
+		s.cells[i] = b;
+		ids.push(b.id);
+	}
+	return ids;
+}
 
-/** Straight lines of 3+ of one colour; a rainbow stands in for any colour. */
-export function findRuns(s: State): Run[] {
-	const runs: Run[] = [];
-	const scan = (cells: number[]): void => {
-		for (let k = 0; k < s.cfg.colors; k++) {
-			let run: number[] = [];
-			const flush = (): void => {
-				if (run.length >= 3 && run.some((i) => s.board[i]!.kind !== 'rainbow')) runs.push({ color: k, cells: run });
-				run = [];
-			};
-			for (const i of cells) {
-				const g = s.board[i];
-				if (canLine(g) && isColour(g, k)) run.push(i);
-				else flush();
+/* ---------- Explosions ---------- */
+
+/** Same-colour groups of 3+, each in flood order from its most advanced cell along dir. */
+export function findGroups(s: State, dir: Dir = 'down'): number[][] {
+	const seen = new Uint8Array(N * N);
+	const out: number[][] = [];
+	const [sr, sc] = STEP[dir];
+	const lead = (i: number): number => rc(i)[0] * sr + rc(i)[1] * sc;
+	for (let i = 0; i < N * N; i++) {
+		const k = colourOf(s.cells[i]);
+		if (k < 0 || seen[i]) continue;
+		const comp: number[] = [];
+		const stack = [i];
+		seen[i] = 1;
+		while (stack.length) {
+			const j = stack.pop()!;
+			comp.push(j);
+			const [r, c] = rc(j);
+			for (const [dr, dc] of NEIGH) {
+				if (!inside(r + dr, c + dc)) continue;
+				const n = at(r + dr, c + dc);
+				if (!seen[n] && colourOf(s.cells[n]) === k) {
+					seen[n] = 1;
+					stack.push(n);
+				}
 			}
-			flush();
 		}
-	};
-	for (let r = 0; r < ROWS; r++) scan(Array.from({ length: COLS }, (_, c) => idx(r, c)));
-	for (let c = 0; c < COLS; c++) scan(Array.from({ length: ROWS }, (_, r) => idx(r, c)));
-	return runs;
+		if (comp.length < 3) continue;
+		// Breadth-first from the leading cell (first in reading order on a tie), so the screen
+		// can pop it outward and the special lands on a cell the player can predict.
+		const start = comp.reduce((a, b) => (lead(b) > lead(a) || (lead(b) === lead(a) && b < a) ? b : a));
+		const set = new Set(comp);
+		const order = [start];
+		const done = new Set([start]);
+		for (let q = 0; q < order.length; q++) {
+			const [r, c] = rc(order[q]);
+			for (const [dr, dc] of NEIGH) {
+				const n = at(r + dr, c + dc);
+				if (inside(r + dr, c + dc) && set.has(n) && !done.has(n)) {
+					done.add(n);
+					order.push(n);
+				}
+			}
+		}
+		out.push(order);
+	}
+	return out;
 }
 
-/** Most common colour on the board: what a rainbow caught in a blast clears. */
-function commonColour(s: State): number {
-	const n = new Array(s.cfg.colors).fill(0);
-	for (const g of s.board) if (g && g.kind === 'gem') n[g.color]++;
-	return n.indexOf(Math.max(...n));
+/** The groups a swipe would set off by itself, before any arrival: what the screen previews. */
+export function previewGroups(s: State, dir: Dir): number[][] {
+	const t = cloneState(s);
+	if (!slide(t, dir)) return [];
+	return findGroups(t, dir);
 }
 
-const POINTS_PER_GEM = 10;
-const POINTS_PER_TREASURE = 150;
+const POINTS = { gem: 10, bomb: 50, star: 120, chest: 100, rock: 20 };
 
-/** One burst of every line on the board, then the fall. Null when nothing lines up. */
-export function resolveWave(s: State): Wave | null {
-	const runs = findRuns(s);
-	if (!runs.length) {
-		s.moved.clear();
-		return null;
-	}
-	s.chain++;
-	const wave: Wave = { popped: [], cracked: [], unlocked: [], specials: [], blasts: [], digs: [], chain: s.chain, points: 0 };
+/** One wave: explode every group and what it sets off, then the specials appear. Null when nothing bursts. */
+function burst(s: State, dir: Dir, wave: number): Burst | null {
+	const groups = findGroups(s, dir);
+	if (!groups.length) return null;
+	const step: Burst = { t: 'burst', wave, groups, popped: [], opened: [], blasts: [], stars: [], thawed: [], unlocked: [], specials: [], points: 0, cells: [] };
 
-	// Runs of one colour that share a cell are one group; a long line or a cross earns a special.
-	const groups: { color: number; cells: Set<number>; longest: number[] }[] = [];
-	for (const run of runs) {
-		const g = groups.find((x) => x.color === run.color && run.cells.some((i) => x.cells.has(i)));
-		if (g) {
-			run.cells.forEach((i) => g.cells.add(i));
-			if (run.cells.length > g.longest.length) g.longest = run.cells;
-		} else groups.push({ color: run.color, cells: new Set(run.cells), longest: run.cells });
-	}
-	const keep = new Set<number>();
+	// A big group leaves a special on its leading cell: that gem does not pop.
+	const born: { cell: number; kind: 'bomb' | 'star'; color: number }[] = [];
 	for (const g of groups) {
-		const kind = g.longest.length >= 5 ? 'rainbow' : g.longest.length === 4 || g.cells.size >= 5 ? 'bomb' : null;
-		if (!kind) continue;
-		const plain = [...g.cells].filter((i) => s.board[i]!.kind === 'gem' && !keep.has(i));
-		if (!plain.length) continue;
-		// On the gem that just landed if there is one, else mid-line.
-		const fresh = plain.filter((i) => s.moved.has(s.board[i]!.id)).sort((a, b) => b - a);
-		const mid = g.longest[Math.floor(g.longest.length / 2)];
-		const at = fresh[0] ?? (plain.includes(mid) ? mid : plain[0]);
-		keep.add(at);
-		const gem = s.board[at]!;
-		gem.kind = kind;
-		gem.ice = false;
-		wave.specials.push({ id: gem.id, r: Math.floor(at / COLS), c: at % COLS, kind });
+		const kind = s.cfg.starAt && g.length >= s.cfg.starAt ? 'star' : g.length >= s.cfg.bombAt ? 'bomb' : null;
+		if (kind) born.push({ cell: g[0], kind, color: colourOf(s.cells[g[0]]) });
 	}
+	const keep = new Set(born.map((b) => b.cell));
 
-	// Everything the lines hit, plus what bombs and rainbows they set off reach.
+	// The groups, then every bomb or star they touch and everything those reach. Whatever sits
+	// beside an explosion is "touched": chests open, rocks break, ice thaws.
 	const hit = new Set<number>();
+	const touch = new Set<number>();
 	const queue: number[] = [];
 	const add = (i: number): void => {
-		if (keep.has(i) || hit.has(i) || !s.board[i]) return;
+		if (keep.has(i) || hit.has(i) || !s.cells[i]) return;
 		hit.add(i);
 		queue.push(i);
 	};
-	const runColour = new Map<number, number>();
-	for (const run of runs) for (const i of run.cells) { if (!runColour.has(i)) runColour.set(i, run.color); add(i); }
+	for (const g of groups) for (const i of g) add(i);
 	while (queue.length) {
 		const i = queue.shift()!;
-		const g = s.board[i]!;
-		const r = Math.floor(i / COLS);
-		const c = i % COLS;
-		if (g.kind === 'bomb') {
-			wave.blasts.push({ r, c });
-			for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) if (inBoard(r + dr, c + dc)) add(idx(r + dr, c + dc));
-		} else if (g.kind === 'rainbow') {
-			const k = runColour.get(i) ?? commonColour(s);
-			s.board.forEach((o, j) => { if (o && o.kind === 'gem' && o.color === k) add(j); });
+		const b = s.cells[i]!;
+		const [r, c] = rc(i);
+		if (b.kind === 'bomb') {
+			step.blasts.push(i);
+			for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) if (inside(r + dr, c + dc)) add(at(r + dr, c + dc));
+		} else if (b.kind === 'star') {
+			step.stars.push(i);
+			s.cells.forEach((o, j) => { if (o && o.kind === 'gem' && o.color === b.color) add(j); });
+		}
+		if (b.kind === 'chest' || b.kind === 'rock') continue; // a hit chest or rock is not an explosion itself
+		for (const [dr, dc] of NEIGH) {
+			if (!inside(r + dr, c + dc)) continue;
+			const j = at(r + dr, c + dc);
+			const o = s.cells[j];
+			if (!o || hit.has(j) || keep.has(j)) continue;
+			if (o.kind === 'bomb' || o.kind === 'star') add(j);
+			else touch.add(j);
 		}
 	}
 
-	// A hit takes one protection off — the ice — or the gem itself.
-	const gone: number[] = [];
+	// A chest or rock caught in a blast counts as touched; gems, bombs and stars hit are gone.
 	for (const i of hit) {
-		const g = s.board[i]!;
-		const r = Math.floor(i / COLS);
-		const c = i % COLS;
-		if (g.ice) {
-			g.ice = false;
-			wave.cracked.push({ r, c });
-		} else if (g.lock) {
-			g.lock = false;
-			wave.unlocked.push({ r, c });
-		} else gone.push(i);
+		const b = s.cells[i]!;
+		if (b.kind === 'chest' || b.kind === 'rock') {
+			touch.add(i);
+			continue;
+		}
+		step.popped.push({ id: b.id, cell: i, kind: b.kind, color: b.color });
+		s.cells[i] = null;
 	}
-	const cols: number[] = [];
-	for (const i of gone) {
-		const g = s.board[i]!;
-		const r = Math.floor(i / COLS);
-		const c = i % COLS;
-		wave.popped.push({ id: g.id, r, c, color: g.color, kind: g.kind });
-		if (g.kind !== 'stone' && (!s.cfg.floorOnly || r === ROWS - 1)) cols.push(c);
-		s.board[i] = null;
-	}
-	// A burst breaks the stones and opens the locks right next to it.
-	for (const p of wave.popped) {
-		if (p.kind === 'stone') continue;
-		for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-			const r = p.r + dr;
-			const c = p.c + dc;
-			if (!inBoard(r, c)) continue;
-			const o = s.board[idx(r, c)];
-			if (!o) continue;
-			if (o.kind === 'stone') {
-				wave.popped.push({ id: o.id, r, c, color: o.color, kind: 'stone' });
-				s.board[idx(r, c)] = null;
-			} else if (o.lock) {
-				o.lock = false;
-				wave.unlocked.push({ r, c });
+	for (const i of touch) {
+		const b = s.cells[i];
+		if (!b) continue;
+		if (b.kind === 'chest') {
+			if (b.lock) {
+				b.lock = false;
+				step.unlocked.push(i);
+			} else {
+				step.opened.push(i);
+				step.popped.push({ id: b.id, cell: i, kind: 'chest', color: 0 });
+				s.cells[i] = null;
 			}
+		} else if (b.kind === 'rock') {
+			step.popped.push({ id: b.id, cell: i, kind: 'rock', color: 0 });
+			s.cells[i] = null;
+		} else if (b.ice) {
+			b.ice = false;
+			step.thawed.push(i);
 		}
 	}
-
-	for (const c of cols.sort((a, b) => a - b)) {
-		const d = digColumn(s, c);
-		if (d) wave.digs.push(d);
+	for (const b of born) {
+		const old = s.cells[b.cell]!;
+		s.cells[b.cell] = { ...old, kind: b.kind, color: b.color, ice: false };
+		step.specials.push({ id: old.id, cell: b.cell, kind: b.kind });
 	}
-	const gems = wave.popped.filter((p) => p.kind !== 'stone').length;
-	wave.points = gems * POINTS_PER_GEM * s.chain + wave.digs.filter((d) => d.treasure).length * POINTS_PER_TREASURE;
-	s.score += wave.points;
 
-	s.moved.clear();
-	gravity(s);
-	return wave;
+	s.opened += step.opened.length;
+	step.points = step.popped.reduce((t, p) => t + (p.kind === 'gem' ? POINTS.gem * wave : POINTS[p.kind]), 0);
+	s.score += step.points;
+	step.cells = snap(s);
+	return step;
 }
 
-function award(s: State): Booster {
-	// A shuffled bag of the three, refilled every three treasures: never three of a kind in a row.
-	const round = Math.floor(s.boosterBag / 3);
-	const order = BOOSTERS.slice().sort((a, b) => hash2(s.cfg.seed + round, BOOSTERS.indexOf(a)) - hash2(s.cfg.seed + round, BOOSTERS.indexOf(b)));
-	const b = order[s.boosterBag % 3];
-	s.boosterBag++;
-	s.boosters[b]++;
-	return b;
-}
+/* ---------- A move ---------- */
 
-function open(s: State, r: number, c: number): Dig {
-	const g = s.ground;
-	const i = gi(g, r, c);
-	g.dug[i] = 1;
-	g.hard[i] = 0;
-	g.flag[i] = 0;
-	const treasure = !!g.treasure[i];
-	const trap = !!g.trap[i];
-	let booster: Booster | null = null;
-	if (treasure) {
-		s.found++;
-		// The last treasure ends the level: a booster then would be a prize nobody can use.
-		if ((s.found < s.cfg.treasures || s.endless) && s.found % s.cfg.bonusEvery === 0) booster = award(s);
-	}
-	if (trap) s.pendingStones++;
-	return { c, r, opened: true, treasure, trap, booster };
-}
-
-/** One dig at the top of a column: cracks a hard cell, else opens it. */
-export function digColumn(s: State, c: number): Dig | null {
-	const g = s.ground;
-	const r = digRow(g, c);
-	if (r < 0) return null;
-	const i = gi(g, r, c);
-	if (g.hard[i] > 0) {
-		g.hard[i]--;
-		return { c, r, opened: false, treasure: false, trap: false, booster: null };
-	}
-	return open(s, r, c);
-}
-
-/** Push a row of stones in under the pile, one gap to let a gem through. */
-function pushStones(s: State): boolean {
-	for (let c = 0; c < COLS; c++) {
-		if (s.board[idx(0, c)]) {
-			s.status = 'lost';
-			return false;
-		}
-	}
-	for (let r = 0; r < ROWS - 1; r++) for (let c = 0; c < COLS; c++) s.board[idx(r, c)] = s.board[idx(r + 1, c)];
-	const gap = hash2(s.cfg.seed + 77, s.pieceIndex + s.pendingStones) % COLS;
-	for (let c = 0; c < COLS; c++) s.board[idx(ROWS - 1, c)] = c === gap ? null : newGem(s, 0, 'stone');
-	gravity(s);
-	return true;
-}
+/** Most refills a move can run: a safety net, the stream runs out of matches long before. */
+const MAX_ROUNDS = 16;
 
 /**
- * Close the turn once the waves are spent: stones from dug traps, a new ground in endless
- * mode, the win, then the next piece. Returns true when stones went in (the caller resolves
- * again, they can line things up through the gap).
+ * Swipe the board. Null when nothing moves (the swipe is refused). Otherwise the timeline: the slide,
+ * every wave (burst, slide) until nothing explodes, the arrivals at the entry edge, and more waves
+ * if the arrivals made a group.
  */
-export function endTurn(s: State): boolean {
-	if (s.status !== 'playing') return false;
-	if (s.pendingStones > 0) {
-		while (s.pendingStones > 0 && s.status === 'playing') {
-			s.pendingStones--;
-			pushStones(s);
+export function play(s: State, dir: Dir): Step[] | null {
+	if (s.status !== 'playing' || !slide(s, dir)) return null;
+	s.moves++;
+	const steps: Step[] = [{ t: 'slide', cells: snap(s) }];
+	const won = (): boolean => s.cfg.goal > 0 && s.opened >= s.cfg.goal;
+	let wave = 0;
+	for (let round = 0; round < MAX_ROUNDS && !won(); round++) {
+		let burstNow = false;
+		for (let b = burst(s, dir, wave + 1); b; b = won() ? null : burst(s, dir, wave + 1)) {
+			wave++;
+			burstNow = true;
+			steps.push(b);
+			if (won()) break; // the last chest ends the level at once
+			if (slide(s, dir)) steps.push({ t: 'slide', cells: snap(s) });
 		}
-		return s.status === 'playing';
+		if (won() || (round > 0 && !burstNow)) break;
+		const ids = refill(s, dir);
+		if (!ids.length) break;
+		steps.push({ t: 'arrive', ids, cells: snap(s) });
 	}
-	if (s.found >= s.cfg.treasures) {
-		if (!s.endless) {
-			s.status = 'won';
-			return false;
-		}
-		nextField(s);
-	}
-	spawn(s);
-	return false;
-}
-
-/** Endless mode: a fresh ground, one more treasure, a quicker fall. */
-export function nextField(s: State): void {
-	s.field++;
-	s.score += 500 * s.field;
-	const cfg: EclatsCfg = {
-		...s.cfg,
-		seed: hash2(s.cfg.seed, 1000 + s.field),
-		treasures: Math.min(10, s.cfg.treasures + 1),
-		fallMs: Math.max(220, Math.round(s.cfg.fallMs * 0.9)),
-	};
-	s.cfg = cfg;
-	s.ground = makeGround(cfg, mulberry32(hash2(cfg.seed, 0x51a7)));
-	s.found = 0;
-	s.boosterBag = 0;
-}
-
-/** Run every wave and the turn's end without pauses. */
-export function settle(s: State): Wave[] {
-	const waves: Wave[] = [];
-	for (;;) {
-		let w: Wave | null;
-		while ((w = resolveWave(s))) waves.push(w);
-		if (!endTurn(s)) break;
-	}
-	return waves;
-}
-
-/* ---------- Boosters ---------- */
-
-/** Pioche: dig exactly this cell, however deep, hard or not. */
-export function digPioche(s: State, r: number, c: number): Dig | null {
-	const g = s.ground;
-	if (s.boosters.pioche <= 0 || r < 0 || r >= g.depth || c < 0 || c >= g.cols || g.dug[gi(g, r, c)]) return null;
-	s.boosters.pioche--;
-	const d = open(s, r, c);
-	if (d.treasure) s.score += POINTS_PER_TREASURE;
-	if (s.found >= s.cfg.treasures) {
-		if (s.endless) nextField(s);
-		else s.status = 'won';
-	}
-	return d;
-}
-
-/** Radar: show what one hidden cell holds without digging it. */
-export function scanRadar(s: State, r: number, c: number): boolean {
-	const g = s.ground;
-	if (s.boosters.radar <= 0 || r < 0 || r >= g.depth || c < 0 || c >= g.cols) return false;
-	const i = gi(g, r, c);
-	if (g.dug[i] || g.seen[i]) return false;
-	s.boosters.radar--;
-	g.seen[i] = 1;
-	return true;
-}
-
-/** Mark or unmark a hidden cell as a likely treasure. */
-export function toggleFlag(s: State, r: number, c: number): boolean {
-	const g = s.ground;
-	if (r < 0 || r >= g.depth || c < 0 || c >= g.cols) return false;
-	const i = gi(g, r, c);
-	if (g.dug[i]) return false;
-	g.flag[i] = g.flag[i] ? 0 : 1;
-	return true;
-}
-
-export function spendSablier(s: State): boolean {
-	if (s.boosters.sablier <= 0) return false;
-	s.boosters.sablier--;
-	return true;
+	if (won()) s.status = 'won';
+	else if (!s.cells.some((b) => !b)) s.status = 'lost';
+	return steps;
 }
 
 /* ---------- Reading the board ---------- */
 
-/** Height of the pile: rows from the top row down to the highest gem. 0 = empty board. */
-export function pileHeight(s: State): number {
-	for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) if (s.board[idx(r, c)]) return ROWS - r;
-	return 0;
-}
-
-export const gemAt = (s: State, r: number, c: number): Gem | null => s.board[idx(r, c)];
+export const countWaves = (steps: Step[]): number => steps.filter((x) => x.t === 'burst').length;
+export const emptyCells = (s: State): number => s.cells.filter((b) => !b).length;
+export const chestsLeft = (s: State): number => s.cells.filter((b) => b?.kind === 'chest').length;

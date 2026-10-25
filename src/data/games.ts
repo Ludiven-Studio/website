@@ -180,7 +180,7 @@ export const games: GameTile[] = [
 	{
 		id: 'eclats',
 		title: 'Éclats',
-		pitch: 'Place les gemmes qui tombent, aligne-en trois pour les faire éclater et creuse le sol : ses chiffres disent combien de trésors se cachent autour. Déterre-les tous avant que la pile touche le haut.',
+		pitch: 'Glisse tout le plateau comme dans 2048 : trois blocs de la même couleur qui se touchent explosent, tout reglisse, et les explosions s’enchaînent. Fais sauter les coffres en un minimum de coups.',
 		icon: 'eclats',
 		href: '/jeux/eclats/',
 		status: 'play',

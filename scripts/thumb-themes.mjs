@@ -45,7 +45,7 @@ export const THEMES = {
 	mine: 'a crystal cavern glittering with giant rubies emeralds and diamonds, golden cages hanging from the ceiling, magenta glow',
 
 	// Arcade & skill
-	eclats: 'a cross-section of a sunny meadow, a thin strip of grass over thick layered brown earth, glittering coloured gems and a half-buried golden treasure chest in the soil, sparkles',
+	eclats: 'a magical crystal cave, glossy coloured gem blocks bursting into sparkling explosions of light and confetti, an open golden treasure chest spilling coins on the cave floor',
 	bulles: 'an underwater reef scene, glossy colourful bubbles rising through turquoise water, soft rays of light',
 	rayou: 'a sunny storybook valley at golden hour, a stone peak with a small lantern on top in the distance, a winding river, a red-roofed cottage, round green trees and a meadow of flowers, warm glowing fireflies',
 	atelier: 'a cosy old watchmaker workshop, wooden workbench with brass gears and small tools, shelves of antique clocks, warm lamp light through a dusty window',

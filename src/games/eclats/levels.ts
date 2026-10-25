@@ -1,9 +1,10 @@
 // Éclats levels plan (1-100, 101-200 with the Expert pack). Five worlds of twenty levels, each
-// adding one new thing on top of the last: traps, ice, hard ground, locks. A level is won once
-// every treasure is unearthed; the stars count the pieces it took, against the bot's own count
-// on that level. Each level's ground is the candidate whose bot count sits nearest a smooth
+// adding one new thing on top of the last: locked chests, rocks, ice, a fifth colour. A level is won
+// once N chests are open: a few on the board, the rest arriving at a fixed pace the preview shows.
+// The stars count the swipes it took, against the bot's own
+// count on that level. Each level's board is the candidate whose bot count sits nearest a smooth
 // ramp (picks.ts, written by scripts/eclats-levels.ts), so no level is a freebie or a slog.
-// metric 'time' with score = pieces (lower is better).
+// metric 'time' with score = swipes (lower is better).
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
 import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
@@ -13,89 +14,74 @@ import { PICKS } from './picks';
 export interface World {
 	from: number;
 	name: string;
-	novelty: string; // the one thing this world adds, shown once
+	novelty: string; // the one thing this world adds, shown on its first levels
 }
 
 export const WORLDS: World[] = [
 	{ from: 1, name: 'La prairie', novelty: '' },
-	{ from: 21, name: 'La grotte aux pièges', novelty: 'Pièges : un piège creusé pousse une ligne de pierres sous ta pile. La pastille rouge d’une case creusée compte les pièges voisins.' },
-	{ from: 41, name: 'Le glacier', novelty: 'Glace : une gemme gelée demande deux éclats, le premier casse la glace.' },
-	{ from: 61, name: 'La carrière', novelty: 'Roche : une case de sol fendue demande deux coups avant de s\'ouvrir.' },
-	{ from: 81, name: 'La forteresse', novelty: 'Cadenas : une gemme verrouillée ne tombe pas et ne s\'aligne pas tant qu\'une voisine n\'a pas éclaté.' },
+	{ from: 21, name: 'Les coffres-forts', novelty: 'Coffres cadenassés : le premier éclat fait sauter le cadenas, le second ouvre le coffre.' },
+	{ from: 41, name: 'Les rochers', novelty: 'Rochers : ils ne glissent pas et arrêtent les blocs. Une explosion juste à côté les brise.' },
+	{ from: 61, name: 'Le glacier', novelty: 'Glace : un bloc gelé ne glisse plus. Une explosion juste à côté le dégèle ; il peut aussi exploser avec sa couleur.' },
+	{ from: 81, name: 'La cinquième gemme', novelty: 'Une cinquième couleur se mêle aux autres : les groupes se forment moins facilement.' },
 	{ from: 101, name: 'Les profondeurs', novelty: '' },
 ];
 
 export const worldOf = (level: number): World => [...WORLDS].reverse().find((w) => level >= w.from) ?? WORLDS[0];
 
 export interface EclatsLevelCfg extends EclatsCfg {
-	three: number; // pieces for 3★
-	two: number; // pieces for 2★
+	three: number; // swipes for 3★
+	two: number; // swipes for 2★
 }
 
 const levelSeed = (level: number): number => (Math.imul(level, 2654435761) ^ 0x3c6ef372) >>> 0;
 const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
 
-/** The board of a level, before its star thresholds. */
+/** The board of level 1-100, before its candidate is picked. */
 export function levelBoard(level: number): EclatsCfg {
 	const l = Math.max(1, Math.min(LEVEL_COUNT, level));
 	const w = Math.min(4, Math.floor((l - 1) / 20)); // 0..4
 	const t = ((l - 1) % 20) / 19; // 0..1 inside the world
-	const g = (l - 1) / (LEVEL_COUNT - 1); // 0..1 across the game
-	const at = (world: number, a: number, b: number, after = b): number => (w < world ? 0 : w === world ? lerp(a, b, t) : after);
+	// A hazard ramps up in its own world, then stays at a gentler level in the next ones.
+	const at = (world: number, a: number, b: number, after: number): number => (w < world ? 0 : w === world ? lerp(a, b, t) : after);
+	const g = (l - 1) / (LEVEL_COUNT - 1);
 	return {
 		seed: levelSeed(l),
-		colors: l <= 5 ? 3 : l <= 90 ? 4 : 5,
-		depth: w === 0 ? 4 : w === 1 ? Math.round(lerp(4, 5, t)) : 5,
-		treasures: Math.round(lerp(3, 5, t) + w * 0.6),
-		traps: Math.round(at(1, 1, 3, 2)),
-		ice: Math.round(at(2, 2, 6, 3)),
-		hard: at(3, 0.15, 0.35, 0.25),
-		locks: Math.round(at(4, 2, 5)),
-		pile: l <= 3 ? 0 : w < 2 ? 2 : 3,
-		fallMs: Math.round(lerp(1150, 600, g)),
-		trios: lerp(0.25, 0.45, g),
-		clues: 2,
-		bonusEvery: 1,
+		fifth: at(4, 0.06, 0.16, 0.16),
+		goal: Math.round(lerp(5, 8, t) + w * 0.8),
+		chests: 3,
+		locked: Math.round(at(1, 1, 3, 2)),
+		chestEvery: Math.round(lerp(12, 9, g)),
+		rocks: Math.round(at(2, 1, 3, 2)),
+		ice: Math.round(at(3, 2, 5, 3)),
+		fill: 0.55,
+		bombAt: 5,
+		starAt: 7,
 	};
 }
 
-/** 101-200: five colours, every hazard at once, a deeper ground and a quicker fall. */
+/** 101-200: everything at once, five colours, more chests. */
 function expertBoard(level: number): EclatsCfg {
 	const t = (Math.min(200, level) - 101) / 99;
-	return {
-		seed: levelSeed(level),
-		colors: 5,
-		depth: 5,
-		treasures: Math.round(lerp(6, 8, t)),
-		traps: 3,
-		ice: 4,
-		hard: 0.3,
-		locks: Math.round(lerp(3, 5, t)),
-		pile: 3,
-		fallMs: Math.round(lerp(560, 450, t)),
-		trios: 0.45,
-		clues: 2,
-		bonusEvery: 1,
-	};
+	return { seed: levelSeed(level), fifth: 0.16, goal: Math.round(lerp(9, 12, t)), chests: 3, locked: 3, chestEvery: 9, rocks: 2, ice: 3, fill: 0.55, bombAt: 4, starAt: 6 };
 }
 
-/** A level's board before its ground is picked. */
+/** A level's board before its candidate is picked. */
 export const boardFor = (level: number): EclatsCfg => (level > LEVEL_COUNT ? expertBoard(level) : levelBoard(level));
 
-/** The k-th candidate ground of a board: 0 is the board's own seed. */
+/** The k-th candidate of a board: 0 is the board's own seed. */
 export const pickSeed = (seed: number, k: number): number => (k === 0 ? seed : hash2(seed, k));
 
-/** The bot's piece count each level is picked for: a smooth climb instead of a lucky draw. */
+/** The bot's swipe count each level is picked for: a smooth climb instead of a lucky draw. */
 export const targetPar = (level: number): number =>
-	level > LEVEL_COUNT ? Math.round(lerp(15, 21, (level - 101) / 99)) : Math.round(lerp(7, 16, (level - 1) / (LEVEL_COUNT - 1)));
+	level > LEVEL_COUNT ? Math.round(lerp(14, 20, (level - 101) / 99)) : Math.round(lerp(6, 16, (level - 1) / (LEVEL_COUNT - 1)));
 
-/** Star thresholds in pieces: the bot's count plus room for the falling clock and for thinking. */
+/** Star thresholds in swipes: the bot's count plus room for a person. */
 export function starsFor(par: number): { three: number; two: number } {
-	const three = par + 3 + Math.round(par * 0.3);
-	return { three, two: three + 4 + Math.round(par * 0.5) };
+	const three = par + 2 + Math.round(par * 0.3);
+	return { three, two: three + 3 + Math.round(par * 0.5) };
 }
 
-/** Level n's board with its picked ground and star thresholds. */
+/** Level n's board with its picked candidate and star thresholds. */
 export function levelConfig(level: number): EclatsLevelCfg {
 	const b = boardFor(level);
 	const [k, par] = PICKS[level - 1] ?? [0, targetPar(level)];
@@ -104,7 +90,7 @@ export function levelConfig(level: number): EclatsLevelCfg {
 
 const basePlan: LevelPlan<EclatsLevelCfg> = {
 	count: LEVEL_COUNT,
-	metric: 'time', // score = pieces; fewer is better
+	metric: 'time', // score = swipes; fewer is better
 	config: levelConfig,
 	// `this.config`, not levelConfig: past 100, extendPlan hands the hardened config in that way.
 	stars(level: number, r: LevelResult): 0 | 1 | 2 | 3 {
@@ -116,7 +102,7 @@ const basePlan: LevelPlan<EclatsLevelCfg> = {
 	},
 	starHint(level: number) {
 		const cfg = this.config(level);
-		return { two: `≤ ${cfg.two} pièces`, three: `≤ ${cfg.three} pièces` };
+		return { two: `≤ ${cfg.two} coups`, three: `≤ ${cfg.three} coups` };
 	},
 };
 
@@ -131,9 +117,19 @@ export type TierKey = 'facile' | 'moyen' | 'difficile' | 'expert';
 export const TIER_ORDER: TierKey[] = ['facile', 'moyen', 'difficile'];
 
 type Tier = { label: string; cfg: Omit<EclatsCfg, 'seed'> };
+
+/** Free play: endless, scored in points; the fifth colour creeps in every few swipes (engine `fifthNow`). */
 export const TIERS: Record<TierKey, Tier> = {
-	facile: { label: 'Facile', cfg: { colors: 4, depth: 4, treasures: 4, traps: 0, ice: 0, hard: 0, locks: 0, pile: 2, fallMs: 1000, trios: 0.3, clues: 2, bonusEvery: 1 } },
-	moyen: { label: 'Moyen', cfg: { colors: 4, depth: 5, treasures: 5, traps: 1, ice: 2, hard: 0.1, locks: 0, pile: 2, fallMs: 800, trios: 0.38, clues: 2, bonusEvery: 1 } },
-	difficile: { label: 'Difficile', cfg: { colors: 4, depth: 5, treasures: 6, traps: 2, ice: 3, hard: 0.2, locks: 2, pile: 3, fallMs: 650, trios: 0.42, clues: 2, bonusEvery: 1 } },
-	expert: { label: 'Expert', cfg: { colors: 5, depth: 5, treasures: 7, traps: 3, ice: 4, hard: 0.3, locks: 4, pile: 3, fallMs: 520, trios: 0.45, clues: 2, bonusEvery: 1 } },
+	facile: { label: 'Facile', cfg: { fifth: 0, goal: 0, chests: 1, locked: 0, chestEvery: 40, rocks: 0, ice: 0, fill: 0.5, bombAt: 4, starAt: 6 } },
+	moyen: { label: 'Moyen', cfg: { fifth: 0.06, goal: 0, chests: 1, locked: 0, chestEvery: 40, rocks: 0, ice: 0, fill: 0.55, bombAt: 4, starAt: 6 } },
+	difficile: { label: 'Difficile', cfg: { fifth: 0.12, goal: 0, chests: 1, locked: 0, chestEvery: 40, rocks: 0, ice: 0, fill: 0.6, bombAt: 4, starAt: 6 } },
+	expert: { label: 'Expert', cfg: { fifth: 0.18, goal: 0, chests: 1, locked: 0, chestEvery: 40, rocks: 0, ice: 0, fill: 0.6, bombAt: 4, starAt: 6 } },
+};
+
+/** The daily challenge: N chests, the arrivals announced, fewest swipes wins. */
+export const DAILY: Record<TierKey, Tier> = {
+	facile: { label: 'Facile', cfg: { fifth: 0, goal: 6, chests: 3, locked: 1, chestEvery: 12, rocks: 0, ice: 0, fill: 0.55, bombAt: 4, starAt: 6 } },
+	moyen: { label: 'Moyen', cfg: { fifth: 0, goal: 8, chests: 3, locked: 2, chestEvery: 11, rocks: 1, ice: 0, fill: 0.55, bombAt: 4, starAt: 6 } },
+	difficile: { label: 'Difficile', cfg: { fifth: 0.08, goal: 10, chests: 3, locked: 2, chestEvery: 10, rocks: 2, ice: 2, fill: 0.55, bombAt: 4, starAt: 6 } },
+	expert: { label: 'Expert', cfg: { fifth: 0.16, goal: 12, chests: 3, locked: 3, chestEvery: 9, rocks: 2, ice: 3, fill: 0.55, bombAt: 4, starAt: 6 } },
 };

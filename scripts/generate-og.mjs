@@ -126,18 +126,18 @@ async function main() {
 			}
 			await freeze();
 		},
-		// Free play, then a dozen pieces through the test hook so the shot shows a pile, bursts
-		// and dug cells with their numbers; freeze before the pile can top out.
+		// Free play, then swipes through the test hook so the shot catches a chain going off.
 		eclats: async () => {
 			await page.evaluate(() => {
 				Array.from(document.querySelectorAll('[role="tab"]')).find((b) => /libre/i.test(b.textContent || ''))?.click();
 			});
 			await sleep(400);
-			for (let k = 0; k < 12; k++) {
-				await page.evaluate((k) => window.__eclats?.place([1, 4, 2, 5, 0, 6, 3, 2, 4, 1, 5, 3][k], k % 4), k);
-				await sleep(1500);
+			for (const d of ['left', 'down', 'right', 'up', 'left', 'down', 'right']) {
+				await page.evaluate((d) => window.__eclats?.swipe(d), d);
+				await sleep(1400);
 			}
-			await freeze();
+			await page.evaluate(() => window.__eclats?.swipe('up'));
+			await sleep(420);
 		},
 		// Dig a short tunnel so the board shows the hen at work.
 		'cocotte-mineuse': async () => {
