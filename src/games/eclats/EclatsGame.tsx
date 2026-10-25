@@ -9,6 +9,8 @@ import {
 	canBreathe,
 	cloneState,
 	createGame,
+	movesLeft,
+	outOfMoves,
 	endlessStep,
 	findGroups,
 	nextCentre,
@@ -1060,6 +1062,7 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 			].filter(Boolean);
 			setToast({ id: ++fxId.current, text: parts.join(' · ') });
 		}
+		if (st.status === 'playing' && outOfMoves(st)) setToast({ id: ++fxId.current, text: '🔥 Plus de coups : le souffle de Bijou est ta dernière chance !' });
 		if (st.status !== 'playing') {
 			setPhase('over');
 			onEndRef.current(st);
@@ -1236,7 +1239,7 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 					goal: st.cfg.goal, score: st.score, empty: st.cells.filter((b) => !b).length,
 					ranks: [2, 3, 4].map((r) => st.cells.filter((b) => b?.kind === 'gem' && b.rank === r).length),
 					butin: butinRef.current, shown: { ...shownRef.current }, shows: showsRef.current.started, flying: showsRef.current.pending,
-					hoard: hoardRef.current, mood: moodRef.current, fire: st.fire, fireFull: FIRE_FULL,
+					hoard: hoardRef.current, mood: moodRef.current, fire: st.fire, fireFull: FIRE_FULL, limit: st.limit,
 				};
 			},
 			swipe(dir: Dir) { doMove(dir); },
@@ -1293,7 +1296,7 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 
 			{mode === 'levels' ? (
 				<div className="ec-tag">
-					{lv.menu ? 'Progression — réussis un niveau pour débloquer le suivant' : <>{world?.name} · Niveau {lv.level}{cfgLv ? ` · ★★★ en ${cfgLv.three} coups` : ''}</>}
+					{lv.menu ? 'Progression — réussis un niveau pour débloquer le suivant' : <>{world?.name} · Niveau {lv.level}{cfgLv?.hard ? ' · 🔥 difficile' : ''}{cfgLv ? ` · ★★★ en ${cfgLv.three} coups` : ''}</>}
 				</div>
 			) : mode === 'daily' ? (
 				<div className="ec-tag">{dailyLoading ? 'Préparation du défi…' : `Défi du jour · ${dailyWeekdayLabel()} · ${DAILY[tierKey].label}`}</div>
@@ -1320,7 +1323,13 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 					) : (
 						<>
 							<span ref={chestChip} className="ec-chip">🎁 <strong>{shownOpened}</strong>/{s.cfg.goal}</span>
-							<span className="ec-chip">👆 <strong>{s.moves}</strong> coup{s.moves > 1 ? 's' : ''}</span>
+							{s.limit > 0 ? (
+								<span className={`ec-chip${movesLeft(s) <= 3 && !over ? ' low' : ''}`} title="Coups restants : sans coup, le niveau est perdu">
+									👆 <strong>{movesLeft(s)}</strong> coup{movesLeft(s) > 1 ? 's' : ''} <small>restant{movesLeft(s) > 1 ? 's' : ''}</small>
+								</span>
+							) : (
+								<span className="ec-chip">👆 <strong>{s.moves}</strong> coup{s.moves > 1 ? 's' : ''}</span>
+							)}
 							{mode === 'daily' && <span className="ec-chip chrono">{fmtCentis(elapsed)}</span>}
 							{goldChipEl}
 						</>
@@ -1588,7 +1597,7 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 						detail={
 							lv.won
 								? `${s?.moves ?? 0} coups${cfgLv ? ` · ★★★ ≤ ${cfgLv.three}, ★★ ≤ ${cfgLv.two}` : ''}${endGain ? ` · 🪙 +${fmtGold(endGain)} au trésor` : ''}`
-								: `Le plateau est plein${butinRef.current ? ` · le butin (${fmtGold(butinRef.current)}) est perdu` : ''}`
+								: `${s && outOfMoves(s) ? 'Plus de coups' : 'Le plateau est plein'}${butinRef.current ? ` · le butin (${fmtGold(butinRef.current)}) est perdu` : ''}`
 						}
 						onNext={() => startLevel(lv.level + 1)}
 						onReplay={() => startLevel(lv.level)}
@@ -1612,7 +1621,9 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 				bébé dragon ; un niveau perdu le perd. Chaque gemme détruite remplit la jauge de souffle de Bijou :
 				pleine, touche Bijou (ou la barre d'espace) et il crache trois boules de feu, d'abord sur les coffres,
 				sinon là où les gemmes s'entassent. Ça ne compte pas comme un coup, et tant que la jauge est pleine,
-				un plateau plein n'est pas perdu. Garde le doigt appuyé pour accélérer une longue chaîne.
+				un plateau plein n'est pas perdu. En mode Niveaux, les coups sont comptés : sans coup avant le dernier
+				coffre, le niveau est perdu (un niveau sur dix, marqué 🔥, est plus serré). Garde le doigt appuyé pour
+				accélérer une longue chaîne.
 			</p>
 
 			{lv.active && lv.menu && (
@@ -1674,6 +1685,8 @@ const CSS = `
 .ec-chip strong { color: var(--accent-regular); }
 .ec-chip.gold strong { color: #d99a0b; }
 .ec-chip small { color: var(--gray-300); font-weight: 500; }
+.ec-chip.low { background: rgba(214, 58, 31, 0.16); animation: ec-low 0.8s ease-in-out infinite alternate; }
+.ec-chip.low strong { color: #d63a1f; }
 .ec-sound { border: none; background: var(--gray-900); border-radius: 999px; width: 32px; height: 28px; cursor: pointer; font-size: 14px; }
 
 /* The arrivals on the left; Bijou on his pile at the board's top corner, over its frame but never a cell. */
@@ -1902,6 +1915,7 @@ span.ec-ember { border-radius: 50%; background: radial-gradient(circle, #fff6c8 
 @keyframes ec-step-a { 0% { opacity: 1; } 50% { opacity: 0; } 100% { opacity: 0; } }
 @keyframes ec-step-b { 0% { opacity: 0; } 50% { opacity: 1; } 100% { opacity: 1; } }
 @keyframes ec-grew { 0% { transform: scale(0.8); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
+@keyframes ec-low { from { box-shadow: 0 0 0 0 rgba(214, 58, 31, 0); } to { box-shadow: 0 0 0 3px rgba(214, 58, 31, 0.35); } }
 @keyframes ec-fire-glow { from { filter: brightness(1); } to { filter: brightness(1.2); } }
 @keyframes ec-flow { from { background-position: 0 0; } to { background-position: -200% 0; } }
 @keyframes ec-pour { from { clip-path: inset(0 0 0 0); } to { clip-path: inset(0 0 0 100%); } }
@@ -1915,6 +1929,6 @@ span.ec-ember { border-radius: 50%; background: radial-gradient(circle, #fff6c8 
   .ec-dance img:nth-child(1) { animation: none; }
   .ec-dance img:nth-child(2) { display: none; }
   .ec-fire-fill { transition: none; }
-  .ec-fire-fill.pour, .ec-fire.full .ec-fire-track, .ec-fire.full .ec-fire-fill, .ec-fire.full .ec-fire-tip { animation: none; }
+  .ec-fire-fill.pour, .ec-fire.full .ec-fire-track, .ec-fire.full .ec-fire-fill, .ec-fire.full .ec-fire-tip, .ec-chip.low { animation: none; }
 }
 `;

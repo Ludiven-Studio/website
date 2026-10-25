@@ -8,6 +8,8 @@
 // they make a group, the cascade goes on. Chests slide like blocks and open when an explosion
 // touches them. Every gem destroyed fills Bijou's gauge; once it is full he can breathe three
 // fireballs on the board, a 3×3 blast each, chests first, and a full board is not lost while he can.
+// A level may limit the swipes: run out before the last chest and it is lost (unless Bijou can
+// still breathe); `revive` gives a lost level more swipes and a full gauge.
 //
 // play() returns a timeline of steps, each with a snapshot of the board after it, so the screen can
 // animate a move one step at a time while the engine stays a plain function.
@@ -48,6 +50,7 @@ export interface EclatsCfg {
 	rocks: number; // fixed rocks at the start
 	ice: number; // frozen gems at the start
 	fill: number; // share of the board filled at the start
+	limit?: number; // swipes allowed to open the chests (none when absent or 0)
 }
 
 export type Status = 'playing' | 'won' | 'lost';
@@ -62,6 +65,7 @@ export interface State {
 	opened: number;
 	score: number;
 	fire: number; // Bijou's gauge: gems destroyed since his last breath, up to FIRE_FULL
+	limit: number; // swipes allowed, 0 = no limit; a revive raises it
 	status: Status;
 }
 
@@ -179,7 +183,7 @@ function groupSize(s: State, i: number): number {
 }
 
 export function createGame(cfg: EclatsCfg): State {
-	const s: State = { cfg, cells: new Array(N * N).fill(null), nextId: 1, moves: 0, arrivals: 0, centred: 0, opened: 0, score: 0, fire: 0, status: 'playing' };
+	const s: State = { cfg, cells: new Array(N * N).fill(null), nextId: 1, moves: 0, arrivals: 0, centred: 0, opened: 0, score: 0, fire: 0, limit: cfg.limit ?? 0, status: 'playing' };
 	const rng = mulberry32(hash2(cfg.seed, 0x51a7));
 	const free = (inner: boolean): number[] =>
 		s.cells.map((b, i) => (b || (inner && (rc(i)[0] % (N - 1) === 0 || rc(i)[1] % (N - 1) === 0)) ? -1 : i)).filter((i) => i >= 0);
@@ -503,7 +507,7 @@ const MAX_ROUNDS = 16;
  * and more waves if the arrivals made a group. One centre gem per swipe, however long the cascade.
  */
 export function play(s: State, dir: Dir): Step[] | null {
-	if (s.status !== 'playing' || !slide(s, dir)) return null;
+	if (s.status !== 'playing' || outOfMoves(s) || !slide(s, dir)) return null;
 	s.moves++;
 	const steps: Step[] = [{ t: 'slide', cells: snap(s) }];
 	const won = (): boolean => s.cfg.goal > 0 && s.opened >= s.cfg.goal;
@@ -524,8 +528,26 @@ export function play(s: State, dir: Dir): Step[] | null {
 		steps.push({ t: 'arrive', ids: a.ids, centre: a.centre, cells: snap(s) });
 	}
 	if (won()) s.status = 'won';
-	else if (!s.cells.some((b) => !b) && !canBreathe(s)) s.status = 'lost';
+	else if ((!s.cells.some((b) => !b) || outOfMoves(s)) && !canBreathe(s)) s.status = 'lost';
 	return steps;
+}
+
+/** No swipe left: the level's limit is reached. */
+export const outOfMoves = (s: State): boolean => s.limit > 0 && s.moves >= s.limit;
+
+/** Swipes left before the limit, or Infinity without one. */
+export const movesLeft = (s: State): number => (s.limit > 0 ? Math.max(0, s.limit - s.moves) : Infinity);
+
+/**
+ * A lost level plays on: `more` swipes past the ones played (when it has a limit) and Bijou's gauge full,
+ * so a full board can be breathed clear. False unless the level was lost.
+ */
+export function revive(s: State, more: number): boolean {
+	if (s.status !== 'lost') return false;
+	if (s.limit > 0) s.limit = Math.max(s.limit, s.moves) + more;
+	s.fire = FIRE_FULL;
+	s.status = 'playing';
+	return true;
 }
 
 /* ---------- Bijou's breath ---------- */
@@ -579,6 +601,7 @@ export function breathe(s: State): Step[] | null {
 	const steps: Step[] = [{ t: 'breath', balls, cells: snap(s) }];
 	steps.push(burst(s, 'down', 1, balls.flatMap(around))!);
 	if (s.cfg.goal > 0 && s.opened >= s.cfg.goal) s.status = 'won';
+	else if (outOfMoves(s)) s.status = 'lost';
 	return steps;
 }
 

@@ -786,3 +786,18 @@
 - 19:18 : build complet OK. Non commité : en attente du feu vert de l'utilisateur.
 - 19:47 : commité et poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé.
   Réservations libérées.
+
+## 2026-10-25 — Dragon's Gems Swipe : coups limités par niveau (session website)
+- Statut : en cours (2026-10-25T19:50+01:00). Demande de l'utilisateur : oui aux coups limités (proposition de
+  monétisation pour l'app : échec, cœurs, « +5 coups »), zéro pub imposée
+- Réservations actives : `src/games/eclats/`, `scripts/eclats-levels.ts`, `scripts/check-eclats.mjs`,
+  `src/data/tutorials.ts` (carte Éclats).
+- Ressources : serveur de dev sur le port 4473 ; eslint, `astro check`. Build annoncé ici avant.
+- 20:02 : moteur : limite de coups (perdu sans coup, sauf si Bijou peut encore souffler ; revive pour l'app). picks.ts
+  régénéré [graine, par, limite] : limite = coups d'un joueur type (robot 60 % au hasard) gagnés 80 % du temps, 50 % un
+  niveau sur dix (🔥 difficile), plancher par + 2 ; étoiles dans la limite. Mesuré : joueur type 87 % (1-50), 83 %
+  (51-100). Écran : coups restants (rouge à 3), « Plus de coups », dernière chance. vitest 357/357, eslint, astro check
+  0 erreur, check-eclats.mjs OK. Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 20:03 : build complet OK. Non commité : en attente du feu vert de l'utilisateur.
+- 20:14 : commité et poussé à la demande de l'utilisateur : mes 8 fichiers et cette section seulement. Statut :
+  terminé. Réservations libérées.

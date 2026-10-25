@@ -1,10 +1,10 @@
 // Éclats levels plan (1-100, 101-200 with the Expert pack). Five worlds of twenty levels, each
 // adding one new thing on top of the last: locked chests, rocks, ice, a fifth colour. A level is won
-// once N chests are open: a few on the board, the rest arriving at a fixed pace the preview shows.
-// The stars count the swipes it took, against the bot's own
-// count on that level. Each level's board is the candidate whose bot count sits nearest a smooth
-// ramp (picks.ts, written by scripts/eclats-levels.ts), so no level is a freebie or a slog.
-// metric 'time' with score = swipes (lower is better).
+// once N chests are open: a few on the board, the rest arriving at a fixed pace the preview shows,
+// within a number of swipes: out of swipes, the level is lost. Each level's board is the candidate
+// whose bot count sits nearest a smooth ramp, and its limit is the count a typical player wins within
+// 80 % of the time, 50 % on a hard level (one in ten) — picks.ts, written by scripts/eclats-levels.ts.
+// The stars count the swipes it took, inside that limit. metric 'time' with score = swipes (lower is better).
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
 import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
@@ -29,6 +29,8 @@ export const WORLDS: World[] = [
 export const worldOf = (level: number): World => [...WORLDS].reverse().find((w) => level >= w.from) ?? WORLDS[0];
 
 export interface EclatsLevelCfg extends EclatsCfg {
+	limit: number; // swipes allowed
+	hard: boolean; // one level in ten: a typical player wins it half the time
 	three: number; // swipes for 3★
 	two: number; // swipes for 2★
 }
@@ -66,6 +68,9 @@ function expertBoard(level: number): EclatsCfg {
 /** A level's board before its candidate is picked. */
 export const boardFor = (level: number): EclatsCfg => (level > LEVEL_COUNT ? expertBoard(level) : levelBoard(level));
 
+/** One level in ten is hard: its limit lets a typical player through half the time, not four in five. */
+export const isHard = (level: number): boolean => level % 10 === 0;
+
 /** The k-th candidate of a board: 0 is the board's own seed. */
 export const pickSeed = (seed: number, k: number): number => (k === 0 ? seed : hash2(seed, k));
 
@@ -73,17 +78,17 @@ export const pickSeed = (seed: number, k: number): number => (k === 0 ? seed : h
 export const targetPar = (level: number): number =>
 	level > LEVEL_COUNT ? Math.round(lerp(14, 20, (level - 101) / 99)) : Math.round(lerp(6, 16, (level - 1) / (LEVEL_COUNT - 1)));
 
-/** Star thresholds in swipes: the bot's count plus room for a person. */
-export function starsFor(par: number): { three: number; two: number } {
-	const three = par + 2 + Math.round(par * 0.3);
-	return { three, two: three + 3 + Math.round(par * 0.5) };
+/** Star thresholds in swipes, inside the limit (at least the bot's count + 2): 3★ near the bot's count, 2★ halfway to the limit, 1★ any win. */
+export function starsFor(par: number, limit: number): { three: number; two: number } {
+	const three = Math.max(par, Math.min(par + Math.round(par * 0.15), limit - 2));
+	return { three, two: Math.max(three + 1, Math.round((three + limit) / 2)) };
 }
 
-/** Level n's board with its picked candidate and star thresholds. */
+/** Level n's board with its picked candidate, its swipe limit and its star thresholds. */
 export function levelConfig(level: number): EclatsLevelCfg {
 	const b = boardFor(level);
-	const [k, par] = PICKS[level - 1] ?? [0, targetPar(level)];
-	return { ...b, seed: pickSeed(b.seed, k), ...starsFor(par) };
+	const [k, par, limit] = PICKS[level - 1] ?? [0, targetPar(level), targetPar(level) + 4];
+	return { ...b, seed: pickSeed(b.seed, k), limit, hard: isHard(level), ...starsFor(par, limit) };
 }
 
 const basePlan: LevelPlan<EclatsLevelCfg> = {

@@ -8,6 +8,9 @@ import {
 	breathe,
 	canBreathe,
 	createGame,
+	movesLeft,
+	outOfMoves,
+	revive,
 	endlessStep,
 	entryEdge,
 	fifthNow,
@@ -435,7 +438,72 @@ describe("Bijou's breath", () => {
 	});
 });
 
+describe('the swipe limit', () => {
+	it('out of swipes before the last chest, the level is lost and takes no more swipes', () => {
+		const s = blank({ goal: 5, limit: 1 });
+		put(s, B, 0, 'gem', 0);
+		put(s, 0, N - 1, 'gem', 1);
+		expect(movesLeft(s)).toBe(1);
+		play(s, 'down');
+		expect(movesLeft(s)).toBe(0);
+		expect(s.status).toBe('lost');
+		expect(play(s, 'up')).toBeNull();
+	});
+
+	it('a full gauge as the swipes run out: Bijou breathes first, and his breath can still win', () => {
+		const s = blank({ goal: 5, limit: 1 });
+		put(s, 0, N - 1, 'gem', 1);
+		s.fire = FIRE_FULL;
+		play(s, 'down');
+		expect(s.status).toBe('playing');
+		expect(play(s, 'up')).toBeNull();
+
+		const win = blank({ goal: 1, limit: 3 });
+		put(win, 3, 3, 'chest');
+		win.moves = 3;
+		win.fire = FIRE_FULL;
+		breathe(win);
+		expect(win.status).toBe('won');
+
+		const lose = blank({ goal: 2, limit: 3 });
+		put(lose, 3, 3, 'chest');
+		lose.moves = 3;
+		lose.fire = FIRE_FULL;
+		breathe(lose);
+		expect(lose.opened).toBe(1);
+		expect(lose.status).toBe('lost');
+	});
+
+	it('a revive plays a lost level on: more swipes and a full gauge', () => {
+		const s = blank({ goal: 5, limit: 1 });
+		put(s, 0, N - 1, 'gem', 1);
+		expect(revive(s, 5)).toBe(false);
+		play(s, 'down');
+		expect(s.status).toBe('lost');
+		expect(revive(s, 5)).toBe(true);
+		expect(s.status).toBe('playing');
+		expect(movesLeft(s)).toBe(5);
+		expect(canBreathe(s)).toBe(true);
+	});
+
+	it('without a limit, swipes never run out', () => {
+		const s = blank();
+		expect(movesLeft(s)).toBe(Infinity);
+		expect(outOfMoves(s)).toBe(false);
+	});
+});
+
 describe('levels', () => {
+	it('every level lets the bot through with room, one in ten is hard, and its stars sit inside its limit', () => {
+		for (let l = 1; l <= 200; l++) {
+			const cfg = eclatsLevels.config(l);
+			expect(cfg.limit).toBeGreaterThanOrEqual(PICKS[l - 1][1] + 2);
+			expect(cfg.three).toBeLessThan(cfg.two);
+			expect(cfg.two).toBeLessThan(cfg.limit);
+			expect(cfg.hard).toBe(l % 10 === 0);
+		}
+	});
+
 	it('picks.ts matches the engine: the bot clears every level in the swipes recorded there', () => {
 		// Fails after a change to the engine, the bot or a board: rerun scripts/eclats-levels.ts.
 		expect(PICKS).toHaveLength(200);

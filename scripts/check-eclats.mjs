@@ -76,6 +76,8 @@ try {
 			if (s.moves > 0) break;
 		}
 		check('an arrow key swipes the board', s.moves === 1, `${s.moves} move`);
+		const left = await page.evaluate(() => [...document.querySelectorAll('.ec-hud .ec-chip')].map((c) => c.textContent).find((t) => t.includes('restant')) ?? '');
+		check('a level counts the swipes it has left', s.limit > 0 && left.includes(String(s.limit - s.moves)), `limit ${s.limit}, chip "${left.trim()}"`);
 		await idle(page);
 		// Did a chest ever pop out big in the flying layer? A mutation observer sees it even between polls.
 		await page.evaluate(() => {
