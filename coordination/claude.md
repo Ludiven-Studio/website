@@ -762,3 +762,15 @@
   du feu vert de l'utilisateur.
 - 16:41 : commité et poussé à la demande de l'utilisateur, avec la correction de la danse (7ebeee0) : mes 13 fichiers
   et cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-10-25 — Dragon's Gems Swipe : la jauge se remplit plus doucement (session website)
+- Statut : en cours (2026-10-25T17:49+01:00). Demande de l'utilisateur : la jauge doit se remplir plus doucement
+- Réservations actives : `src/games/eclats/engine.ts`.
+- Ressources : serveur de dev sur le port 4473 ; eslint, `astro check`. Build annoncé ici avant.
+- 17:49 : FIRE_FULL 40 → 60, mesuré au robot : pleine dans 95 % des niveaux aux deux tiers (au lieu de 100 % à la
+  moitié), tous les 6 coups en libre (au lieu de 4). vitest eclats 37/37, check-eclats.mjs OK. Lancement du build
+  complet (écrit dist/, .astro/, public/vendor/)…
+- 17:51 : build complet OK (153 pages, précache 310 entrées, liens OK). Non commité : en attente du feu vert de
+  l'utilisateur.
+- 18:23 : commité et poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé.
+  Réservations libérées.
