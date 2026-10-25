@@ -801,3 +801,11 @@
 - 20:03 : build complet OK. Non commité : en attente du feu vert de l'utilisateur.
 - 20:14 : commité et poussé à la demande de l'utilisateur : mes 8 fichiers et cette section seulement. Statut :
   terminé. Réservations libérées.
+
+## 2026-10-25 — Dragon's Gems Swipe : images des cœurs de Bijou (Codex, pour l'app) (session website)
+- Statut : en cours (2026-10-25T20:16+01:00). Demande de l'utilisateur : les cœurs de Bijou (vies) dans l'app Unity
+- Réservations actives : `.collab/tickets/0046-dragons-gems-coeurs.md` (nouveau), `.collab/out/0046/`,
+  `.collab/LOG.md`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 20:35 : les 2 images retenues et intégrées dans l'app Unity ; commité et poussé à la demande de l'utilisateur : le
+  ticket, la ligne du LOG et cette section seulement. Statut : terminé. Réservations libérées.

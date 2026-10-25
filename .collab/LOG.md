@@ -39,3 +39,4 @@ Une ligne par ticket : date · id · résumé · décision.
 - 2026-10-25 · 0043 · essai de Bijou, le bébé dragon de Dragon's Gems (Codex, images) · 4 images retenues : Bijou au repos et qui applaudit, coffre ouvert, tas d'or moyen
 - 2026-10-25 · 0044 · série de Bijou, des tas d'or et des rayons (Codex, images) · 12 images retenues ; clignement aligné à 1-2 px ; Bijou remplace la cocotte sur la carte du jeu
 - 2026-10-25 · 0045 · le souffle de Bijou (Codex, images) · 4 images retenues : Bijou prêt et qui crache le feu, boule de feu, flamme de la jauge
+- 2026-10-25 · 0046 · les cœurs de Bijou (Codex, images) · 2 images retenues : la gemme-cœur pleine et vide, pour les vies de l'app
