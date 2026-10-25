@@ -20,6 +20,9 @@ function pairs(s: State): number {
 	return n;
 }
 
+/** Charged gems on the board: power stored for later. */
+const power = (s: State): number => s.cells.reduce((t, b) => t + (b?.kind === 'gem' ? b.rank - 1 : 0), 0);
+
 /** Gems right beside a chest: the next explosion there opens it. */
 function chestContacts(s: State): number {
 	let n = 0;
@@ -43,7 +46,7 @@ export function bestMove(s: State): Dir | null {
 		const steps = play(t, d);
 		if (!steps) continue;
 		const opened = t.opened - s.opened;
-		let v = opened * 1000 + (t.score - s.score) + countWaves(steps) * 15 + emptyCells(t) * 14 + pairs(t) * 4 + chestContacts(t) * 6;
+		let v = opened * 1000 + (t.score - s.score) + countWaves(steps) * 15 + emptyCells(t) * 14 + pairs(t) * 4 + chestContacts(t) * 6 + power(t) * 6;
 		if (t.status === 'won') v += 1e6;
 		if (t.status === 'lost') v -= 1e6;
 		if (v > bestV) {

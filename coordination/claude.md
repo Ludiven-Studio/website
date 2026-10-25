@@ -676,3 +676,20 @@
 - 08:04 : build complet OK : astro check 0 erreur, 153 pages, précache 310 entrées, liens OK.
 - 08:04 : commité et poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé.
   Réservations libérées.
+
+## 2026-10-25 — Éclats : fusions, carrés et grille plus grande (session website)
+- Statut : en cours (2026-10-25T07:38+01:00). Demande de l'utilisateur : grille un peu plus grande avec un élément
+  ajouté au centre à chaque coup ; d'autres déclencheurs de combos (carré de même objet) ; fusions avec un ordre
+  hiérarchique ; plus d'effets, de plus en plus sur les éléments de niveau supérieur
+- Réservations actives : `src/games/eclats/`, `scripts/check-eclats.mjs`, `scripts/eclats-levels.ts`,
+  `src/data/tutorials.ts` (cartes eclats), `src/pages/jeux/eclats.astro`, `.collab/tickets/0040-*`, `.collab/LOG.md`.
+- Ressources : serveur de dev sur le port 4473 ; eslint, `astro check`. Build annoncé ici avant.
+- 08:21 : 7×7, gemme au centre, gemmes de pouvoir (fusion à 4+, chargée/joyau/couronne), comète sur carré 2×2, effets
+  par rang et ralentis faits ; picks.ts régénéré ; vitest 347/347, tsc OK, check-eclats.mjs OK. Réservation ajoutée :
+  `public/assets/jeux/eclats.jpg` et `public/assets/jeux/og/eclats.jpg` (capture refaite après le build). Lancement du
+  build complet (écrit dist/, .astro/, public/vendor/)…
+- 08:24 : build complet OK (astro check 0 erreur, 153 pages, précache 310 entrées, liens OK) ; capture du jeu refaite
+  (scripts/generate-og.mjs : la capture attend une gemme chargée, réservé aussi) ; ticket 0040 clos. Fait et vérifié,
+  pas de commit : en attente du feu vert de l'utilisateur. Aucun changement Supabase.
+- 08:27 : commité et poussé à la demande de l'utilisateur : mes 17 fichiers et cette section seulement. Statut :
+  terminé. Réservations libérées.

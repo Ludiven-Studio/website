@@ -1,7 +1,7 @@
 /**
  * ÉCLATS — procedural sound effects (WebAudio, no assets), on the model of billard/sfx.ts.
- * A swipe whooshes, every wave of a chain plucks one note higher up a pentatonic scale, a bomb
- * thumps, a chest chimes. Muting is a per-device preference.
+ * A swipe whooshes, every wave of a chain plucks one note higher up a pentatonic scale, a fusion
+ * rings, a charged gem thumps, a comet hisses, a chest chimes. Muting is a per-device preference.
  */
 
 const KEY = 'eclats-sound';
@@ -129,20 +129,31 @@ export function pop(wave: number, gems: number): void {
 	noise(c, 'highpass', 3000, 0.7, 0.05 + Math.min(0.08, gems * 0.006), 0.07);
 }
 
-/** A bomb goes off. */
-export function bomb(): void {
-	const c = gate('bomb', 90);
+/** A charged gem goes off: deeper and longer the higher its rank; a crown also rings out. */
+export function blast(rank: number): void {
+	const c = gate('blast', 90);
 	if (!c) return;
-	tone(c, 'sine', 140, 42, 0.55, 0.32);
-	noise(c, 'lowpass', 900, 0.6, 0.35, 0.3, 0, 0.3);
+	const k = Math.min(3, Math.max(1, rank - 1));
+	tone(c, 'sine', 150 - k * 20, 42 - k * 6, 0.45 + k * 0.08, 0.26 + k * 0.1);
+	noise(c, 'lowpass', 1000 - k * 150, 0.6, 0.28 + k * 0.06, 0.24 + k * 0.1, 0, 0.3);
+	if (rank >= 4) [1046.5, 1318.51, 1567.98, 2093].forEach((f, i) => tone(c, 'sine', f, f, 0.14, 0.2, 0.05 + i * 0.05));
 }
 
-/** A star clears a colour. */
-export function star(): void {
-	const c = gate('star', 200);
+/** Gems fuse into one a rank up: a bright chord that climbs with the rank. */
+export function fuse(rank: number): void {
+	const c = gate('fuse', 80);
 	if (!c) return;
-	[1046.5, 1318.51, 1567.98, 2093].forEach((f, i) => tone(c, 'sine', f, f, 0.14, 0.18, i * 0.04));
-	noise(c, 'highpass', 5000, 0.5, 0.08, 0.35);
+	const base = [0, 0, 659.25, 783.99, 987.77][Math.min(4, rank)];
+	[1, 1.25, 1.5].forEach((m, i) => tone(c, 'triangle', base * m, base * m, 0.13, 0.22, i * 0.035));
+	noise(c, 'highpass', 4500, 0.6, 0.06, 0.18);
+}
+
+/** A comet takes off toward its target. */
+export function comet(): void {
+	const c = gate('comet', 120);
+	if (!c) return;
+	noise(c, 'bandpass', 500, 1.4, 0.16, 0.32, 0, 6);
+	tone(c, 'sine', 600, 1800, 0.08, 0.3);
 }
 
 /** A chest opens: a chime and a little rain of coins. */

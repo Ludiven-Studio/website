@@ -1,24 +1,34 @@
 // Éclats engine — « Glisse et explose ». Pure, no DOM.
 // A swipe slides every block to the wall (2048, no merging). Three or more of a colour touching by
-// their sides explode; in a fixed order the specials appear and everything slides again the same
-// way, wave after wave. Once nothing explodes, the entry edge (opposite the swipe) refills from the
-// arrival stream, and if the arrivals make a group, the cascade goes on. Chests slide like blocks
-// and open when an explosion touches them.
+// their sides explode; four or more fuse instead into one gem of that colour, a rank up (gem →
+// charged → jewel → crown). A charged gem that explodes releases its power: a 3×3 blast, a 5×5
+// one, or for the crown every gem of its colour. A 2×2 square also sends a comet to the nearest
+// chest. After each wave everything slides again the same way. Once nothing explodes, the entry
+// edge (opposite the swipe) refills from the arrival stream and one gem drops at the centre; if
+// they make a group, the cascade goes on. Chests slide like blocks and open when an explosion
+// touches them.
 //
 // play() returns a timeline of steps, each with a snapshot of the board after it, so the screen can
 // animate a move one step at a time while the engine stays a plain function.
 
 import { mulberry32 } from '../prng';
 
-export const N = 6;
+export const N = 7;
 export type Dir = 'up' | 'right' | 'down' | 'left';
 export const DIRS: Dir[] = ['up', 'right', 'down', 'left'];
-export type Kind = 'gem' | 'bomb' | 'star' | 'chest' | 'rock';
+export type Kind = 'gem' | 'chest' | 'rock';
+
+/** Gem ranks: 1 gem, 2 charged, 3 jewel, 4 crown. */
+export const MAX_RANK = 4;
+/** A group this big fuses into one gem a rank up; LEAP_AT and more, two ranks up. */
+export const FUSE_AT = 4;
+export const LEAP_AT = 5;
 
 export interface Block {
 	id: number;
 	kind: Kind;
-	color: number; // gems and stars only
+	color: number; // gems only
+	rank: number; // gems only, 1..MAX_RANK
 	ice: boolean; // a frozen gem stays put until an explosion beside it thaws it
 	lock: boolean; // a locked chest takes two explosions
 }
@@ -29,12 +39,10 @@ export interface EclatsCfg {
 	goal: number; // chests to open (0 = endless, scored in points)
 	chests: number; // chests on the board at the start
 	locked: number; // how many of them are locked
-	chestEvery: number; // every this many arrivals, a chest (0 = none): announced in the preview
+	chestEvery: number; // every this many edge arrivals, a chest (0 = none): announced in the preview
 	rocks: number; // fixed rocks at the start
 	ice: number; // frozen gems at the start
 	fill: number; // share of the board filled at the start
-	bombAt: number; // group size that leaves a bomb
-	starAt: number; // group size that leaves a star (0 = never)
 }
 
 export type Status = 'playing' | 'won' | 'lost';
@@ -44,7 +52,8 @@ export interface State {
 	cells: (Block | null)[];
 	nextId: number;
 	moves: number;
-	arrivals: number; // blocks dealt from the stream so far
+	arrivals: number; // blocks dealt from the edge stream so far
+	centred: number; // gems dropped at the centre so far
 	opened: number;
 	score: number;
 	status: Status;
@@ -55,6 +64,9 @@ export interface Popped {
 	cell: number;
 	kind: Kind;
 	color: number;
+	rank: number;
+	into: number; // the cell it fused into, or -1 when it exploded
+	late: boolean; // caught by a comet: the screen pops it once the comet lands
 }
 
 export interface Burst {
@@ -62,17 +74,20 @@ export interface Burst {
 	wave: number;
 	groups: number[][]; // each in flood order from its leading cell
 	popped: Popped[]; // everything gone in this wave
+	fused: { id: number; cell: number; rank: number; color: number }[];
+	releases: { cell: number; rank: number; color: number; late: boolean }[]; // charged gems that went off
+	comets: { from: number; to: number }[];
 	opened: number[]; // chest cells opened
-	blasts: number[]; // bomb cells that went off
-	stars: number[]; // star cells that went off
 	thawed: number[];
 	unlocked: number[];
-	specials: { id: number; cell: number; kind: 'bomb' | 'star' }[];
 	points: number;
 	cells: (Block | null)[];
 }
 
-export type Step = { t: 'slide'; cells: (Block | null)[] } | Burst | { t: 'arrive'; ids: number[]; cells: (Block | null)[] };
+export type Step =
+	| { t: 'slide'; cells: (Block | null)[] }
+	| Burst
+	| { t: 'arrive'; ids: number[]; centre: number; cells: (Block | null)[] }; // centre: the id dropped there, or -1
 
 /* ---------- Helpers ---------- */
 
@@ -91,13 +106,13 @@ export function hash2(a: number, b: number): number {
 }
 
 const movable = (b: Block | null): boolean => !!b && b.kind !== 'rock' && !b.ice;
-const colourOf = (b: Block | null): number => (b && (b.kind === 'gem' || b.kind === 'star') ? b.color : -1);
+const colourOf = (b: Block | null): number => (b && b.kind === 'gem' ? b.color : -1);
 const snap = (s: State): (Block | null)[] => s.cells.map((b) => (b ? { ...b } : null));
 
 /** A gem colour: one of four, or the fifth with probability `fifth`. */
 const gemColour = (rng: () => number, fifth: number): number => (rng() < fifth ? 4 : Math.floor(rng() * 4));
 
-/* ---------- The arrival stream ---------- */
+/* ---------- The arrival streams ---------- */
 
 export interface Arrival {
 	kind: 'gem' | 'chest';
@@ -111,19 +126,30 @@ const MAX_FIFTH = 0.3;
 export const endlessStep = (s: State): number => (s.cfg.goal > 0 ? 0 : Math.floor(s.moves / STEP_MOVES));
 export const fifthNow = (s: State): number => (s.cfg.goal > 0 ? s.cfg.fifth : Math.min(MAX_FIFTH, s.cfg.fifth + endlessStep(s) * STEP_FIFTH));
 
-/** Arrival n of a game: the same for everyone on the same seed, whatever was played before. */
+/** Edge arrival n of a game: the same for everyone on the same seed, whatever was played before. */
 export function arrivalAt(cfg: EclatsCfg, n: number, fifth = cfg.fifth): Arrival {
 	if (cfg.chestEvery && (n + 1) % cfg.chestEvery === 0) return { kind: 'chest', color: 0 };
 	return { kind: 'gem', color: gemColour(mulberry32(hash2(cfg.seed, n)), fifth) };
 }
 
-/** The next k arrivals, for the preview. */
+/** Centre gem n: its own stream, so the preview can show it whatever the edge takes. */
+export const centreAt = (cfg: EclatsCfg, n: number, fifth = cfg.fifth): number => gemColour(mulberry32(hash2(cfg.seed ^ 0x5c3e7a11, n)), fifth);
+
+/** The next k edge arrivals, for the preview. */
 export const upcoming = (s: State, k: number): Arrival[] => Array.from({ length: k }, (_, i) => arrivalAt(s.cfg, s.arrivals + i, fifthNow(s)));
+export const nextCentre = (s: State): number => centreAt(s.cfg, s.centred, fifthNow(s));
+
+/** Cells from the centre outward, ties in reading order: where the centre gem lands. */
+export const CENTRE_ORDER: number[] = Array.from({ length: N * N }, (_, i) => i).sort((a, b) => {
+	const m = (N - 1) / 2;
+	const d = (i: number): number => (rc(i)[0] - m) ** 2 + (rc(i)[1] - m) ** 2;
+	return d(a) - d(b) || a - b;
+});
 
 /* ---------- Setup ---------- */
 
 function block(s: State, kind: Kind, color = 0, extra: Partial<Block> = {}): Block {
-	return { id: s.nextId++, kind, color, ice: false, lock: false, ...extra };
+	return { id: s.nextId++, kind, color, rank: 1, ice: false, lock: false, ...extra };
 }
 
 function groupSize(s: State, i: number): number {
@@ -146,7 +172,7 @@ function groupSize(s: State, i: number): number {
 }
 
 export function createGame(cfg: EclatsCfg): State {
-	const s: State = { cfg, cells: new Array(N * N).fill(null), nextId: 1, moves: 0, arrivals: 0, opened: 0, score: 0, status: 'playing' };
+	const s: State = { cfg, cells: new Array(N * N).fill(null), nextId: 1, moves: 0, arrivals: 0, centred: 0, opened: 0, score: 0, status: 'playing' };
 	const rng = mulberry32(hash2(cfg.seed, 0x51a7));
 	const free = (inner: boolean): number[] =>
 		s.cells.map((b, i) => (b || (inner && (rc(i)[0] % (N - 1) === 0 || rc(i)[1] % (N - 1) === 0)) ? -1 : i)).filter((i) => i >= 0);
@@ -228,8 +254,8 @@ export function entryEdge(dir: Dir): number[] {
 	return k.map((r) => at(r, 0));
 }
 
-/** Fill every empty cell of the entry edge from the stream. */
-function refill(s: State, dir: Dir): number[] {
+/** Fill every empty cell of the entry edge from the stream, then drop the centre gem if asked. */
+function refill(s: State, dir: Dir, centre: boolean): { ids: number[]; centre: number } {
 	const ids: number[] = [];
 	for (const i of entryEdge(dir)) {
 		if (s.cells[i]) continue;
@@ -238,12 +264,20 @@ function refill(s: State, dir: Dir): number[] {
 		s.cells[i] = b;
 		ids.push(b.id);
 	}
-	return ids;
+	let mid = -1;
+	const spot = centre ? CENTRE_ORDER.find((i) => !s.cells[i]) : undefined;
+	if (spot !== undefined) {
+		const b = block(s, 'gem', centreAt(s.cfg, s.centred++, fifthNow(s)));
+		s.cells[spot] = b;
+		ids.push(b.id);
+		mid = b.id;
+	}
+	return { ids, centre: mid };
 }
 
 /* ---------- Explosions ---------- */
 
-/** Same-colour groups of 3+, each in flood order from its most advanced cell along dir. */
+/** Same-colour groups of 3+ (any rank), each in flood order from its most advanced cell along dir. */
 export function findGroups(s: State, dir: Dir = 'down'): number[][] {
 	const seen = new Uint8Array(N * N);
 	const out: number[][] = [];
@@ -270,7 +304,7 @@ export function findGroups(s: State, dir: Dir = 'down'): number[][] {
 		}
 		if (comp.length < 3) continue;
 		// Breadth-first from the leading cell (first in reading order on a tie), so the screen
-		// can pop it outward and the special lands on a cell the player can predict.
+		// can pop it outward and a fusion lands on a cell the player can predict.
 		const start = comp.reduce((a, b) => (lead(b) > lead(a) || (lead(b) === lead(a) && b < a) ? b : a));
 		const set = new Set(comp);
 		const order = [start];
@@ -297,66 +331,124 @@ export function previewGroups(s: State, dir: Dir): number[][] {
 	return findGroups(t, dir);
 }
 
-const POINTS = { gem: 10, bomb: 50, star: 120, chest: 100, rock: 20 };
+/** True if the group holds a 2×2 square. */
+export function hasSquare(group: number[]): boolean {
+	const set = new Set(group);
+	return group.some((i) => i % N < N - 1 && set.has(i + 1) && set.has(i + N) && set.has(i + N + 1));
+}
 
-/** One wave: explode every group and what it sets off, then the specials appear. Null when nothing bursts. */
+/** The rank a group fuses into, or 0 when it explodes. */
+export function fusedRank(group: number[], cells: (Block | null)[]): number {
+	const top = Math.max(...group.map((i) => cells[i]!.rank));
+	if (group.length < FUSE_AT || top >= MAX_RANK) return 0;
+	return Math.min(MAX_RANK, top + (group.length >= LEAP_AT ? 2 : 1));
+}
+
+const POINTS = { chest: 100, rock: 20 };
+/** A gem is worth three of the rank below it. */
+export const gemPoints = (rank: number): number => 10 * 3 ** (rank - 1);
+
+/** One wave: explode or fuse every group, with everything it sets off. Null when nothing bursts. */
 function burst(s: State, dir: Dir, wave: number): Burst | null {
 	const groups = findGroups(s, dir);
 	if (!groups.length) return null;
-	const step: Burst = { t: 'burst', wave, groups, popped: [], opened: [], blasts: [], stars: [], thawed: [], unlocked: [], specials: [], points: 0, cells: [] };
+	const step: Burst = { t: 'burst', wave, groups, popped: [], fused: [], releases: [], comets: [], opened: [], thawed: [], unlocked: [], points: 0, cells: [] };
 
-	// A big group leaves a special on its leading cell: that gem does not pop.
-	const born: { cell: number; kind: 'bomb' | 'star'; color: number }[] = [];
+	// A big group fuses into its leading cell: that gem stays, the others fly into it.
+	const born: { cell: number; rank: number }[] = [];
+	const into = new Map<number, number>();
+	const squares: number[] = [];
 	for (const g of groups) {
-		const kind = s.cfg.starAt && g.length >= s.cfg.starAt ? 'star' : g.length >= s.cfg.bombAt ? 'bomb' : null;
-		if (kind) born.push({ cell: g[0], kind, color: colourOf(s.cells[g[0]]) });
+		const rank = fusedRank(g, s.cells);
+		if (rank) {
+			born.push({ cell: g[0], rank });
+			for (const i of g.slice(1)) into.set(i, g[0]);
+		}
+		if (hasSquare(g)) squares.push(g[0]);
 	}
 	const keep = new Set(born.map((b) => b.cell));
 
-	// The groups, then every bomb or star they touch and everything those reach. Whatever sits
-	// beside an explosion is "touched": chests open, rocks break, ice thaws.
-	const hit = new Set<number>();
-	const touch = new Set<number>();
+	// The groups, then every blast they set off. Whatever sits beside an explosion is "touched":
+	// chests open, rocks break, ice thaws. A comet strikes once the rest has settled, so it never
+	// aims at a chest this wave opens anyway.
+	const hit = new Map<number, boolean>(); // cell → caught by a comet
+	const touch = new Map<number, boolean>();
 	const queue: number[] = [];
+	let late = false;
 	const add = (i: number): void => {
 		if (keep.has(i) || hit.has(i) || !s.cells[i]) return;
-		hit.add(i);
+		hit.set(i, late);
 		queue.push(i);
 	};
-	for (const g of groups) for (const i of g) add(i);
-	while (queue.length) {
-		const i = queue.shift()!;
-		const b = s.cells[i]!;
+	const blast = (i: number, rad: number): void => {
 		const [r, c] = rc(i);
-		if (b.kind === 'bomb') {
-			step.blasts.push(i);
-			for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) if (inside(r + dr, c + dc)) add(at(r + dr, c + dc));
-		} else if (b.kind === 'star') {
-			step.stars.push(i);
-			s.cells.forEach((o, j) => { if (o && o.kind === 'gem' && o.color === b.color) add(j); });
+		for (let dr = -rad; dr <= rad; dr++) for (let dc = -rad; dc <= rad; dc++) if (inside(r + dr, c + dc)) add(at(r + dr, c + dc));
+	};
+	const drain = (): void => {
+		while (queue.length) {
+			const i = queue.shift()!;
+			const b = s.cells[i]!;
+			if (b.kind === 'chest' || b.kind === 'rock') continue; // a hit chest or rock is not an explosion itself
+			if (b.rank >= 2 && !into.has(i)) {
+				step.releases.push({ cell: i, rank: b.rank, color: b.color, late });
+				if (b.rank >= MAX_RANK) {
+					s.cells.forEach((o, j) => { if (o && o.kind === 'gem' && o.color === b.color) add(j); });
+					blast(i, 1);
+				} else blast(i, b.rank - 1);
+			}
+			const [r, c] = rc(i);
+			for (const [dr, dc] of NEIGH) {
+				if (!inside(r + dr, c + dc)) continue;
+				const j = at(r + dr, c + dc);
+				if (s.cells[j] && !hit.has(j) && !keep.has(j) && !touch.has(j)) touch.set(j, late);
+			}
 		}
-		if (b.kind === 'chest' || b.kind === 'rock') continue; // a hit chest or rock is not an explosion itself
+	};
+	for (const g of groups) for (const i of g) add(i);
+	drain();
+	// A fusion explodes too: what sits beside the gem it leaves is touched as well.
+	for (const i of keep) {
+		const [r, c] = rc(i);
 		for (const [dr, dc] of NEIGH) {
-			if (!inside(r + dr, c + dc)) continue;
 			const j = at(r + dr, c + dc);
-			const o = s.cells[j];
-			if (!o || hit.has(j) || keep.has(j)) continue;
-			if (o.kind === 'bomb' || o.kind === 'star') add(j);
-			else touch.add(j);
+			if (inside(r + dr, c + dc) && s.cells[j] && !hit.has(j) && !keep.has(j) && !touch.has(j)) touch.set(j, false);
 		}
+	}
+	late = true;
+	for (const from of squares) {
+		const [fr, fc] = rc(from);
+		const dist = (j: number): number => Math.abs(rc(j)[0] - fr) + Math.abs(rc(j)[1] - fc);
+		let to = -1;
+		s.cells.forEach((o, j) => {
+			if (o?.kind === 'chest' && !hit.has(j) && !touch.has(j) && (to < 0 || dist(j) < dist(to))) to = j;
+		});
+		if (to < 0) {
+			// No chest left to aim at: the 3×3 with the most gems still standing, a flight away.
+			let most = -1;
+			for (let j = 0; j < N * N; j++) {
+				if (dist(j) < 3) continue;
+				const [r, c] = rc(j);
+				let n = 0;
+				for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) if (inside(r + dr, c + dc) && s.cells[at(r + dr, c + dc)]?.kind === 'gem' && !hit.has(at(r + dr, c + dc))) n++;
+				if (n > most) { most = n; to = j; }
+			}
+		}
+		step.comets.push({ from, to });
+		blast(to, 1);
+		drain();
 	}
 
-	// A chest or rock caught in a blast counts as touched; gems, bombs and stars hit are gone.
-	for (const i of hit) {
+	// A chest or rock caught in a blast counts as touched; gems hit are gone.
+	for (const [i, byComet] of hit) {
 		const b = s.cells[i]!;
 		if (b.kind === 'chest' || b.kind === 'rock') {
-			touch.add(i);
+			if (!touch.has(i)) touch.set(i, byComet);
 			continue;
 		}
-		step.popped.push({ id: b.id, cell: i, kind: b.kind, color: b.color });
+		step.popped.push({ id: b.id, cell: i, kind: b.kind, color: b.color, rank: b.rank, into: into.get(i) ?? -1, late: byComet });
 		s.cells[i] = null;
 	}
-	for (const i of touch) {
+	for (const [i, byComet] of touch) {
 		const b = s.cells[i];
 		if (!b) continue;
 		if (b.kind === 'chest') {
@@ -365,11 +457,11 @@ function burst(s: State, dir: Dir, wave: number): Burst | null {
 				step.unlocked.push(i);
 			} else {
 				step.opened.push(i);
-				step.popped.push({ id: b.id, cell: i, kind: 'chest', color: 0 });
+				step.popped.push({ id: b.id, cell: i, kind: 'chest', color: 0, rank: 1, into: -1, late: byComet });
 				s.cells[i] = null;
 			}
 		} else if (b.kind === 'rock') {
-			step.popped.push({ id: b.id, cell: i, kind: 'rock', color: 0 });
+			step.popped.push({ id: b.id, cell: i, kind: 'rock', color: 0, rank: 1, into: -1, late: byComet });
 			s.cells[i] = null;
 		} else if (b.ice) {
 			b.ice = false;
@@ -377,13 +469,13 @@ function burst(s: State, dir: Dir, wave: number): Burst | null {
 		}
 	}
 	for (const b of born) {
-		const old = s.cells[b.cell]!;
-		s.cells[b.cell] = { ...old, kind: b.kind, color: b.color, ice: false };
-		step.specials.push({ id: old.id, cell: b.cell, kind: b.kind });
+		const g = s.cells[b.cell]!;
+		s.cells[b.cell] = { ...g, rank: b.rank, ice: false };
+		step.fused.push({ id: g.id, cell: b.cell, rank: b.rank, color: g.color });
 	}
 
 	s.opened += step.opened.length;
-	step.points = step.popped.reduce((t, p) => t + (p.kind === 'gem' ? POINTS.gem * wave : POINTS[p.kind]), 0);
+	step.points = step.popped.reduce((t, p) => t + (p.kind === 'gem' ? gemPoints(p.rank) * wave : POINTS[p.kind]), 0);
 	s.score += step.points;
 	step.cells = snap(s);
 	return step;
@@ -396,8 +488,8 @@ const MAX_ROUNDS = 16;
 
 /**
  * Swipe the board. Null when nothing moves (the swipe is refused). Otherwise the timeline: the slide,
- * every wave (burst, slide) until nothing explodes, the arrivals at the entry edge, and more waves
- * if the arrivals made a group.
+ * every wave (burst, slide) until nothing explodes, the arrivals at the entry edge and the centre,
+ * and more waves if the arrivals made a group. One centre gem per swipe, however long the cascade.
  */
 export function play(s: State, dir: Dir): Step[] | null {
 	if (s.status !== 'playing' || !slide(s, dir)) return null;
@@ -415,9 +507,9 @@ export function play(s: State, dir: Dir): Step[] | null {
 			if (slide(s, dir)) steps.push({ t: 'slide', cells: snap(s) });
 		}
 		if (won() || (round > 0 && !burstNow)) break;
-		const ids = refill(s, dir);
-		if (!ids.length) break;
-		steps.push({ t: 'arrive', ids, cells: snap(s) });
+		const a = refill(s, dir, round === 0);
+		if (!a.ids.length) break;
+		steps.push({ t: 'arrive', ids: a.ids, centre: a.centre, cells: snap(s) });
 	}
 	if (won()) s.status = 'won';
 	else if (!s.cells.some((b) => !b)) s.status = 'lost';

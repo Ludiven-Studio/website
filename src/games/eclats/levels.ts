@@ -18,7 +18,7 @@ export interface World {
 }
 
 export const WORLDS: World[] = [
-	{ from: 1, name: 'La prairie', novelty: '' },
+	{ from: 1, name: 'La prairie', novelty: '4 gemmes ou plus fusionnent en une gemme plus forte, qui explose plus fort. Un carré de 4 lance une comète vers un coffre.' },
 	{ from: 21, name: 'Les coffres-forts', novelty: 'Coffres cadenassés : le premier éclat fait sauter le cadenas, le second ouvre le coffre.' },
 	{ from: 41, name: 'Les rochers', novelty: 'Rochers : ils ne glissent pas et arrêtent les blocs. Une explosion juste à côté les brise.' },
 	{ from: 61, name: 'Le glacier', novelty: 'Glace : un bloc gelé ne glisse plus. Une explosion juste à côté le dégèle ; il peut aussi exploser avec sa couleur.' },
@@ -47,22 +47,20 @@ export function levelBoard(level: number): EclatsCfg {
 	return {
 		seed: levelSeed(l),
 		fifth: at(4, 0.06, 0.16, 0.16),
-		goal: Math.round(lerp(5, 8, t) + w * 0.8),
+		goal: Math.round(lerp(6, 10, t) + w * 1.2),
 		chests: 3,
 		locked: Math.round(at(1, 1, 3, 2)),
 		chestEvery: Math.round(lerp(12, 9, g)),
 		rocks: Math.round(at(2, 1, 3, 2)),
 		ice: Math.round(at(3, 2, 5, 3)),
 		fill: 0.55,
-		bombAt: 5,
-		starAt: 7,
 	};
 }
 
 /** 101-200: everything at once, five colours, more chests. */
 function expertBoard(level: number): EclatsCfg {
 	const t = (Math.min(200, level) - 101) / 99;
-	return { seed: levelSeed(level), fifth: 0.16, goal: Math.round(lerp(9, 12, t)), chests: 3, locked: 3, chestEvery: 9, rocks: 2, ice: 3, fill: 0.55, bombAt: 4, starAt: 6 };
+	return { seed: levelSeed(level), fifth: lerp(0.08, 0.14, t), goal: Math.round(lerp(12, 16, t)), chests: 3, locked: 3, chestEvery: 9, rocks: 2, ice: 3, fill: 0.5 };
 }
 
 /** A level's board before its candidate is picked. */
@@ -120,16 +118,16 @@ type Tier = { label: string; cfg: Omit<EclatsCfg, 'seed'> };
 
 /** Free play: endless, scored in points; the fifth colour creeps in every few swipes (engine `fifthNow`). */
 export const TIERS: Record<TierKey, Tier> = {
-	facile: { label: 'Facile', cfg: { fifth: 0, goal: 0, chests: 1, locked: 0, chestEvery: 40, rocks: 0, ice: 0, fill: 0.5, bombAt: 4, starAt: 6 } },
-	moyen: { label: 'Moyen', cfg: { fifth: 0.06, goal: 0, chests: 1, locked: 0, chestEvery: 40, rocks: 0, ice: 0, fill: 0.55, bombAt: 4, starAt: 6 } },
-	difficile: { label: 'Difficile', cfg: { fifth: 0.12, goal: 0, chests: 1, locked: 0, chestEvery: 40, rocks: 0, ice: 0, fill: 0.6, bombAt: 4, starAt: 6 } },
-	expert: { label: 'Expert', cfg: { fifth: 0.18, goal: 0, chests: 1, locked: 0, chestEvery: 40, rocks: 0, ice: 0, fill: 0.6, bombAt: 4, starAt: 6 } },
+	facile: { label: 'Facile', cfg: { fifth: 0, goal: 0, chests: 1, locked: 0, chestEvery: 40, rocks: 0, ice: 0, fill: 0.5 } },
+	moyen: { label: 'Moyen', cfg: { fifth: 0.06, goal: 0, chests: 1, locked: 0, chestEvery: 40, rocks: 0, ice: 0, fill: 0.55 } },
+	difficile: { label: 'Difficile', cfg: { fifth: 0.12, goal: 0, chests: 1, locked: 0, chestEvery: 40, rocks: 0, ice: 0, fill: 0.6 } },
+	expert: { label: 'Expert', cfg: { fifth: 0.18, goal: 0, chests: 1, locked: 0, chestEvery: 40, rocks: 0, ice: 0, fill: 0.6 } },
 };
 
 /** The daily challenge: N chests, the arrivals announced, fewest swipes wins. */
 export const DAILY: Record<TierKey, Tier> = {
-	facile: { label: 'Facile', cfg: { fifth: 0, goal: 6, chests: 3, locked: 1, chestEvery: 12, rocks: 0, ice: 0, fill: 0.55, bombAt: 4, starAt: 6 } },
-	moyen: { label: 'Moyen', cfg: { fifth: 0, goal: 8, chests: 3, locked: 2, chestEvery: 11, rocks: 1, ice: 0, fill: 0.55, bombAt: 4, starAt: 6 } },
-	difficile: { label: 'Difficile', cfg: { fifth: 0.08, goal: 10, chests: 3, locked: 2, chestEvery: 10, rocks: 2, ice: 2, fill: 0.55, bombAt: 4, starAt: 6 } },
-	expert: { label: 'Expert', cfg: { fifth: 0.16, goal: 12, chests: 3, locked: 3, chestEvery: 9, rocks: 2, ice: 3, fill: 0.55, bombAt: 4, starAt: 6 } },
+	facile: { label: 'Facile', cfg: { fifth: 0, goal: 8, chests: 3, locked: 1, chestEvery: 12, rocks: 0, ice: 0, fill: 0.55 } },
+	moyen: { label: 'Moyen', cfg: { fifth: 0, goal: 10, chests: 3, locked: 2, chestEvery: 11, rocks: 1, ice: 0, fill: 0.55 } },
+	difficile: { label: 'Difficile', cfg: { fifth: 0.08, goal: 12, chests: 3, locked: 2, chestEvery: 10, rocks: 2, ice: 2, fill: 0.55 } },
+	expert: { label: 'Expert', cfg: { fifth: 0.12, goal: 14, chests: 3, locked: 3, chestEvery: 9, rocks: 2, ice: 3, fill: 0.55 } },
 };

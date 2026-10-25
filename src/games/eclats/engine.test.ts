@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
+	CENTRE_ORDER,
+	MAX_RANK,
 	N,
 	arrivalAt,
 	createGame,
@@ -7,6 +9,7 @@ import {
 	entryEdge,
 	fifthNow,
 	findGroups,
+	nextCentre,
 	play,
 	previewGroups,
 	slide,
@@ -23,7 +26,8 @@ import { playBot } from './bot';
 import { eclatsLevels, levelConfig } from './levels';
 import { PICKS } from './picks';
 
-const CFG: EclatsCfg = { seed: 7, fifth: 0, goal: 0, chests: 0, locked: 0, chestEvery: 0, rocks: 0, ice: 0, fill: 0, bombAt: 4, starAt: 6 };
+const CFG: EclatsCfg = { seed: 7, fifth: 0, goal: 0, chests: 0, locked: 0, chestEvery: 0, rocks: 0, ice: 0, fill: 0 };
+const B = N - 1; // the bottom row
 
 /** An empty board: the test lays out the blocks. */
 function blank(over: Partial<EclatsCfg> = {}): State {
@@ -35,12 +39,17 @@ function blank(over: Partial<EclatsCfg> = {}): State {
 const at = (r: number, c: number): number => r * N + c;
 
 function put(s: State, r: number, c: number, kind: Kind, color = 0, extra: Partial<Block> = {}): Block {
-	const b: Block = { id: s.nextId++, kind, color, ice: false, lock: false, ...extra };
+	const b: Block = { id: s.nextId++, kind, color, rank: 1, ice: false, lock: false, ...extra };
 	s.cells[at(r, c)] = b;
 	return b;
 }
 
 const bursts = (steps: Step[]): Burst[] => steps.filter((x): x is Burst => x.t === 'burst');
+/** Swipe down with gems on the bottom row: a gem dropped in the top-right corner makes the swipe legal. */
+const swipeDown = (s: State): Burst => {
+	put(s, 0, N - 1, 'gem', 3);
+	return bursts(play(s, 'down')!)[0];
+};
 
 describe('sliding', () => {
 	it('slides every block to the wall, in order, without merging', () => {
@@ -88,6 +97,14 @@ describe('explosions', () => {
 		expect(g[0]).toHaveLength(3);
 	});
 
+	it('gems of every rank group by their colour', () => {
+		const s = blank();
+		put(s, 5, 0, 'gem', 1, { rank: 3 });
+		put(s, 5, 1, 'gem', 1);
+		put(s, 5, 2, 'gem', 1, { rank: 2 });
+		expect(findGroups(s)[0]).toHaveLength(3);
+	});
+
 	it('a group is ordered outward from its leading cell along the swipe', () => {
 		const s = blank();
 		[1, 2, 3].forEach((c) => put(s, 4, c, 'gem', 0));
@@ -104,6 +121,7 @@ describe('explosions', () => {
 		const steps = play(s, 'left')!;
 		const b = bursts(steps);
 		expect(b[0].popped.map((p) => p.cell).sort((x, y) => x - y)).toEqual([at(5, 0), at(5, 1), at(5, 2)]);
+		expect(b[0].fused).toEqual([]);
 		expect(steps[0].t).toBe('slide');
 	});
 
@@ -135,71 +153,131 @@ describe('explosions', () => {
 	});
 });
 
-describe('specials', () => {
-	it('a group of 4 leaves a bomb on its leading cell', () => {
+describe('fusions', () => {
+	it('four of a colour fuse into one gem a rank up, on the leading cell', () => {
 		const s = blank();
-		[0, 1, 2, 3].forEach((c) => put(s, 5, c, 'gem', 1));
-		put(s, 0, 5, 'gem', 3); // something has to move
-		const b = bursts(play(s, 'left')!)[0];
-		expect(b.specials).toEqual([expect.objectContaining({ kind: 'bomb', cell: at(5, 0) })]);
+		[0, 1, 2, 3].forEach((c) => put(s, B, c, 'gem', 1));
+		const b = swipeDown(s);
+		expect(b.fused).toEqual([expect.objectContaining({ cell: at(B, 0), rank: 2, color: 1 })]);
 		expect(b.popped).toHaveLength(3);
+		expect(b.popped.every((p) => p.into === at(B, 0))).toBe(true);
+		expect(s.cells.some((x) => x?.kind === 'gem' && x.rank === 2 && x.color === 1)).toBe(true);
 	});
 
-	it('a star clears every gem of its colour', () => {
+	it('five or more climb two ranks, from the highest rank in the group', () => {
 		const s = blank();
-		[0, 1, 2].forEach((c) => put(s, 5, c, 'gem', 1));
-		put(s, 5, 3, 'star', 2);
-		put(s, 2, 2, 'gem', 2);
-		put(s, 0, 5, 'gem', 2);
-		put(s, 0, 4, 'gem', 3);
-		const b = bursts(play(s, 'down')!)[0];
-		expect(b.stars).toHaveLength(1);
-		expect(b.popped.filter((p) => p.kind === 'gem' && p.color === 2)).toHaveLength(2);
+		[0, 1, 2, 3, 4].forEach((c) => put(s, B, c, 'gem', 1, { rank: c === 2 ? 2 : 1 }));
+		expect(swipeDown(s).fused[0].rank).toBe(4);
+	});
+
+	it('a charged gem in a trio releases a 3×3 blast', () => {
+		const s = blank();
+		[0, 1, 2].forEach((c) => put(s, B, c, 'gem', 1, { rank: c === 2 ? 2 : 1 }));
+		put(s, B, 3, 'gem', 2);
+		put(s, B, 5, 'gem', 0);
+		const b = swipeDown(s);
+		expect(b.releases).toEqual([expect.objectContaining({ cell: at(B, 2), rank: 2 })]);
+		expect(b.popped.some((p) => p.cell === at(B, 3))).toBe(true);
+		expect(b.popped.some((p) => p.cell === at(B, 5))).toBe(false);
+	});
+
+	it('a jewel releases a 5×5 blast', () => {
+		const s = blank();
+		[0, 1, 2].forEach((c) => put(s, B, c, 'gem', 1, { rank: c === 2 ? 3 : 1 }));
+		put(s, B, 4, 'gem', 2);
+		put(s, B, 5, 'gem', 0);
+		const b = swipeDown(s);
+		expect(b.popped.some((p) => p.cell === at(B, 4))).toBe(true);
+		expect(b.popped.some((p) => p.cell === at(B, 5))).toBe(false);
+	});
+
+	it('a crown clears its whole colour, and never fuses further', () => {
+		const s = blank();
+		[0, 1, 2, 3].forEach((c) => put(s, B, c, 'gem', 1, { rank: c === 2 ? MAX_RANK : 1 }));
+		put(s, B, 5, 'gem', 1);
+		put(s, 0, 0, 'gem', 1);
+		const b = swipeDown(s);
+		expect(b.fused).toEqual([]);
+		expect(b.releases[0].rank).toBe(MAX_RANK);
+		expect(b.popped.filter((p) => p.color === 1)).toHaveLength(6);
+	});
+
+	it('a charged gem caught in a blast goes off too', () => {
+		const s = blank();
+		[0, 1, 2].forEach((c) => put(s, B, c, 'gem', 1, { rank: c === 2 ? 2 : 1 }));
+		put(s, B, 3, 'gem', 2, { rank: 2 });
+		put(s, B, 4, 'gem', 0);
+		const b = swipeDown(s);
+		expect(b.releases).toHaveLength(2);
+		expect(b.popped.some((p) => p.cell === at(B, 4))).toBe(true);
 	});
 });
 
-describe('bombs in a chain', () => {
-	it('two bombs side by side both go off, and the blast opens a chest', () => {
+describe('squares and comets', () => {
+	it('a 2×2 square sends a comet to the nearest chest, and it opens', () => {
+		const s = blank({ goal: 5 });
+		[[B - 1, 0], [B - 1, 1], [B, 0], [B, 1]].forEach(([r, c]) => put(s, r, c, 'gem', 1));
+		put(s, B, 4, 'chest');
+		const b = swipeDown(s);
+		expect(b.comets).toEqual([{ from: at(B, 0), to: at(B, 4) }]);
+		expect(b.opened).toEqual([at(B, 4)]);
+		expect(b.popped.find((p) => p.kind === 'chest')?.late).toBe(true);
+	});
+
+	it('a comet never aims at a chest the wave opens anyway', () => {
+		const s = blank({ goal: 5 });
+		[[B - 1, 0], [B - 1, 1], [B, 0], [B, 1]].forEach(([r, c]) => put(s, r, c, 'gem', 1));
+		put(s, B, 2, 'chest');
+		put(s, B, 5, 'chest');
+		const b = swipeDown(s);
+		expect(b.comets[0].to).toBe(at(B, 5));
+		expect(b.opened.sort((x, y) => x - y)).toEqual([at(B, 2), at(B, 5)]);
+	});
+
+	it('without a chest, a comet flies to the thickest 3×3 at least three cells away', () => {
 		const s = blank();
-		[0, 1, 2].forEach((c) => put(s, 5, c, 'gem', 0));
-		put(s, 5, 3, 'bomb');
-		put(s, 4, 4, 'bomb');
-		put(s, 3, 5, 'chest');
-		put(s, 0, 0, 'gem', 1); // so the swipe down moves something
-		const b = bursts(play(s, 'down')!)[0];
-		expect(b.blasts).toHaveLength(2);
-		expect(b.opened).toHaveLength(1);
+		[[B - 1, 0], [B - 1, 1], [B, 0], [B, 1]].forEach(([r, c]) => put(s, r, c, 'gem', 1));
+		[3, 4, 5].forEach((c) => put(s, B, c, 'gem', c % 2 ? 2 : 0));
+		put(s, B - 1, 4, 'gem', 2);
+		const b = swipeDown(s);
+		expect(b.comets[0].to).toBe(at(B - 1, 4));
+		expect(b.popped.filter((p) => p.late)).toHaveLength(4);
 	});
 });
 
 describe('chests, rocks, ice', () => {
 	it('an explosion beside a chest opens it; a locked one takes two', () => {
 		const s = blank({ goal: 9 });
-		[0, 1, 2].forEach((c) => put(s, 5, c, 'gem', 0));
-		put(s, 4, 1, 'chest', 0, { lock: true });
-		put(s, 0, 5, 'gem', 3);
-		const b = bursts(play(s, 'down')!)[0];
+		[0, 1, 2].forEach((c) => put(s, B, c, 'gem', 0));
+		put(s, B - 1, 1, 'chest', 0, { lock: true });
+		const b = swipeDown(s);
 		expect(b.unlocked).toHaveLength(1);
 		expect(b.opened).toHaveLength(0);
 		expect(s.cells.some((x) => x?.kind === 'chest' && !x.lock)).toBe(true);
 	});
 
+	it('a fusion opens the chest beside the gem it leaves', () => {
+		const s = blank({ goal: 9 });
+		[0, 1, 2, 3].forEach((c) => put(s, B, c, 'gem', 0));
+		put(s, B - 1, 0, 'chest');
+		expect(swipeDown(s).opened).toEqual([at(B - 1, 0)]);
+	});
+
 	it('an explosion breaks the rock beside it and thaws the ice beside it', () => {
 		const s = blank();
-		[1, 2, 3].forEach((c) => put(s, 5, c, 'gem', 0));
-		put(s, 5, 0, 'rock');
-		put(s, 4, 2, 'gem', 1, { ice: true });
-		put(s, 0, 5, 'gem', 3);
-		const b = bursts(play(s, 'down')!)[0];
+		[1, 2, 3].forEach((c) => put(s, B, c, 'gem', 0));
+		put(s, B, 0, 'rock');
+		put(s, B - 1, 2, 'gem', 1, { ice: true });
+		const b = swipeDown(s);
 		expect(b.popped.some((p) => p.kind === 'rock')).toBe(true);
-		expect(b.thawed).toEqual([at(4, 2)]);
+		expect(b.thawed).toEqual([at(B - 1, 2)]);
 	});
 
 	it('opening the last chest ends the level at once', () => {
 		const s = blank({ goal: 1 });
-		[0, 1, 2].forEach((c) => put(s, 5, c, 'gem', 0));
-		put(s, 4, 0, 'chest');
-		put(s, 0, 5, 'gem', 3);
+		[0, 1, 2].forEach((c) => put(s, B, c, 'gem', 0));
+		put(s, B - 1, 0, 'chest');
+		put(s, 0, N - 1, 'gem', 3);
 		const steps = play(s, 'down')!;
 		expect(s.status).toBe('won');
 		expect(steps[steps.length - 1].t).toBe('burst');
@@ -227,8 +305,29 @@ describe('arrivals', () => {
 		put(s, 2, 5, 'gem', 0);
 		const steps = play(s, 'left')!;
 		const arrive = steps.find((x) => x.t === 'arrive')!;
-		const right = entryEdge('left');
-		expect(right.every((i) => arrive.cells[i] !== null)).toBe(true);
+		expect(entryEdge('left').every((i) => arrive.cells[i] !== null)).toBe(true);
+	});
+
+	it('one gem drops at the centre each swipe, the one the preview showed', () => {
+		const s = blank();
+		put(s, 0, 0, 'gem', 0);
+		const colour = nextCentre(s);
+		const steps = play(s, 'right')!;
+		const arrive = steps.find((x) => x.t === 'arrive');
+		if (!arrive || arrive.t !== 'arrive') throw new Error('no arrivals');
+		const mid = arrive.cells[CENTRE_ORDER[0]];
+		expect(mid?.id).toBe(arrive.centre);
+		expect(mid?.color).toBe(colour);
+		expect(s.centred).toBe(1);
+	});
+
+	it('the centre gem takes the nearest free cell when the centre is taken', () => {
+		const s = blank();
+		put(s, 3, 3, 'rock');
+		put(s, 0, 0, 'gem', 0);
+		const arrive = play(s, 'right')!.find((x) => x.t === 'arrive');
+		if (!arrive || arrive.t !== 'arrive') throw new Error('no arrivals');
+		expect(arrive.cells[at(2, 3)]?.id).toBe(arrive.centre);
 	});
 
 	it('endless mode adds a little of the fifth colour every few swipes', () => {
@@ -255,7 +354,7 @@ describe('setup and the end', () => {
 
 	it('a full board loses', () => {
 		const s = blank();
-		for (let i = 0; i < N * N; i++) s.cells[i] = { id: s.nextId++, kind: 'gem', color: ((i % N) + Math.floor(i / N) * 2) % 4, ice: false, lock: false };
+		for (let i = 0; i < N * N; i++) s.cells[i] = { id: s.nextId++, kind: 'gem', color: ((i % N) + Math.floor(i / N) * 2) % 4, rank: 1, ice: false, lock: false };
 		s.cells[0] = null;
 		const steps = play(s, 'left');
 		// The swipe fills the board back up: unless something explodes, it is over.

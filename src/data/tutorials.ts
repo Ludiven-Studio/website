@@ -125,9 +125,10 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 	],
 	eclats: [
 		{ emoji: '👆', title: 'Glisse', body: 'Glisse le doigt sur le plateau (ou les flèches du clavier) : tous les blocs glissent jusqu’au bout, comme dans 2048. Pendant que tu glisses, les blocs qui vont exploser brillent.' },
-		{ emoji: '💥', title: 'Explose', body: '3 blocs de la même couleur qui se touchent explosent. Tout reglisse dans le même sens, et de nouveaux blocs entrent par le bord opposé : les explosions s’enchaînent toutes seules.' },
+		{ emoji: '💥', title: 'Explose', body: '3 gemmes de la même couleur qui se touchent explosent. Tout reglisse dans le même sens, de nouveaux blocs entrent par le bord opposé et une gemme tombe au centre : les explosions s’enchaînent toutes seules.' },
 		{ emoji: '🎁', title: 'Les coffres', body: 'Une explosion juste à côté d’un coffre l’ouvre. Ouvre le nombre de coffres demandé, en le moins de coups possible pour les 3 étoiles. La bande « À venir » annonce les prochains blocs, coffres compris.' },
-		{ emoji: '💣', title: 'Bombes et étoiles', body: '4 blocs d’un coup laissent une bombe : une explosion à côté la fait sauter, avec tout son carré, et les bombes voisines suivent. 6 blocs laissent une étoile, qui fait sauter toute sa couleur.' },
+		{ emoji: '👑', title: 'Fusionne', body: '4 gemmes ou plus fusionnent en une seule, plus forte : gemme chargée, puis joyau, puis couronne. Quand elle saute avec sa couleur, elle libère sa force : 3×3, 5×5, et la couronne fait sauter toute sa couleur. Fais-la grandir ou fais-la sauter : à toi de voir.' },
+		{ emoji: '☄️', title: 'Le carré', body: 'Un carré de 4 gemmes de la même couleur lance une comète : elle file vers le coffre le plus proche et explose autour de lui.' },
 		{ emoji: '⚡', title: 'Astuce', body: 'Garde le doigt appuyé sur le plateau pour accélérer une longue chaîne. En mode Libre, le plateau finit par se remplir : la cinquième couleur arrive petit à petit, à chaque palier.' },
 	],
 	bulles: [

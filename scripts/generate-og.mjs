@@ -126,18 +126,29 @@ async function main() {
 			}
 			await freeze();
 		},
-		// Free play, then swipes through the test hook so the shot catches a chain going off.
+		// Free play, swipes through the test hook until a charged gem or better is on the board, then
+		// one more swipe so the shot catches a group popping.
 		eclats: async () => {
 			await page.evaluate(() => {
 				Array.from(document.querySelectorAll('[role="tab"]')).find((b) => /libre/i.test(b.textContent || ''))?.click();
 			});
 			await sleep(400);
-			for (const d of ['left', 'down', 'right', 'up', 'left', 'down', 'right']) {
-				await page.evaluate((d) => window.__eclats?.swipe(d), d);
-				await sleep(1400);
+			const idle = () => page.waitForFunction(() => window.__eclats?.state?.phase !== 'busy', null, { timeout: 15000 });
+			const best = () => page.evaluate(() => {
+				const dirs = ['up', 'right', 'down', 'left'];
+				const n = dirs.map((d) => window.__eclats.previewCount(d));
+				return { dir: dirs[n.indexOf(Math.max(...n))], n: Math.max(...n) };
+			});
+			for (let k = 0; k < 14; k++) {
+				const st = await page.evaluate(() => window.__eclats.state);
+				if (k >= 6 && st.ranks.some((x) => x > 0)) break;
+				await page.evaluate((d) => window.__eclats.swipe(d), (await best()).dir);
+				await sleep(200);
+				await idle();
 			}
-			await page.evaluate(() => window.__eclats?.swipe('up'));
-			await sleep(420);
+			const b = await best();
+			await page.evaluate((d) => window.__eclats.swipe(d), b.n ? b.dir : 'up');
+			await sleep(300);
 		},
 		// Dig a short tunnel so the board shows the hen at work.
 		'cocotte-mineuse': async () => {
