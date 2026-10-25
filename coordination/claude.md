@@ -662,3 +662,17 @@
   commit : en attente du feu vert de l'utilisateur. Aucun changement Supabase.
 - 07:20 : commité et poussé à la demande de l'utilisateur : mes 24 fichiers et cette section seulement. Statut :
   terminé. Réservations libérées.
+
+## 2026-10-25 — Pétanque Game : licences des composants tiers (session PetanqueGame)
+- Statut : en cours (2026-10-25T07:45+01:00). Demande de l'utilisateur : une section Licences sur la page Mentions
+  légales (les personnages Rocketbox sous MIT et les autres composants tiers du jeu), en plus d'un écran Crédits et
+  licences dans le jeu
+- Réservations actives : `src/pages/mentions-legales.astro`.
+- Ressources : serveur de dev sur le port 4491 ; eslint, `astro check`. Build annoncé ici avant.
+- 07:58 : section « Licences des composants tiers » ajoutée à src/pages/mentions-legales.astro ; eslint OK ; astro
+  check : 0 erreur sur ce fichier (les 23 erreurs viennent de src/games/eclats, travail en cours de la session Éclats)
+  ; captures desk et phone-dark vérifiées. Pas de build complet ni de commit : en attente du feu vert de l'utilisateur.
+- 08:02 : Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 08:04 : build complet OK : astro check 0 erreur, 153 pages, précache 310 entrées, liens OK.
+- 08:04 : commité et poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé.
+  Réservations libérées.
