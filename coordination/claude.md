@@ -774,3 +774,15 @@
   l'utilisateur.
 - 18:23 : commité et poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé.
   Réservations libérées.
+
+## 2026-10-25 — Dragon's Gems Swipe : jauge à 80 gemmes (session website)
+- Statut : en cours (2026-10-25T19:17+01:00). Demande de l'utilisateur : la jauge se remplit trop vite, peut-être 100
+  gemmes (choisi après mesure : 80 partout)
+- Réservations actives : `src/games/eclats/engine.ts`.
+- Ressources : serveur de dev sur le port 4473 ; eslint, `astro check`. Build annoncé ici avant.
+- 19:17 : FIRE_FULL 60 → 80 (100 mesuré : aucun souffle du robot avant le niveau 39). vitest eclats 37/37,
+  check-eclats.mjs OK (pleine après 10 coups en libre). Lancement du build complet (écrit dist/, .astro/,
+  public/vendor/)…
+- 19:18 : build complet OK. Non commité : en attente du feu vert de l'utilisateur.
+- 19:47 : commité et poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé.
+  Réservations libérées.

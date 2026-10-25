@@ -24,8 +24,8 @@ export const MAX_RANK = 4;
 /** A group this big fuses into one gem a rank up; LEAP_AT and more, two ranks up. */
 export const FUSE_AT = 4;
 export const LEAP_AT = 5;
-/** Gems to destroy to fill Bijou's gauge: the bot fills it two thirds of the way through a level, in 95 % of them. */
-export const FIRE_FULL = 60;
+/** Gems to destroy to fill Bijou's gauge: the bot fills it near the end of a level, in 83 % of them (a player taking more swipes, sooner). */
+export const FIRE_FULL = 80;
 /** Fireballs in one breath, each a 3×3 blast. */
 export const FIREBALLS = 3;
 
