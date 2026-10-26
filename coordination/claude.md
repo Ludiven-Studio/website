@@ -989,3 +989,16 @@
   sur le build, vitest popular 6/6. Non commité : en attente de l'utilisateur.
 - 13:48 : commité et poussé à la demande de l'utilisateur : mes 9 fichiers et cette section seulement. Statut :
   terminé. Réservations libérées.
+
+## 2026-10-26 — Pétanque Game : mise en ligne de la confidentialité et des CGU de l'appli (session PetanqueGame)
+- Statut : en cours (2026-10-26T13:47+01:00). Demande de l'utilisateur : Ok (mettre en ligne la politique de
+  confidentialité et les CGU du jeu en 5 langues)
+- Réservations actives : `src/pages/jeux/petanque/confidentialite.astro`, `src/pages/jeux/petanque/cgu.astro`,
+  `src/pages/{en,es,de,it}/jeux/petanque/confidentialite.astro` et `cgu.astro`, `src/pages/confidentialite.astro`.
+- Ressources : serveur de dev sur le port 4493 ; eslint, `astro check`. Build annoncé ici avant.
+- 13:50 : pages relues, lien Pétanque Game ajouté sur /confidentialite/ ; eslint OK sur les 11 fichiers, astro check 0
+  erreur, captures téléphone et bureau sombre OK.
+- 13:50 : Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 13:51 : build complet OK (166 pages, précache 324 entrées, liens OK).
+- 13:51 : commité et poussé à la demande de l'utilisateur : mes 11 fichiers et cette section seulement. Statut :
+  terminé. Réservations libérées.

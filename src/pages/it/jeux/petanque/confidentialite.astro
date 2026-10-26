@@ -1,0 +1,527 @@
+---
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import Hero from '../../../../components/Hero.astro';
+import LangSwitch from '../../../../components/LangSwitch.astro';
+---
+
+<BaseLayout
+	title="Informativa sulla privacy dell'app Pétanque Game | Ludiven Studio"
+	description="Informativa sulla privacy del gioco mobile Pétanque Game: gioco senza account, account Google o Apple, gioco online e classifica, pubblicità, acquisti, eliminazione dell'account, diritti GDPR."
+	lang="it"
+	alternates={{ fr: '/jeux/petanque/confidentialite/', en: '/en/jeux/petanque/confidentialite/', es: '/es/jeux/petanque/confidentialite/', de: '/de/jeux/petanque/confidentialite/', it: '/it/jeux/petanque/confidentialite/' }}
+>
+	<div class="wrapper stack gap-12 legal">
+		<div class="stack gap-8">
+			<LangSwitch
+				lang="it"
+				links={[
+					{ lang: 'fr', href: '/jeux/petanque/confidentialite/' },
+					{ lang: 'en', href: '/en/jeux/petanque/confidentialite/' },
+					{ lang: 'es', href: '/es/jeux/petanque/confidentialite/' },
+					{ lang: 'de', href: '/de/jeux/petanque/confidentialite/' },
+				]}
+			/>
+			<Hero
+				title="Privacy — Pétanque Game"
+				tagline="Online, il tuo nickname e il tuo punteggio sono pubblici. Il resto non viene né venduto né ceduto."
+			/>
+		</div>
+
+		<p class="updated">
+			Questa informativa riguarda <strong>l'app mobile Pétanque Game</strong>
+			(<code>com.ludivenstudio.petanquegame</code>). Il gioco di pétanque del sito
+			(<a href="/jeux/petanque/">ludiven-studio.fr/jeux/petanque</a>) e il resto del sito hanno una
+			<a href="/confidentialite/">propria informativa</a>. Ultimo aggiornamento: 26 ottobre 2026.
+		</p>
+		<p class="updated">
+			Questa è una traduzione di cortesia. In caso di discordanza, prevale la
+			<a href="/jeux/petanque/confidentialite/" hreflang="fr">versione originale in francese</a>.
+		</p>
+
+		<div class="summary">
+			<p><strong>L'essenziale:</strong></p>
+			<ul>
+				<li>Contro il computer o in due su un telefono, giochi <strong>senza account</strong>, anche offline. Quando c'è internet, dal telefono partono solo la pubblicità, statistiche d'uso anonime e alcuni controlli tecnici (vedi §2).</li>
+				<li>Le monete, il negozio, le leghe e il gioco online richiedono un <strong>account Google</strong> (Android) <strong>o Apple</strong> (iPhone). I tuoi progressi vengono allora salvati da <strong>Unity</strong>, il nostro fornitore, per ritrovarli su tutti i tuoi telefoni.</li>
+				<li><strong>Il tuo nickname è pubblico</strong>: nell'elenco delle partite pubbliche, per il tuo avversario e in classifica, con il tuo punteggio. Non c'è chat.</li>
+				<li>La pubblicità di Google è <strong>personalizzata solo con il tuo consenso</strong>. Nessuna rivendita di dati.</li>
+				<li>Puoi <strong>eliminare il tuo account</strong> in qualsiasi momento: Opzioni › «Elimina il mio account» (<a href="#suppression">vedi §11</a>).</li>
+			</ul>
+		</div>
+
+		<section class="stack gap-2">
+			<h2>1. Chi è il titolare del trattamento</h2>
+			<p>Editore dell'applicazione e titolare del trattamento:</p>
+			<ul>
+				<li>Denominazione sociale: <strong>Ludiven Studio</strong></li>
+				<li>Forma giuridica: EURL (società unipersonale francese) con capitale di 1&nbsp;000&nbsp;€</li>
+				<li>Iscrizione: 999&nbsp;253&nbsp;586 R.C.S. Vienne — SIRET 999&nbsp;253&nbsp;586&nbsp;00013</li>
+				<li>Sede legale: 1166 route de la Ranche, 38440 Châtonnay, Francia</li>
+				<li>Contatto: <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a></li>
+			</ul>
+			<p>Consulta anche le <a href="/mentions-legales/">note legali</a> (in francese).</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>2. Giocare senza account</h2>
+			<p>
+				Contro il computer e in due sullo stesso telefono, il gioco non ha bisogno né di un account né di
+				internet. I tuoi progressi restano allora sul tuo telefono. Anche senza account, avvengono alcuni
+				scambi quando il telefono ha internet:
+			</p>
+			<ul>
+				<li>la <strong>pubblicità</strong> di Google (vedi §6);</li>
+				<li><strong>statistiche d'uso</strong> senza identificativo (vedi §7);</li>
+				<li>la lettura del <strong>numero dell'ultima versione</strong> del gioco sul nostro sito, e statistiche tecniche del motore Unity (vedi §9).</li>
+			</ul>
+			<p>
+				Se apri la classifica senza aver fatto l'accesso, il gioco si connette a Unity con un
+				<strong>identificativo di giocatore anonimo</strong>, generato a caso, per leggere l'elenco. Non
+				contiene né un nome né un indirizzo e-mail.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>3. Il tuo account</h2>
+			<p>
+				Le monete, il negozio, le leghe, il gioco online e gli acquisti richiedono un account. Il gioco te lo
+				propone quando ti serve: accedi con <strong>Google</strong> su Android, con <strong>Apple</strong>
+				(«Accedi con Apple») su iPhone. Non riceviamo mai la tua password.
+			</p>
+			<p>
+				Il telefono consegna un token di accesso a <strong>Unity Authentication</strong>, che crea il tuo
+				identificativo di giocatore Unity (un numero generato a caso) e lo collega al tuo account Google o
+				Apple. Il token di Google contiene l'identificativo del tuo account Google e, come previsto da Google,
+				il tuo indirizzo e-mail, il tuo nome e la tua foto del profilo: il gioco non li legge, non li mostra e
+				non li usa. Il gioco non chiede ad Apple né il tuo nome né il tuo indirizzo e-mail.
+			</p>
+			<p>
+				I tuoi progressi sono salvati in <strong>Unity Cloud Save</strong>, legati al tuo identificativo di
+				giocatore: le tue monete, gli oggetti acquistati e quelli che usi (bocce, pallini, cerchi,
+				ambientazioni, divise), il tuo bonus giornaliero e la tua serie, le tue sfide e i tuoi traguardi, le
+				tue vittorie e le tue sconfitte, le tue leghe, la tua coppa in corso e i tuoi trofei, il tuo punteggio
+				online, le tue impostazioni di gioco, il tuo nickname, il giocatore che hai scelto, l'opzione «Senza
+				pubblicità» se l'hai acquistata, e i numeri degli acquisti già accreditati (per non accreditare mai due
+				volte lo stesso pagamento).
+			</p>
+			<p>
+				Una copia resta sul telefono per giocare offline; viene sincronizzata alla connessione successiva. Se
+				il telefono e l'account non hanno gli stessi progressi, il gioco ti chiede quali tenere. Uscire
+				dall'account (Opzioni › «Account») lascia i tuoi progressi sul tuo account.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>4. Gioco online e classifica</h2>
+			<p>
+				<strong>Il tuo nickname.</strong> Lo scegli in «Il mio personaggio» (16 caratteri al massimo; ti viene
+				proposto un nome di club). Non deve essere per forza il tuo vero nome: non metterci né il cognome, né
+				un numero, né un indirizzo. Un filtro rifiuta i nickname offensivi, nelle cinque lingue del gioco, e li
+				nasconde se arrivano comunque sullo schermo.
+			</p>
+			<p><strong>Cosa vedono gli altri giocatori:</strong></p>
+			<ul>
+				<li><strong>Partita pubblica</strong>: il tuo nickname, il tuo punteggio e il formato della partita compaiono nell'elenco delle partite pubbliche, finché un avversario non entra nella partita. Una partita privata, con un amico tramite il suo codice, non vi compare.</li>
+				<li><strong>Durante la partita</strong>, il tuo avversario riceve il tuo nickname, il tuo punteggio, il tuo giocatore, la tua divisa e la tua boccia, poi i tuoi lanci (la loro velocità e il punto in cui la tua mano lascia la boccia). Dopo ogni lancio, il telefono che ha aperto la partita invia l'arbitraggio (posizione delle bocce, punteggio della partita). Questi messaggi passano da <strong>Unity Relay</strong>, che li inoltra senza conservarli.</li>
+				<li><strong>Classifica</strong>: ogni partita pubblica individuale giocata fino alla fine fa variare il tuo punteggio (un punteggio Elo). Il tuo punteggio e il tuo nickname vengono allora inviati alla classifica <strong>Unity Leaderboards</strong>, che tutti i giocatori del gioco possono consultare: i primi 50, e ognuno la propria riga. Le partite con un amico tramite codice e le partite a squadre non contano.</li>
+			</ul>
+			<p>
+				Non ci sono <strong>né chat, né messaggi, né voce</strong>. Per far rimuovere un nickname, il tuo o
+				quello di un altro giocatore, scrivi a <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>
+				indicando il nickname.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>5. Dati trattati</h2>
+			<div class="table-scroll">
+				<table>
+					<thead>
+						<tr>
+							<th>Dato</th>
+							<th>Finalità</th>
+							<th>Base giuridica</th>
+							<th>Destinatario</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td>Identificativo di giocatore Unity, token di sessione, collegamento con il tuo account Google o Apple</td>
+							<td>Farti accedere, ritrovare i tuoi progressi</td>
+							<td>Esecuzione del contratto (art. 6.1.b GDPR)</td>
+							<td>Unity (Authentication); Google o Apple per l'accesso</td>
+						</tr>
+						<tr>
+							<td>Profilo di gioco (vedi §3)</td>
+							<td>Salvare i tuoi progressi su tutti i tuoi telefoni</td>
+							<td>Esecuzione del contratto</td>
+							<td>Unity (Cloud Save)</td>
+						</tr>
+						<tr>
+							<td>Nickname, punteggio e formato di una partita pubblica</td>
+							<td>L'elenco delle partite pubbliche</td>
+							<td>Esecuzione del contratto</td>
+							<td>Unity (Multiplayer); i giocatori del gioco</td>
+						</tr>
+						<tr>
+							<td>Nickname, punteggio, giocatore, divisa, boccia, lanci, arbitraggio</td>
+							<td>Giocare la stessa partita su due telefoni</td>
+							<td>Esecuzione del contratto</td>
+							<td>Unity (Relay); il tuo avversario</td>
+						</tr>
+						<tr>
+							<td>Punteggio e nickname</td>
+							<td>La classifica online</td>
+							<td>Esecuzione del contratto</td>
+							<td>Unity (Leaderboards); i giocatori del gioco</td>
+						</tr>
+						<tr>
+							<td>Prodotto acquistato, ricevuta dello store, numero di transazione</td>
+							<td>Vendere, accreditare e ripristinare i tuoi acquisti</td>
+							<td>Esecuzione del contratto</td>
+							<td>Google Play o App Store; Unity (modulo di acquisto)</td>
+						</tr>
+						<tr>
+							<td>Identificativo pubblicitario, indirizzo IP, interazioni con gli annunci, informazioni tecniche (vedi §6)</td>
+							<td>Mostrare e misurare la pubblicità, contrastare le frodi</td>
+							<td>Il tuo consenso (art. 6.1.a) per gli annunci personalizzati; legittimo interesse (art. 6.1.f) negli altri casi</td>
+							<td>Google (AdMob) e, con il tuo consenso, i suoi partner pubblicitari</td>
+						</tr>
+						<tr>
+							<td>La tua scelta sulla pubblicità</td>
+							<td>Ricordarla e non chiedertela di nuovo</td>
+							<td>Obbligo legale</td>
+							<td>Memorizzata sul telefono; gestita da Google (UMP)</td>
+						</tr>
+						<tr>
+							<td>Statistiche d'uso, senza account né identificativo (vedi §7)</td>
+							<td>Sapere quali funzioni vengono usate e migliorare il gioco</td>
+							<td>Legittimo interesse</td>
+							<td>Umami Cloud</td>
+						</tr>
+						<tr>
+							<td>Indirizzo IP, come per qualsiasi connessione</td>
+							<td>Instradare gli scambi; Unity ne deduce la tua regione per scegliere il server di gioco</td>
+							<td>Esecuzione del contratto; legittimo interesse</td>
+							<td>Ogni servizio chiamato (vedi §12)</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+			<p>
+				Il gioco <strong>non</strong> chiede la tua posizione GPS, né i tuoi contatti, né le tue foto, né il
+				microfono, né la fotocamera. Non trasmettiamo alla pubblicità né il tuo account, né il tuo nickname, né
+				i tuoi progressi.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>6. Pubblicità</h2>
+			<p>
+				Il gioco è gratuito ed è finanziato dalla pubblicità di <strong>Google AdMob</strong>: video facoltativi
+				che scegli di guardare (per raddoppiare le monete di una partita o il tuo bonus giornaliero, o per avere
+				monete gratis), e una pubblicità tra due partite libere contro il computer, al massimo una volta ogni
+				due partite.
+			</p>
+			<p>
+				Per mostrare gli annunci, misurarli e contrastare le frodi, il modulo di Google riceve
+				l'<strong>identificativo pubblicitario</strong> del tuo telefono e altri identificativi propri
+				dell'applicazione (su Android, l'«app set ID»), il tuo <strong>indirizzo IP</strong> (che dà una
+				posizione approssimativa, a livello di città), le tue interazioni con l'applicazione e con gli annunci
+				(avvii, annunci visti, tocchi) e informazioni tecniche (prestazioni, arresti anomali).
+			</p>
+			<p>
+				<strong>Il tuo consenso.</strong> Al primo avvio, dove la legge lo richiede (in particolare nell'Unione
+				europea), una schermata di Google (UMP) ti chiede se accetti gli annunci personalizzati. Il modulo
+				pubblicitario si avvia solo dopo questa schermata. Senza il tuo consenso, gli annunci non sono
+				personalizzati. Puoi cambiare idea in qualsiasi momento: Opzioni › «Scelte pubblicitarie» (questo
+				pulsante compare dove questa scelta è richiesta). Su iPhone, il gioco ti chiede poi l'autorizzazione al
+				tracciamento di Apple; senza di essa, l'identificativo pubblicitario dell'iPhone non viene usato.
+			</p>
+			<p>
+				<strong>«Senza pubblicità»</strong>, un acquisto unico, toglie le pubblicità tra le partite. I video
+				facoltativi restano disponibili per chi vuole monete: il modulo di Google quindi continua a funzionare.
+			</p>
+			<p>
+				Puoi anche reimpostare o eliminare l'identificativo pubblicitario nelle impostazioni del tuo telefono.
+				Per saperne di più:
+				<a href="https://policies.google.com/technologies/partner-sites?hl=it" target="_blank" rel="noopener">come
+				Google utilizza i dati delle app partner</a> e le
+				<a href="https://policies.google.com/privacy?hl=it" target="_blank" rel="noopener">norme sulla privacy
+				di Google</a>.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>7. Statistiche d'uso</h2>
+			<p>
+				Il gioco invia a <strong>Umami Cloud</strong>, uno strumento di statistiche senza cookie, il nome di
+				alcune azioni, con qualche dettaglio:
+			</p>
+			<ul>
+				<li><code>app_open</code> — il gioco si avvia (indicando se la pubblicità può essere mostrata o no);</li>
+				<li><code>match_start</code> / <code>match_end</code> — una partita inizia o finisce (modalità, livello, risultato, punteggio della partita);</li>
+				<li><code>cup_enter</code> / <code>cup_end</code> — una coppa di lega inizia o finisce (lega, turno raggiunto, vincita);</li>
+				<li><code>rated_end</code> — una partita classificata finisce (risultato, fascia del punteggio);</li>
+				<li><code>daily_bonus</code>, <code>challenge_claim</code> — si riceve un bonus giornaliero (serie) o una sfida (monete);</li>
+				<li><code>shop_buy</code>, <code>iap_buy</code> — un oggetto viene acquistato con monete (oggetto, prezzo), o con denaro (prodotto);</li>
+				<li><code>ad_offer</code>, <code>ad_rewarded</code>, <code>ad_interstitial</code> — un video viene proposto o guardato, una pubblicità viene mostrata (posizione, risultato);</li>
+				<li><code>account_gate</code>, <code>sign_in</code>, <code>sign_out</code>, <code>account_delete</code> — viene richiesto l'account, avviene un accesso, un'uscita o un'eliminazione (Google o Apple, riuscita);</li>
+				<li><code>reminders</code>, <code>review_ask</code>, <code>howto</code>, <code>update_prompt</code>, <code>update_tapped</code> — la tua risposta sui promemoria, la richiesta di recensione dello store, una pagina di «Come si gioca», la proposta di aggiornamento.</li>
+			</ul>
+			<p>
+				Ogni invio contiene anche la piattaforma, la versione del gioco e del sistema, il modello del telefono,
+				la lingua del telefono e la dimensione dello schermo. <strong>Nessun</strong> identificativo di
+				giocatore, nickname, account, indirizzo e-mail né identificativo pubblicitario vi compare: queste
+				statistiche non sono collegate né al tuo account né alla tua identità.
+			</p>
+			<p>
+				Come ogni servizio web, Umami vede l'indirizzo IP del tuo telefono. Non lo conserva, ma ne deduce il
+				paese, la regione e la città. Per contare i visitatori, raggruppa le azioni fatte dalla stessa
+				connessione e dallo stesso modello di telefono, per un mese di calendario al massimo.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>8. Acquisti in-app</h2>
+			<p>
+				Il gioco vende <strong>pacchetti di monete</strong> e l'opzione <strong>«Senza pubblicità»</strong>.
+				Il pagamento è gestito <strong>interamente da Google Play o dall'App Store</strong>: non vediamo mai i
+				tuoi metodi di pagamento, né il tuo indirizzo di fatturazione. Il modulo di acquisto di Unity,
+				nell'applicazione, riceve dallo store una prova d'acquisto («ricevuta»); il gioco
+				accredita quindi il tuo acquisto e conserva il suo numero di transazione nei tuoi progressi. Secondo
+				Unity, questo modulo può anche inviare a Unity la cronologia degli acquisti e informazioni tecniche sul
+				dispositivo.
+			</p>
+			<p>
+				Un acquisto richiede un account: le monete fanno parte dei tuoi progressi. Opzioni › «Ripristina
+				acquisti» ti restituisce «Senza pubblicità» dopo una reinstallazione.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>9. Promemoria, recensioni e aggiornamenti</h2>
+			<p>
+				<strong>Promemoria.</strong> Dopo la tua prima partita, il gioco ti chiede se vuoi un promemoria, poi il
+				telefono ti chiede l'autorizzazione. Sono <strong>notifiche locali</strong>: il gioco le programma sul
+				tuo telefono quando esci dal gioco (la sera del giorno dopo per il tuo bonus giornaliero e le tue
+				sfide, poi dopo tre e sette giorni di assenza) e le cancella quando torni. Nessun server ti invia
+				messaggi e niente parte dal telefono. Opzioni › «Promemoria» le disattiva, e anche le impostazioni del
+				telefono.
+			</p>
+			<p>
+				<strong>La tua recensione.</strong> Dopo la tua terza vittoria contro il computer, il gioco può chiedere
+				allo store di mostrare la sua scheda di valutazione (al massimo una volta ogni 120 giorni, tre volte in
+				tutto). Questa scheda è quella di Google o di Apple: il tuo voto e il tuo commento vanno allo store, e
+				il gioco non sa se hai votato.
+			</p>
+			<p>
+				<strong>Aggiornamento.</strong> All'avvio, il gioco legge sul nostro sito un piccolo file che indica il
+				numero dell'ultima versione, per proporti un aggiornamento. Come per qualsiasi pagina web, chi ospita
+				il sito (GitHub) vede l'indirizzo IP del tuo telefono. Non viene inviato nient'altro.
+			</p>
+			<p>
+				<strong>Motore del gioco.</strong> Il gioco è costruito con Unity, il cui motore può inviare a Unity
+				statistiche tecniche anonime sul dispositivo (modello, sistema, processore, scheda grafica).
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>10. Cosa viene memorizzato sul tuo telefono</h2>
+			<ul>
+				<li>la copia dei tuoi progressi (una per account, e quella del gioco senza account);</li>
+				<li>le impostazioni che restano con il telefono: mano che lancia, lato della pedana, lancio semplice o esperto, visuale di gioco, lingua, tema, audio, promemoria;</li>
+				<li>la tua sessione Unity, se hai fatto l'accesso;</li>
+				<li>la tua scelta sulla pubblicità, scritta dalla schermata di Google, e i dati del modulo pubblicitario (vedi §6).</li>
+			</ul>
+			<p>Tutto questo scompare quando disinstalli l'applicazione.</p>
+		</section>
+
+		<section class="stack gap-2" id="suppression">
+			<h2>11. Eliminare il tuo account</h2>
+			<p>
+				<strong>Nell'applicazione</strong>: Opzioni › <strong>«Elimina il mio account»</strong> (il pulsante
+				compare quando hai fatto l'accesso), poi conferma. Serve internet. È immediato e definitivo:
+			</p>
+			<ul>
+				<li>i tuoi progressi vengono cancellati da Unity Cloud Save;</li>
+				<li>il tuo account Unity viene cancellato, insieme al suo collegamento con il tuo account Google o Apple;</li>
+				<li>la copia dei tuoi progressi sul telefono viene cancellata.</li>
+			</ul>
+			<p>
+				Le tue monete, le tue bocce, i tuoi oggetti e i tuoi trofei vanno persi, su tutti i tuoi telefoni.
+				«Senza pubblicità» resta legato al tuo account Google Play o App Store: «Ripristina acquisti» te lo
+				restituisce. Senza connessione, il gioco dice «Non è possibile ora» e nulla viene cancellato a metà.
+			</p>
+			{/* TODO legal: the in-app deletion does not erase the « elo » leaderboard entry yet (docs/store.md, contradiction 6). Once it does, say it is erased with the account. */}
+			<p>
+				<strong>La tua riga in classifica</strong> (il tuo nickname e il tuo punteggio) non viene ancora
+				cancellata da questo pulsante. Scrivici per farla rimuovere: la cancelliamo entro un mese.
+			</p>
+			<p>
+				<strong>Senza l'applicazione</strong>: scrivi a
+				<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a> indicando il tuo nickname, il
+				tipo di account (Google o Apple) e, se te la ricordi, la data della tua ultima partita. Cancelliamo i
+				tuoi progressi, il tuo account e la tua riga in classifica entro un mese, e te lo confermiamo via
+				e-mail. Possiamo chiederti qualcosa per verificare che l'account sia davvero tuo. Puoi anche
+				reinstallare il gioco, accedere con lo stesso account ed eliminarlo tu stesso.
+			</p>
+			<p>
+				Ciò che non dipende da noi: il tuo account Google o Apple stesso e la cronologia dei tuoi acquisti,
+				conservati da Google o da Apple. Puoi revocare l'accesso del gioco dalle impostazioni del tuo account
+				Google (collegamenti con app di terze parti) o del tuo ID Apple («Accedi con Apple»). Le statistiche
+				d'uso non contengono alcun identificativo: non c'è nulla da cancellare.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>12. Destinatari e trasferimenti al di fuori dell'Unione europea</h2>
+			<p>
+				Non abbiamo un server nostro. I tuoi dati non vengono né venduti né ceduti. Sono trattati solo da
+				questi fornitori:
+			</p>
+			<ul>
+				<li><strong>Unity Technologies</strong> — account (Authentication), salvataggio (Cloud Save), partite online (Multiplayer e Relay), classifica (Leaderboards), modulo di acquisto (In-App Purchasing) e statistiche del motore.</li>
+				<li><strong>Google</strong> (Google Ireland Limited, Google LLC) — accesso su Android, pubblicità (AdMob), schermata del consenso (UMP), Google Play (distribuzione, pagamento, scheda di valutazione).</li>
+				<li><strong>Apple Inc.</strong> — «Accedi con Apple», autorizzazione al tracciamento, App Store (distribuzione, pagamento, scheda di valutazione).</li>
+				<li><strong>Umami Software, Inc.</strong> — statistiche d'uso, senza account né identificativo (vedi §7).</li>
+				<li><strong>GitHub, Inc.</strong> — hosting del nostro sito, letto per il controllo degli aggiornamenti (vedi §9).</li>
+			</ul>
+			<p>
+				Questi fornitori sono società statunitensi o loro filiali. Tali trasferimenti sono disciplinati dai
+				meccanismi previsti dal capo V del GDPR: clausole contrattuali tipo e, per i fornitori interessati,
+				certificazione ai sensi dell'<em>EU-U.S. Data Privacy Framework</em>.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>13. Periodi di conservazione</h2>
+			<ul>
+				<li><strong>Account e progressi</strong> (Unity Authentication e Cloud Save): finché non elimini il tuo account.</li>
+				<li><strong>Classifica</strong>: il tuo punteggio e il tuo nickname, finché non li fai rimuovere (vedi §11).</li>
+				<li><strong>Partite online</strong>: una partita pubblica esce dall'elenco appena inizia o appena la chiudi; i lanci non vengono conservati dopo la partita.</li>
+				<li><strong>Statistiche d'uso</strong>: cancellate da Umami dopo <strong>6 mesi</strong>.</li>
+				<li><strong>Dati pubblicitari</strong>: secondo le regole di Google.</li>
+				<li><strong>Acquisti</strong>: i numeri di transazione restano nei tuoi progressi, fino all'eliminazione dell'account; Google e Apple conservano le proprie ricevute.</li>
+				<li><strong>Sul telefono</strong>: fino alla disinstallazione o all'eliminazione dell'account.</li>
+			</ul>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>14. I tuoi diritti</h2>
+			<p>
+				Ai sensi del GDPR, disponi del diritto di accesso, rettifica, cancellazione, limitazione, opposizione e
+				portabilità, nonché del diritto di revocare il tuo consenso in qualsiasi momento.
+			</p>
+			<ul>
+				<li><strong>Correggere il tuo nickname</strong>: «Il mio personaggio», dalle Opzioni.</li>
+				<li><strong>Revocare il consenso alla pubblicità personalizzata</strong>: Opzioni › «Scelte pubblicitarie»; su iPhone, Impostazioni › Privacy e sicurezza › Tracciamento.</li>
+				<li><strong>Cancellare i tuoi dati</strong>: vedi <a href="#suppression">§11</a>.</li>
+				<li><strong>Il resto</strong> (copia dei tuoi dati, opposizione, domande): scrivi a <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>, con il tuo nickname e il tuo tipo di account. Rispondiamo entro un mese.</li>
+			</ul>
+			<p>
+				Se ritieni che i tuoi diritti non siano rispettati, puoi presentare un reclamo alla CNIL
+				(<a href="https://www.cnil.fr" target="_blank" rel="noopener">www.cnil.fr</a>), 3 place de Fontenoy,
+				TSA 80715, 75334 Paris Cedex 07.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>15. Minori</h2>
+			<p>
+				Il gioco si rivolge agli <strong>adulti</strong>: non è destinato ai minori di 18 anni, e non
+				raccogliamo consapevolmente dati di bambini. Se sei un genitore e ti accorgi che un bambino ha creato
+				un account, scrivici: lo elimineremo.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>16. Sicurezza</h2>
+			<p>
+				Tutti gli scambi sono cifrati (HTTPS). I tuoi progressi si possono leggere solo con la sessione del tuo
+				account, oppure da parte nostra dalla console di Unity. Le partite online passano dai server di Unity:
+				il tuo avversario non vede il tuo indirizzo IP. La tua sessione è conservata nella memoria
+				dell'applicazione, sul tuo telefono.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>17. Modifiche</h2>
+			<p>
+				Questa informativa può cambiare con il gioco. La data dell'ultimo aggiornamento è indicata in cima alla
+				pagina. In caso di modifica importante, il gioco te lo segnalerà.
+			</p>
+			<p>Consulta anche le <a href="/it/jeux/petanque/cgu/">condizioni d'uso del gioco</a>.</p>
+		</section>
+	</div>
+</BaseLayout>
+
+<style>
+	.legal {
+		max-width: 68ch;
+		margin-inline: auto;
+		color: var(--gray-200);
+		font-size: var(--text-md);
+		line-height: 1.6;
+	}
+	.legal h2 {
+		font-size: var(--text-xl);
+		color: var(--gray-0);
+	}
+	.legal ul {
+		padding-left: 1.2rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+	.legal a {
+		color: var(--accent-regular);
+		text-decoration: 1px solid underline transparent;
+		text-underline-offset: 0.25em;
+		transition: text-decoration-color var(--theme-transition);
+	}
+	.legal a:hover,
+	.legal a:focus {
+		text-decoration-color: currentColor;
+	}
+	.updated {
+		font-size: var(--text-sm);
+		color: var(--gray-300);
+	}
+	.summary {
+		border: 1px solid var(--gray-800);
+		border-left: 3px solid var(--accent-regular);
+		border-radius: 0.5rem;
+		padding: 1rem 1.25rem;
+		background: var(--gray-999_40);
+	}
+	.summary p {
+		margin-bottom: 0.5rem;
+	}
+	code {
+		font-size: 0.9em;
+		background: var(--gray-999_40);
+		padding: 0.1em 0.35em;
+		border-radius: 0.25em;
+	}
+	/* The 4-column table can't shrink below ~40em — scroll it instead of overflowing the page. */
+	.table-scroll {
+		overflow-x: auto;
+	}
+	table {
+		border-collapse: collapse;
+		width: 100%;
+		min-width: 36rem;
+		font-size: var(--text-sm);
+	}
+	th,
+	td {
+		border: 1px solid var(--gray-800);
+		padding: 0.5rem 0.65rem;
+		text-align: left;
+		vertical-align: top;
+	}
+	th {
+		color: var(--gray-0);
+	}
+</style>
