@@ -835,3 +835,13 @@
   1..500 vérifiée en ligne). Non commité.
 - 07:45 : commité et poussé à la demande de l'utilisateur : mes 9 fichiers et cette section seulement. Statut :
   terminé. Réservations libérées.
+
+## 2026-10-25 — Dragon's Gems Swipe : images de l'histoire et de la carte (Codex, pour l'app) (session website)
+- Statut : en cours (2026-10-25T21:10+01:00). Demande de l'utilisateur : un onboarding, une carte avec décor,
+  l'histoire du dragon (« le plus petit des dragons »)
+- Réservations actives : `.collab/tickets/0047-*`, `.collab/tickets/0048-*` (nouveaux), `.collab/out/0047/`,
+  `.collab/out/0048/`, `.collab/LOG.md`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 07:45 : tickets 0047-0050 clos (images de l'histoire, des cartes et des stores intégrées dans l'app Unity ; revues
+  des captures et de la fiche) ; commité et poussé à la demande de l'utilisateur : les 4 tickets, les lignes du LOG et
+  cette section seulement. Statut : terminé. Réservations libérées.

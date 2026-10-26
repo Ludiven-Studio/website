@@ -40,3 +40,7 @@ Une ligne par ticket : date · id · résumé · décision.
 - 2026-10-25 · 0044 · série de Bijou, des tas d'or et des rayons (Codex, images) · 12 images retenues ; clignement aligné à 1-2 px ; Bijou remplace la cocotte sur la carte du jeu
 - 2026-10-25 · 0045 · le souffle de Bijou (Codex, images) · 4 images retenues : Bijou prêt et qui crache le feu, boule de feu, flamme de la jauge
 - 2026-10-25 · 0046 · les cœurs de Bijou (Codex, images) · 2 images retenues : la gemme-cœur pleine et vide, pour les vies de l'app
+- 2026-10-26 · 0047 · essai de l'histoire et de la carte de Dragon's Gems (Codex, images) · 2 images retenues, modèle de la série
+- 2026-10-26 · 0048 · série des stores, de l'histoire et des cartes (Codex, images) · 12 images retenues : icône, bannière Play, histoire, fin, 4 contrées, patte, cadeau
+- 2026-10-26 · 0049 · revue des écrans avant les stores (Codex, revue) · 10 points : 7 retenus, 1 reporté, 1 rejeté (artefact de test), 1 déjà fait
+- 2026-10-26 · 0050 · revue marketing des visuels des stores (Codex, revue) · 8 points : ordre et légendes repris, bannière titrée, captures recadrées
