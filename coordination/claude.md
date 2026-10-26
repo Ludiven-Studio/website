@@ -868,3 +868,18 @@
   aucun secret OAuth Apple (Services ID) configuré. Non commité.
 - 07:45 : commité et poussé à la demande de l'utilisateur : mes 7 fichiers et cette section seulement (déjà déployés à
   07:34). Statut : terminé. Réservations libérées.
+
+## 2026-10-26 — Dragon's Gems Swipe : page de confidentialité de l'app (stores) (session website)
+- Statut : en cours (2026-10-26T00:35+01:00). Demande de l'utilisateur : préparer de quoi soumettre demain sur les
+  stores (autonomie de nuit)
+- Réservations actives : `src/pages/dragons-gems/`, `src/pages/en/dragons-gems/`, `src/pages/confidentialite.astro`
+  (lien vers la page de l'app).
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 00:42 : écrites : src/pages/dragons-gems/confidentialite.astro (FR, ancre #suppression),
+  src/pages/en/dragons-gems/confidentialite.astro (EN), lien ajouté dans src/pages/confidentialite.astro ; eslint et
+  astro check à 0 erreur. Pas de build, pas de commit : attend l'accord de l'utilisateur.
+- 00:59 : Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 01:01 : build complet OK (156 pages, précache 313 entrées, liens OK), avec aussi le lot 1 du site (niveaux qui
+  apprennent) et les pages de confidentialité. Non commité : en attente du feu vert de l'utilisateur.
+- 07:46 : commité et poussé à la demande de l'utilisateur : mes 3 fichiers et cette section seulement. Statut :
+  terminé. Réservations libérées.

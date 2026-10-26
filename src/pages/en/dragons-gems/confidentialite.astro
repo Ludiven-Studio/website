@@ -1,0 +1,341 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import Hero from '../../../components/Hero.astro';
+import LangSwitch from '../../../components/LangSwitch.astro';
+---
+
+<BaseLayout
+	title="Privacy policy of the Dragon's Gems Swipe app | Ludiven Studio"
+	description="Privacy policy of the Dragon's Gems Swipe mobile app: no account needed, optional Google or Apple account, public leaderboards, no ads or tracking, account deletion, GDPR rights."
+	lang="en"
+	alternates={{ fr: '/dragons-gems/confidentialite/', en: '/en/dragons-gems/confidentialite/' }}
+>
+	<div class="wrapper stack gap-12 legal">
+		<div class="stack gap-8">
+			<LangSwitch lang="en" href="/dragons-gems/confidentialite/" />
+			<Hero
+				title="Privacy — Dragon's Gems Swipe"
+				tagline="Only your name and your score are public. No ads, no tracking."
+			/>
+		</div>
+
+		<p class="updated">
+			This policy covers <strong>the Dragon's Gems Swipe mobile app</strong>
+			(<code>com.ludivenstudio.dragonsgems</code>) and its leaderboards, shared with the game on the website
+			(<a href="/jeux/eclats/">ludiven-studio.fr/jeux/eclats</a>). The rest of the website has its
+			<a href="/confidentialite/">own policy</a> (in French). Last updated: October 26, 2026.
+		</p>
+		<p class="updated">
+			This is a courtesy translation. In case of discrepancy, the
+			<a href="/dragons-gems/confidentialite/" hreflang="fr">original French version</a> prevails.
+		</p>
+
+		<div class="summary">
+			<p><strong>In short:</strong></p>
+			<ul>
+				<li>The game is played <strong>without an account</strong>. Your progress is kept on your phone.</li>
+				<li>An optional <strong>Google or Apple account</strong> saves your progress online, to find it on all your devices.</li>
+				<li>The daily challenge and endless mode leaderboards show <strong>your name and your score</strong> to everyone. Nothing else.</li>
+				<li><strong>No ads, no usage analytics, no tracking.</strong> The app asks for neither your location, nor your contacts, nor your photos.</li>
+				<li>You can <strong>delete your account</strong> at any time from the app's Settings.</li>
+			</ul>
+		</div>
+
+		<section class="stack gap-2">
+			<h2>1. Who is responsible</h2>
+			<p>Publisher of the app and data controller:</p>
+			<ul>
+				<li>Company: <strong>Ludiven Studio</strong></li>
+				<li>Legal form: EURL (French single-member limited company) with a capital of €1,000</li>
+				<li>Registration: 999&nbsp;253&nbsp;586 R.C.S. Vienne — SIRET 999&nbsp;253&nbsp;586&nbsp;00013</li>
+				<li>Registered office: 1166 route de la Ranche, 38440 Châtonnay, France</li>
+				<li>Contact: <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a></li>
+			</ul>
+			<p>See also the <a href="/mentions-legales/">legal notice</a> (in French).</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>2. Without an account</h2>
+			<p>
+				Your levels, your stars, Bijou's treasure, your hearts, your daily gift and your settings are stored
+				<strong>on your phone</strong>. Levels play without a connection.
+			</p>
+			<p>
+				When you finish a daily challenge or an endless game, the app sends your result to the world
+				leaderboard:
+			</p>
+			<ul>
+				<li>your <strong>name</strong>: "Dragon" followed by four digits until you pick one in Settings ("Your name on the rankings"), 20 characters at most;</li>
+				<li>your <strong>score</strong> (for the daily challenge, your moves then your time; for endless mode, your points) and how long the game lasted;</li>
+				<li>a <strong>technical id</strong>, drawn at random when the app is installed. It counts your daily try and ties your scores together. It is never shown, never linked to your account, and it changes if you reinstall the app.</li>
+			</ul>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>3. Your account (optional)</h2>
+			<p>
+				To save your progress online, you sign in with <strong>Google</strong> or <strong>Apple</strong>, from
+				Settings or when the game offers it after level 10. We then receive an account id and your email
+				address; with Apple, it may be the relay address that hides yours, or none. We never receive your
+				password. With Google, the sign-in service also keeps the name and picture of your Google profile: we
+				neither show nor use them.
+			</p>
+			<p>
+				This account is the <strong>Ludiven Studio account</strong>: the same one is used by the Pétanque Meet
+				app and the website.
+			</p>
+			<p>
+				Once you are signed in, your progress is copied online: your stars on each level, Bijou's treasure,
+				the number of games played and your best endless score. Your hearts and your settings stay on the
+				phone. Your email address is shown only to you, in Settings.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>4. What is public</h2>
+			<p>
+				Anyone can see the leaderboards, in the app and on the website. They show <strong>your name, your
+				score and its date</strong>. Never your technical id, your account or your email address.
+			</p>
+			<p>
+				Your name doesn't have to be your real name: don't put a surname, a number or an address in it.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>5. Data processed</h2>
+			<div class="table-scroll">
+				<table>
+					<thead>
+						<tr>
+							<th>Data</th>
+							<th>Purpose</th>
+							<th>Legal basis</th>
+							<th>Recipient</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td>Name, score, game length, technical id</td>
+							<td>The daily challenge and endless mode leaderboards; one daily try</td>
+							<td>Legitimate interest (GDPR art. 6.1.f) in offering leaderboards</td>
+							<td>Supabase; name and score public</td>
+						</tr>
+						<tr>
+							<td>Account id and email address (if you sign in)</td>
+							<td>Sign you in, tie your save to you</td>
+							<td>Performance of a contract (art. 6.1.b)</td>
+							<td>Supabase; Google or Apple for the sign-in</td>
+						</tr>
+						<tr>
+							<td>Google profile name and picture (if you sign in with Google)</td>
+							<td>None: kept by the sign-in service, never used</td>
+							<td>Performance of a contract</td>
+							<td>Supabase</td>
+						</tr>
+						<tr>
+							<td>Save: stars, treasure, games played, best endless score (if you sign in)</td>
+							<td>Find your progress on all your devices</td>
+							<td>Performance of a contract</td>
+							<td>Supabase</td>
+						</tr>
+						<tr>
+							<td>IP address</td>
+							<td>Carry the exchanges</td>
+							<td>Legitimate interest</td>
+							<td>Supabase; Google or Apple during a sign-in</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>6. What the app does not do</h2>
+			<ul>
+				<li><strong>No ads</strong>, and no advertising id read.</li>
+				<li><strong>No usage analytics</strong>, no crash reports sent.</li>
+				<li><strong>No tracking</strong> across apps or websites.</li>
+				<li>No location, contacts, photos or files: the app asks for none of these permissions.</li>
+				<li>No in-app purchases.</li>
+			</ul>
+			<p>
+				If any of these answers changes (ads or purchases in the future), this page will be updated before
+				the version that brings it.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>7. What is stored on your phone</h2>
+			<ul>
+				<li>your progress: levels, stars, treasure, hearts, daily challenge played, daily gift;</li>
+				<li>your sign-in session and your email address, if you are signed in;</li>
+				<li>your name and the leaderboards' technical id;</li>
+				<li>your settings: language, theme and reminders.</li>
+			</ul>
+			<p>
+				All of this stays on the device and is erased when you uninstall the app.
+			</p>
+			<p>
+				If you accept them, the <strong>reminders</strong> (the gift of the day, Bijou's full hearts) are
+				notifications scheduled by the phone itself: nothing is sent to us for them. You can turn them off in
+				the app's Settings or in the phone's.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>8. Recipients, transfers and retention</h2>
+			<p>
+				Your data is neither sold nor handed over. It is processed only by:
+			</p>
+			<ul>
+				<li><strong>Supabase</strong> — database, accounts and saves. Data hosted in the European Union (Ireland).</li>
+				<li><strong>Google</strong> and <strong>Apple</strong> — signing in to your account and distributing the app.</li>
+			</ul>
+			<p>
+				Supabase is an American company. This transfer is covered by the mechanisms of chapter V of the GDPR
+				(standard contractual clauses).
+			</p>
+			<p>Retention:</p>
+			<ul>
+				<li><strong>Account and save</strong>: until you delete your account.</li>
+				<li><strong>Leaderboard scores</strong>: as long as the leaderboard is online. On request, we remove your name and your scores (see §10).</li>
+				<li><strong>IP address</strong>: only in Supabase's technical logs, which it erases within a few days.</li>
+			</ul>
+		</section>
+
+		<section class="stack gap-2" id="suppression">
+			<h2>9. Delete your account</h2>
+			<p>
+				In the app: <strong>Settings → "Delete my account"</strong> (the button shows once you are signed in).
+				It is immediate and final:
+			</p>
+			<ul>
+				<li>your Ludiven Studio account and your email address are erased;</li>
+				<li>your online save is erased;</li>
+				<li>since this account is also used by Pétanque Meet, what it holds there is erased or anonymized the same way (see the <a href="/petanque-meet/confidentialite/">Pétanque Meet policy</a>, in French).</li>
+			</ul>
+			<p>
+				The progress stored on your phone stays; uninstalling the app erases it.
+			</p>
+			<p>
+				Your leaderboard scores are not tied to your account: they stay under your name. To have them
+				removed, write to us with your name.
+			</p>
+			<p>
+				You can also ask for your account to be deleted by email at
+				<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>, from your account's address.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>10. Your rights</h2>
+			<p>
+				Under the GDPR, you have the right of access, rectification, erasure, restriction, objection and
+				portability. To use them, or to have a name removed from a leaderboard, write to
+				<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>. We answer within one month.
+			</p>
+			<p>
+				If you believe your rights are not respected, you can lodge a complaint with the CNIL, the French data
+				protection authority (<a href="https://www.cnil.fr" target="_blank" rel="noopener">www.cnil.fr</a>),
+				3 place de Fontenoy, TSA 80715, 75334 Paris Cedex 07, France, or with your own country's authority.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>11. Children</h2>
+			<p>
+				The game suits all ages and is played without an account. If you are under 15, ask your parents
+				before signing in with an account. Pick a name that is not your real name. If you are a parent and
+				want an account or a name removed, write to us: we will delete it.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>12. Security</h2>
+			<p>
+				All exchanges are encrypted (HTTPS). Saves can only be reached through our server: no direct access
+				to the database is open. The leaderboards' technical id is never published. Your session is kept in
+				the app's storage on your phone.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>13. Changes</h2>
+			<p>
+				We will update this page with every change of the app that touches your data, with its date at the
+				top.
+			</p>
+		</section>
+	</div>
+</BaseLayout>
+
+<style>
+	.legal {
+		max-width: 68ch;
+		margin-inline: auto;
+		color: var(--gray-200);
+		font-size: var(--text-md);
+		line-height: 1.6;
+	}
+	.legal h2 {
+		font-size: var(--text-xl);
+		color: var(--gray-0);
+	}
+	.legal ul {
+		padding-left: 1.2rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+	.legal a {
+		color: var(--accent-regular);
+		text-decoration: 1px solid underline transparent;
+		text-underline-offset: 0.25em;
+		transition: text-decoration-color var(--theme-transition);
+	}
+	.legal a:hover,
+	.legal a:focus {
+		text-decoration-color: currentColor;
+	}
+	.updated {
+		font-size: var(--text-sm);
+		color: var(--gray-300);
+	}
+	.summary {
+		border: 1px solid var(--gray-800);
+		border-left: 3px solid var(--accent-regular);
+		border-radius: 0.5rem;
+		padding: 1rem 1.25rem;
+		background: var(--gray-999_40);
+	}
+	.summary p {
+		margin-bottom: 0.5rem;
+	}
+	code {
+		font-size: 0.9em;
+		background: var(--gray-999_40);
+		padding: 0.1em 0.35em;
+		border-radius: 0.25em;
+	}
+	/* The 4-column table can't shrink below ~40em — scroll it instead of overflowing the page. */
+	.table-scroll {
+		overflow-x: auto;
+	}
+	table {
+		border-collapse: collapse;
+		width: 100%;
+		min-width: 36rem;
+		font-size: var(--text-sm);
+	}
+	th,
+	td {
+		border: 1px solid var(--gray-800);
+		padding: 0.5rem 0.65rem;
+		text-align: left;
+		vertical-align: top;
+	}
+	th {
+		color: var(--gray-0);
+	}
+</style>
