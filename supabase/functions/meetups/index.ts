@@ -23,6 +23,8 @@
 
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2.117.0';
 import { ipKey, ipQuotaEnabled } from '../_shared/ipKey.ts';
+import { deleteAccount } from '../_shared/account.ts';
+import { dropPosters, thumbOf } from '../_shared/posters.ts';
 
 const CORS = {
 	'Access-Control-Allow-Origin': '*',
@@ -487,17 +489,7 @@ async function followedTournaments(db: SupabaseClient, uid: string, nowMs: numbe
 		.sort((x, y) => String(x.starts_at).localeCompare(String(y.starts_at)));
 }
 
-/** The map cards' small copy, stored next to the poster. */
-const thumbOf = (path: string): string => path.replace(/\.(jpg|png)$/, '_t.jpg');
 const POSTER_THUMB_MAX_BYTES = 200 * 1024;
-
-/** Removes posters and their thumbnails from both buckets; a missing object is not an error. */
-async function dropPosters(db: SupabaseClient, paths: (string | null | undefined)[]): Promise<void> {
-	const list = paths.filter((p): p is string => Boolean(p)).flatMap((p) => [p, thumbOf(p)]);
-	if (!list.length) return;
-	await db.storage.from('posters-pending').remove(list);
-	await db.storage.from('posters').remove(list);
-}
 
 /** Posters of tournaments a week past, so storage does not grow forever. */
 async function prunePosters(db: SupabaseClient, nowMs: number): Promise<number> {
@@ -1038,29 +1030,11 @@ Deno.serve(async (req) => {
 				return json({ ok: true });
 			}
 
-			// Apple requires it in the app. Open games are cancelled, not deleted, so
-			// signed-up players still learn they are off. A ban outlives the account:
-			// meetup_bans keeps only the id, which is no personal data on its own.
+			// The account is the studio's: its apps' data goes too (_shared/account.ts).
 			case 'delete_account': {
 				const uid = await whoAmI();
 				if (!uid) return bad(LOGIN, 401);
-				await db.from('meetup_events').update({ status: 'cancelled', hidden: true, updated_at: nowIso })
-					.eq('organizer_id', uid).eq('status', 'open');
-				await db.from('meetup_events').update({ organizer_name: 'Compte supprimé' }).eq('organizer_id', uid);
-				await db.from('meetup_signups').delete().eq('player_id', uid);
-				await db.from('meetup_reports').delete().eq('reporter_id', uid);
-				// Tournaments have no signups to warn: they go, posters with them.
-				const { data: tours } = await db.from('meetup_tournaments').select('poster_path').eq('organizer_id', uid);
-				await dropPosters(db, (tours ?? []).map((t) => t.poster_path as string | null));
-				await db.from('meetup_tournaments').delete().eq('organizer_id', uid);
-				await db.from('meetup_tournament_reports').delete().eq('reporter_id', uid);
-				const { error: fErr } = await db.from('meetup_tournament_follows').delete().eq('player_id', uid);
-				if (fErr) throw fErr;
-				// A claim holds the name and phone the claimer typed, and no foreign key removes it.
-				const { error: cErr } = await db.from('meetup_tournament_claims').delete().eq('player_id', uid);
-				if (cErr) throw cErr;
-				const { error } = await db.auth.admin.deleteUser(uid);
-				if (error) throw error;
+				await deleteAccount(db, uid);
 				return json({ ok: true });
 			}
 

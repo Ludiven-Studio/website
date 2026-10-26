@@ -845,3 +845,26 @@
 - 07:45 : tickets 0047-0050 clos (images de l'histoire, des cartes et des stores intégrées dans l'app Unity ; revues
   des captures et de la fiche) ; commité et poussé à la demande de l'utilisateur : les 4 tickets, les lignes du LOG et
   cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-10-25 — Dragon's Gems Swipe : compte Google/Apple et sauvegarde en ligne (serveur) (session website)
+- Statut : en cours (2026-10-25T23:57+01:00). Demande de l'utilisateur : Il faut pouvoir se connecter avec google ou
+  Apple pour garder sa progression
+- Réservations actives : `supabase/migrations/*_app_saves.sql`, `supabase/functions/app-save/`,
+  `supabase/functions/_shared/deleteAccount.ts`, `supabase/functions/meetups/index.ts` (delete_account seulement).
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 23:59 : écrit : migration app_saves (RLS sans politique), fonction app-save (get / put avec version /
+  delete_account), suppression de compte partagée dans _shared/account.ts (meetups l'appelle) et _shared/posters.ts ;
+  deno check passe. Pas déployé : attend l'accord de l'utilisateur.
+- 00:29 : ajouté : migration 20261026010000_eclats_endless.sql (ligne de jeu 'eclats-inf' pour le classement du mode
+  infini de l'app), pas déployée.
+- 01:56 : fait cette nuit (non commité, non déployé) : app-save + migrations app_saves et eclats-inf (db push --dry-run
+  : exactement 3 migrations), _shared/account.ts et posters.ts, meetups appelle deleteAccount ; deno check OK ; tickets
+  Codex 0047-0050 fermés avec LOG. En attente du feu vert : déploiement Supabase et config Auth (dragonsgems://auth,
+  client Apple).
+- 07:34 : déployé en production à la demande de l'utilisateur : migrations app_saves et eclats_endless (dry-run :
+  exactement les 3 en attente), fonctions app-save et meetups (suppression de compte partagée) ; essai de bout en bout
+  OK sur un compte anonyme jetable, supprimé à la fin. Auth (lu avant) : dragonsgems://auth ajouté aux Redirect URLs,
+  com.ludivenstudio.dragonsgems aux Client IDs Apple. Apple dans le navigateur (Android, éditeur) refusé par Supabase :
+  aucun secret OAuth Apple (Services ID) configuré. Non commité.
+- 07:45 : commité et poussé à la demande de l'utilisateur : mes 7 fichiers et cette section seulement (déjà déployés à
+  07:34). Statut : terminé. Réservations libérées.
