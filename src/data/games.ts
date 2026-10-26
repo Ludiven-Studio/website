@@ -7,6 +7,7 @@ export interface GameTile {
 	icon: keyof typeof iconPaths;
 	href?: string;
 	status: 'play' | 'soon';
+	added: string; // first published, 'YYYY-MM-DD': orders the « Nouveautés »
 	category?: 'aventure' | 'maths' | 'grilles' | 'logique' | 'mots' | 'adresse' | 'illusions' | 'multi'; // defaults to logique
 	image?: string; // optional presentation thumbnail, e.g. '/assets/jeux/<id>.png' (shown only if set)
 }
@@ -19,6 +20,7 @@ export const games: GameTile[] = [
 		icon: 'mine',
 		href: '/jeux/mine/',
 		status: 'play',
+		added: '2026-07-21',
 	},
 	{
 		id: '2048',
@@ -27,6 +29,7 @@ export const games: GameTile[] = [
 		icon: '2048',
 		href: '/jeux/2048/',
 		status: 'play',
+		added: '2026-07-03',
 		category: 'maths',
 	},
 	{
@@ -36,6 +39,7 @@ export const games: GameTile[] = [
 		icon: 'mots-meles',
 		href: '/jeux/mots-meles/',
 		status: 'play',
+		added: '2026-07-02',
 		category: 'mots',
 	},
 	{
@@ -45,6 +49,7 @@ export const games: GameTile[] = [
 		icon: 'winding-path',
 		href: '/jeux/mots-tournes/',
 		status: 'play',
+		added: '2026-07-15',
 		category: 'mots',
 	},
 	{
@@ -54,6 +59,7 @@ export const games: GameTile[] = [
 		icon: 'letter-wheel',
 		href: '/jeux/lettres-croisees/',
 		status: 'play',
+		added: '2026-07-16',
 		category: 'mots',
 	},
 	{
@@ -63,6 +69,7 @@ export const games: GameTile[] = [
 		icon: 'letter-tiles',
 		href: '/jeux/mot-secret/',
 		status: 'play',
+		added: '2026-07-16',
 		category: 'mots',
 	},
 	{
@@ -72,6 +79,7 @@ export const games: GameTile[] = [
 		icon: 'boggle-grid',
 		href: '/jeux/meli-melo/',
 		status: 'play',
+		added: '2026-07-16',
 		category: 'mots',
 	},
 	{
@@ -81,6 +89,7 @@ export const games: GameTile[] = [
 		icon: 'scales',
 		href: '/jeux/somme-toute/',
 		status: 'play',
+		added: '2026-06-13',
 		category: 'maths',
 	},
 	{
@@ -90,6 +99,7 @@ export const games: GameTile[] = [
 		icon: 'grid-dots',
 		href: '/jeux/solitaire/',
 		status: 'play',
+		added: '2026-07-07',
 	},
 	{
 		id: 'reussite',
@@ -98,6 +108,7 @@ export const games: GameTile[] = [
 		icon: 'cards',
 		href: '/jeux/reussite/',
 		status: 'play',
+		added: '2026-07-15',
 	},
 	{
 		id: 'tempo',
@@ -106,6 +117,7 @@ export const games: GameTile[] = [
 		icon: 'partition',
 		href: '/jeux/tempo/',
 		status: 'play',
+		added: '2026-07-08',
 		category: 'adresse',
 	},
 	{
@@ -115,6 +127,7 @@ export const games: GameTile[] = [
 		icon: 'grid-nine',
 		href: '/jeux/sudoku/',
 		status: 'play',
+		added: '2026-06-13',
 		category: 'grilles',
 	},
 	{
@@ -124,6 +137,7 @@ export const games: GameTile[] = [
 		icon: 'crown',
 		href: '/jeux/reines/',
 		status: 'play',
+		added: '2026-06-13',
 		category: 'grilles',
 	},
 	{
@@ -133,6 +147,7 @@ export const games: GameTile[] = [
 		icon: 'cage-sum',
 		href: '/jeux/calcudoku/',
 		status: 'play',
+		added: '2026-06-13',
 		category: 'maths',
 	},
 	{
@@ -142,6 +157,7 @@ export const games: GameTile[] = [
 		icon: 'winding-path',
 		href: '/jeux/chemin/',
 		status: 'play',
+		added: '2026-06-13',
 		category: 'grilles',
 	},
 	{
@@ -151,6 +167,7 @@ export const games: GameTile[] = [
 		icon: 'circuit',
 		href: '/jeux/circuit/',
 		status: 'play',
+		added: '2026-08-06',
 	},
 	{
 		id: 'lumen',
@@ -159,6 +176,7 @@ export const games: GameTile[] = [
 		icon: 'lumen',
 		href: '/jeux/lumen/',
 		status: 'play',
+		added: '2026-08-21',
 	},
 	{
 		id: 'cordes',
@@ -167,6 +185,7 @@ export const games: GameTile[] = [
 		icon: 'cordes',
 		href: '/jeux/cordes/',
 		status: 'play',
+		added: '2026-08-07',
 	},
 	{
 		id: 'bulles',
@@ -175,6 +194,7 @@ export const games: GameTile[] = [
 		icon: 'bulles',
 		href: '/jeux/bulles/',
 		status: 'play',
+		added: '2026-08-09',
 		category: 'adresse',
 	},
 	{
@@ -184,6 +204,7 @@ export const games: GameTile[] = [
 		icon: 'eclats',
 		href: '/jeux/eclats/',
 		status: 'play',
+		added: '2026-10-25',
 		category: 'adresse',
 	},
 	{
@@ -193,6 +214,7 @@ export const games: GameTile[] = [
 		icon: 'sequence',
 		href: '/jeux/suite/',
 		status: 'play',
+		added: '2026-06-13',
 		category: 'maths',
 	},
 	{
@@ -202,6 +224,7 @@ export const games: GameTile[] = [
 		icon: 'fruits',
 		href: '/jeux/fruits/',
 		status: 'play',
+		added: '2026-07-01',
 		category: 'maths',
 	},
 	{
@@ -211,6 +234,7 @@ export const games: GameTile[] = [
 		icon: 'matrix',
 		href: '/jeux/matrices/',
 		status: 'play',
+		added: '2026-06-29',
 	},
 	{
 		id: 'symboles',
@@ -219,6 +243,7 @@ export const games: GameTile[] = [
 		icon: 'squares-four',
 		href: '/jeux/symboles/',
 		status: 'play',
+		added: '2026-06-22',
 	},
 	{
 		id: 'rond-carre',
@@ -227,6 +252,7 @@ export const games: GameTile[] = [
 		icon: 'circle-square',
 		href: '/jeux/rond-carre/',
 		status: 'play',
+		added: '2026-06-15',
 		category: 'grilles',
 	},
 	{
@@ -236,6 +262,7 @@ export const games: GameTile[] = [
 		icon: 'grid-dots',
 		href: '/jeux/suguru/',
 		status: 'play',
+		added: '2026-06-16',
 		category: 'grilles',
 	},
 	{
@@ -245,6 +272,7 @@ export const games: GameTile[] = [
 		icon: 'partition',
 		href: '/jeux/motifs/',
 		status: 'play',
+		added: '2026-06-16',
 		category: 'grilles',
 	},
 	{
@@ -254,6 +282,7 @@ export const games: GameTile[] = [
 		icon: 'tetromino',
 		href: '/jeux/pavage/',
 		status: 'play',
+		added: '2026-06-26',
 		category: 'grilles',
 	},
 	{
@@ -263,6 +292,7 @@ export const games: GameTile[] = [
 		icon: 'flask',
 		href: '/jeux/tubes/',
 		status: 'play',
+		added: '2026-06-26',
 	},
 	{
 		id: 'colorgramme',
@@ -271,6 +301,7 @@ export const games: GameTile[] = [
 		icon: 'palette',
 		href: '/jeux/colorgramme/',
 		status: 'play',
+		added: '2026-06-18',
 		category: 'grilles',
 	},
 	// Tente & Aquarium temporarily disabled (code kept; re-add entries to re-enable).
@@ -281,6 +312,7 @@ export const games: GameTile[] = [
 		icon: 'ship',
 		href: '/jeux/bataille/',
 		status: 'play',
+		added: '2026-06-19',
 		category: 'grilles',
 	},
 	{
@@ -290,6 +322,7 @@ export const games: GameTile[] = [
 		icon: 'mine',
 		href: '/jeux/demineur/',
 		status: 'play',
+		added: '2026-06-22',
 		category: 'grilles',
 	},
 	{
@@ -299,6 +332,7 @@ export const games: GameTile[] = [
 		icon: 'tectonique',
 		href: '/jeux/tapis/',
 		status: 'play',
+		added: '2026-07-26',
 	},
 	{
 		id: 'souffle',
@@ -307,6 +341,7 @@ export const games: GameTile[] = [
 		icon: 'souffle',
 		href: '/jeux/souffle/',
 		status: 'play',
+		added: '2026-08-25',
 		category: 'grilles',
 	},
 	{
@@ -316,6 +351,7 @@ export const games: GameTile[] = [
 		icon: 'feuilles',
 		href: '/jeux/feuilles/',
 		status: 'play',
+		added: '2026-08-26',
 		category: 'adresse',
 	},
 	{
@@ -325,6 +361,7 @@ export const games: GameTile[] = [
 		icon: 'codecolor',
 		href: '/jeux/codecolor/',
 		status: 'play',
+		added: '2026-06-23',
 	},
 	{
 		id: 'cocottes-renards',
@@ -333,6 +370,7 @@ export const games: GameTile[] = [
 		icon: 'cocottes-renards',
 		href: '/jeux/cocottes-renards/',
 		status: 'play',
+		added: '2026-07-04',
 		category: 'adresse',
 	},
 	{
@@ -342,6 +380,7 @@ export const games: GameTile[] = [
 		icon: 'casse-briques',
 		href: '/jeux/casse-briques/',
 		status: 'play',
+		added: '2026-07-24',
 		category: 'adresse',
 	},
 	{
@@ -351,6 +390,7 @@ export const games: GameTile[] = [
 		icon: 'snake',
 		href: '/jeux/snake/',
 		status: 'play',
+		added: '2026-06-22',
 		category: 'adresse',
 	},
 	{
@@ -360,6 +400,7 @@ export const games: GameTile[] = [
 		icon: 'car',
 		href: '/jeux/course-de-peinture/',
 		status: 'play',
+		added: '2026-08-27',
 		category: 'adresse',
 	},
 	{
@@ -369,6 +410,7 @@ export const games: GameTile[] = [
 		icon: 'golf',
 		href: '/jeux/golf/',
 		status: 'play',
+		added: '2026-06-26',
 		category: 'adresse',
 	},
 	{
@@ -378,6 +420,7 @@ export const games: GameTile[] = [
 		icon: 'angry',
 		href: '/jeux/angry/',
 		status: 'play',
+		added: '2026-06-30',
 		category: 'adresse',
 	},
 	{
@@ -387,6 +430,7 @@ export const games: GameTile[] = [
 		icon: 'flechettes',
 		href: '/jeux/flechettes/',
 		status: 'play',
+		added: '2026-07-01',
 		category: 'adresse',
 	},
 	{
@@ -396,6 +440,7 @@ export const games: GameTile[] = [
 		icon: 'billard',
 		href: '/jeux/billard/',
 		status: 'play',
+		added: '2026-06-29',
 		category: 'adresse',
 	},
 	{
@@ -405,6 +450,7 @@ export const games: GameTile[] = [
 		icon: 'petanque',
 		href: '/jeux/petanque/',
 		status: 'play',
+		added: '2026-09-18',
 		category: 'adresse',
 	},
 	{
@@ -414,6 +460,7 @@ export const games: GameTile[] = [
 		icon: 'molkky',
 		href: '/jeux/molkky/',
 		status: 'play',
+		added: '2026-09-25',
 		category: 'adresse',
 	},
 	{
@@ -423,6 +470,7 @@ export const games: GameTile[] = [
 		icon: 'car',
 		href: '/jeux/drift/',
 		status: 'play',
+		added: '2026-06-24',
 		category: 'adresse',
 	},
 	{
@@ -432,6 +480,7 @@ export const games: GameTile[] = [
 		icon: 'rocket-launch',
 		href: '/jeux/esquive/',
 		status: 'play',
+		added: '2026-06-23',
 		category: 'adresse',
 	},
 	{
@@ -441,6 +490,7 @@ export const games: GameTile[] = [
 		icon: 'luge',
 		href: '/jeux/luge/',
 		status: 'play',
+		added: '2026-07-11',
 		category: 'adresse',
 	},
 	{
@@ -450,6 +500,7 @@ export const games: GameTile[] = [
 		icon: 'bird',
 		href: '/jeux/flappy/',
 		status: 'play',
+		added: '2026-06-22',
 		category: 'adresse',
 	},
 	{
@@ -459,6 +510,7 @@ export const games: GameTile[] = [
 		icon: 'cocotte-mineuse',
 		href: '/jeux/cocotte-mineuse/',
 		status: 'play',
+		added: '2026-07-16',
 		category: 'adresse',
 	},
 	{
@@ -468,6 +520,7 @@ export const games: GameTile[] = [
 		icon: 'alchimie',
 		href: '/jeux/alchimie/',
 		status: 'play',
+		added: '2026-07-18',
 	},
 	// Optical illusions: pages to look at and play with — no daily, no levels, no Expert pack.
 	{
@@ -477,6 +530,7 @@ export const games: GameTile[] = [
 		icon: 'eye',
 		href: '/jeux/stereogrammes/',
 		status: 'play',
+		added: '2026-10-09',
 		category: 'illusions',
 	},
 	{
@@ -486,6 +540,7 @@ export const games: GameTile[] = [
 		icon: 'afterimage',
 		href: '/jeux/image-remanente/',
 		status: 'play',
+		added: '2026-10-09',
 		category: 'illusions',
 	},
 	{
@@ -495,6 +550,7 @@ export const games: GameTile[] = [
 		icon: 'ruler',
 		href: '/jeux/oeil-mesureur/',
 		status: 'play',
+		added: '2026-10-09',
 		category: 'illusions',
 	},
 	{
@@ -504,6 +560,7 @@ export const games: GameTile[] = [
 		icon: 'spiral',
 		href: '/jeux/mouvement-illusoire/',
 		status: 'play',
+		added: '2026-10-09',
 		category: 'illusions',
 	},
 	{
@@ -513,6 +570,7 @@ export const games: GameTile[] = [
 		icon: 'contrast',
 		href: '/jeux/meme-couleur/',
 		status: 'play',
+		added: '2026-10-09',
 		category: 'illusions',
 	},
 	{
@@ -522,6 +580,7 @@ export const games: GameTile[] = [
 		icon: 'atelier',
 		href: '/jeux/atelier/',
 		status: 'play',
+		added: '2026-09-29',
 		category: 'aventure',
 	},
 	{
@@ -531,6 +590,7 @@ export const games: GameTile[] = [
 		icon: 'rayou',
 		href: '/jeux/rayou/',
 		status: 'play',
+		added: '2026-10-15',
 		category: 'aventure',
 	},
 	{
@@ -540,6 +600,7 @@ export const games: GameTile[] = [
 		icon: 'pong',
 		href: '/jeux/pong/',
 		status: 'play',
+		added: '2026-06-25',
 		category: 'multi',
 	},
 	{
@@ -549,6 +610,7 @@ export const games: GameTile[] = [
 		icon: 'foot',
 		href: '/jeux/foot/',
 		status: 'play',
+		added: '2026-07-01',
 		category: 'multi',
 	},
 ];

@@ -1,0 +1,114 @@
+---
+// The catalogue's tile size: icons, tiles or one game per row. Sets `data-tiles` on the
+// nearest `[data-tiles]` ancestor, and remembers the choice on this device. Place it inside
+// that ancestor, before the grids: its inline script then applies the stored size before
+// they paint.
+
+const SIZES = [
+	{ id: 'icon', label: 'Icônes', title: 'Le plus de jeux possible, comme des icônes d’applications' },
+	{ id: 'grid', label: 'Vignettes', title: 'Plusieurs jeux par ligne' },
+	{ id: 'list', label: 'Liste', title: 'Un jeu par ligne, avec sa description' },
+] as const;
+---
+
+<div class="tile-size" role="group" aria-label="Taille des tuiles">
+	{
+		SIZES.map((s) => (
+			<button type="button" class="ts-btn" data-size={s.id} aria-pressed={s.id === 'grid' ? 'true' : 'false'} title={s.title}>
+				<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+					{s.id === 'icon' &&
+						[1, 6, 11].flatMap((y) => [1, 6, 11].map((x) => <rect x={x} y={y} width="4" height="4" rx="1" />))}
+					{s.id === 'grid' && [1, 9].flatMap((y) => [1, 9].map((x) => <rect x={x} y={y} width="6" height="6" rx="1.5" />))}
+					{s.id === 'list' && [2, 10].map((y) => <rect x="1" y={y} width="5" height="4" rx="1" />)}
+					{s.id === 'list' && [4, 12].map((y) => <rect x="8" y={y - 0.75} width="7" height="1.5" rx="0.75" />)}
+				</svg>
+				<span>{s.label}</span>
+			</button>
+		))
+	}
+</div>
+<script is:inline>
+	(function () {
+		const box = document.currentScript.closest('[data-tiles]');
+		let size = null;
+		try {
+			size = localStorage.getItem('ludiven-tiles');
+		} catch (e) {
+			/* storage blocked: the default size stays */
+		}
+		if (!box || (size !== 'icon' && size !== 'list')) return;
+		box.dataset.tiles = size;
+		box.querySelectorAll('.tile-size [data-size]').forEach(function (b) {
+			b.setAttribute('aria-pressed', String(b.dataset.size === size));
+		});
+	})();
+</script>
+
+<style>
+	.tile-size {
+		display: inline-flex;
+		gap: 2px;
+		padding: 3px;
+		border: 1px solid var(--gray-800);
+		border-radius: 999px;
+		background: var(--gray-999);
+	}
+
+	.ts-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		padding: 0.4rem 0.8rem;
+		border: none;
+		border-radius: 999px;
+		background: transparent;
+		color: var(--gray-200);
+		font: inherit;
+		font-size: var(--text-sm);
+		font-weight: 600;
+		cursor: pointer;
+		transition:
+			background-color var(--theme-transition),
+			color var(--theme-transition);
+	}
+
+	.ts-btn svg {
+		fill: currentColor;
+		flex: none;
+	}
+
+	.ts-btn:hover,
+	.ts-btn:focus-visible {
+		color: var(--gray-0);
+		background: var(--gray-900);
+	}
+
+	.ts-btn[aria-pressed='true'] {
+		color: var(--accent-text-over);
+		background: var(--accent-regular);
+	}
+</style>
+
+<script>
+	const KEY = 'ludiven-tiles';
+
+	document.querySelectorAll<HTMLElement>('.tile-size').forEach((group) => {
+		const box = group.closest<HTMLElement>('[data-tiles]');
+		if (!box) return;
+		const buttons = Array.from(group.querySelectorAll<HTMLButtonElement>('[data-size]'));
+		const show = (size: string) => {
+			box.dataset.tiles = size;
+			for (const b of buttons) b.setAttribute('aria-pressed', String(b.dataset.size === size));
+		};
+		for (const b of buttons)
+			b.addEventListener('click', () => {
+				const size = b.dataset.size || 'grid';
+				show(size);
+				try {
+					localStorage.setItem(KEY, size);
+				} catch {
+					/* storage blocked: the size holds until the page closes */
+				}
+			});
+	});
+</script>

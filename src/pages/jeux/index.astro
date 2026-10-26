@@ -4,10 +4,12 @@ import GameCard from '../../components/GameCard.astro';
 import GameFold from '../../components/GameFold.astro';
 import GameSearch from '../../components/GameSearch.astro';
 import GameFavorites from '../../components/GameFavorites.astro';
+import GameTileSize from '../../components/GameTileSize.astro';
 import SuggestionForm from '../../components/SuggestionForm.astro';
 import CocoinBar from '../../components/CocoinBar';
 import CocoinToast from '../../components/CocoinToast';
-import { games } from '../../data/games';
+import { games, type GameTile } from '../../data/games';
+import { fetchPlayRows, rankPlayed } from '../../lib/popular';
 
 const NUM_FR = ['zéro', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf', 'dix', 'onze', 'douze', 'treize', 'quatorze', 'quinze', 'seize'];
 const playable = games.filter((g) => g.status === 'play').length;
@@ -33,6 +35,31 @@ const byCategory = CATEGORIES.map((c) => ({
 	...c,
 	games: games.filter((g) => (g.category ?? 'logique') === c.id),
 })).filter((c) => c.games.length > 0);
+const card = (g: GameTile) => ({
+	id: g.id,
+	title: g.title,
+	pitch: g.pitch,
+	icon: g.icon,
+	href: g.href,
+	status: g.status,
+	image: g.image,
+	daily: !NO_DAILY.includes(g.category ?? 'logique'),
+	favorite: true,
+	art: true,
+});
+
+// Shortcut sections, above the categories that still hold every game.
+const live = games.filter((g) => g.status === 'play');
+const SHORTLIST = 5;
+const fresh = [...live].sort((a, b) => b.added.localeCompare(a.added)).slice(0, SHORTLIST);
+// Most played over the last 30 days, read at build time: it moves with each deploy.
+const POPULAR_DAYS = 30;
+const playRows = await fetchPlayRows(POPULAR_DAYS);
+if (!playRows) console.warn('[jeux] game_scores unreachable: no « Top 5 » in this build');
+const byId = new Map(live.map((g) => [g.id, g]));
+const top = rankPlayed(playRows ?? [], [...byId.keys()])
+	.slice(0, SHORTLIST)
+	.map((id) => byId.get(id)!);
 ---
 
 <BaseLayout
@@ -58,9 +85,26 @@ const byCategory = CATEGORIES.map((c) => ({
 			<div class="games-wallet"><CocoinBar client:load /></div>
 			<CocoinToast client:idle />
 
-		<div class="games-sections stack gap-4">
-			<GameSearch total={games.length} />
-			<GameFold id="favoris" title="⭐ Favoris" count={0} hidden>
+		<div class="games-sections stack gap-4" data-tiles="grid">
+			<div class="games-tools">
+				<GameSearch total={games.length} />
+				<GameTileSize />
+			</div>
+			<GameFold id="nouveautes" title="🆕 Nouveautés" count={fresh.length} extra>
+				<ul class="games-grid short">
+					{fresh.map((g) => <li><GameCard {...card(g)} /></li>)}
+				</ul>
+			</GameFold>
+			{
+				top.length > 0 && (
+					<GameFold id="top" title={`🔥 Top ${top.length}`} count={top.length} meta={`les plus joués sur ${POPULAR_DAYS} jours`} extra>
+						<ol class="games-grid short ranked">
+							{top.map((g) => <li><GameCard {...card(g)} /></li>)}
+						</ol>
+					</GameFold>
+				)
+			}
+			<GameFold id="favoris" title="⭐ Favoris" count={0} hidden extra>
 				<ul class="games-grid" data-fav-grid></ul>
 			</GameFold>
 			<GameFavorites />
@@ -68,22 +112,7 @@ const byCategory = CATEGORIES.map((c) => ({
 				byCategory.map((c) => (
 					<GameFold id={c.id} title={c.title} count={c.games.length}>
 						<ul class="games-grid">
-							{c.games.map((game) => (
-								<li>
-									<GameCard
-										id={game.id}
-										title={game.title}
-										pitch={game.pitch}
-										icon={game.icon}
-										href={game.href}
-										status={game.status}
-										image={game.image}
-										daily={!NO_DAILY.includes(c.id)}
-										favorite
-										art
-									/>
-								</li>
-							))}
+							{c.games.map((g) => <li><GameCard {...card(g)} /></li>)}
 						</ul>
 					</GameFold>
 				))
@@ -178,6 +207,18 @@ const byCategory = CATEGORIES.map((c) => ({
 		justify-content: center;
 	}
 
+	.games-tools {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: flex-start;
+		justify-content: center;
+		gap: 0.75rem;
+	}
+
+	.games-tools > :global(.game-search) {
+		margin-inline: 0;
+	}
+
 	.games-grid {
 		display: grid;
 		grid-template-columns: repeat(2, 1fr);
@@ -185,6 +226,45 @@ const byCategory = CATEGORIES.map((c) => ({
 		list-style: none;
 		padding: 0;
 		margin: 0;
+	}
+
+	/* Four icons a row on a phone, like its home screen: five cut the names. */
+	[data-tiles='icon'] .games-grid {
+		grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr));
+		gap: 0.9rem 0.6rem;
+	}
+
+	[data-tiles='list'] .games-grid {
+		grid-template-columns: 1fr;
+		gap: 0.6rem;
+	}
+
+	/* The Top's rank, on the tile's corner whatever its size. */
+	.games-grid.ranked {
+		counter-reset: rank;
+	}
+	.games-grid.ranked > li {
+		position: relative;
+		counter-increment: rank;
+	}
+	.games-grid.ranked > li::before {
+		content: counter(rank);
+		position: absolute;
+		top: -0.4rem;
+		left: -0.4rem;
+		z-index: 2;
+		display: grid;
+		place-items: center;
+		width: 1.6rem;
+		height: 1.6rem;
+		border-radius: 999px;
+		background: var(--accent-regular);
+		color: var(--accent-text-over);
+		font-family: var(--font-brand);
+		font-weight: 800;
+		font-size: 0.85rem;
+		box-shadow: var(--shadow-sm);
+		pointer-events: none;
 	}
 
 	@media (min-width: 50em) {
@@ -199,6 +279,21 @@ const byCategory = CATEGORIES.map((c) => ({
 		.games-grid {
 			grid-template-columns: repeat(4, 1fr);
 			gap: 1rem;
+		}
+
+		/* The five of a shortcut on one row, instead of four and a lone one. */
+		[data-tiles='grid'] .games-grid.short {
+			grid-template-columns: repeat(5, 1fr);
+		}
+
+		[data-tiles='icon'] .games-grid {
+			grid-template-columns: repeat(auto-fill, minmax(5.75rem, 1fr));
+			gap: 1.1rem 0.9rem;
+		}
+
+		[data-tiles='list'] .games-grid {
+			grid-template-columns: 1fr;
+			gap: 0.75rem;
 		}
 	}
 </style>

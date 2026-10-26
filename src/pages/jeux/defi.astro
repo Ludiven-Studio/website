@@ -56,7 +56,7 @@ const byCategory = CATEGORIES.map((c) => ({
 
 		<div class="defi-sections stack gap-4">
 			<GameSearch total={dailyGames.length} />
-			<GameFold id="favoris" title="⭐ Favoris" count={0} hidden>
+			<GameFold id="favoris" title="⭐ Favoris" count={0} hidden extra>
 				<ul class="defi-grid" data-fav-grid></ul>
 			</GameFold>
 			<GameFavorites />
@@ -198,8 +198,11 @@ const byCategory = CATEGORIES.map((c) => ({
 			// à faire → en cours → fait (stable within a group)
 			ranked.sort((a, b) => a.s - b.s || a.i - b.i);
 			for (const { li } of ranked) grid.appendChild(li);
-			done += sectionDone;
-			total += lis.length;
+			// Favoris holds copies of games already counted in their category.
+			if (!grid.closest('[data-fold-extra]')) {
+				done += sectionDone;
+				total += lis.length;
+			}
 			// Per-section progress in the fold header ("3/12 faits").
 			const meta = grid.closest('.game-fold')?.querySelector('[data-fold-meta]');
 			if (meta) meta.textContent = sectionDone === lis.length
@@ -213,7 +216,7 @@ const byCategory = CATEGORIES.map((c) => ({
 	};
 
 	refresh();
-	document.addEventListener('favorites-applied', refresh); // cards moved to/from the favorites fold
+	document.addEventListener('favorites-applied', refresh); // the favorites fold was refilled
 	document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
 	window.addEventListener('pageshow', refresh);
 </script>

@@ -127,12 +127,19 @@ const { placeholder = 'Rechercher un jeu…', total } = Astro.props;
 	const status = document.querySelector<HTMLElement>('.gs-status');
 	if (input && status) {
 		const total = Number(status.dataset.total || 0);
-		const cards = Array.from(document.querySelectorAll<HTMLElement>('[data-search]'));
+		// Shortcut sections repeat games of the categories: hidden while searching, so each
+		// game shows and counts once.
+		const extras = Array.from(document.querySelectorAll<HTMLElement>('[data-fold-extra]'));
+		const cards = Array.from(document.querySelectorAll<HTMLElement>('[data-search]')).filter(
+			(card) => !card.closest('[data-fold-extra]'),
+		);
 		const items = cards.map((card) => ({
 			hay: card.dataset.search || '',
 			el: (card.closest('li') as HTMLElement | null) ?? card,
 		}));
-		const folds = Array.from(document.querySelectorAll<HTMLDetailsElement>('.game-fold'));
+		const folds = Array.from(document.querySelectorAll<HTMLDetailsElement>('.game-fold')).filter(
+			(f) => !f.hasAttribute('data-fold-extra'),
+		);
 		// Fold state and header text the player had, restored when the search is cleared.
 		// The défi page writes its own "3/12 faits" meta, so we save whatever is there.
 		const userOpen = new WeakMap<HTMLDetailsElement, boolean>();
@@ -157,6 +164,7 @@ const { placeholder = 'Rechercher un jeu…', total } = Astro.props;
 			// Tell GameFold not to persist the opens/closes we drive here.
 			if (on) document.documentElement.dataset.gameSearch = 'on';
 
+			for (const f of extras) f.classList.toggle('gs-hidden', on);
 			let hits = 0;
 			for (const { hay, el } of items) {
 				const match = !on || words.every((w) => hay.includes(w));

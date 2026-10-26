@@ -930,3 +930,33 @@
 - 08:42 : build complet OK (astro check 0 erreur, 166 pages, précache 323 entrées, liens OK)
 - 08:42 : commité, push en attente de l'accord de l'utilisateur : mes 2 fichiers et cette section seulement ; l'app est
   faite par la session Unity. Statut : terminé. Réservations libérées.
+
+## 2026-10-26 — Mini-jeux : rubriques Nouveautés, Top 5 et Favoris, et taille des tuiles (session website)
+- Statut : en cours (2026-10-26T11:49+01:00). Demande de l'utilisateur : sur la page des mini jeux, j'aimerais qu'on
+  ajoute en haut la rubrique nouveauté, ensuite le top 5 des jeux joués et ensuite les favoris et on répete tous les
+  mini jeux dans leur rubriques. par contre j'aimerais qu'on puisse choisir la taille des tuiles entre plusieurs
+  formats, le plus petit comme des icones de d'applications pour en voir le plus possible d'un coup d'oeil ensuite
+  plusieurs par lignes ou une par ligne en gardant en mémoire le format préféré (Top 5 : les plus joués par tous, au
+  build)
+- Réservations actives : `src/pages/jeux/index.astro`, `src/components/GameCard.astro`,
+  `src/components/GameFavorites.astro`, `src/components/GameSearch.astro`, `src/components/GameFold.astro`,
+  `src/data/games.ts`, `src/lib/popular.ts`, `src/lib/popular.test.ts`, `scripts/check-games-page.mjs`.
+- Ressources : serveur de dev sur le port 4474 ; eslint, `astro check`. Build annoncé ici avant.
+- 11:54 : réservation ajoutée : `src/components/GameTileSize.astro` (nouveau). games.ts : date de sortie (added) de
+  chaque jeu, prise du premier commit de sa page.
+- 12:01 : fait : Nouveautés (5 derniers jeux, date added), Top 5 (les plus joués sur 30 jours, lu dans game_scores au
+  build), Favoris (des copies : chaque jeu reste dans sa catégorie), la recherche ignore ces trois rubriques ; tailles
+  Icônes / Vignettes / Liste mémorisées (ludiven-tiles). scripts/check-games-page.mjs : 18 contrôles OK en clair et en
+  sombre, eslint OK, astro check 0 erreur, vitest popular 5/5.
+- 12:01 : Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 12:03 : build complet OK (astro check 0 erreur, 166 pages, précache 323 entrées, liens OK) ; check-games-page.mjs OK
+  aussi sur le build (MODE=preview). Non commité : en attente de l'utilisateur.
+- 12:06 : demande de l'utilisateur : « les défis favoris pourraient etre aussi dupliqué de leur catégorie ».
+  Réservation ajoutée : `src/pages/jeux/defi.astro`.
+- 12:07 : défis : les favoris sont aussi des copies (GameFavorites ne fait plus que des copies), le compteur « N défis
+  à faire » ne les compte qu'une fois ; check-games-page.mjs : 22 contrôles OK. Lancement du build complet (écrit
+  dist/, .astro/, public/vendor/)…
+- 12:09 : build complet OK (astro check 0 erreur, 166 pages, précache 323 entrées, liens OK) ; check-games-page.mjs OK
+  sur le build. Non commité : en attente de l'utilisateur.
+- 12:39 : commité et poussé à la demande de l'utilisateur : mes 11 fichiers et cette section seulement. Statut :
+  terminé. Réservations libérées.

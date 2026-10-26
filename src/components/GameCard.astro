@@ -65,14 +65,19 @@ const searchText = [title, pitch, id]
 				</div>
 			)
 		}
-		<h3>{title}</h3>
+		{!art && <h3>{title}</h3>}
 		{
 			art ? (
-				// Status as pips, not sentences: the catalogue is scanned, not read.
-				<div class="pips">
-					{playable && id && daily && <span class="pip daily-chip" data-game-id={id} data-pip hidden />}
-					{playable && id && daily && <span class="pip streak-badge" data-game-id={id} data-pip hidden />}
-					{playable && id && <span class="pip level-badge" data-game-id={id} data-pip hidden />}
+				// A box only in the catalogue's list view; elsewhere its children sit on the art.
+				<div class="art-text">
+					<h3>{title}</h3>
+					{/* Status as pips, not sentences: the catalogue is scanned, not read. */}
+					<div class="pips">
+						{playable && id && daily && <span class="pip daily-chip" data-game-id={id} data-pip hidden />}
+						{playable && id && daily && <span class="pip streak-badge" data-game-id={id} data-pip hidden />}
+						{playable && id && <span class="pip level-badge" data-game-id={id} data-pip hidden />}
+					</div>
+					<p class="art-pitch">{pitch}</p>
 				</div>
 			) : compact ? (
 				// The title rides the art as a plaque, so the panel below is free for the
@@ -296,6 +301,132 @@ const searchText = [title, pitch, id]
 		bottom: 0.15rem;
 		right: 0.3rem;
 		color: rgba(255, 255, 255, 0.8);
+	}
+
+	.art-text {
+		display: contents;
+	}
+
+	.art-pitch {
+		display: none;
+	}
+
+	/* The catalogue's tile sizes (data-tiles on its sections, picked by the player).
+	   Icons: an app-icon square with its name under it, to see the most games at once. */
+	:global([data-tiles='icon']) .game-card.art {
+		aspect-ratio: auto;
+		overflow: visible;
+		gap: 0.35rem;
+		border: none;
+		border-radius: 0;
+		background: none;
+		box-shadow: none;
+	}
+
+	:global([data-tiles='icon']) .game-card.art .game-card-media {
+		position: relative;
+		inset: auto;
+		aspect-ratio: 1;
+		border-radius: 22%;
+		overflow: hidden;
+		border: 1px solid var(--gray-800);
+		box-shadow: var(--shadow-sm);
+		background: var(--gray-999);
+	}
+
+	:global([data-tiles='icon']) a.game-card.art:hover .game-card-media,
+	:global([data-tiles='icon']) a.game-card.art:focus-visible .game-card-media {
+		border-color: var(--accent-regular);
+	}
+
+	:global([data-tiles='icon']) .game-card.art h3 {
+		position: static;
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+		padding: 0;
+		font-size: 0.75rem;
+		font-weight: 600;
+		line-height: 1.25;
+		text-align: center;
+		color: var(--gray-100);
+		background: none;
+		text-shadow: none;
+	}
+
+	/* Too small for status pips and a heart: other sizes show them. */
+	:global([data-tiles='icon']) .game-card.art .pips,
+	:global([data-tiles='icon']) .game-card-wrap .fav-toggle {
+		display: none;
+	}
+
+	/* List: one game per row, the art at the left, the name, pips and pitch beside it. */
+	/* .game-card-wrap: as specific as the has-fav rule that zeroes the bottom padding. */
+	:global([data-tiles='list']) .game-card-wrap .game-card.art {
+		aspect-ratio: auto;
+		flex-direction: row;
+		align-items: center;
+		gap: 0.9rem;
+		padding: 0.5rem 2.75rem 0.5rem 0.5rem;
+	}
+
+	:global([data-tiles='list']) .game-card.art .game-card-media {
+		position: relative;
+		inset: auto;
+		flex: 0 0 auto;
+		width: clamp(6.5rem, 30%, 12rem);
+		aspect-ratio: 16 / 10;
+		border-radius: 0.75rem;
+		overflow: hidden;
+	}
+
+	:global([data-tiles='list']) .art-text {
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+		min-width: 0;
+	}
+
+	:global([data-tiles='list']) .game-card.art h3 {
+		position: static;
+		padding: 0;
+		font-size: var(--text-md);
+		color: var(--gray-0);
+		background: none;
+		text-shadow: none;
+	}
+
+	:global([data-tiles='list']) .pips {
+		position: static;
+		flex-direction: row;
+		flex-wrap: wrap;
+		align-items: center;
+	}
+
+	:global([data-tiles='list']) .pips:not(:has(.pip:not([hidden]))) {
+		display: none;
+	}
+
+	:global([data-tiles='list']) .art-pitch {
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+		font-size: var(--text-sm);
+		line-height: 1.35;
+	}
+
+	:global([data-tiles='list']) .game-card-wrap:has(.game-card.art) .fav-toggle {
+		top: 50%;
+		bottom: auto;
+		right: 0.4rem;
+		transform: translateY(-50%);
+		color: var(--gray-400);
+	}
+
+	:global([data-tiles='list']) .game-card-wrap:has(.game-card.art) .fav-toggle.is-fav {
+		color: var(--accent-regular);
 	}
 
 	/* Plaque over the art: the scenes are prompted with their ground plane at the

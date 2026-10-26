@@ -1,7 +1,7 @@
 ---
 // Behaviour only — the page renders the fold and an empty `[data-fav-grid]` list so
-// the grid keeps the page's own styles. This moves the favorite cards into that list
-// (never copies them, so counts and search stay right) and puts them back on untoggle.
+// the grid keeps the page's own styles. This fills that list with copies of the favorite
+// cards: every game stays in its category too.
 ---
 
 <script>
@@ -11,20 +11,12 @@
 	const fold = grid?.closest('details');
 	if (grid && fold) {
 		const li = new Map<string, HTMLElement>();
-		const home = new Map<string, HTMLElement>();
-		// Position in the category before any move, so a card comes back where it was.
-		const rank = new WeakMap<Element, number>();
-
 		document.querySelectorAll<HTMLElement>('.game-card-wrap[data-game-id]').forEach((wrap) => {
 			const id = wrap.dataset.gameId;
 			const item = wrap.closest('li');
-			const parent = item?.parentElement;
-			if (!id || !item || !parent || li.has(id)) return;
+			// The shortcut sections hold copies too: the category's card is the one to take.
+			if (!id || !item || li.has(id) || wrap.closest('[data-fold-extra]')) return;
 			li.set(id, item);
-			home.set(id, parent);
-		});
-		document.querySelectorAll<HTMLElement>('.fold-body > ul').forEach((list) => {
-			Array.from(list.children).forEach((item, i) => rank.set(item, i));
 		});
 
 		const read = (): string[] => {
@@ -36,27 +28,14 @@
 			}
 		};
 
-		const restore = (id: string) => {
-			const item = li.get(id)!;
-			const parent = home.get(id)!;
-			const i = rank.get(item) ?? 0;
-			const after = Array.from(parent.children).find((c) => (rank.get(c) ?? -1) > i);
-			parent.insertBefore(item, after ?? null);
-		};
-
 		const apply = () => {
 			const favs = read().filter((id) => li.has(id));
-			for (const [id, item] of li) if (!favs.includes(id) && item.parentElement === grid) restore(id);
-			for (const id of favs) grid.appendChild(li.get(id)!);
-
+			// The category's card carries the live pips and heart state at this moment.
+			grid.replaceChildren(...favs.map((id) => li.get(id)!.cloneNode(true)));
 			fold.hidden = favs.length === 0;
-			// Sections gained or lost cards — the défi page rewrites these with its own
-			// "3/12 faits" right after, on the event below.
-			document.querySelectorAll<HTMLElement>('.game-fold').forEach((f) => {
-				const meta = f.querySelector('[data-fold-meta]');
-				const n = f.querySelectorAll('.game-card-wrap').length;
-				if (meta) meta.textContent = `${n} jeu${n > 1 ? 'x' : ''}`;
-			});
+			// The défi page rewrites these with its own "3/12 faits" right after, on the event below.
+			const meta = fold.querySelector('[data-fold-meta]');
+			if (meta) meta.textContent = `${favs.length} jeu${favs.length > 1 ? 'x' : ''}`;
 			document.dispatchEvent(new Event('favorites-applied'));
 		};
 

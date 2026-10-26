@@ -7,16 +7,18 @@ interface Props {
 	title: string;
 	count: number;
 	hidden?: boolean; // sections filled client-side start hidden, e.g. favorites
+	meta?: string; // fixed header text instead of the count
+	extra?: boolean; // a shortcut whose games are also in their category: the search skips it
 }
 
-const { id, title, count, hidden = false } = Astro.props;
+const { id, title, count, hidden = false, meta, extra = false } = Astro.props;
 ---
 
-<details class="game-fold" data-fold-id={id} open hidden={hidden}>
+<details class="game-fold" data-fold-id={id} data-fold-extra={extra || undefined} open hidden={hidden}>
 	<summary>
 		<span class="fold-caret" aria-hidden="true">▸</span>
 		<span class="fold-title">{title}</span>
-		<span class="fold-meta" data-fold-meta>{count} jeux</span>
+		{meta ? <span class="fold-meta">{meta}</span> : <span class="fold-meta" data-fold-meta>{count} jeux</span>}
 	</summary>
 	<div class="fold-body">
 		<slot />
