@@ -1002,3 +1002,29 @@
 - 13:51 : build complet OK (166 pages, précache 324 entrées, liens OK).
 - 13:51 : commité et poussé à la demande de l'utilisateur : mes 11 fichiers et cette section seulement. Statut :
   terminé. Réservations libérées.
+
+## 2026-10-26 — Dragon's Gems Swipe : l'attraction au début du glissé devient un aller-retour (session website)
+- Statut : en cours (2026-10-26T14:50+01:00). Demande de l'utilisateur : Pour l effet quand on commence a swipe, les
+  gems sont censés être animé être attiré vers le côté du swipe mais revenir a leur place initiale rapidement
+- Réservations actives : `src/games/eclats/EclatsGame.tsx`, `scripts/check-eclats.mjs`.
+- Ressources : serveur de dev sur le port 4473 ; eslint, `astro check`. Build annoncé ici avant.
+- 14:56 : fait : le penché tenu (0,15 case, retour au lâcher) devient un aller-retour au début du glissé : dès 8 px,
+  les blocs que le coup déplacerait partent d'un quart de case vers lui et reviennent à leur place en 260 ms, doigt
+  toujours posé (Web Animations, ajouté par-dessus si la direction change ; rien en mouvement réduit). check-eclats.mjs
+  : 26 contrôles OK (11 blocs tirés pour 11 qui bougeraient, 2,49/2,5 unités à 60 ms, tous en place doigt posé, rien
+  sous 8 px). eslint, astro check 0 erreur. L'app : demandé à la session Unity. Lancement du build complet (écrit
+  dist/, .astro/, public/vendor/)…
+- 14:57 : build complet OK (astro check 0 erreur, 166 pages, précache 324 entrées, liens OK) ; en attente du feu vert
+  de l'utilisateur pour le commit
+- 15:16 : suite demandée par l'utilisateur (« Recommencer l'effet toutes les secondes tant qu'on n'a pas relâché ») :
+  tant que le doigt tient une direction, l'aller-retour revient chaque seconde dans le sens où il pointe ; le lâcher
+  l'arrête. check-eclats.mjs : 28 contrôles OK (11 blocs tirés de nouveau à 1063 ms, plus rien après le lâcher). Même
+  demande transmise à la session Unity. Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 15:17 : build complet OK (astro check 0 erreur, 166 pages, précache 324 entrées, liens OK) ; en attente du feu vert
+  de l'utilisateur pour le commit
+- 15:20 : aligné sur l'app (session Unity, 0a7543f) : aller-retour raccourci à 200 ms, pic à 35 % ; check-eclats.mjs 28
+  contrôles OK. Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 15:21 : build complet OK (astro check 0 erreur, 166 pages, précache 324 entrées, liens OK) ; en attente du feu vert
+  de l'utilisateur pour le commit
+- 15:22 : commité et poussé à la demande de l'utilisateur : mes 2 fichiers et cette section seulement ; l'app est faite
+  par la session Unity. Statut : terminé. Réservations libérées.. Statut : terminé. Réservations libérées.

@@ -64,9 +64,10 @@ const GLOW_MS = 120;
 const POP_MS = 300;
 const COMET_MS = 380;
 const SWIPE_PX = 16;
-const LEAN_START_PX = 4; // a held finger starts pulling the blocks it would move
-const LEAN_PX = 40; // finger travel at which the pull nears its most
-const LEAN_MAX = 0.15 * U;
+const TUG_START_PX = 8; // a starting swipe tugs the blocks it would move once it has a direction
+const TUG = 0.25 * U;
+const TUG_MS = 200;
+const TUG_EVERY_MS = 1000; // a finger that holds tugs them again
 const DIR_VEC: Record<Dir, [number, number]> = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 const LB_ID = (gameId: string): string => `${gameId}-t`;
 const recordKey = (t: TierKey): string => `eclats-score-${t}`;
@@ -474,7 +475,6 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 	const [chain, setChain] = useState<{ id: number; wave: number } | null>(null);
 	const [shake, setShake] = useState(0);
 	const [nudge, setNudge] = useState<{ id: number; dir: Dir } | null>(null);
-	const [lean, setLean] = useState<{ dir: Dir; ids: Set<number> } | null>(null); // the blocks a held swipe would move
 	const [sweep, setSweep] = useState<{ id: number; dir: Dir } | null>(null);
 	const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
 	const [elapsed, setElapsed] = useState(0);
@@ -1124,7 +1124,7 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 		return findGroups(t, dir).flat().map((i) => t.cells[i]!.id);
 	};
 
-	/** The block ids a swipe would move: they lean toward the finger before it lets go. */
+	/** The block ids a swipe would move: a starting swipe tugs them its way. */
 	const movingIds = (dir: Dir): Set<number> => {
 		const st = sRef.current;
 		const ids = new Set<number>();
@@ -1139,34 +1139,50 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 
 	/* ---------- Input ---------- */
 
-	const drag = useRef<{ x: number; y: number; dir: Dir | null; lean: Dir | null } | null>(null);
+	const drag = useRef<{ x: number; y: number; dir: Dir | null; pulled: Dir | null; tugged: Set<Dir> } | null>(null);
+	const tugClock = useRef(0);
+	useEffect(() => () => clearInterval(tugClock.current), []);
 	const dirOf = (dx: number, dy: number, min = SWIPE_PX): Dir | null => {
 		if (Math.abs(dx) < min && Math.abs(dy) < min) return null;
 		return Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'down' : 'up';
 	};
-	/** The pull on the leaning blocks: it follows the finger, easing out toward LEAN_MAX. */
-	const pull = (dir: Dir | null, travel: number) => {
+	/** The blocks `dir` would move jump its way and spring straight back, the finger still down. */
+	const tug = (dir: Dir) => {
 		const el = boardRef.current;
-		if (!el) return;
-		const k = dir ? LEAN_MAX * (1 - Math.exp(-travel / LEAN_PX)) : 0;
-		const [vx, vy] = dir ? DIR_VEC[dir] : [0, 0];
-		el.style.setProperty('--lx', `${vx * k}px`);
-		el.style.setProperty('--ly', `${vy * k}px`);
+		if (!el || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+		const ids = movingIds(dir);
+		const [vx, vy] = DIR_VEC[dir];
+		const at = (k: number) => ({ transform: `translate(${vx * TUG * k}px, ${vy * TUG * k}px)` });
+		el.querySelectorAll<SVGGElement>('.ec-tug').forEach((g) => {
+			if (!ids.has(Number(g.dataset.id))) return;
+			// Added, not replaced: a tug the other way over one still running starts from where the block is.
+			g.animate(
+				[{ ...at(0), easing: 'cubic-bezier(.2, .8, .4, 1)' }, { ...at(1), offset: 0.35, easing: 'ease-in-out' }, { ...at(-0.12), offset: 0.7, easing: 'ease-out' }, at(0)],
+				{ duration: TUG_MS, composite: 'add' },
+			);
+		});
 	};
 	const onPress = (x: number, y: number) => {
-		drag.current = { x, y, dir: null, lean: null };
+		clearInterval(tugClock.current);
+		drag.current = { x, y, dir: null, pulled: null, tugged: new Set() };
 		if (phaseRef.current === 'busy') fastRef.current = true;
 	};
 	const onDrag = (x: number, y: number) => {
 		const d = drag.current;
 		if (!d || phaseRef.current !== 'idle') return;
 		const [dx, dy] = [x - d.x, y - d.y];
-		const lean = dirOf(dx, dy, LEAN_START_PX);
-		if (lean !== d.lean) {
-			d.lean = lean;
-			setLean(lean ? { dir: lean, ids: movingIds(lean) } : null);
+		d.pulled = dirOf(dx, dy, TUG_START_PX);
+		// At once the first time the finger takes a direction (a diagonal start flickering between two does not
+		// shake the board), then every second the way it points while it holds.
+		if (d.pulled && !d.tugged.has(d.pulled)) {
+			d.tugged.add(d.pulled);
+			tug(d.pulled);
+			clearInterval(tugClock.current);
+			tugClock.current = window.setInterval(() => {
+				const held = drag.current?.pulled;
+				if (held && phaseRef.current === 'idle' && !document.hidden) tug(held);
+			}, TUG_EVERY_MS);
 		}
-		pull(lean, Math.max(Math.abs(dx), Math.abs(dy)));
 		const dir = dirOf(dx, dy);
 		if (dir === d.dir) return;
 		d.dir = dir;
@@ -1176,12 +1192,10 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 		const d = drag.current;
 		drag.current = null;
 		fastRef.current = false;
+		clearInterval(tugClock.current);
 		if (!d) return;
 		const dir = dirOf(x - d.x, y - d.y);
 		setPreview([]);
-		// Back in place in 120 ms, or off from where they lean when the swipe plays: no jump either way.
-		setLean(null);
-		pull(null, 0);
 		if (dir) doMove(dir);
 	};
 	const swipe = usePointerDrag(onPress, onDrag, onRelease);
@@ -1461,7 +1475,7 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 							{cells.map((b, i) =>
 								b ? (
 									<g key={`${round}-${b.id}`} className="ec-cell" style={{ transform: `translate(${cx(i)}px, ${cy(i)}px)` }}>
-										<g className={lean?.ids.has(b.id) ? 'ec-lean on' : 'ec-lean'}>
+										<g className="ec-tug" data-id={b.id}>
 											<g
 												className={b.id === enter.centre ? 'ec-drop' : enter.ids.has(b.id) ? 'ec-in' : undefined}
 												style={enter.ids.has(b.id) ? { ['--fx' as string]: `${inFrom[0]}px`, ['--fy' as string]: `${inFrom[1]}px` } : undefined}
@@ -1839,8 +1853,6 @@ span.ec-ember { border-radius: 50%; background: radial-gradient(circle, #fff6c8 
 .ec-centre-mark { fill: none; stroke: #3a4870; stroke-width: 0.5; stroke-dasharray: 1 0.8; }
 
 .ec-cell { transition: transform 0.14s ease-out; }
-.ec-lean { transition: transform 0.12s ease-out; }
-.ec-lean.on { transform: translate(var(--lx, 0px), var(--ly, 0px)); }
 /* A played swipe: a band of light crosses the board its way. The band is 45 % of the board, so 222 % of it is the board. */
 .ec-sweep { position: absolute; inset: 0; overflow: hidden; border-radius: 4%; pointer-events: none; }
 .ec-sweep::before { content: ''; position: absolute; opacity: 0; animation: 0.28s ease-out both; }
@@ -1993,8 +2005,7 @@ span.ec-ember { border-radius: 50%; background: radial-gradient(circle, #fff6c8 
 @keyframes ec-ready { from { transform: scale(1); filter: drop-shadow(0 0 2px rgba(255, 138, 31, 0.5)); } to { transform: scale(1.04); filter: drop-shadow(0 0 9px rgba(255, 138, 31, 0.95)); } }
 @keyframes ec-roar { 0% { transform: none; } 18% { transform: translateX(-3px) rotate(-6deg) scale(1.08); } 75% { transform: translateX(-3px) rotate(-6deg) scale(1.08); } 100% { transform: none; } }
 @media (prefers-reduced-motion: reduce) {
-  .ec-cell, .ec-lean { transition: none; }
-  .ec-lean.on { transform: none; }
+  .ec-cell { transition: none; }
   .ec-sweep { display: none; }
   .ec-in, .ec-drop, .ec-grow, .ec-glow, .ec-pop, .ec-burst, .ec-sparkfly, .ec-shard, .ec-coin, .ec-fly, .ec-zone, .ec-wave, .ec-bolt, .ec-born, .ec-chain, .ec-label { animation-duration: 0.01s; }
   .ec-core, .ec-charged, .ec-rank.r2 > g > path, .ec-rank.r2 > g > circle:first-child, .ec-twinkle, .ec-halo, .ec-orbit, .ec-rays, .ec-comet-star, .ec-chest, .ec-preview, .ec-boardwrap.shake-a, .ec-boardwrap.shake-b, .ec-nudge, .ec-drake, .ec-dance img, .ec-pile { animation: none; }
