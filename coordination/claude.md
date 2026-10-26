@@ -960,3 +960,15 @@
   sur le build. Non commité : en attente de l'utilisateur.
 - 12:39 : commité et poussé à la demande de l'utilisateur : mes 11 fichiers et cette section seulement. Statut :
   terminé. Réservations libérées.
+
+## 2026-10-26 — Pétanque Game : crédits des musiques et sons (mentions légales) (session PetanqueGame)
+- Statut : en cours (2026-10-26T13:11+01:00). Demande de l'utilisateur : Oui, ajoute et pousse (crédits des musiques CC
+  BY du jeu sur les mentions légales)
+- Réservations actives : `src/pages/mentions-legales.astro`.
+- Ressources : serveur de dev sur le port 4493 ; eslint, `astro check`. Build annoncé ici avant.
+- 13:13 : mentions légales : musiques (CC BY 4.0, CC0) et ambiances sonores (CC0, Mixkit) du jeu ajoutées à la section
+  Licences ; eslint OK, astro check 0 erreur, captures bureau et téléphone sombre OK.
+- 13:13 : Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 13:14 : build complet OK (166 pages, précache 324 entrées, liens OK).
+- 13:14 : commité et poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé.
+  Réservations libérées.
