@@ -68,7 +68,9 @@ try {
 		await page.screenshot({ path: `${OUT}/desk-ready.png` });
 		await page.click('.ec-start');
 		await until(page, (x) => x.phase === 'idle');
-		const keys = { up: 'ArrowUp', right: 'ArrowRight', down: 'ArrowDown', left: 'ArrowLeft' };
+		const lesson = await page.evaluate(() => ({ text: document.querySelector('.ec-lesson')?.textContent ?? '', lit: document.querySelectorAll('.ec-preview').length }));
+		check('level 1 is a lesson whose suggested swipe glows before the first move', lesson.text.includes('Glisse') && lesson.text.includes('gauche') && lesson.lit === 3, `"${lesson.text.slice(0, 60)}…", ${lesson.lit} blocks lit`);
+		const keys ={ up: 'ArrowUp', right: 'ArrowRight', down: 'ArrowDown', left: 'ArrowLeft' };
 		for (const d of DIRS) {
 			await page.keyboard.press(keys[d]);
 			await page.waitForTimeout(60);
@@ -76,8 +78,9 @@ try {
 			if (s.moves > 0) break;
 		}
 		check('an arrow key swipes the board', s.moves === 1, `${s.moves} move`);
-		const left = await page.evaluate(() => [...document.querySelectorAll('.ec-hud .ec-chip')].map((c) => c.textContent).find((t) => t.includes('restant')) ?? '');
-		check('a level counts the swipes it has left', s.limit > 0 && left.includes(String(s.limit - s.moves)), `limit ${s.limit}, chip "${left.trim()}"`);
+		// Levels 1-20 have no swipe limit: the chip counts the swipes played, never the ones left.
+		const chips = await page.evaluate(() => [...document.querySelectorAll('.ec-hud .ec-chip')].map((c) => c.textContent).join(' | '));
+		check('level 1 takes as many swipes as it needs', s.limit === 0 && chips.includes('1 coup') && !chips.includes('restant'), `limit ${s.limit}, chips "${chips}"`);
 		await idle(page);
 		// Did a chest ever pop out big in the flying layer? A mutation observer sees it even between polls.
 		await page.evaluate(() => {

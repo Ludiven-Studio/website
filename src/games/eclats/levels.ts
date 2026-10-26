@@ -1,14 +1,15 @@
-// Éclats levels plan (1-100, 101-200 with the Expert pack). Five worlds of twenty levels, each
+// Éclats levels plan (1-250, 251-500 with the Expert pack). Five worlds of fifty levels, each
 // adding one new thing on top of the last: locked chests, rocks, ice, a fifth colour. A level is won
 // once N chests are open: a few on the board, the rest arriving at a fixed pace the preview shows,
 // within a number of swipes: out of swipes, the level is lost. Each level's board is the candidate
 // whose bot count sits nearest a smooth ramp, and its limit is the count a typical player wins within
-// 80 % of the time, 50 % on a hard level (one in ten) — picks.ts, written by scripts/eclats-levels.ts.
-// The stars count the swipes it took, inside that limit. metric 'time' with score = swipes (lower is better).
+// 80 % of the time, 65 % on a hard level (one in ten from 30) — picks.ts, written by scripts/eclats-levels.ts.
+// Levels 1-10 are lessons on hand-made boards (LESSONS), and 1-20 have no limit: a new player learns,
+// then plays freely. The stars count the swipes it took. metric 'time' with score = swipes (lower is better).
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
-import { hash2, type EclatsCfg } from './engine';
+import { extendPlan } from '../../lib/progression';
+import { FIRE_FULL, hash2, type Dir, type EclatsCfg } from './engine';
 import { PICKS } from './picks';
 
 export interface World {
@@ -17,35 +18,77 @@ export interface World {
 	novelty: string; // the one thing this world adds, shown on its first levels
 }
 
+/** Levels in the base plan, the Expert pack doubling them; a world is a fifth of them. */
+export const COUNT = 250;
+export const WORLD_SIZE = 50;
+
 export const WORLDS: World[] = [
 	{ from: 1, name: 'La prairie', novelty: '4 gemmes ou plus fusionnent en une gemme plus forte, qui explose plus fort. Un carré de 4 lance une comète vers un coffre.' },
-	{ from: 21, name: 'Les coffres-forts', novelty: 'Coffres cadenassés : le premier éclat fait sauter le cadenas, le second ouvre le coffre.' },
-	{ from: 41, name: 'Les rochers', novelty: 'Rochers : ils ne glissent pas et arrêtent les blocs. Une explosion juste à côté les brise.' },
-	{ from: 61, name: 'Le glacier', novelty: 'Glace : un bloc gelé ne glisse plus. Une explosion juste à côté le dégèle ; il peut aussi exploser avec sa couleur.' },
-	{ from: 81, name: 'La cinquième gemme', novelty: 'Une cinquième couleur se mêle aux autres : les groupes se forment moins facilement.' },
-	{ from: 101, name: 'Les profondeurs', novelty: '' },
+	{ from: 51, name: 'Les coffres-forts', novelty: 'Coffres cadenassés : le premier éclat fait sauter le cadenas, le second ouvre le coffre.' },
+	{ from: 101, name: 'Les rochers', novelty: 'Rochers : ils ne glissent pas et arrêtent les blocs. Une explosion juste à côté les brise.' },
+	{ from: 151, name: 'Le glacier', novelty: 'Glace : un bloc gelé ne glisse plus. Une explosion juste à côté le dégèle ; il peut aussi exploser avec sa couleur.' },
+	{ from: 201, name: 'La cinquième gemme', novelty: 'Une cinquième couleur se mêle aux autres : les groupes se forment moins facilement.' },
+	{ from: 251, name: 'Les profondeurs', novelty: '' },
 ];
 
 export const worldOf = (level: number): World => [...WORLDS].reverse().find((w) => level >= w.from) ?? WORLDS[0];
 
 export interface EclatsLevelCfg extends EclatsCfg {
-	limit: number; // swipes allowed
-	hard: boolean; // one level in ten: a typical player wins it half the time
+	limit: number; // swipes allowed, 0 = no limit
+	hard: boolean; // one level in ten from 30: a bit harder, a typical player wins it two times in three
 	three: number; // swipes for 3★
 	two: number; // swipes for 2★
+	lesson?: string; // levels 1-10: what this level teaches
+	hint?: Dir; // the first swipe that shows it
 }
+
+export interface Lesson {
+	text: string;
+	layout?: string; // the hand-made board (engine LAYOUT_CODES), by rows from the top
+	hint?: Dir;
+	goal: number;
+	fire?: number; // Bijou's gauge at the start
+}
+
+const rows = (...r: string[]): string => r.join('');
+
+/**
+ * Levels 1-10: one thing each, on a board made so that the suggested first swipe shows it (engine tests
+ * prove each one). Chests arrive every 3 edge arrivals; no swipe limit.
+ */
+export const LESSONS: Lesson[] = [
+	{ goal: 3, hint: 'left', text: 'Glisse ! Tous les blocs glissent jusqu’au bord. Trois gemmes de la même couleur qui se touchent explosent.',
+		layout: rows('1.2..3.', '.2..1..', '.......', '..0.0.0', '.......', '3..1..2', '.1..2.3') },
+	{ goal: 3, hint: 'down', text: 'Une explosion juste à côté d’un coffre l’ouvre. Ouvre tous les coffres demandés !',
+		layout: rows('0...2.1', '..0..3.', '.2..1..', '.0....3', '.....1.', '.......', '...C3.2') },
+	{ goal: 3, hint: 'down', text: 'Après une explosion, tout reglisse et les explosions s’enchaînent. De nouvelles gemmes arrivent du bord opposé, et une tombe au centre : « À venir » les annonce.',
+		layout: rows('.2.0..2', '3....1.', '..22...', '.1..3..', '1....0.', '..1....', '.......') },
+	{ goal: 4, hint: 'right', text: 'Quatre gemmes de la même couleur fusionnent en une gemme chargée.',
+		layout: rows('.1..2..', '2..3..1', '..1....', '0.0.0.0', '.3...2.', '...1...', '3.2..1.') },
+	{ goal: 4, hint: 'down', text: 'Une gemme chargée qui explose avec sa couleur fait sauter tout le carré autour d’elle, coffres compris.',
+		layout: rows('.2.....', '3..C...', '..3.2.0', '.0...3.', '2..0...', '..a...1', '....1..') },
+	{ goal: 4, hint: 'left', text: 'Cinq gemmes d’un coup montent de deux rangs : un joyau, qui explose encore plus large.',
+		layout: rows('2..3..0', '.3..2..', '1.11.11', '..0..2.', '3...0.2', '.2.3...', '0....3.') },
+	{ goal: 4, hint: 'down', text: 'Quatre gemmes en carré lancent une comète vers le coffre le plus proche.',
+		layout: rows('2...0..', '.23...1', '...1...', '2.....0', '.2.....', '....3..', '.....C.') },
+	{ goal: 5, hint: 'right', text: 'La couronne : quand elle explose avec sa couleur, toutes les gemmes de cette couleur sautent.',
+		layout: rows('.0.2..1', '3...1..', '.2...0.', '1..3...', '0.v.0..', '..2..3.', '2..0..1') },
+	{ goal: 5, hint: 'left', fire: FIRE_FULL - 3, text: 'Chaque gemme détruite remplit la jauge de Bijou. Pleine, touche Bijou : il crache trois boules de feu, d’abord sur les coffres !',
+		layout: rows('1.2..3.', '.2..1..', '..C..C.', '..0.0.0', '.......', '3..1..2', '.1..2.3') },
+	{ goal: 0, text: 'Moins tu utilises de coups, plus tu gagnes d’étoiles. À toi de jouer !' },
+];
 
 const levelSeed = (level: number): number => (Math.imul(level, 2654435761) ^ 0x3c6ef372) >>> 0;
 const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
 
-/** The board of level 1-100, before its candidate is picked. */
+/** The board of level 1-COUNT, before its candidate is picked. */
 export function levelBoard(level: number): EclatsCfg {
-	const l = Math.max(1, Math.min(LEVEL_COUNT, level));
-	const w = Math.min(4, Math.floor((l - 1) / 20)); // 0..4
-	const t = ((l - 1) % 20) / 19; // 0..1 inside the world
+	const l = Math.max(1, Math.min(COUNT, level));
+	const w = Math.min(4, Math.floor((l - 1) / WORLD_SIZE)); // 0..4
+	const t = ((l - 1) % WORLD_SIZE) / (WORLD_SIZE - 1); // 0..1 inside the world
 	// A hazard ramps up in its own world, then stays at a gentler level in the next ones.
 	const at = (world: number, a: number, b: number, after: number): number => (w < world ? 0 : w === world ? lerp(a, b, t) : after);
-	const g = (l - 1) / (LEVEL_COUNT - 1);
+	const g = (l - 1) / (COUNT - 1);
 	return {
 		seed: levelSeed(l),
 		fifth: at(4, 0.06, 0.16, 0.16),
@@ -59,24 +102,36 @@ export function levelBoard(level: number): EclatsCfg {
 	};
 }
 
-/** 101-200: everything at once, five colours, more chests. */
+/** The Expert pack, past COUNT: everything at once, five colours, more chests. */
 function expertBoard(level: number): EclatsCfg {
-	const t = (Math.min(200, level) - 101) / 99;
+	const t = (Math.min(2 * COUNT, level) - COUNT - 1) / (COUNT - 1);
 	return { seed: levelSeed(level), fifth: lerp(0.08, 0.14, t), goal: Math.round(lerp(12, 16, t)), chests: 3, locked: 3, chestEvery: 9, rocks: 2, ice: 3, fill: 0.5 };
 }
 
-/** A level's board before its candidate is picked. */
-export const boardFor = (level: number): EclatsCfg => (level > LEVEL_COUNT ? expertBoard(level) : levelBoard(level));
+/** A lesson's hand-made board; its candidates only change the arrivals. */
+function lessonBoard(level: number, lesson: Lesson): EclatsCfg {
+	return { seed: levelSeed(level), fifth: 0, goal: lesson.goal, chests: 0, locked: 0, chestEvery: 3, rocks: 0, ice: 0, fill: 0, layout: lesson.layout, fire: lesson.fire };
+}
 
-/** One level in ten is hard: its limit lets a typical player through half the time, not four in five. */
-export const isHard = (level: number): boolean => level % 10 === 0;
+/** A level's board before its candidate is picked. */
+export function boardFor(level: number): EclatsCfg {
+	const lesson = level >= 1 && level <= LESSONS.length ? LESSONS[level - 1] : null;
+	if (lesson?.layout) return lessonBoard(level, lesson);
+	return level > COUNT ? expertBoard(level) : levelBoard(level);
+}
+
+/** Levels 1-20 take as many swipes as they need: the first ten teach, the next ten let a new player play. */
+export const FREE_LEVELS = 20;
+
+/** One level in ten from 30 is a bit harder: its limit lets a typical player through two times in three, not four in five. */
+export const isHard = (level: number): boolean => level % 10 === 0 && level >= 30;
 
 /** The k-th candidate of a board: 0 is the board's own seed. */
 export const pickSeed = (seed: number, k: number): number => (k === 0 ? seed : hash2(seed, k));
 
 /** The bot's swipe count each level is picked for: a smooth climb instead of a lucky draw. */
 export const targetPar = (level: number): number =>
-	level > LEVEL_COUNT ? Math.round(lerp(14, 20, (level - 101) / 99)) : Math.round(lerp(6, 16, (level - 1) / (LEVEL_COUNT - 1)));
+	level > COUNT ? Math.round(lerp(14, 20, (level - COUNT - 1) / (COUNT - 1))) : Math.round(lerp(6, 16, (level - 1) / (COUNT - 1)));
 
 /** Star thresholds in swipes, inside the limit (at least the bot's count + 2): 3★ near the bot's count, 2★ halfway to the limit, 1★ any win. */
 export function starsFor(par: number, limit: number): { three: number; two: number } {
@@ -84,18 +139,25 @@ export function starsFor(par: number, limit: number): { three: number; two: numb
 	return { three, two: Math.max(three + 1, Math.round((three + limit) / 2)) };
 }
 
-/** Level n's board with its picked candidate, its swipe limit and its star thresholds. */
+/** The stars of a level without a limit are counted against this one. */
+export const starsLimit = (par: number): number => par + 4 + Math.round(par / 2);
+
+/** Level n's board with its picked candidate, its swipe limit, its star thresholds and, for 1-10, its lesson. */
 export function levelConfig(level: number): EclatsLevelCfg {
 	const b = boardFor(level);
-	const [k, par, limit] = PICKS[level - 1] ?? [0, targetPar(level), targetPar(level) + 4];
-	return { ...b, seed: pickSeed(b.seed, k), limit, hard: isHard(level), ...starsFor(par, limit) };
+	const [k, par, limit] = PICKS[level - 1] ?? [0, targetPar(level), level <= FREE_LEVELS ? 0 : targetPar(level) + 4];
+	const lesson = level >= 1 && level <= LESSONS.length ? LESSONS[level - 1] : null;
+	return {
+		...b, seed: pickSeed(b.seed, k), limit, hard: isHard(level), ...starsFor(par, limit || starsLimit(par)),
+		...(lesson ? { lesson: lesson.text, hint: lesson.hint } : {}),
+	};
 }
 
 const basePlan: LevelPlan<EclatsLevelCfg> = {
-	count: LEVEL_COUNT,
+	count: COUNT,
 	metric: 'time', // score = swipes; fewer is better
 	config: levelConfig,
-	// `this.config`, not levelConfig: past 100, extendPlan hands the hardened config in that way.
+	// `this.config`, not levelConfig: past COUNT, extendPlan hands the hardened config in that way.
 	stars(level: number, r: LevelResult): 0 | 1 | 2 | 3 {
 		if (!r.won) return 0;
 		const cfg = this.config(level);
@@ -109,7 +171,7 @@ const basePlan: LevelPlan<EclatsLevelCfg> = {
 	},
 };
 
-// 101-200 are their own boards (expertBoard), not a reseeded replay of 51-100.
+// The Expert pack's levels are their own boards (expertBoard), not a reseeded replay of the upper half.
 export const eclatsLevels = extendPlan('eclats', basePlan, {
 	configExt: (_base, level) => levelConfig(level),
 });

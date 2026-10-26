@@ -820,3 +820,18 @@
   public/vendor/)…
 - 20:46 : build complet OK ; APK 0.1.1 publié (builds/dragonsgems) ; commité et poussé à la demande de l'utilisateur :
   mon fichier et cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-10-25 — Dragon's Gems Swipe : niveaux 1 à 20 qui apprennent, sans limite de coups (session website)
+- Statut : en cours (2026-10-25T21:12+01:00). Demande de l'utilisateur : les 10 premiers niveaux faciles qui expliquent
+  comment les gemmes se combinent, puis 10 niveaux sans être bloqué par le nombre de coups
+- Réservations actives : `src/games/eclats/`, `scripts/eclats-levels.ts`, `scripts/check-eclats.mjs`.
+- Ressources : serveur de dev sur le port 4473 ; eslint, `astro check`. Build annoncé ici avant.
+- 21:25 : 250 niveaux (5 zones de 50) + pack Expert 251-500 ; leçons 1-10 sur plateaux faits main (tests : chaque
+  glissé conseillé montre sa mécanique) ; 1-20 sans limite ; un niveau un peu plus dur tous les 10 dès 30 (65 % pour le
+  joueur type). picks.ts régénéré (500). vitest 358/358, astro check 0 erreur, check-eclats OK. Réservations ajoutées :
+  `supabase/migrations/20261025210000_progression_levels_500.sql` (nouveau), `supabase/functions/submit-level/index.ts`
+  (borne 200 → 500, pas encore déployé : accord de l'utilisateur demandé).
+- 07:34 : déployé en production à la demande de l'utilisateur : migration progression_levels_500 et submit-level (borne
+  1..500 vérifiée en ligne). Non commité.
+- 07:45 : commité et poussé à la demande de l'utilisateur : mes 9 fichiers et cette section seulement. Statut :
+  terminé. Réservations libérées.

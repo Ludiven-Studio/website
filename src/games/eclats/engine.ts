@@ -51,6 +51,8 @@ export interface EclatsCfg {
 	ice: number; // frozen gems at the start
 	fill: number; // share of the board filled at the start
 	limit?: number; // swipes allowed to open the chests (none when absent or 0)
+	layout?: string; // a hand-made starting board instead of the random one (LAYOUT_CODES, 49 cells by rows)
+	fire?: number; // Bijou's gauge at the start
 }
 
 export type Status = 'playing' | 'won' | 'lost';
@@ -159,6 +161,13 @@ export const CENTRE_ORDER: number[] = Array.from({ length: N * N }, (_, i) => i)
 
 /* ---------- Setup ---------- */
 
+/**
+ * A hand-made board, one character a cell, by rows from the top: `.` empty, `0`-`4` a gem of that colour,
+ * `a`-`e` charged (rank 2), `A`-`E` a jewel (rank 3), `v`-`z` a crown (rank 4), `C` a chest, `L` a locked
+ * chest, `R` a rock.
+ */
+export const LAYOUT_CODES = '.01234abcdeABCDEvwxyzCLR';
+
 function block(s: State, kind: Kind, color = 0, extra: Partial<Block> = {}): Block {
 	return { id: s.nextId++, kind, color, rank: 1, ice: false, lock: false, ...extra };
 }
@@ -183,7 +192,14 @@ function groupSize(s: State, i: number): number {
 }
 
 export function createGame(cfg: EclatsCfg): State {
-	const s: State = { cfg, cells: new Array(N * N).fill(null), nextId: 1, moves: 0, arrivals: 0, centred: 0, opened: 0, score: 0, fire: 0, limit: cfg.limit ?? 0, status: 'playing' };
+	const s: State = {
+		cfg, cells: new Array(N * N).fill(null), nextId: 1, moves: 0, arrivals: 0, centred: 0, opened: 0, score: 0,
+		fire: Math.min(FIRE_FULL, cfg.fire ?? 0), limit: cfg.limit ?? 0, status: 'playing',
+	};
+	if (cfg.layout) {
+		lay(s, cfg.layout);
+		return s;
+	}
 	const rng = mulberry32(hash2(cfg.seed, 0x51a7));
 	const free = (inner: boolean): number[] =>
 		s.cells.map((b, i) => (b || (inner && (rc(i)[0] % (N - 1) === 0 || rc(i)[1] % (N - 1) === 0)) ? -1 : i)).filter((i) => i >= 0);
@@ -207,6 +223,20 @@ export function createGame(cfg: EclatsCfg): State {
 	const gems = s.cells.map((b, i) => (b?.kind === 'gem' ? i : -1)).filter((i) => i >= 0);
 	for (let k = 0; k < cfg.ice && gems.length; k++) s.cells[gems.splice(Math.floor(rng() * gems.length), 1)[0]]!.ice = true;
 	return s;
+}
+
+/** Puts a hand-made board down (LAYOUT_CODES); the ids go in reading order. */
+function lay(s: State, layout: string): void {
+	if (layout.length !== N * N) throw new Error(`a layout has ${N * N} cells, not ${layout.length}`);
+	for (let i = 0; i < N * N; i++) {
+		const ch = layout[i];
+		if (ch === '.') continue;
+		const k = LAYOUT_CODES.indexOf(ch);
+		if (k < 0) throw new Error(`unknown layout code ${ch}`);
+		if (ch === 'C' || ch === 'L') s.cells[i] = block(s, 'chest', 0, { lock: ch === 'L' });
+		else if (ch === 'R') s.cells[i] = block(s, 'rock');
+		else s.cells[i] = block(s, 'gem', (k - 1) % 5, { rank: 1 + Math.floor((k - 1) / 5) });
+	}
 }
 
 export function cloneState(s: State): State {

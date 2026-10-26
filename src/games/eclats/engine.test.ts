@@ -29,7 +29,7 @@ import {
 	type Step,
 } from './engine';
 import { playBot } from './bot';
-import { eclatsLevels, levelConfig } from './levels';
+import { COUNT, FREE_LEVELS, eclatsLevels, levelConfig, starsLimit } from './levels';
 import { PICKS } from './picks';
 
 const CFG: EclatsCfg = { seed: 7, fifth: 0, goal: 0, chests: 0, locked: 0, chestEvery: 0, rocks: 0, ice: 0, fill: 0 };
@@ -494,26 +494,52 @@ describe('the swipe limit', () => {
 });
 
 describe('levels', () => {
-	it('every level lets the bot through with room, one in ten is hard, and its stars sit inside its limit', () => {
-		for (let l = 1; l <= 200; l++) {
+	it('every level past the free ones lets the bot through with room, one in ten from 30 is harder, and its stars sit inside its limit', () => {
+		for (let l = 1; l <= 2 * COUNT; l++) {
 			const cfg = eclatsLevels.config(l);
-			expect(cfg.limit).toBeGreaterThanOrEqual(PICKS[l - 1][1] + 2);
+			const par = PICKS[l - 1][1];
+			if (l <= FREE_LEVELS) expect(cfg.limit).toBe(0);
+			else expect(cfg.limit).toBeGreaterThanOrEqual(par + 2);
 			expect(cfg.three).toBeLessThan(cfg.two);
-			expect(cfg.two).toBeLessThan(cfg.limit);
-			expect(cfg.hard).toBe(l % 10 === 0);
+			expect(cfg.two).toBeLessThan(cfg.limit || starsLimit(par));
+			expect(cfg.hard).toBe(l % 10 === 0 && l >= 30);
 		}
+	});
+
+	it('the first levels are lessons: nothing explodes before the first swipe, and the suggested one shows the lesson', () => {
+		const first = (l: number): { s: State; b: Burst[] } => {
+			const cfg = levelConfig(l);
+			const s = createGame(cfg);
+			expect(findGroups(s), `level ${l} starts with a group`).toEqual([]);
+			return { s, b: bursts(play(s, cfg.hint!)!) };
+		};
+		const gems = (b: Burst, color?: number): number => b.popped.filter((p) => p.kind === 'gem' && (color === undefined || p.color === color)).length;
+		expect(gems(first(1).b[0], 0)).toBe(3);
+		expect(first(2).b[0].opened.length).toBeGreaterThanOrEqual(1);
+		expect(first(3).b.length).toBeGreaterThanOrEqual(2);
+		expect(first(4).b[0].fused.some((f) => f.rank === 2)).toBe(true);
+		const charged = first(5).b[0];
+		expect(charged.releases.some((z) => z.rank === 2) && charged.opened.length >= 1).toBe(true);
+		expect(first(6).b[0].fused.some((f) => f.rank === 3)).toBe(true);
+		const comet = first(7).b[0];
+		expect(comet.comets.length >= 1 && comet.opened.length >= 1).toBe(true);
+		const crown = first(8).b[0];
+		expect(crown.releases.some((z) => z.rank === MAX_RANK) && gems(crown, 0) >= 6).toBe(true);
+		expect(canBreathe(first(9).s)).toBe(true);
+		for (let l = 1; l <= 10; l++) expect(levelConfig(l).lesson, `level ${l}`).toBeTruthy();
+		expect(levelConfig(11).lesson).toBeUndefined();
 	});
 
 	it('picks.ts matches the engine: the bot clears every level in the swipes recorded there', () => {
 		// Fails after a change to the engine, the bot or a board: rerun scripts/eclats-levels.ts.
-		expect(PICKS).toHaveLength(200);
+		expect(PICKS).toHaveLength(2 * COUNT);
 		const stale: number[] = [];
-		for (let l = 1; l <= 200; l++) {
+		for (let l = 1; l <= 2 * COUNT; l++) {
 			const run = playBot(levelConfig(l));
 			if (!run.won || run.moves !== PICKS[l - 1][1]) stale.push(l);
 		}
 		expect(stale).toEqual([]);
-	}, 60_000);
+	}, 120_000);
 
 	it('stars ask for fewer swipes at 3★ than at 2★', () => {
 		for (const l of [1, 20, 21, 50, 99, 100, 150, 200]) {

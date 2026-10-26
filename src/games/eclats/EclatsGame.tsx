@@ -448,6 +448,8 @@ function timeFx(step: Burst, balls: number[] = []): Omit<Fx, 'id'> {
 	};
 }
 
+const HINT_WORDS: Record<Dir, string> = { up: 'le haut ↑', down: 'le bas ↓', left: 'la gauche ←', right: 'la droite →' };
+
 const DIR_KEYS: Record<string, Dir> = {
 	ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
 	z: 'up', w: 'up', s: 'down', q: 'left', a: 'left', d: 'right',
@@ -1257,12 +1259,15 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 	const dailyScore = encodePacked(10_000_000, [s?.moves ?? 0, Math.min(9_999_999, elapsed)]);
 	const fmtPacked = (v: number): string => formatScore(DAILY_LB.eclats.fmt, v);
 	const world = mode === 'levels' ? worldOf(lv.level) : null;
-	const novelty = world && lv.level < world.from + 3 ? world.novelty : '';
 	const cfgLv = mode === 'levels' && (lv.playing || lv.done) ? eclatsLevels.config(lv.level) : null;
+	const lesson = mode === 'levels' && !lv.menu ? cfgLv?.lesson : undefined;
+	const novelty = !lesson && world && lv.level < world.from + 3 ? world.novelty : '';
+	// A lesson's suggested first swipe: its blocks glow until the player swipes.
+	const guide = lesson && cfgLv?.hint && s && s.moves === 0 && phase === 'idle' && !preview.length ? previewIds(cfgLv.hint) : [];
 	const next = s && s.status === 'playing' ? upcoming(s, 4) : [];
 	const glowSet = new Set(glow);
 	const grown = new Map((fx?.fused ?? []).map((f) => [cells[f.cell]?.id ?? -1, f.delay]));
-	const previewSet = new Set(preview);
+	const previewSet = new Set([...preview, ...guide]);
 	const step = s && mode === 'free' ? endlessStep(s) : 0;
 	const toNext = s ? STEP_MOVES - (s.moves % STEP_MOVES) : 0;
 	const nudgeDir = nudge ? { up: [0, -1.2], down: [0, 1.2], left: [-1.2, 0], right: [1.2, 0] }[nudge.dir] : [0, 0];
@@ -1311,6 +1316,12 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 			)}
 
 			{novelty && !over && <p className="ec-novelty">Nouveau : {novelty}</p>}
+			{lesson && !over && (
+				<p className="ec-novelty ec-lesson">
+					💡 {lesson}
+					{guide.length > 0 && cfgLv?.hint ? <strong> Essaie vers {HINT_WORDS[cfgLv.hint]}.</strong> : null}
+				</p>
+			)}
 
 			{s && (
 				<div className="ec-hud" aria-live="polite">

@@ -2,21 +2,22 @@
 // number of swipes nearest the level's target, so the climb is smooth rather than a run of lucky
 // and unlucky draws. Then the level's swipe limit: a typical player (the bot, a share of its swipes
 // random, breathing when it can) plays the board PLAYERS times, and the limit is the count it wins
-// within WIN of the time (WIN_HARD on a hard level). Writes src/games/eclats/picks.ts; rerun it after
+// within WIN of the time (WIN_HARD on a hard level); levels 1-FREE_LEVELS have none (0). Writes
+// src/games/eclats/picks.ts; rerun it after
 // any change to the engine, the bot or a level's board (the engine test fails until you do).
 // Usage: node node_modules/esbuild/bin/esbuild scripts/eclats-levels.ts --bundle --platform=node --format=esm --outfile=$TEMP/eclats-levels.mjs && node $TEMP/eclats-levels.mjs
 import { writeFileSync } from 'node:fs';
 import { bestMove, playBot } from '../src/games/eclats/bot';
 import { DIRS, breathe, canBreathe, cloneState, createGame, hash2, play, type EclatsCfg } from '../src/games/eclats/engine';
-import { boardFor, isHard, pickSeed, targetPar } from '../src/games/eclats/levels';
+import { COUNT, FREE_LEVELS, boardFor, isHard, pickSeed, targetPar } from '../src/games/eclats/levels';
 import { mulberry32 } from '../src/games/prng';
 
 const CANDIDATES = 16;
-const LEVELS = 200;
+const LEVELS = 2 * COUNT; // the Expert pack included
 const PLAYERS = 60;
 const CASUAL = 0.6; // share of the typical player's swipes played at random: between the bot (≈ the best) and a random swiper
 const WIN = 0.8;
-const WIN_HARD = 0.5;
+const WIN_HARD = 0.65; // a hard level, one in ten from 30: a bit harder, not a wall
 
 /** The typical player's swipes to win, or Infinity when the board fills up first. */
 function typical(cfg: EclatsCfg, seed: number): number {
@@ -61,8 +62,8 @@ for (let l = 1; l <= LEVELS; l++) {
 	}
 	if (!best) throw new Error(`level ${l}: the bot clears none of its ${CANDIDATES} boards`);
 	off += Math.abs(best[1] - want);
-	picks.push([...best, limitFor(l, { ...b, seed: pickSeed(b.seed, best[0]) }, best[1])]);
-	if (l % 20 === 0) console.log(`level ${l}…`);
+	picks.push([...best, l <= FREE_LEVELS ? 0 : limitFor(l, { ...b, seed: pickSeed(b.seed, best[0]) }, best[1])]);
+	if (l % 50 === 0) console.log(`level ${l}…`);
 }
 const rows: string[] = [];
 for (let i = 0; i < picks.length; i += 10) rows.push('\t' + picks.slice(i, i + 10).map(([k, p, m]) => `[${k}, ${p}, ${m}]`).join(', ') + ',');
