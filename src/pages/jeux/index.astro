@@ -2,14 +2,13 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import GameCard from '../../components/GameCard.astro';
 import GameFold from '../../components/GameFold.astro';
-import GameSearch from '../../components/GameSearch.astro';
+import GameTools from '../../components/GameTools.astro';
 import GameFavorites from '../../components/GameFavorites.astro';
-import GameTileSize from '../../components/GameTileSize.astro';
 import SuggestionForm from '../../components/SuggestionForm.astro';
 import CocoinBar from '../../components/CocoinBar';
 import CocoinToast from '../../components/CocoinToast';
-import { games, type GameTile } from '../../data/games';
-import { fetchPlayRows, rankPlayed } from '../../lib/popular';
+import { games, newest, type GameTile } from '../../data/games';
+import { POPULAR_DAYS, topPlayed } from '../../lib/popular';
 
 const NUM_FR = ['zéro', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf', 'dix', 'onze', 'douze', 'treize', 'quatorze', 'quinze', 'seize'];
 const playable = games.filter((g) => g.status === 'play').length;
@@ -51,15 +50,10 @@ const card = (g: GameTile) => ({
 // Shortcut sections, above the categories that still hold every game.
 const live = games.filter((g) => g.status === 'play');
 const SHORTLIST = 5;
-const fresh = [...live].sort((a, b) => b.added.localeCompare(a.added)).slice(0, SHORTLIST);
-// Most played over the last 30 days, read at build time: it moves with each deploy.
-const POPULAR_DAYS = 30;
-const playRows = await fetchPlayRows(POPULAR_DAYS);
-if (!playRows) console.warn('[jeux] game_scores unreachable: no « Top 5 » in this build');
+const fresh = newest(live, SHORTLIST);
+// Most played, read at build time: it moves with each deploy.
 const byId = new Map(live.map((g) => [g.id, g]));
-const top = rankPlayed(playRows ?? [], [...byId.keys()])
-	.slice(0, SHORTLIST)
-	.map((id) => byId.get(id)!);
+const top = (await topPlayed([...byId.keys()], SHORTLIST, POPULAR_DAYS)).map((id) => byId.get(id)!);
 ---
 
 <BaseLayout
@@ -86,10 +80,7 @@ const top = rankPlayed(playRows ?? [], [...byId.keys()])
 			<CocoinToast client:idle />
 
 		<div class="games-sections stack gap-4" data-tiles="grid">
-			<div class="games-tools">
-				<GameSearch total={games.length} />
-				<GameTileSize />
-			</div>
+			<GameTools total={games.length} />
 			<GameFold id="nouveautes" title="🆕 Nouveautés" count={fresh.length} extra>
 				<ul class="games-grid short">
 					{fresh.map((g) => <li><GameCard {...card(g)} /></li>)}
@@ -207,18 +198,6 @@ const top = rankPlayed(playRows ?? [], [...byId.keys()])
 		justify-content: center;
 	}
 
-	.games-tools {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: flex-start;
-		justify-content: center;
-		gap: 0.75rem;
-	}
-
-	.games-tools > :global(.game-search) {
-		margin-inline: 0;
-	}
-
 	.games-grid {
 		display: grid;
 		grid-template-columns: repeat(2, 1fr);
@@ -239,33 +218,6 @@ const top = rankPlayed(playRows ?? [], [...byId.keys()])
 		gap: 0.6rem;
 	}
 
-	/* The Top's rank, on the tile's corner whatever its size. */
-	.games-grid.ranked {
-		counter-reset: rank;
-	}
-	.games-grid.ranked > li {
-		position: relative;
-		counter-increment: rank;
-	}
-	.games-grid.ranked > li::before {
-		content: counter(rank);
-		position: absolute;
-		top: -0.4rem;
-		left: -0.4rem;
-		z-index: 2;
-		display: grid;
-		place-items: center;
-		width: 1.6rem;
-		height: 1.6rem;
-		border-radius: 999px;
-		background: var(--accent-regular);
-		color: var(--accent-text-over);
-		font-family: var(--font-brand);
-		font-weight: 800;
-		font-size: 0.85rem;
-		box-shadow: var(--shadow-sm);
-		pointer-events: none;
-	}
 
 	@media (min-width: 50em) {
 		.games-hero {

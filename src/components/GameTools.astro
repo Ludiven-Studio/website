@@ -1,0 +1,31 @@
+---
+// The search and the tile size side by side, above a page's game sections. Place it inside
+// the `[data-tiles]` element that holds those sections (GameTileSize sets it).
+import GameSearch from './GameSearch.astro';
+import GameTileSize from './GameTileSize.astro';
+
+interface Props {
+	total: number;
+}
+
+const { total } = Astro.props;
+---
+
+<div class="game-tools">
+	<GameSearch total={total} />
+	<GameTileSize />
+</div>
+
+<style>
+	.game-tools {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: flex-start;
+		justify-content: center;
+		gap: 0.75rem;
+	}
+
+	.game-tools > :global(.game-search) {
+		margin-inline: 0;
+	}
+</style>

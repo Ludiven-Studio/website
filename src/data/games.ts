@@ -614,3 +614,7 @@ export const games: GameTile[] = [
 		category: 'multi',
 	},
 ];
+
+/** The `count` games published last; a tie keeps the list's order. */
+export const newest = (list: GameTile[], count: number): GameTile[] =>
+	[...list].sort((a, b) => b.added.localeCompare(a.added)).slice(0, count);

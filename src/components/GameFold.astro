@@ -76,6 +76,34 @@ const { id, title, count, hidden = false, meta, extra = false } = Astro.props;
 	.fold-body {
 		padding-top: 1rem;
 	}
+
+	/* A ranked list (the Top): its rank on each tile's corner, whatever the tile size. */
+	.fold-body :global(.ranked) {
+		counter-reset: rank;
+	}
+	.fold-body :global(.ranked > li) {
+		position: relative;
+		counter-increment: rank;
+	}
+	.fold-body :global(.ranked > li::before) {
+		content: counter(rank);
+		position: absolute;
+		top: -0.4rem;
+		left: -0.4rem;
+		z-index: 2;
+		display: grid;
+		place-items: center;
+		width: 1.6rem;
+		height: 1.6rem;
+		border-radius: 999px;
+		background: var(--accent-regular);
+		color: var(--accent-text-over);
+		font-family: var(--font-brand);
+		font-weight: 800;
+		font-size: 0.85rem;
+		box-shadow: var(--shadow-sm);
+		pointer-events: none;
+	}
 </style>
 
 <script>

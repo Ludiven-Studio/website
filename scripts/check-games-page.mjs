@@ -5,7 +5,8 @@
        takes it out again.
      · The search hides the shortcuts, so each game shows and counts once.
      · Icons, tiles and list change the grid, and the choice survives a reload.
-     · The daily challenges page (/jeux/defi/) copies its favorites too, and counts them once.
+     · The daily challenges page (/jeux/defi/) has the same shortcuts and sizes: its favorites are
+       copies counted once, and its Top keeps its rank order when its tiles sort by today's status.
    The browser's calls to the scores backend are stubbed empty (the Top is read by the server).
    MODE=preview after a build (default: dev). SHOTS=<dir> also writes a capture of each size,
    THEME=dark in the dark theme. */
@@ -25,7 +26,8 @@ const line = (ok, what) => {
 	if (!ok) fail.push(what);
 };
 
-const open = async (viewport, path = '/jeux/', favorites = null) => {
+// `store`: localStorage items set before the page's own scripts run.
+const open = async (viewport, path = '/jeux/', store = {}) => {
 	const ctx = await browser.newContext({
 		locale: 'fr-FR',
 		viewport,
@@ -35,7 +37,9 @@ const open = async (viewport, path = '/jeux/', favorites = null) => {
 	await ctx.route(/supabase\.co\/(rest|functions)\//, (r) =>
 		r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' }),
 	);
-	if (favorites) await ctx.addInitScript((f) => localStorage.setItem('ludiven-favorites', f), JSON.stringify(favorites));
+	await ctx.addInitScript((items) => {
+		for (const [k, v] of Object.entries(items)) localStorage.setItem(k, v);
+	}, store);
 	const page = await ctx.newPage();
 	const errs = [];
 	page.on('pageerror', (e) => errs.push(e.message));
@@ -56,12 +60,12 @@ const folds = (page) =>
 	);
 // The sections from the tools down, once the size buttons have finished their fade.
 const shoot = async (page, name) => {
-	await page.evaluate(() => document.querySelector('.games-tools').scrollIntoView({ block: 'start' }));
+	await page.evaluate(() => document.querySelector('.game-tools').scrollIntoView({ block: 'start' }));
 	await page.waitForTimeout(400);
 	await page.screenshot({ path: `${shots}/${name}.png` });
 };
 const columns = (page, fold) =>
-	page.$eval(`.game-fold[data-fold-id="${fold}"] .games-grid`, (g) => getComputedStyle(g).gridTemplateColumns.split(' ').length);
+	page.$eval(`.game-fold[data-fold-id="${fold}"] .fold-body > :is(ul, ol)`, (g) => getComputedStyle(g).gridTemplateColumns.split(' ').length);
 
 try {
 	const { ctx, page, errs } = await open({ width: 1366, height: 900 });
@@ -74,7 +78,7 @@ try {
 	const top = all.find((f) => f.id === 'top')?.ids ?? [];
 	line(fresh.length === 5, `5 new games: ${fresh.join(', ')}`);
 	line(top.length >= 1 && top.length <= 5, `a Top of ${top.length}: ${top.join(', ')}`);
-	const ranks = await page.$$eval('.games-grid.ranked > li', (ls) => ls.map((l) => getComputedStyle(l, '::before').content));
+	const ranks = await page.$$eval('.game-fold[data-fold-id="top"] .ranked > li', (ls) => ls.map((l) => getComputedStyle(l, '::before').content));
 	line(ranks.length === top.length && ranks.every((r) => r && r !== 'none'), 'each Top tile carries its rank');
 	const inCategories = all.filter((f) => !f.extra).flatMap((f) => f.ids);
 	const total = Number(await page.$eval('#game-search-status', (s) => s.dataset.total));
@@ -148,17 +152,54 @@ try {
 	line(!overflow, 'phone: no sideways scroll');
 	await phone.ctx.close();
 
-	// Daily challenges: a favorite is copied, and the « N défis à faire » counts it once.
-	const defi = await open({ width: 1366, height: 900 }, '/jeux/defi/', ['sudoku', 'tubes']);
-	const dFolds = await folds(defi.page);
+	// Daily challenges: the same shortcuts, sizes shared with /jeux/, favorites copied and counted once.
+	const first = await open({ width: 1366, height: 900 }, '/jeux/defi/');
+	let dFolds = await folds(first.page);
+	const dOrder = dFolds.filter((f) => f.shown).map((f) => f.id);
+	const dTop = dFolds.find((f) => f.id === 'top')?.ids ?? [];
+	line(dOrder[0] === 'nouveautes' && dOrder[1] === 'top' && dFolds.find((f) => f.id === 'nouveautes').ids.length === 5,
+		`défi: Nouveautés, then the Top (${dTop.join(', ')}), then the categories`);
+	await first.ctx.close();
+
+	const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
+	const defi = await open({ width: 1366, height: 900 }, '/jeux/defi/', {
+		'ludiven-favorites': JSON.stringify(['sudoku', 'tubes']),
+		'ludiven-tiles': 'icon',
+		[`ludiven-dailyrun-${dTop[0]}-${day}`]: JSON.stringify({ done: true }),
+	});
+	dFolds = await folds(defi.page);
 	const dFav = dFolds.find((f) => f.id === 'favoris');
 	const dCats = dFolds.filter((f) => !f.extra).flatMap((f) => f.ids);
 	const counter = await defi.page.$eval('#defi-count', (c) => c.textContent);
 	line(dFav.shown && dFav.ids.sort().join() === 'sudoku,tubes', `défi: Favoris holds copies of ${dFav.ids.join(', ')}`);
 	line(['sudoku', 'tubes'].every((id) => dCats.includes(id)), 'défi: both stay in their category');
-	line(counter.includes(`/${dCats.length} `), `défi: the counter counts each game once (${counter})`);
+	line(counter.includes(`1/${dCats.length} `), `défi: the counter counts each game once (${counter})`);
+	const topNow = dFolds.find((f) => f.id === 'top').ids;
+	const firstDone = await defi.page.$eval('.game-fold[data-fold-id="top"] .ranked > li', (l) => l.classList.contains('is-done'));
+	line(topNow.join() === dTop.join() && firstDone, `défi: the Top keeps its order with its #1 done today`);
+	const dIcon = await columns(defi.page, 'maths');
+	const dSize = await defi.page.$eval('.defi-sections', (s) => s.dataset.tiles);
+	line(dSize === 'icon' && dIcon >= 9, `défi: opens in the size picked on /jeux/ (${dSize}, ${dIcon} per row)`);
+	if (shots) await shoot(defi.page, 'defi-desk-icon');
+	await defi.page.getByRole('button', { name: 'Liste' }).click();
+	line((await columns(defi.page, 'maths')) === 1, 'défi: list, one per row');
+	if (shots) await shoot(defi.page, 'defi-desk-list');
+	await defi.page.getByRole('button', { name: 'Vignettes' }).click();
+	if (shots) await shoot(defi.page, 'defi-desk-grid');
 	line(defi.errs.length === 0, `défi: no page error${defi.errs.length ? `: ${defi.errs.join(' | ')}` : ''}`);
 	await defi.ctx.close();
+
+	const dPhone = await open({ width: 390, height: 844 }, '/jeux/defi/', { [`ludiven-dailyrun-${dTop[0]}-${day}`]: JSON.stringify({ done: true }) });
+	const dCounts = {};
+	for (const [label, size] of [['Icônes', 'icon'], ['Vignettes', 'grid'], ['Liste', 'list']]) {
+		await dPhone.page.getByRole('button', { name: label }).click();
+		dCounts[size] = await columns(dPhone.page, 'maths');
+		if (shots) await shoot(dPhone.page, `defi-phone-${size}`);
+	}
+	const dOverflow = await dPhone.page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
+	line(dCounts.icon === 4 && dCounts.grid === 2 && dCounts.list === 1 && !dOverflow,
+		`défi phone: ${dCounts.icon} icons, ${dCounts.grid} tiles, ${dCounts.list} row per line, no sideways scroll`);
+	await dPhone.ctx.close();
 } finally {
 	await browser.close();
 	server.stop();

@@ -2,12 +2,13 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import GameCard from '../../components/GameCard.astro';
 import GameFold from '../../components/GameFold.astro';
-import GameSearch from '../../components/GameSearch.astro';
+import GameTools from '../../components/GameTools.astro';
 import GameFavorites from '../../components/GameFavorites.astro';
 import Icon from '../../components/Icon.astro';
 import CocoinBar from '../../components/CocoinBar';
 import CocoinToast from '../../components/CocoinToast';
-import { games } from '../../data/games';
+import { games, newest, type GameTile } from '../../data/games';
+import { POPULAR_DAYS, topPlayed } from '../../lib/popular';
 
 // Every playable game now has a daily challenge (Pong & Foot race the AI to 3), so the
 // hub lists them all — same count as the /jeux catalogue.
@@ -26,6 +27,14 @@ const byCategory = CATEGORIES.map((c) => ({
 	...c,
 	games: dailyGames.filter((g) => (g.category ?? 'logique') === c.id),
 })).filter((c) => c.games.length > 0);
+const card = (g: GameTile) => ({ id: g.id, title: g.title, pitch: g.pitch, icon: g.icon, href: `${g.href}?defi`, status: g.status, compact: true });
+
+// Shortcut sections, from the challenges this page lists: copies, every game stays in its category.
+const listed = byCategory.flatMap((c) => c.games);
+const SHORTLIST = 5;
+const fresh = newest(listed, SHORTLIST);
+const byId = new Map(listed.map((g) => [g.id, g]));
+const top = (await topPlayed([...byId.keys()], SHORTLIST, POPULAR_DAYS)).map((id) => byId.get(id)!);
 ---
 
 <BaseLayout
@@ -54,8 +63,22 @@ const byCategory = CATEGORIES.map((c) => ({
 		</header>
 		<CocoinToast client:idle />
 
-		<div class="defi-sections stack gap-4">
-			<GameSearch total={dailyGames.length} />
+		<div class="defi-sections stack gap-4" data-tiles="grid">
+			<GameTools total={listed.length} />
+			<GameFold id="nouveautes" title="🆕 Nouveautés" count={fresh.length} extra>
+				<ul class="defi-grid">
+					{fresh.map((g) => <li><GameCard {...card(g)} /></li>)}
+				</ul>
+			</GameFold>
+			{
+				top.length > 0 && (
+					<GameFold id="top" title={`🔥 Top ${top.length}`} count={top.length} meta={`les plus joués sur ${POPULAR_DAYS} jours`} extra>
+						<ol class="defi-grid ranked">
+							{top.map((g) => <li><GameCard {...card(g)} /></li>)}
+						</ol>
+					</GameFold>
+				)
+			}
 			<GameFold id="favoris" title="⭐ Favoris" count={0} hidden extra>
 				<ul class="defi-grid" data-fav-grid></ul>
 			</GameFold>
@@ -64,11 +87,7 @@ const byCategory = CATEGORIES.map((c) => ({
 				byCategory.map((c) => (
 					<GameFold id={c.id} title={c.title} count={c.games.length}>
 						<ul class="defi-grid">
-							{c.games.map((g) => (
-								<li>
-									<GameCard id={g.id} title={g.title} pitch={g.pitch} icon={g.icon} href={`${g.href}?defi`} status={g.status} compact />
-								</li>
-							))}
+							{c.games.map((g) => <li><GameCard {...card(g)} /></li>)}
 						</ul>
 					</GameFold>
 				))
@@ -139,6 +158,24 @@ const byCategory = CATEGORIES.map((c) => ({
 		gap: 0.85rem;
 	}
 
+	/* Four icons a row on a phone, like its home screen. */
+	[data-tiles='icon'] .defi-grid {
+		grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr));
+		gap: 0.9rem 0.6rem;
+	}
+
+	[data-tiles='list'] .defi-grid {
+		grid-template-columns: 1fr;
+		gap: 0.6rem;
+	}
+
+	@media (min-width: 50em) {
+		[data-tiles='icon'] .defi-grid {
+			grid-template-columns: repeat(auto-fill, minmax(5.75rem, 1fr));
+			gap: 1.1rem 0.9rem;
+		}
+	}
+
 	.defi-streak {
 		align-self: center;
 		font-weight: 800;
@@ -160,7 +197,7 @@ const byCategory = CATEGORIES.map((c) => ({
 	import { globalStreak } from '../../lib/streak';
 	import { challengeDay } from '../../lib/day';
 
-	const grids = Array.from(document.querySelectorAll<HTMLUListElement>('.defi-grid'));
+	const grids = Array.from(document.querySelectorAll<HTMLElement>('.defi-grid'));
 	const counter = document.getElementById('defi-count');
 	const streakEl = document.getElementById('defi-streak');
 
@@ -183,7 +220,7 @@ const byCategory = CATEGORIES.map((c) => ({
 		for (const grid of grids) {
 			const lis = Array.from(grid.children) as HTMLElement[];
 			let sectionDone = 0;
-			const ranked = lis.map((li, i) => {
+			const items = lis.map((li, i) => {
 				const id = li.querySelector('[data-game-id]')?.getAttribute('data-game-id');
 				let s = 0; // 0 = à faire, 1 = en cours, 2 = fait
 				try {
@@ -195,10 +232,12 @@ const byCategory = CATEGORIES.map((c) => ({
 				if (s === 2) sectionDone++;
 				return { li, s, i };
 			});
-			// à faire → en cours → fait (stable within a group)
-			ranked.sort((a, b) => a.s - b.s || a.i - b.i);
-			for (const { li } of ranked) grid.appendChild(li);
-			// Favoris holds copies of games already counted in their category.
+			// à faire → en cours → fait (stable within a group); the Top keeps its rank order.
+			if (!grid.classList.contains('ranked')) {
+				items.sort((a, b) => a.s - b.s || a.i - b.i);
+				for (const { li } of items) grid.appendChild(li);
+			}
+			// The shortcut sections hold copies of games already counted in their category.
 			if (!grid.closest('[data-fold-extra]')) {
 				done += sectionDone;
 				total += lis.length;

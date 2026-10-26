@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { fetchPlayRows, rankPlayed } from './popular';
+import { fetchPlayRows, rankPlayed, topPlayed } from './popular';
 
 const rows = (...ids: string[]) => ids.map((game_id) => ({ game_id }));
 
@@ -37,6 +37,14 @@ describe('fetchPlayRows', () => {
 		expect(fetch).toHaveBeenCalledTimes(2);
 		expect(fetch.mock.calls[0][0]).toContain('challenge_date=gte.2026-09-26');
 		expect(fetch.mock.calls[1][0]).toContain('offset=1000');
+	});
+
+	it('topPlayed reads once for the pages of a build and cuts to the count', async () => {
+		const fetch = vi.fn().mockResolvedValue(reply(200, rows('tubes', 'sudoku', 'sudoku', 'reines')));
+		vi.stubGlobal('fetch', fetch);
+		expect(await topPlayed(['reines', 'sudoku', 'tubes'], 2, 7)).toEqual(['sudoku', 'reines']);
+		expect(await topPlayed(['tubes', 'reines'], 5, 7)).toEqual(['tubes', 'reines']);
+		expect(fetch).toHaveBeenCalledTimes(1);
 	});
 
 	it('says null when Supabase cannot be reached', async () => {

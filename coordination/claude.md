@@ -972,3 +972,20 @@
 - 13:14 : build complet OK (166 pages, précache 324 entrées, liens OK).
 - 13:14 : commité et poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé.
   Réservations libérées.
+
+## 2026-10-26 — Défis du jour : trois tailles de tuiles et Top 5 (session website)
+- Statut : en cours (2026-10-26T12:55+01:00). Demande de l'utilisateur : ok pour les défis aussi on peut avoir les 3
+  types , le top 5 et les favoris
+- Réservations actives : `src/pages/jeux/defi.astro`, `src/pages/jeux/index.astro`, `src/components/GameCard.astro`,
+  `src/components/GameFold.astro`, `src/components/GameTools.astro` (nouveau), `src/lib/popular.ts`,
+  `src/lib/popular.test.ts`, `scripts/check-games-page.mjs`.
+- Ressources : serveur de dev sur le port 4474 ; eslint, `astro check`. Build annoncé ici avant.
+- 12:56 : demande ajoutée : « et les nouveautés ». Réservation ajoutée : `src/data/games.ts`.
+- 13:00 : fait : Nouveautés, Top 5 (le Top garde son ordre quand ses tuiles sont faites), Favoris en copies, tailles
+  Icônes / Vignettes / Liste partagées avec /jeux/ ; GameTools (recherche + tailles) et le rang du Top dans GameFold
+  servent aux deux pages ; topPlayed lit game_scores une fois par build. check-games-page.mjs : 27 contrôles OK.
+  Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 13:01 : build complet OK (astro check 0 erreur, 166 pages, précache 324 entrées, liens OK) ; check-games-page.mjs OK
+  sur le build, vitest popular 6/6. Non commité : en attente de l'utilisateur.
+- 13:48 : commité et poussé à la demande de l'utilisateur : mes 9 fichiers et cette section seulement. Statut :
+  terminé. Réservations libérées.

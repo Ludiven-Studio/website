@@ -8,6 +8,9 @@ export interface PlayRow {
 	game_id: string;
 }
 
+/** The window of the catalogue's Top, shown in its header. */
+export const POPULAR_DAYS = 30;
+
 // PostgREST answers 1000 rows at most per request.
 const PAGE = 1000;
 
@@ -24,6 +27,17 @@ export function rankPlayed(rows: PlayRow[], known: string[]): string[] {
 		if (known.includes(id)) count.set(id, (count.get(id) ?? 0) + 1);
 	}
 	return known.filter((id) => count.has(id)).sort((a, b) => count.get(b)! - count.get(a)!);
+}
+
+const reads = new Map<number, Promise<PlayRow[] | null>>();
+
+/** The `count` most played of `ids` over the last `days` days, [] when Supabase can't be reached.
+ *  The pages of one build share one read. */
+export async function topPlayed(ids: string[], count: number, days: number): Promise<string[]> {
+	if (!reads.has(days)) reads.set(days, fetchPlayRows(days));
+	const rows = await reads.get(days)!;
+	if (!rows) console.warn('[popular] game_scores unreachable: no « Top » in this build');
+	return rankPlayed(rows ?? [], ids).slice(0, count);
 }
 
 /** Every row of the last `days` days, or null when Supabase can't be reached. */
