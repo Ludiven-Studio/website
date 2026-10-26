@@ -430,7 +430,10 @@ export default function PongGame({ gameId }: { gameId: string }) {
 			setStatus('Entre un pseudo.');
 			return null;
 		}
-		setPlayerName(nm);
+		if (!setPlayerName(nm)) {
+			setStatus('Ce pseudo n’est pas accepté.');
+			return null;
+		}
 		return nm;
 	}, [name]);
 

@@ -4,6 +4,7 @@
 import { dateSeed } from '../games/prng';
 import { challengeDay, challengeDayOrdinal, challengeWeekday } from './day';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../data/site';
+import { cleanPlayerName } from './names';
 import { trackGame } from './analytics';
 import { recordDailyDone } from './streak';
 import { earn } from './wallet';
@@ -57,19 +58,24 @@ export const dailyTierOrdinal = (d: Date = new Date()): number => {
 };
 
 const NAME_KEY = 'ludiven-player';
+/** The stored name, '' when the filter refuses it (one saved before the filter existed). */
 export const playerName = (): string => {
 	try {
-		return localStorage.getItem(NAME_KEY) || '';
+		return cleanPlayerName(localStorage.getItem(NAME_KEY) || '');
 	} catch {
 		return '';
 	}
 };
-export const setPlayerName = (name: string): void => {
+/** False, and nothing saved, when the leaderboards' filter refuses the name (src/lib/names.ts). */
+export const setPlayerName = (name: string): boolean => {
+	const clean = cleanPlayerName(name);
+	if (!clean) return false;
 	try {
-		localStorage.setItem(NAME_KEY, name.trim().slice(0, 20));
+		localStorage.setItem(NAME_KEY, clean);
 	} catch {
 		/* ignore */
 	}
+	return true;
 };
 
 /** Snapshot of today's daily attempt (one try per device, resumable). */

@@ -953,7 +953,10 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 			setStatus('Entre un pseudo.');
 			return;
 		}
-		setPlayerName(nm);
+		if (!setPlayerName(nm)) {
+			setStatus('Ce pseudo n’est pas accepté.');
+			return;
+		}
 		selfColorRef.current = CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)];
 		if (!initScene()) return;
 		resize();

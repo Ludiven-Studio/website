@@ -990,7 +990,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 	const play = useCallback(async (m: Mode) => {
 		const nm = (name || playerName()).trim();
 		if (m === 'defi' && !nm) { setStatus('Entre un pseudo.'); return; }
-		if (nm) setPlayerName(nm);
+		if (nm && !setPlayerName(nm)) { setStatus('Ce pseudo n’est pas accepté.'); return; }
 		selfColorRef.current = BALL_COLORS[Math.floor(Math.random() * BALL_COLORS.length)];
 		if (!initScene()) return;
 

@@ -430,13 +430,21 @@ export default function FootGame({ gameId }: { gameId: string }) {
 
 	const ensureName = useCallback((): string => {
 		const nm = (name || playerName()).trim();
-		if (nm) setPlayerName(nm);
+		if (!nm) {
+			setStatus('Entre un pseudo.');
+			return '';
+		}
+		// A name the leaderboards' filter refuses (lib/names) is no name: the player is asked for another.
+		if (!setPlayerName(nm)) {
+			setStatus('Ce pseudo n’est pas accepté.');
+			return '';
+		}
 		return nm;
 	}, [name]);
 
 	const playQuick = useCallback(async () => {
 		const nm = ensureName();
-		if (!nm) { setStatus('Entre un pseudo.'); return; }
+		if (!nm) return;
 		curTeamRef.current = teamSize;
 		setStatus('Recherche d’un adversaire…');
 		const m = await joinRandom(nm, teamSize);
@@ -446,7 +454,7 @@ export default function FootGame({ gameId }: { gameId: string }) {
 
 	const playCreateCode = useCallback(async () => {
 		const nm = ensureName();
-		if (!nm) { setStatus('Entre un pseudo.'); return; }
+		if (!nm) return;
 		curTeamRef.current = teamSize;
 		const code = makeCode();
 		const m = await joinByCode(nm, code);
@@ -456,7 +464,7 @@ export default function FootGame({ gameId }: { gameId: string }) {
 
 	const playJoinCode = useCallback(async () => {
 		const nm = ensureName();
-		if (!nm) { setStatus('Entre un pseudo.'); return; }
+		if (!nm) return;
 		curTeamRef.current = teamSize;
 		const code = codeInput.trim().toUpperCase();
 		if (!code) { setStatus('Entre un code.'); return; }

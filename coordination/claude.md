@@ -883,3 +883,19 @@
   apprennent) et les pages de confidentialité. Non commité : en attente du feu vert de l'utilisateur.
 - 07:46 : commité et poussé à la demande de l'utilisateur : mes 3 fichiers et cette section seulement. Statut :
   terminé. Réservations libérées.
+
+## 2026-10-26 — Dragon's Gems Swipe : filtre de mots des pseudos (5 langues) (session website)
+- Statut : en cours (2026-10-26T01:59+01:00). Demande de l'utilisateur : Ok il faut ajouter un filtre sur les mots dans
+  les 5 langues
+- Réservations actives : `supabase/functions/_shared/names.ts`, `supabase/functions/submit-score/index.ts`,
+  `src/lib/leaderboard.ts`, `src/lib/names.ts`, `src/lib/names.test.ts`, `src/components/Leaderboard.tsx`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 02:09 : fait (non commité, non déployé) : supabase/functions/_shared/names.ts (FR, EN, ES, DE, IT), utilisé par
+  submit-score (un pseudo refusé devient « Anonyme », name_refused dans la réponse), src/lib/names.ts le réexporte pour
+  le site ; leaderboard.ts refuse et Leaderboard.tsx dit pourquoi ; Drift, Foot, Golf et Pong refusent aussi. eslint
+  OK, astro check 0 erreur, vitest 1537 OK, deno check OK.
+- 07:34 : submit-score déployé en production à la demande de l'utilisateur. Non commité.
+- 07:43 : Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 07:45 : build complet OK : astro check 0 erreur, 166 pages, précache 323 entrées, liens OK
+- 07:46 : commité et poussé à la demande de l'utilisateur : mes 10 fichiers et cette section seulement (submit-score
+  déjà déployé à 07:34). Statut : terminé. Réservations libérées.

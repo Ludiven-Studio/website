@@ -62,6 +62,7 @@ const TXT = {
 		empty: "Personne n'a encore joué aujourd'hui. À toi de lancer le classement !",
 		nick: 'Ton pseudo', nickLabel: 'Pseudo', ok: 'Valider', cancel: 'Annuler', nickIs: 'Pseudo :', change: 'Changer',
 		setNick: 'Définir un pseudo', crashed: 'Classement momentanément indisponible.',
+		nickRefused: 'Ce pseudo n’est pas accepté. Choisis-en un autre.',
 		seeAll: (n: number) => `Voir tout (${n})`, close: 'Fermer',
 	},
 	en: {
@@ -74,6 +75,7 @@ const TXT = {
 		empty: 'Nobody has played today yet. Be the first on the board!',
 		nick: 'Your nickname', nickLabel: 'Nickname', ok: 'Save', cancel: 'Cancel', nickIs: 'Nickname:', change: 'Change',
 		setNick: 'Set a nickname', crashed: 'Leaderboard unavailable for now.',
+		nickRefused: 'This nickname is not allowed. Pick another one.',
 		seeAll: (n: number) => `See all (${n})`, close: 'Close',
 	},
 	es: {
@@ -86,6 +88,7 @@ const TXT = {
 		empty: 'Nadie ha jugado todavía hoy. ¡Estrena tú la clasificación!',
 		nick: 'Tu apodo', nickLabel: 'Apodo', ok: 'Guardar', cancel: 'Cancelar', nickIs: 'Apodo:', change: 'Cambiar',
 		setNick: 'Elegir un apodo', crashed: 'Clasificación no disponible por ahora.',
+		nickRefused: 'Ese apodo no está permitido. Elige otro.',
 		seeAll: (n: number) => `Ver todo (${n})`, close: 'Cerrar',
 	},
 };
@@ -116,6 +119,7 @@ function LeaderboardInner({ game, metric, submitValue, format, source, actions =
 	const [name, setName] = useState<string>(() => playerName());
 	const [draft, setDraft] = useState('');
 	const [editing, setEditing] = useState(false);
+	const [nickRefused, setNickRefused] = useState(false);
 	const [shown, setShown] = useState<(Ranked | null)[]>([]);
 	const [total, setTotal] = useState(0);
 	const [myRank, setMyRank] = useState<number | null>(null);
@@ -245,9 +249,14 @@ function LeaderboardInner({ game, metric, submitValue, format, source, actions =
 	const save = () => {
 		const n = draft.trim().slice(0, 20);
 		if (!n) return;
-		setPlayerName(n);
+		// The leaderboards' filter (lib/names): an insult stays in the field, with why.
+		if (!setPlayerName(n)) {
+			setNickRefused(true);
+			return;
+		}
+		setNickRefused(false);
 		lastSubmittedRef.current = null; // allow submitting the pending run under the new name
-		setName(n);
+		setName(playerName());
 		setEditing(false);
 	};
 
@@ -368,7 +377,7 @@ function LeaderboardInner({ game, metric, submitValue, format, source, actions =
 								maxLength={20}
 								placeholder={t.nick}
 								value={draft}
-								onChange={(e) => setDraft(e.target.value)}
+								onChange={(e) => { setDraft(e.target.value); setNickRefused(false); }}
 								onKeyDown={(e) => e.key === 'Enter' && save()}
 								aria-label={t.nickLabel}
 								autoFocus
@@ -377,6 +386,7 @@ function LeaderboardInner({ game, metric, submitValue, format, source, actions =
 							{editing && (
 								<button className="lb-cancel" onClick={() => setEditing(false)}>{t.cancel}</button>
 							)}
+							{nickRefused && <p className="lb-refused" role="alert">{t.nickRefused}</p>}
 						</div>
 					) : (
 						<p className="lb-foot">
@@ -514,6 +524,7 @@ const CSS = `
 .lb-share-msg { font-size: 12.5px; font-weight: 600; color: var(--accent-regular); }
 
 .lb-name { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 0.9rem; }
+.lb-refused { flex-basis: 100%; margin: 0; text-align: center; color: var(--gray-200); font-size: 12.5px; }
 .lb-name input {
   font: inherit; color: var(--gray-0); background: var(--gray-999);
   border: 1.5px solid var(--gray-700); border-radius: 999px; padding: 6px 14px; min-width: 0; flex: 1;

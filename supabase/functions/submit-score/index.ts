@@ -6,6 +6,7 @@
 // Local:   supabase functions serve submit-score
 
 import { createClient } from 'jsr:@supabase/supabase-js@2.117.0';
+import { cleanPlayerName } from '../_shared/names.ts';
 
 const CORS = {
 	// Open CORS: the games are also embedded in iframes on third-party portals (CrazyGames).
@@ -81,7 +82,10 @@ Deno.serve(async (req) => {
 		? payload.duration_seconds : null;
 	// Audit data is a few fields; an unbounded jsonb would be free storage for anyone.
 	if (JSON.stringify(payload.raw_data ?? null).length > 8192) return bad('raw_data too large');
-	const playerName = String(payload.player_name ?? '').trim().slice(0, 20);
+	// The leaderboards' filter (_shared/names.ts, the site's and the app's too): an insult, a link or a tag is
+	// shown as « Anonyme ». The score stays; the answer says the name was refused.
+	const playerName = cleanPlayerName(payload.player_name);
+	const nameRefused = !playerName && String(payload.player_name ?? '').trim() !== '';
 	const isDaily = payload.is_daily_challenge === true;
 
 	const supabase = createClient(
@@ -127,7 +131,7 @@ Deno.serve(async (req) => {
 			raw_data: payload.raw_data ?? null, challenge_date: null,
 		});
 		if (error) return json({ error: 'insert failed' }, 500);
-		return json({ retained: true, best_score: score, attempts_left: null });
+		return json({ retained: true, best_score: score, attempts_left: null, name_refused: nameRefused });
 	}
 
 	// ---- Daily challenge: quota + best-score-retained upsert ----
@@ -197,6 +201,7 @@ Deno.serve(async (req) => {
 		retained,
 		best_score: bestScore,
 		attempts_left: game.max_attempts_per_day != null ? game.max_attempts_per_day - (attemptsUsed + 1) : null,
+		name_refused: nameRefused,
 		rank: (count ?? 0) + 1,
 	});
 });
