@@ -899,3 +899,18 @@
 - 07:45 : build complet OK : astro check 0 erreur, 166 pages, précache 323 entrées, liens OK
 - 07:46 : commité et poussé à la demande de l'utilisateur : mes 10 fichiers et cette section seulement (submit-score
   déjà déployé à 07:34). Statut : terminé. Réservations libérées.
+
+## 2026-10-26 — Dragon's Gems Swipe : le site garde ses 100 niveaux, les 250 sont pour l'app (session website)
+- Statut : en cours (2026-10-26T07:56+01:00). Demande de l'utilisateur : Mais les 250 niveaux étaient pour le projet
+  unity seulement
+- Réservations actives : `src/games/eclats/levels.ts`, `src/games/eclats/picks.ts`, `src/games/eclats/engine.test.ts`,
+  `scripts/eclats-levels.ts`.
+- Ressources : serveur de dev sur le port 4473 ; eslint, `astro check`. Build annoncé ici avant.
+- 08:00 : levels.ts : deux plans, SITE (100 niveaux en mondes de 20, Expert 101-200, joué par le site) et APP (250 en
+  contrées de 50, 251-500, porté par l'app) ; picks.ts : PICKS_SITE recalculé (identique à avant le commit des 250 hors
+  niveaux 1-20 et niveaux difficiles), PICKS_APP inchangé ; parity.json de l'app identique. vitest eclats 210/210,
+  eslint OK. Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 08:04 : build complet OK (astro check 0 erreur, 166 pages, précache 323 entrées, liens OK), check-eclats.mjs OK (port
+  4473, arrêté)
+- 08:04 : commité, push en attente de l'accord de l'utilisateur : mes 4 fichiers et cette section seulement. Statut :
+  terminé. Réservations libérées.

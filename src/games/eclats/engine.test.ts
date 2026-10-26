@@ -29,8 +29,7 @@ import {
 	type Step,
 } from './engine';
 import { playBot } from './bot';
-import { COUNT, FREE_LEVELS, eclatsLevels, levelConfig, starsLimit } from './levels';
-import { PICKS } from './picks';
+import { APP, FREE_LEVELS, SITE, eclatsLevels, levelConfig, starsLimit } from './levels';
 
 const CFG: EclatsCfg = { seed: 7, fifth: 0, goal: 0, chests: 0, locked: 0, chestEvery: 0, rocks: 0, ice: 0, fill: 0 };
 const B = N - 1; // the bottom row
@@ -494,15 +493,25 @@ describe('the swipe limit', () => {
 });
 
 describe('levels', () => {
+	it('the website has 100 levels in worlds of 20, the app the same climb over 250 in lands of 50', () => {
+		expect(SITE.count).toBe(100);
+		expect(SITE.worlds.map((w) => w.from)).toEqual([1, 21, 41, 61, 81, 101]);
+		expect(eclatsLevels.config(57)).toEqual(SITE.levelConfig(57));
+		expect(APP.count).toBe(250);
+		expect(APP.worlds.map((w) => w.from)).toEqual([1, 51, 101, 151, 201, 251]);
+	});
+
 	it('every level past the free ones lets the bot through with room, one in ten from 30 is harder, and its stars sit inside its limit', () => {
-		for (let l = 1; l <= 2 * COUNT; l++) {
-			const cfg = eclatsLevels.config(l);
-			const par = PICKS[l - 1][1];
-			if (l <= FREE_LEVELS) expect(cfg.limit).toBe(0);
-			else expect(cfg.limit).toBeGreaterThanOrEqual(par + 2);
-			expect(cfg.three).toBeLessThan(cfg.two);
-			expect(cfg.two).toBeLessThan(cfg.limit || starsLimit(par));
-			expect(cfg.hard).toBe(l % 10 === 0 && l >= 30);
+		for (const set of [SITE, APP]) {
+			for (let l = 1; l <= 2 * set.count; l++) {
+				const cfg = set.levels.config(l);
+				const par = set.picks[l - 1][1];
+				if (l <= FREE_LEVELS) expect(cfg.limit).toBe(0);
+				else expect(cfg.limit).toBeGreaterThanOrEqual(par + 2);
+				expect(cfg.three).toBeLessThan(cfg.two);
+				expect(cfg.two).toBeLessThan(cfg.limit || starsLimit(par));
+				expect(cfg.hard).toBe(l % 10 === 0 && l >= 30);
+			}
 		}
 	});
 
@@ -532,14 +541,16 @@ describe('levels', () => {
 
 	it('picks.ts matches the engine: the bot clears every level in the swipes recorded there', () => {
 		// Fails after a change to the engine, the bot or a board: rerun scripts/eclats-levels.ts.
-		expect(PICKS).toHaveLength(2 * COUNT);
-		const stale: number[] = [];
-		for (let l = 1; l <= 2 * COUNT; l++) {
-			const run = playBot(levelConfig(l));
-			if (!run.won || run.moves !== PICKS[l - 1][1]) stale.push(l);
+		const stale: string[] = [];
+		for (const [name, set] of [['site', SITE], ['app', APP]] as const) {
+			expect(set.picks).toHaveLength(2 * set.count);
+			for (let l = 1; l <= 2 * set.count; l++) {
+				const run = playBot(set.levelConfig(l));
+				if (!run.won || run.moves !== set.picks[l - 1][1]) stale.push(`${name} ${l}`);
+			}
 		}
 		expect(stale).toEqual([]);
-	}, 120_000);
+	}, 240_000);
 
 	it('stars ask for fewer swipes at 3★ than at 2★', () => {
 		for (const l of [1, 20, 21, 50, 99, 100, 150, 200]) {
