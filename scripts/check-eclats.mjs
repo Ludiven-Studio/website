@@ -1,6 +1,7 @@
 // Dragon's Gems Swipe (gameId eclats) in a real browser: the level opens on its ready gate, its drawn gems
 // and Bijou load, the arrow keys swipe the board, a finger swipe does too (CDP touch events on a
-// phone-sized page), the blocks a swipe would explode light up while the finger is still down, a run of
+// phone-sized page), the blocks a swipe would explode light up while the finger is still down, the ones
+// it would move lean its way and spring back on a short drag, a played swipe sweeps a band of light, a run of
 // swipes explodes blocks and opens chests big, their coins fill the loot, Bijou reacts, and the loot
 // goes to his treasure on a win (or is lost with the level), and in free play the destroyed gems fill
 // Bijou's gauge until a tap on him sends his fireballs, without a page error. Screenshots go to
@@ -201,16 +202,53 @@ try {
 			await page.waitForTimeout(20);
 			await touch('touchMove', [[box.x + vx * k * 12, box.y + vy * k * 12]]);
 		}
-		await page.waitForTimeout(120);
+		await page.waitForTimeout(200);
 		const lit = await page.locator('.ec-preview').count();
 		await page.screenshot({ path: `${OUT}/phone-preview.png` });
 		check('the blocks a swipe would explode light up while the finger is down', lit === Math.max(...counts), `${lit} lit, ${Math.max(...counts)} expected (${best})`);
+		// The blocks the swipe would move lean its way; the ones it would not move stay put.
+		const leans = () => page.evaluate(() => [...document.querySelectorAll('.ec-lean')].map((g) => {
+			const m = new DOMMatrix(getComputedStyle(g).transform);
+			return { on: g.classList.contains('on'), x: m.e, y: m.f };
+		}));
+		const moving = await page.evaluate((d) => window.__eclats.movingCount(d), best);
+		const held = await leans();
+		const pulled = held.filter((l) => l.on);
+		const along = (l) => l.x * vx + l.y * vy;
+		const across = (l) => Math.abs(l.x * vy) + Math.abs(l.y * vx);
+		check('a held swipe pulls the blocks it would move its way, and only those',
+			moving > 0 && pulled.length === moving && pulled.every((l) => along(l) > 0.5 && along(l) <= 1.5 + 1e-6 && across(l) < 0.01)
+				&& held.filter((l) => !l.on).every((l) => l.x === 0 && l.y === 0),
+			`${pulled.length} leaning, ${moving} would move, pull ${pulled.length ? along(pulled[0]).toFixed(2) : '-'} of 1.5 units`);
 		const before = (await state(page)).moves;
 		await touch('touchEnd', []);
 		await page.waitForTimeout(80);
 		const s = await state(page);
 		check('lifting the finger plays the swipe', s.moves === before + 1, `${before} → ${s.moves} moves`);
+		const swept = await page.locator(`.ec-sweep.${best}`).count();
+		await page.screenshot({ path: `${OUT}/phone-sweep.png` });
+		check('a played swipe sends a band of light across the board its way', swept === 1, `${swept} .ec-sweep.${best}`);
 		await idle(page);
+
+		// A finger lifted before the swipe threshold: no swipe, and the leaning blocks spring back.
+		const free = await page.evaluate((dirs) => dirs.find((d) => window.__eclats.movingCount(d) > 0) ?? null, DIRS);
+		if (free) {
+			const [fx, fy] = vec[free];
+			const was = (await state(page)).moves;
+			await touch('touchStart', [[box.x, box.y]]);
+			await touch('touchMove', [[box.x + fx * 6, box.y + fy * 6]]);
+			await touch('touchMove', [[box.x + fx * 11, box.y + fy * 11]]);
+			await page.waitForTimeout(150);
+			const short = (await leans()).filter((l) => l.on).length;
+			await touch('touchEnd', []);
+			await page.waitForTimeout(250);
+			const after = await leans();
+			check('a short drag leans the blocks, then they come back without a swipe',
+				short > 0 && after.every((l) => !l.on && Math.abs(l.x) < 1e-3 && Math.abs(l.y) < 1e-3) && (await state(page)).moves === was,
+				`${short} leaning while held (${free}), ${after.filter((l) => l.x || l.y).length} still off after`);
+		} else {
+			check('a short drag leans the blocks, then they come back without a swipe', false, 'no direction moves anything');
+		}
 
 		for (let k = 0; k < 6 && (await state(page)).phase === 'idle'; k++) {
 			const [dx, dy] = vec[DIRS[(k + 1) % 4]];

@@ -914,3 +914,19 @@
   4473, arrêté)
 - 08:04 : commité, push en attente de l'accord de l'utilisateur : mes 4 fichiers et cette section seulement. Statut :
   terminé. Réservations libérées.
+
+## 2026-10-26 — Dragon's Gems Swipe : les blocs penchent pendant le glissé, un balayage au coup (session website)
+- Statut : en cours (2026-10-26T08:32+01:00). Demande de l'utilisateur : quand on commence a swipe dans une direction
+  sans relâcher, cela pourrait faire bouger les gems et coffres concernés par un déplacement comme s ils étaient
+  attirés par une direction puis revenir rapidement a leu position. Une fois le swipe déclenché on pourrait avoir un fx
+  qui balayage l écran dans la direction souhaitée (dans les 2 : l'app est faite par la session Unity)
+- Réservations actives : `src/games/eclats/EclatsGame.tsx`, `scripts/check-eclats.mjs`.
+- Ressources : serveur de dev sur le port 4473 ; eslint, `astro check`. Build annoncé ici avant.
+- 08:41 : fait : pendant un glissé tenu, les blocs qu'il déplacerait penchent vers lui (jusqu'à 0,15 case, amorti),
+  reviennent en 120 ms au lâcher sans coup ; au coup joué, une bande de lumière traverse le plateau dans son sens (280
+  ms) ; rien de tout ça en mouvement réduit. check-eclats.mjs : 3 contrôles ajoutés (11 blocs penchés pour 11 qui
+  bougeraient, retour sans coup, balayage), tout passe. Lancement du build complet (écrit dist/, .astro/,
+  public/vendor/)…
+- 08:42 : build complet OK (astro check 0 erreur, 166 pages, précache 323 entrées, liens OK)
+- 08:42 : commité, push en attente de l'accord de l'utilisateur : mes 2 fichiers et cette section seulement ; l'app est
+  faite par la session Unity. Statut : terminé. Réservations libérées.
