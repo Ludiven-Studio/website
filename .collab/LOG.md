@@ -44,3 +44,11 @@ Une ligne par ticket : date · id · résumé · décision.
 - 2026-10-26 · 0048 · série des stores, de l'histoire et des cartes (Codex, images) · 12 images retenues : icône, bannière Play, histoire, fin, 4 contrées, patte, cadeau
 - 2026-10-26 · 0049 · revue des écrans avant les stores (Codex, revue) · 10 points : 7 retenus, 1 reporté, 1 rejeté (artefact de test), 1 déjà fait
 - 2026-10-26 · 0050 · revue marketing des visuels des stores (Codex, revue) · 8 points : ordre et légendes repris, bannière titrée, captures recadrées
+- 2026-10-27 · 0051 · revue des écrans du mini-jeu web (Codex, revue) · 10 points : 4 retenus, 3 en partie, 3 rejetés ou reportés (taille des coffres et des gemmes, bande « À venir »)
+- 2026-10-27 · 0052 · chasse aux bugs du composant web (Codex, revue) · 6 bugs, tous vérifiés et corrigés (défi chargé en retard, compteurs, reprise du défi, abandon)
+- 2026-10-27 · 0053 · deuxième regard sur les écrans du mini-jeu web (Codex, revue) · corrections confirmées ; 2 retenus (résumé des règles, carte 1), 2 rejetés (fausse cause, artefact de capture), 1 reporté (liste des niveaux commune)
+- 2026-10-27 · 0054 · relecture du diff de la nuit (Codex, revue) · 1 vrai défaut corrigé (quit jamais écrit à faux), doutes levés par mesure (aucun plateau muré sur ~6 000 parties)
+- 2026-10-27 · 0055 · effets en mouvement, sur planches d'images (Codex, revue) · 2 retenus (résumé effacé au glissé suivant, nom de gemme relevé), 5 à arbitrer par l'utilisateur (durées et styles d'effets)
+- 2026-10-27 · 0056 · relecture finale du diff de la nuit (Codex, revue) · 3 retenus : chronologie unique des éclats sous le souffle (gemmes chargées, comète), annonce de chaque coup au lecteur d'écran
+- 2026-10-27 · 0057 · les dix leçons (Codex, revue) · 1 retenu (niveau 9 : bandeau quand la jauge est pleine), 7 phrases proposées pour le site et l'app ensemble (parité)
+- 2026-10-27 · 0058 · moteur des règles (Codex, revue) · 2 points : plateau vide après un souffle (possible sur le papier, 0 fois sur 3 622 souffles mesurés, proposé pour le moteur et l'app), jauge non remplie par le souffle (voulu)

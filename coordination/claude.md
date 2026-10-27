@@ -1052,3 +1052,67 @@
   de l'utilisateur pour le commit
 - 13:44 : commité et poussé à la demande de l'utilisateur (« pousse tout ») : les morceaux de l'aller-retour dans mes 2
   fichiers, et cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-10-27 — Dragon's Gems Swipe : revue de nuit avec Codex (session website)
+- Statut : en cours (2026-10-27T01:24+01:00). Demande de l'utilisateur : Je vais dormir, je te laisse iterer jusqu'à 8h
+  avec codex pour voir et corriger des choses
+- Réservations actives : `src/games/eclats/`, `scripts/check-eclats.mjs`, `src/pages/jeux/eclats.astro`,
+  `src/data/tutorials.ts` (cartes eclats), `.collab/tickets/0051-*` et suivants, `.collab/out/0051/` et suivants,
+  `.collab/LOG.md`.
+- Ressources : serveur de dev sur le port 4473 ; eslint, `astro check`. Build annoncé ici avant.
+- 01:42 : tickets Codex 0051 (captures) et 0052 (bugs) répondus. Corrigé : 6 bugs (graine du défi arrivée après en être
+  sorti, ancienne partie jouable pendant le chargement du défi, vols de coffres d'une partie précédente qui dérèglent
+  les compteurs, coffre décadenassé qui perd sa valeur double à la reprise du défi, abandon pendant une cascade,
+  défaite du défi reprise comme abandon) ; à l'écran : plateau plein et jauge pleine = « Plus de place : Bijou peut
+  sauver la partie ! » + bouton Souffle, objectif écrit (« Ouvre 9 coffres en 11 coups maximum »), textes de fin,
+  coffre et pièce dessinés dans les compteurs, score lisible en sombre, Commencer cadre le plateau, règles repliées.
+  check-eclats.mjs : 33 contrôles (4 nouveaux), tous OK. Trouvé en passant : la fonction get_daily n'existe pas dans la
+  base (404 sur tous les défis du site, repli sur la graine du jour calculée en local) : signalé, rien touché.
+- 02:16 : deuxième tour Codex : tickets 0053 (écrans refaits) et 0054 (relecture du diff) répondus et clos. Corrigé :
+  un abandon du défi encore mal repris (quit toujours écrit), résumé des règles « de même couleur », première carte du
+  tutoriel (4 cartes au lieu de 8). Mesuré : aucun plateau muré par rochers ou glace sur ~6 000 parties.
+  check-eclats.mjs : 34 contrôles (dont la reprise d'un défi fini perdu ou abandonné), 4 passages OK ; vitest eclats
+  44/44.
+- 02:44 : mesures : fluidité au téléphone (processeur ralenti 4×, GPU) médiane 16,7 ms, 99e centile 50 ms, rien à
+  corriger ; WebKit (moteur de Safari) : aucune erreur, l'aller-retour marche. Trouvé sous WebKit : deux enfants React
+  avec la même clé (« Chaîne ×N » et le nom d'une gemme fusionnée prennent le même id d'effet, l'un des deux pouvait
+  disparaître) : clés séparées. check-eclats.mjs relève maintenant aussi les erreurs de la console (avertissements
+  React), 34 contrôles OK sur 3 passages. Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 02:46 : build complet OK (astro check 0 erreur, 166 pages, précache 324 entrées, liens OK)
+- 03:22 : vu sur une vidéo du jeu découpée en planches : le score du mode libre sautait au total du coup dès le glissé
+  (il monte maintenant vague par vague, comme coffres et butin), et pendant le souffle les gemmes des 2e et 3e boules
+  de feu disparaissaient avant leur arrivée (chaque zone attend sa boule, comme pour la comète). check-eclats.mjs : 2
+  contrôles de plus (score, boules de feu ; témoin sans le correctif : échoue), il relève aussi les erreurs de console
+  hors barre d'outils Astro ; 36 contrôles, 3 passages OK. Lancement du build complet (écrit dist/, .astro/,
+  public/vendor/)…
+- 03:23 : build complet OK (astro check 0 erreur, 166 pages, précache 324 entrées, liens OK)
+- 03:40 : ticket Codex 0055 (effets en mouvement, sur planches d'images) clos : le résumé du coup d'avant s'efface dès
+  le glissé suivant, le nom d'une gemme fusionnée (« Couronne ! ») monte au-dessus de sa case ; 5 réglages d'effets
+  laissés à l'utilisateur. Aussi : le lecteur d'écran annonce le résumé du coup (et « Plus de place ») au lieu de
+  chaque pièce du HUD ; sur ordinateur (900 px et plus), plateau jusqu'à 580 px au lieu de 440 (jamais plus petit,
+  l'objectif reste visible) et HUD un peu plus grand. check-eclats.mjs OK sur 2 passages.
+- 03:56 : ticket Codex 0056 (relecture finale) clos : sous le souffle, chaque bloc attend le délai de son propre éclat
+  (boules, gemmes chargées qu'elles déclenchent, comète) ; chaque coup est annoncé au lecteur d'écran. Aussi : les cinq
+  compteurs du défi tiennent sur une ligne au téléphone. check-eclats.mjs : 37 contrôles, 3 passages OK.
+- 03:56 : Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 03:58 : build complet OK (astro check 0 erreur, 166 pages, précache 324 entrées, liens OK) ; vitest eclats 44/44
+- 04:07 : WebKit (dev et build) : aucune erreur ni avertissement React, seul le 404 connu de get_daily. Planches
+  avant/après envoyées à l'utilisateur ; points utiles à l'app transmis à la session Unity pour information (rien à
+  faire sans l'utilisateur). Non commité : en attente du feu vert de l'utilisateur (avec l'aller-retour élastique,
+  section précédente, et la migration eclats-sommet, non déployée).
+- 04:12 : ticket Codex 0057 (les dix leçons, sur planches) clos : au niveau 9, le bandeau dit de toucher Bijou une fois
+  la jauge pleine ; les autres phrases proposées touchent aussi l'app (Levels.cs, parity.json) : laissées à
+  l'utilisateur. Mesuré : aucun niveau du site gagné moins de 10 fois sur 20 par un joueur type.
+- 04:16 : ticket Codex 0058 (moteur) clos : un plateau vidé par un souffle resterait bloqué, possible sur le papier
+  mais jamais vu sur 3 622 souffles au robot ; proposé à l'utilisateur pour le moteur et l'app, rien touché.
+- 04:17 : son : sfx.ts relance aussi l'audio laissé « interrupted » par Safari après un appel ou l'arrière-plan
+  (billard, bolides, pétanque et atelier ont le même code : signalé, pas touché). Plein écran vérifié au téléphone et
+  sur ordinateur, sombre vérifié. Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 04:24 : vérification finale : build complet OK (astro check 0 erreur, 166 pages, précache 324 entrées, liens OK),
+  vitest eclats 44/44, check-eclats.mjs 37/37 sur 2 passages, WebKit sur le build sans erreur. Non commité, non poussé
+  : en attente du feu vert de l'utilisateur. Fichiers de cette section : src/games/eclats/EclatsGame.tsx,
+  src/games/eclats/sfx.ts, src/data/tutorials.ts, scripts/check-eclats.mjs, .collab/tickets/0051 à 0058,
+  .collab/LOG.md.
+- 13:45 : commité et poussé à la demande de l'utilisateur (« pousse tout ») : EclatsGame.tsx, sfx.ts, tutorials.ts
+  (cartes eclats), check-eclats.mjs, tickets 0051 à 0058, LOG.md et cette section seulement. Statut : terminé.
+  Réservations libérées.

@@ -29,8 +29,14 @@ async function open(browser, opts) {
 	const page = await ctx.newPage();
 	const errors = [];
 	page.on('pageerror', (e) => errors.push(e.message));
-	// The dev server has no sw.js: that 404 is expected.
-	page.on('response', (r) => r.status() >= 400 && !r.url().endsWith('/sw.js') && errors.push(`${r.status()} ${r.url()}`));
+	// React's warnings too (a duplicate key once hid a chain or a gem's name); failed loads, the missing sw.js
+	// among them, are checked below.
+	const loads = /^Failed to load resource|^A bad HTTP response code \(404\) was received when fetching the script/;
+	const devBar = /^%cAstro/; // the dev toolbar's own audits, not the game
+	page.on('console', (m) => m.type() === 'error' && !loads.test(m.text()) && !devBar.test(m.text()) && errors.push(m.text().slice(0, 400)));
+	// The dev server has no sw.js: that 404 is expected. The database has no get_daily (seen 2026-10-27): every
+	// daily falls back to its seed of the day, computed the same on every device.
+	page.on('response', (r) => r.status() >= 400 && !r.url().endsWith('/sw.js') && !r.url().endsWith('/rpc/get_daily') && errors.push(`${r.status()} ${r.url()}`));
 	await page.goto(`${BASE}/jeux/eclats/`, { waitUntil: 'networkidle' });
 	await page.evaluate(() => {
 		localStorage.clear();
@@ -83,6 +89,8 @@ try {
 		const chips = await page.evaluate(() => [...document.querySelectorAll('.ec-hud .ec-chip')].map((c) => c.textContent).join(' | '));
 		check('level 1 takes as many swipes as it needs', s.limit === 0 && chips.includes('1 coup') && !chips.includes('restant'), `limit ${s.limit}, chips "${chips}"`);
 		await idle(page);
+		const said = await page.evaluate(() => document.querySelector('.ec-root [role="status"]')?.textContent ?? '');
+		check('a screen reader is told what the move did', /coffres? sur 3/.test(said), `"${said}"`);
 		// Did a chest ever pop out big in the flying layer? A mutation observer sees it even between polls.
 		await page.evaluate(() => {
 			window.__bigChest = false;
@@ -131,7 +139,14 @@ try {
 	/* ---- Free play: the gauge fills, a tap on Bijou sends his fireballs ---- */
 	{
 		const { page, errors } = await open(browser, { viewport: { width: 1280, height: 900 } });
+		// Into the daily and straight out: its seed, coming back late, must not deal the daily over free play.
+		await page.getByRole('tab', { name: /Défi/ }).click();
 		await page.getByRole('tab', { name: /Libre/ }).click();
+		await page.waitForTimeout(2500);
+		const late = await state(page);
+		const gate = await page.$('.ec-start');
+		check('a daily seed that comes back after leaving the daily changes nothing', late.mode === 'free' && late.phase === 'idle' && !gate,
+			`${late.mode} / ${late.phase}, ${gate ? 'a start gate' : 'no start gate'}`);
 		await until(page, (s) => s.mode === 'free' && s.phase === 'idle');
 		await page.evaluate(() => {
 			window.__seen = { ember: false, ball: false };
@@ -141,6 +156,24 @@ try {
 			}).observe(document.querySelector('.ec-flylayer'), { childList: true });
 		});
 		let s = await state(page);
+		// The score counts up as the waves go off: the engine has the swipe's total at once, the chip must not.
+		const chip = () => page.evaluate(() => Number(document.querySelector('.ec-hud .ec-chip strong')?.textContent.replace(/\D/g, '')));
+		{
+			const was = await chip();
+			await page.evaluate((dirs) => {
+				const c = dirs.map((d) => window.__eclats.previewCount(d));
+				window.__eclats.swipe(dirs[c.indexOf(Math.max(...c))]);
+			}, DIRS);
+			await page.waitForTimeout(60);
+			const early = await chip();
+			const total = (await state(page)).score;
+			await idle(page);
+			await page.waitForTimeout(150);
+			const end = await chip();
+			check('the score counts up with the explosions, not at the swipe', total > was && early === was && end === total,
+				`${was} → ${early} at 60 ms → ${end}, ${total} for the swipe`);
+			s = await state(page);
+		}
 		for (let k = 0; k < 40 && s.fire < s.fireFull && s.phase !== 'over'; k++) {
 			const counts = await page.evaluate((dirs) => dirs.map((d) => window.__eclats.previewCount(d)), DIRS);
 			await page.evaluate((d) => window.__eclats.swipe(d), DIRS[counts.indexOf(Math.max(...counts))]);
@@ -156,13 +189,44 @@ try {
 		const st = await state(page);
 		check('a full gauge glows and Bijou becomes a button', !ready, `mood ${st.mood}, shown ${st.shown.fire}/${st.fireFull}, ${st.flying} flying, ${st.phase}${ready ? ` — ${ready}` : ''}`);
 		await page.waitForTimeout(400); // the fill's last stretch is a 0.25 s transition
+		// Fill the board with swipes that explode nothing: only the breath can play then, and the board says so.
+		for (let k = 0; k < 40 && s.empty > 0; k++) {
+			const quiet = await page.evaluate((dirs) => dirs
+				.map((d) => ({ d, boom: window.__eclats.previewCount(d), moved: window.__eclats.movingCount(d) }))
+				.filter((o) => o.moved > 0)
+				.sort((a, b) => a.boom - b.boom)[0]?.d, DIRS);
+			if (!quiet) break;
+			await page.evaluate((d) => window.__eclats.swipe(d), quiet);
+			await page.waitForTimeout(40);
+			await idle(page);
+			s = await state(page);
+		}
+		const stuck = await page.waitForFunction(() => document.querySelector('.ec-stuck')?.textContent ?? '', null, { timeout: 4000 }).then((h) => h.jsonValue(), () => '');
+		check('a full board with a full gauge says only the breath can save it', s.empty === 0 && s.status === 'playing' && stuck.includes('Plus de place') && stuck.includes('Souffle'),
+			`${s.empty} empty, ${s.status}, "${stuck}"`);
 		await page.screenshot({ path: `${OUT}/breath-ready.png` });
 		const before = await state(page);
+		// When blocks leave the board: what each fireball hits must go as it lands, one after another. Taking them all at
+		// the first landing put the next ones 640 ms later at least; timers slip here, so 170 ms comes out at 200-500.
+		await page.evaluate(() => {
+			const svg = document.querySelector('.ec-svg');
+			const t0 = performance.now();
+			let n = svg.querySelectorAll('.ec-tug').length;
+			window.__drops = [];
+			window.__dropObs = new MutationObserver(() => {
+				const m = svg.querySelectorAll('.ec-tug').length;
+				if (m < n) window.__drops.push(Math.round(performance.now() - t0));
+				n = m;
+			});
+			window.__dropObs.observe(svg, { childList: true, subtree: true });
+		});
 		await page.click('.ec-bijou.tap');
-		await page.waitForTimeout(330);
-		await page.screenshot({ path: `${OUT}/breath-flight.png` });
 		await idle(page);
 		const after = await state(page);
+		const drops = await page.evaluate(() => { window.__dropObs.disconnect(); return window.__drops; });
+		const gap = drops.length > 1 ? drops[1] - drops[0] : null;
+		check('the fireballs land one after another, each taking its blocks as it lands', gap !== null && gap >= 100 && gap <= 600,
+			`blocks left at ${drops.slice(0, 4).join(', ')} ms`);
 		const ball = await page.evaluate(() => window.__seen.ball);
 		check(
 			'a tap on Bijou sends his fireballs: the gauge empties, the board makes room, no swipe spent',
@@ -171,8 +235,37 @@ try {
 		);
 		await page.waitForTimeout(800);
 		s = await state(page);
-		check('the gauge shows empty again, Bijou back to his perch', s.shown.fire === 0 && !(await page.$('.ec-bijou.tap')), `shown ${s.shown.fire}, mood ${s.mood}`);
+		const stillStuck = !!(await page.$('.ec-stuck'));
+		check('the gauge shows empty again, Bijou back to his perch, the board free', s.shown.fire === 0 && !(await page.$('.ec-bijou.tap')) && !stillStuck,
+			`shown ${s.shown.fire}, mood ${s.mood}${stillStuck ? ', still says stuck' : ''}`);
 		check('breath: no page error', errors.length === 0, errors.slice(0, 3).join(' | ') || 'none');
+		await page.context().close();
+	}
+
+	/* ---- Daily: an ended run comes back with how it really ended ---- */
+	{
+		const { page, errors } = await open(browser, { viewport: { width: 1280, height: 900 } });
+		await page.getByRole('tab', { name: /Défi/ }).click();
+		await until(page, (s) => s.mode === 'daily' && s.phase === 'ready');
+		await page.click('.ec-start');
+		await until(page, (s) => s.phase === 'idle');
+		await page.evaluate((dirs) => window.__eclats.swipe(dirs.find((d) => window.__eclats.movingCount(d) > 0)), DIRS);
+		await idle(page);
+		// The saved attempt, turned into an ended one: lost on a full board, then given up.
+		const ends = [];
+		for (const quit of [false, true]) {
+			await page.evaluate((quit) => {
+				const key = Object.keys(localStorage).find((k) => k.startsWith('ludiven-dailyrun-eclats-'));
+				const run = JSON.parse(localStorage.getItem(key));
+				localStorage.setItem(key, JSON.stringify({ ...run, done: true, abandoned: true, finalTime: 1234, state: { ...run.state, quit } }));
+			}, quit);
+			await page.reload({ waitUntil: 'networkidle' });
+			await page.getByRole('tab', { name: /Défi/ }).click();
+			ends.push(await page.waitForFunction(() => document.querySelector('.ec-card h2')?.textContent ?? '', null, { timeout: 10000 }).then((h) => h.jsonValue(), () => ''));
+		}
+		check('a daily lost on a full board comes back lost, a given-up one given up', ends[0] === 'Le plateau est plein' && ends[1] === 'Défi abandonné',
+			ends.map((e) => `"${e}"`).join(' then '));
+		check('daily: no page error', errors.length === 0, errors.slice(0, 3).join(' | ') || 'none');
 		await page.context().close();
 	}
 
@@ -188,6 +281,18 @@ try {
 		}
 		await page.tap('.ec-start');
 		await until(page, (x) => x.phase === 'idle');
+		// Commencer scrolls the page down to the game: wait until it stops before touching the board.
+		await page.waitForFunction(() => new Promise((done) => {
+			const y = scrollY;
+			setTimeout(() => done(scrollY === y), 150);
+		}), null, { timeout: 5000, polling: 200 });
+		const framed = await page.evaluate(() => {
+			const tag = document.querySelector('.ec-tag').getBoundingClientRect();
+			const board = document.querySelector('.ec-boardwrap').getBoundingClientRect();
+			return { tag: Math.round(tag.top), bottom: Math.round(board.bottom), h: innerHeight };
+		});
+		check('Commencer brings the goal and the whole board into view', framed.tag >= 0 && framed.bottom <= framed.h,
+			`goal at ${framed.tag} px, board bottom at ${framed.bottom} of ${framed.h} px`);
 		const cdp = await page.context().newCDPSession(page);
 		const touch = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts.map(([x, y], i) => ({ x, y, id: i + 1 })) });
 		const box = await page.evaluate(() => { const r = document.querySelector('.ec-boardwrap').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });

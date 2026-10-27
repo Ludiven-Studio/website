@@ -59,7 +59,8 @@ export function setEnabled(on: boolean): void {
 export function unlock(): void {
 	if (!isEnabled()) return;
 	const c = ensureCtx();
-	if (c && c.state === 'suspended') c.resume().catch(() => { /* stays silent */ });
+	// Safari also leaves it 'interrupted' after a call or a while in the background.
+	if (c && c.state !== 'running' && c.state !== 'closed') c.resume().catch(() => { /* stays silent */ });
 }
 
 function gate(kind: string, minGapMs: number): AudioContext | null {

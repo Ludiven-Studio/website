@@ -129,7 +129,8 @@ const KINDS: Kind[] = ['gem', 'chest', 'rock'];
 
 interface SavedRun {
 	v: number;
-	cells: ([number, number, number, number, number] | null)[]; // kind, colour, ice, lock, rank
+	// kind, colour, ice, lock, rank, and whether a chest was ever locked (it pays double once open)
+	cells: ([number, number, number, number, number, number?] | null)[];
 	moves: number;
 	arrivals: number;
 	centred: number;
@@ -137,11 +138,12 @@ interface SavedRun {
 	score: number;
 	butin: number;
 	fire?: number; // absent from runs saved before the gauge
+	quit?: boolean; // given up; absent from runs saved before it, whose `abandoned` is set by any loss
 }
 
-const packRun = (s: State, butin: number): SavedRun => ({
+const packRun = (s: State, butin: number, locked: Set<number>, quit = false): SavedRun => ({
 	v: GEN_V,
-	cells: s.cells.map((b) => (b ? [KINDS.indexOf(b.kind), b.color, b.ice ? 1 : 0, b.lock ? 1 : 0, b.rank] : null)),
+	cells: s.cells.map((b) => (b ? [KINDS.indexOf(b.kind), b.color, b.ice ? 1 : 0, b.lock ? 1 : 0, b.rank, locked.has(b.id) ? 1 : 0] : null)),
 	moves: s.moves,
 	arrivals: s.arrivals,
 	centred: s.centred,
@@ -149,6 +151,7 @@ const packRun = (s: State, butin: number): SavedRun => ({
 	score: s.score,
 	butin,
 	fire: s.fire,
+	quit,
 });
 
 const isCurrentRun = (saved: unknown): boolean => (saved as SavedRun | null)?.v === GEN_V;
@@ -247,6 +250,7 @@ const noteLocked = (seen: Set<number>, cells: (Block | null)[]): void => {
 	for (const b of cells) if (b?.kind === 'chest' && b.lock) seen.add(b.id);
 };
 const fmtGold = (n: number): string => n.toLocaleString('fr-FR');
+const chestsWord = (n: number): string => `${n} coffre${n > 1 ? 's' : ''}`;
 
 /**
  * Bijou on his pile of gold, at the board's corner. He blinks at rest; the game sets his mood. With
@@ -499,24 +503,27 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 	const [grew, setGrew] = useState(0);
 	const [endGain, setEndGain] = useState(0);
 	const [pour, setPour] = useState(false); // the gauge pours into Bijou as he breathes
+	const [said, setSaid] = useState(''); // what a screen reader is told after a move
 
 	const sRef = useRef<State | null>(null);
 	const phaseRef = useRef<Phase>('idle');
 	const modeRef = useRef<Mode>('free');
 	const runRef = useRef(0); // the timeline playing now; a new deal cancels it
+	const quitRef = useRef(false); // the daily was given up mid-move: it ends once the move does
+	const dailyAsk = useRef(0); // the daily's latest seed request; a board change drops an older answer
 	const fastRef = useRef(false); // a finger held on the board speeds the cascade up
 	const startRef = useRef(0);
 	const menuRef = useRef(false);
 	const fxId = useRef(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const boardRef = useRef<HTMLDivElement>(null);
-	const onEndRef = useRef<(s: State) => void>(() => {});
+	const onEndRef = useRef<(s: State, quit?: boolean) => void>(() => {});
 	const rootRef = useRef<HTMLDivElement>(null);
 	const flyRef = useRef<HTMLDivElement>(null); // the layer the opening chests and their coins fly in
 	const chestChip = useRef<HTMLSpanElement>(null);
 	const goldChip = useRef<HTMLSpanElement>(null);
 	const butinRef = useRef(0); // the run's loot, counted as soon as a chest opens
-	const shownRef = useRef({ opened: 0, butin: 0, fire: 0 }); // what the counters and the gauge show: they move as things land
+	const shownRef = useRef({ opened: 0, butin: 0, fire: 0, score: 0 }); // what the counters and the gauge show: they move as things land
 	const showsRef = useRef({ token: 0, pending: 0, started: 0 }); // a new deal bumps the token: old flights stop counting
 	const lockedRef = useRef(new Set<number>()); // chests that had a padlock: worth double
 	const reactRef = useRef<{ mood: Mood; until: number; timer: number }>({ mood: 'idle', until: 0, timer: 0 });
@@ -559,7 +566,7 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 	/** Once the move is over and nothing flies any more, the counters show the true values. */
 	const settleShows = useCallback(() => {
 		if (showsRef.current.pending > 0 || phaseRef.current === 'busy') return;
-		shownRef.current = { opened: sRef.current?.opened ?? 0, butin: butinRef.current, fire: sRef.current?.fire ?? 0 };
+		shownRef.current = { opened: sRef.current?.opened ?? 0, butin: butinRef.current, fire: sRef.current?.fire ?? 0, score: sRef.current?.score ?? 0 };
 		bump();
 	}, [bump]);
 
@@ -569,7 +576,7 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 		showsRef.current.pending = 0;
 		flyRef.current?.replaceChildren();
 		butinRef.current = butin;
-		shownRef.current = { opened, butin, fire };
+		shownRef.current = { opened, butin, fire, score: sRef.current?.score ?? 0 };
 		lockedRef.current.clear();
 		clearTimeout(reactRef.current.timer);
 		reactRef.current.until = 0;
@@ -591,6 +598,8 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 		const land = (): void => {
 			if (landed) return;
 			landed = true;
+			// A flight from the board before is not one the new board waits for.
+			if (token !== shows.token) return;
 			shows.pending = Math.max(0, shows.pending - 1);
 			settleShows();
 		};
@@ -834,6 +843,8 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 	/** Deal a fresh game on `cfg`. `go` starts it at once (free play); else the ready gate. */
 	const deal = useCallback((cfg: EclatsCfg, go: boolean) => {
 		runRef.current++;
+		dailyAsk.current++;
+		quitRef.current = false;
 		const st = createGame(cfg);
 		sRef.current = st;
 		resetShows(0, 0, 0);
@@ -845,6 +856,7 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 		setLabel(null);
 		setChain(null);
 		setToast(null);
+		setSaid('');
 		setGaveUp(false);
 		setNewRecord(false);
 		setEndGain(0);
@@ -876,6 +888,7 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 		setMode('levels');
 		modeRef.current = 'levels';
 		setAlreadyPlayed(false);
+		setDailyLoading(false);
 		deal(cfg, false);
 	}, [lv, deal]);
 
@@ -906,15 +919,18 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 			const cfg = { ...DAILY[t].cfg, seed: run.seed };
 			deal(cfg, false);
 			const back = unpackRun(run.state, cfg);
+			const kept = run.state as SavedRun;
 			if (back) {
 				sRef.current = back;
-				resetShows(back.opened, (run.state as SavedRun).butin ?? 0, back.fire);
+				resetShows(back.opened, kept.butin ?? 0, back.fire);
 				noteLocked(lockedRef.current, back.cells);
+				kept.cells.forEach((c, i) => { const b = back.cells[i]; if (c?.[5] && b) lockedRef.current.add(b.id); });
 				setCells(back.cells.map((b) => (b ? { ...b } : null)));
 			}
 			if (run.done) {
 				setAlreadyPlayed(true);
-				setGaveUp(!!run.abandoned);
+				// Runs saved before `quit` only had `abandoned`, which a full board sets too.
+				setGaveUp(kept.quit ?? !!run.abandoned);
 				setElapsed(run.finalTime ?? 0);
 				sRef.current!.status = run.abandoned ? 'lost' : 'won';
 				setPhase('over');
@@ -929,7 +945,12 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 		}
 		setAlreadyPlayed(false);
 		setDailyLoading(true);
+		// The board left behind stops playing and takes no input while the seed loads: it is not the daily.
+		runRef.current++;
+		setPhase('busy');
+		const ask = ++dailyAsk.current;
 		const { seed, diffIndex } = await getDaily(gameId);
+		if (ask !== dailyAsk.current || modeRef.current !== 'daily') return;
 		dailySeedRef.current = { seed, diffIndex };
 		const t = tierOf(diffIndex);
 		setTierKey(t);
@@ -946,9 +967,16 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 		setElapsed(0);
 		setPhase('idle');
 		trackGame(gameId, 'game_started');
+		// The page opens on its header: bring the goal, the counters and the board into view.
+		const tag = rootRef.current?.querySelector('.ec-tag');
+		const board = boardRef.current?.getBoundingClientRect();
+		if (tag && board && board.bottom > innerHeight && !document.fullscreenElement && !document.documentElement.classList.contains('gf-full')) {
+			const by = Math.min(board.bottom - innerHeight + 12, tag.getBoundingClientRect().top - 8);
+			if (by > 0) window.scrollBy({ top: by, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+		}
 		if (modeRef.current === 'daily') {
 			const sd = dailySeedRef.current;
-			saveDailyRun(gameId, { startedAt: startRef.current, done: false, seed: sd?.seed, diffIndex: sd?.diffIndex, state: packRun(st, butinRef.current) });
+			saveDailyRun(gameId, { startedAt: startRef.current, done: false, seed: sd?.seed, diffIndex: sd?.diffIndex, state: packRun(st, butinRef.current, lockedRef.current) });
 		}
 	}, [gameId, setPhase]);
 
@@ -1016,14 +1044,19 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 					if (runRef.current !== my) return;
 					setGlow([]);
 				}
-				setFx({ id: ++fxId.current, ...timeFx(step, balls) });
-				// What a comet catches stays on the board until it lands.
+				const timed = timeFx(step, balls);
+				setFx({ id: ++fxId.current, ...timed });
+				shownRef.current.score += step.points;
+				// What a comet catches stays on the board until it lands. Under Bijou's breath every block stays until
+				// its blast reaches it: the fireballs land BALL_GAP apart, and what they set off goes after them.
 				const late = step.popped.filter((p) => p.late);
-				if (late.length) {
+				const goneAt = new Map(timed.pops.map((p, k) => [p.cell, balls.length ? Math.round(p.delay / 40) * 40 : step.popped[k].late ? COMET_MS : 0]));
+				const showAt = (ms: number): void => {
 					const mid = step.cells.slice();
-					for (const p of late) mid[p.cell] = shown[p.cell];
+					for (const p of step.popped) if ((goneAt.get(p.cell) ?? 0) > ms) mid[p.cell] = shown[p.cell];
 					show(mid);
-				} else show(step.cells);
+				};
+				showAt(0);
 				// A fireball thumps as it lands; its gems feed nothing, the gauge was just spent.
 				if (!balls.length) {
 					sfx.pop(step.wave, step.popped.filter((p) => p.kind === 'gem').length);
@@ -1043,7 +1076,7 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 					const gold = CHEST_GOLD * step.wave * (lockedRef.current.has(p.id) ? 2 : 1);
 					butinRef.current += gold;
 					showsRef.current.pending++;
-					const landing = balls.length ? BALL_GAP * Math.max(0, balls.findIndex((b) => cheb(b, p.cell) <= 1)) + 40 : p.late ? COMET_MS : 40;
+					const landing = (goneAt.get(p.cell) ?? 0) + 40;
 					window.setTimeout(() => chestShow(p.cell, gold, token), landing + k * 200);
 				});
 				const named = step.fused.filter((f) => f.rank >= 3).sort((a, b) => b.rank - a.rank)[0];
@@ -1054,31 +1087,38 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 				else if (step.opened.length) reactTo('wow');
 				if (step.wave >= 3 || step.releases.length >= 2 || top >= 3 || step.comets.length) setShake((x) => x + 1);
 				bump();
-				if (late.length) {
-					// The flight is not sped up: the screen must show the comet land before its catch goes.
-					await wait(COMET_MS);
+				// Not sped up: the screen must show a comet or a fireball land before its catch goes.
+				let at = 0;
+				const marks = [...new Set([...goneAt.values(), ...(late.length ? [COMET_MS] : [])])].filter((ms) => ms > 0).sort((a, b) => a - b);
+				for (const ms of marks) {
+					await wait(ms - at);
 					if (runRef.current !== my) return;
-					show(step.cells);
-					const lateTop = Math.max(0, ...step.releases.filter((z) => z.late).map((z) => z.rank));
-					sfx.blast(Math.max(2, lateTop));
-					if (late.some((p) => p.kind === 'chest')) sfx.chest();
+					if (late.length && at < COMET_MS && ms >= COMET_MS) {
+						const lateTop = Math.max(0, ...step.releases.filter((z) => z.late).map((z) => z.rank));
+						sfx.blast(Math.max(2, lateTop));
+						if (late.some((p) => p.kind === 'chest')) sfx.chest();
+					}
+					at = ms;
+					showAt(ms);
 				}
-				await wait(POP_MS * pace(waves) + Math.max(0, balls.length - 1) * BALL_GAP);
+				await wait(POP_MS * pace(waves));
 			}
 		}
 		if (runRef.current !== my) return;
 		setEnter({ ids: new Set(), centre: -1, dir });
 		const gained = st.score - pointsBefore;
-		if (waves >= 2 || opened || balls.length) {
-			const parts = [
-				balls.length ? '🔥 Souffle de Bijou' : '',
-				waves >= 2 ? `Chaîne ×${waves}` : '',
-				modeRef.current === 'free' ? `+${gained} points` : '',
-				opened ? `🎁 ${opened} coffre${opened > 1 ? 's' : ''}` : '',
-			].filter(Boolean);
-			setToast({ id: ++fxId.current, text: parts.join(' · ') });
-		}
-		if (st.status === 'playing' && outOfMoves(st)) setToast({ id: ++fxId.current, text: '🔥 Plus de coups : le souffle de Bijou est ta dernière chance !' });
+		const parts = [
+			balls.length ? '🔥 Souffle de Bijou' : '',
+			waves >= 2 ? `Chaîne ×${waves}` : '',
+			modeRef.current === 'free' ? `+${gained} points` : '',
+			opened ? `🎁 ${opened} coffre${opened > 1 ? 's' : ''}` : '',
+		].filter(Boolean);
+		if (waves >= 2 || opened || balls.length) setToast({ id: ++fxId.current, text: parts.join(' · ') });
+		// Every move is read out once, where the HUD itself changes with every coin and spark.
+		const count = modeRef.current === 'free'
+			? `${st.score} points en tout`
+			: `${chestsWord(st.opened)} sur ${st.cfg.goal}${st.limit > 0 ? `, ${movesLeft(st)} coup${movesLeft(st) > 1 ? 's' : ''} restant${movesLeft(st) > 1 ? 's' : ''}` : ''}`;
+		setSaid([...parts, count].join(' · '));
 		if (st.status !== 'playing') {
 			setPhase('over');
 			onEndRef.current(st);
@@ -1086,7 +1126,7 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 			setPhase('idle');
 			if (modeRef.current === 'daily') {
 				const sd = dailySeedRef.current;
-				saveDailyRun(gameId, { startedAt: startRef.current, done: false, seed: sd?.seed, diffIndex: sd?.diffIndex, state: packRun(st, butinRef.current) });
+				saveDailyRun(gameId, { startedAt: startRef.current, done: false, seed: sd?.seed, diffIndex: sd?.diffIndex, state: packRun(st, butinRef.current, lockedRef.current) });
 			}
 		}
 		settleShows();
@@ -1108,6 +1148,7 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 		}
 		sfx.swipe();
 		setSweep({ id: ++fxId.current, dir });
+		setToast(null); // the last swipe's summary would cover the bottom row
 		if (st.moves === 1 && modeRef.current === 'free') trackGame(gameId, 'game_started');
 		void runSteps(steps, dir);
 	}, [gameId, runSteps]);
@@ -1239,7 +1280,7 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 
 	/* ---------- End of a run ---------- */
 
-	onEndRef.current = (st: State) => {
+	onEndRef.current = (st: State, quit = false) => {
 		const centis = Math.round((Date.now() - startRef.current) / 10);
 		setElapsed(centis);
 		const m = modeRef.current;
@@ -1266,7 +1307,7 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 				abandoned: st.status !== 'won',
 				seed: sd?.seed,
 				diffIndex: sd?.diffIndex,
-				state: packRun(st, butinRef.current),
+				state: packRun(st, butinRef.current, lockedRef.current, quit),
 			};
 			saveDailyRun(gameId, snapshot);
 			setAlreadyPlayed(true);
@@ -1280,15 +1321,22 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 
 	const giveUp = useCallback(() => {
 		const st = sRef.current;
-		if (!st) return;
+		if (!st || st.status !== 'playing') return;
+		// Mid-move, the chests of its later waves have not paid their coins yet: give up once it ends.
+		if (phaseRef.current === 'busy') {
+			quitRef.current = true;
+			return;
+		}
+		quitRef.current = false;
 		runRef.current++;
 		st.status = 'lost';
 		setGaveUp(true);
 		setPhase('over');
-		onEndRef.current(st);
+		onEndRef.current(st, true);
 		bump();
 		trackGame(gameId, 'solution_shown');
 	}, [bump, gameId, setPhase]);
+	useEffect(() => { if (phase === 'idle' && quitRef.current) giveUp(); }, [phase, giveUp]);
 
 	const toggleSound = () => {
 		const on = !sfx.isEnabled();
@@ -1343,12 +1391,14 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 	const shownFire = shownRef.current.fire;
 	const fireFull = !!s && s.status === 'playing' && phase !== 'ready' && !pour && shownFire >= FIRE_FULL;
 	const canTap = fireFull && phase === 'idle' && !lv.menu && !!s && canBreathe(s);
+	// No swipe can play any more: only his breath saves the run, so it is said over the board.
+	const stuck = canTap && !!s && (s.cells.every((b) => b) || outOfMoves(s));
 	useEffect(() => { if (fireFull) sfx.ready(); }, [fireFull]);
 	const mood: Mood = over ? (won ? 'dance' : 'sad') : react ?? (fireFull ? 'ready' : crowded ? 'scared' : sleepy ? 'sleep' : 'idle');
 	moodRef.current = mood;
 	const shownOpened = shownRef.current.opened;
 	const goldChipEl = (
-		<span ref={goldChip} className="ec-chip gold" title="Le butin des coffres ouverts">🪙 <strong>{fmtGold(shownRef.current.butin)}</strong></span>
+		<span ref={goldChip} className="ec-chip gold" title="Le butin des coffres ouverts">{sprites ? <img className="ec-chip-ico" src={art('coin')} alt="" /> : '🪙'} <strong>{fmtGold(shownRef.current.butin)}</strong></span>
 	);
 
 	return (
@@ -1368,10 +1418,25 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 
 			{mode === 'levels' ? (
 				<div className="ec-tag">
-					{lv.menu ? 'Progression — réussis un niveau pour débloquer le suivant' : <>{world?.name} · Niveau {lv.level}{cfgLv?.hard ? ' · 🔥 difficile' : ''}{cfgLv ? ` · ★★★ en ${cfgLv.three} coups` : ''}</>}
+					{lv.menu ? 'Progression — réussis un niveau pour débloquer le suivant' : (
+						<>
+							{world?.name} · Niveau {lv.level}{cfgLv?.hard ? ' · 🔥 difficile' : ''}
+							{s && (
+								<span className="ec-goal">
+									Ouvre {chestsWord(s.cfg.goal)}{s.limit > 0 ? ` en ${s.limit} coups maximum` : ''}
+									{cfgLv ? <small>★★★ en {cfgLv.three} coups ou moins</small> : null}
+								</span>
+							)}
+						</>
+					)}
 				</div>
 			) : mode === 'daily' ? (
-				<div className="ec-tag">{dailyLoading ? 'Préparation du défi…' : `Défi du jour · ${dailyWeekdayLabel()} · ${DAILY[tierKey].label}`}</div>
+				<div className="ec-tag">
+					{dailyLoading ? 'Préparation du défi…' : <>
+						Défi du jour · {dailyWeekdayLabel()} · {DAILY[tierKey].label}
+						{s && <span className="ec-goal">Ouvre {chestsWord(s.cfg.goal)} en un minimum de coups</span>}
+					</>}
+				</div>
 			) : lv.booting ? null : (
 				<div className="ec-pills" role="tablist" aria-label="Difficulté">
 					{withExpert(TIER_ORDER, gameId).map((k) => (
@@ -1385,22 +1450,23 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 			{novelty && !over && <p className="ec-novelty">Nouveau : {novelty}</p>}
 			{lesson && !over && (
 				<p className="ec-novelty ec-lesson">
-					💡 {lesson}
+					{/* The breath's lesson says what to do once its first swipe has filled the gauge. */}
+					💡 {fireFull && cfgLv?.fire != null ? 'La jauge est pleine ! Touche Bijou : il crache trois boules de feu, d’abord sur les coffres.' : lesson}
 					{guide.length > 0 && cfgLv?.hint ? <strong> Essaie vers {HINT_WORDS[cfgLv.hint]}.</strong> : null}
 				</p>
 			)}
 
 			{s && (
-				<div className="ec-hud" aria-live="polite">
+				<div className="ec-hud">
 					{mode === 'free' ? (
 						<>
-							<span className="ec-chip">⭐ <strong>{s.score}</strong>{record ? <small> · record {record}</small> : null}</span>
+							<span className="ec-chip">⭐ <strong>{shownRef.current.score}</strong>{record ? <small> · record {record}</small> : null}</span>
 							<span className="ec-chip" title="Tous les quelques coups, un peu plus de la cinquième couleur">Palier {step + 1}<small> · {toNext} coup{toNext > 1 ? 's' : ''}</small></span>
 							{goldChipEl}
 						</>
 					) : (
 						<>
-							<span ref={chestChip} className="ec-chip">🎁 <strong>{shownOpened}</strong>/{s.cfg.goal}</span>
+							<span ref={chestChip} className="ec-chip" title="Coffres ouverts sur le nombre à ouvrir">{sprites ? <img className="ec-chip-ico" src={art('chest')} alt="" /> : '🎁'} <strong>{shownOpened}</strong>/{s.cfg.goal}</span>
 							{s.limit > 0 ? (
 								<span className={`ec-chip${movesLeft(s) <= 3 && !over ? ' low' : ''}`} title="Coups restants : sans coup, le niveau est perdu">
 									👆 <strong>{movesLeft(s)}</strong> coup{movesLeft(s) > 1 ? 's' : ''} <small>restant{movesLeft(s) > 1 ? 's' : ''}</small>
@@ -1623,26 +1689,35 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 					<div className="ec-loading">Préparation…</div>
 				)}
 
-				{sweep && <div key={sweep.id} className={`ec-sweep ${sweep.dir}`} aria-hidden="true" onAnimationEnd={() => setSweep(null)} />}
+				{/* Keyed apart: a wave's chain and label take the same fx id. */}
+				{sweep && <div key={`sweep${sweep.id}`}className={`ec-sweep ${sweep.dir}`} aria-hidden="true" onAnimationEnd={() => setSweep(null)} />}
 
-				{chain && <div key={chain.id} className={`ec-chain w${Math.min(5, chain.wave)}`}>Chaîne ×{chain.wave}</div>}
+				{chain && <div key={`chain${chain.id}`} className={`ec-chain w${Math.min(5, chain.wave)}`}>Chaîne ×{chain.wave}</div>}
 				{label && (
 					<div
-						key={label.id}
+						key={`label${label.id}`}
 						className="ec-label"
-						style={{ left: `${Math.min(80, Math.max(20, ((cx(label.cell) + 1.5) / (N * U + 3)) * 100))}%`, top: `${Math.max(14, ((cy(label.cell) + 1.5) / (N * U + 3)) * 100)}%` }}
+						style={{ left: `${Math.min(80, Math.max(20, ((cx(label.cell) + 1.5) / (N * U + 3)) * 100))}%`, top: `${Math.min(78, Math.max(14, ((cy(label.cell) + 1.5 - 0.8 * U) / (N * U + 3)) * 100))}%` }}
 						onAnimationEnd={() => setLabel(null)}
 					>
 						{label.text}
 					</div>
 				)}
-				{toast && <div key={toast.id} className="ec-toast" onAnimationEnd={() => setToast(null)}>{toast.text}</div>}
+				{toast && <div key={`toast${toast.id}`} className="ec-toast" onAnimationEnd={() => setToast(null)}>{toast.text}</div>}
+				<p className="sr-only" role="status">{stuck && s ? `${outOfMoves(s) ? 'Plus de coups' : 'Plus de place'} : touche Bijou pour son souffle.` : said}</p>
 
 				{dailyLoading && <div className="ec-overlay"><div className="ec-card">Préparation…</div></div>}
 
 				{phase === 'ready' && !dailyLoading && s && !lv.menu && (
 					<div className="ec-overlay">
 						<button className="ec-start" onClick={begin}>{mode === 'levels' ? `▶ Niveau ${lv.level} — Commencer` : '▶ Commencer'}</button>
+					</div>
+				)}
+
+				{stuck && s && (
+					<div className="ec-overlay ec-stuck">
+						<p className="ec-stuck-why">{outOfMoves(s) ? 'Plus de coups' : 'Plus de place'} : Bijou peut sauver la partie !</p>
+						<button className="ec-start" onClick={doBreathe}>🔥 Souffle de Bijou</button>
 					</div>
 				)}
 
@@ -1678,8 +1753,10 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 						stars={lv.stars}
 						detail={
 							lv.won
-								? `${s?.moves ?? 0} coups${cfgLv ? ` · ★★★ ≤ ${cfgLv.three}, ★★ ≤ ${cfgLv.two}` : ''}${endGain ? ` · 🪙 +${fmtGold(endGain)} au trésor` : ''}`
-								: `${s && outOfMoves(s) ? 'Plus de coups' : 'Le plateau est plein'}${butinRef.current ? ` · le butin (${fmtGold(butinRef.current)}) est perdu` : ''}`
+								? `${s?.moves ?? 0} coups${cfgLv && lv.stars < 3 ? ` · ★★★ en ${cfgLv.three} coups ou moins` : ''}${endGain ? ` · 🪙 +${fmtGold(endGain)} au trésor de Bijou` : ''}`
+								: s && outOfMoves(s)
+									? `Plus de coups : ${s.opened} ${s.opened > 1 ? 'coffres ouverts' : 'coffre ouvert'} sur ${s.cfg.goal}${butinRef.current ? ` · ${fmtGold(butinRef.current)} pièces de butin perdues` : ''}`
+									: `Plateau plein${s ? ` : ${s.opened} ${s.opened > 1 ? 'coffres ouverts' : 'coffre ouvert'} sur ${s.cfg.goal}` : ''}${butinRef.current ? ` · ${fmtGold(butinRef.current)} pièces de butin perdues` : ''}. Astuce : garde de la place, de nouveaux blocs entrent à chaque coup.`
 						}
 						onNext={() => startLevel(lv.level + 1)}
 						onReplay={() => startLevel(lv.level)}
@@ -1688,25 +1765,31 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 				)}
 			</div>
 
-			{mode === 'daily' && phase !== 'ready' && !over && (
+			{mode === 'daily' && !dailyLoading && phase !== 'ready' && !over && (
 				<GiveUp onGiveUp={giveUp} warn="Le défi du jour sera terminé, sans score classé." />
 			)}
 
-			<p className="ec-help">
-				Glisse le doigt sur le plateau (ou les flèches du clavier) : tous les blocs glissent jusqu'au bout.
-				3 gemmes de la même couleur qui se touchent explosent ; 4 ou plus fusionnent en une gemme plus forte
-				(chargée, joyau, couronne) qui explose plus fort quand elle saute avec sa couleur : 3×3, 5×5, puis
-				toute sa couleur. Un carré de 4 lance une comète vers un coffre. Après chaque coup, de nouveaux blocs
-				entrent par le bord opposé et une gemme tombe au centre : les explosions s'enchaînent. Une explosion
-				à côté d'un coffre l'ouvre : ses pièces vont au butin, d'autant plus nombreuses que la chaîne est
-				longue (le double pour un coffre cadenassé). En fin de partie, le butin rejoint le trésor de Bijou, le
-				bébé dragon ; un niveau perdu le perd. Chaque gemme détruite remplit la jauge de souffle de Bijou :
-				pleine, touche Bijou (ou la barre d'espace) et il crache trois boules de feu, d'abord sur les coffres,
-				sinon là où les gemmes s'entassent. Ça ne compte pas comme un coup, et tant que la jauge est pleine,
-				un plateau plein n'est pas perdu. En mode Niveaux, les coups sont comptés : sans coup avant le dernier
-				coffre, le niveau est perdu (un niveau sur dix, marqué 🔥, est plus serré). Garde le doigt appuyé pour
-				accélérer une longue chaîne.
-			</p>
+			<details className="ec-help">
+				<summary>
+					<span>Glisse : tout le plateau suit. 3 gemmes de même couleur qui se touchent explosent ; 4 ou plus fusionnent. Une explosion près d'un coffre l'ouvre.</span>
+					<strong>Toutes les règles</strong>
+				</summary>
+				<p>
+					Glisse le doigt sur le plateau (ou les flèches du clavier) : tous les blocs glissent jusqu'au bout.
+					3 gemmes de la même couleur qui se touchent explosent ; 4 ou plus fusionnent en une gemme plus forte
+					(chargée, joyau, couronne) qui explose plus fort quand elle saute avec sa couleur : 3×3, 5×5, puis
+					toute sa couleur. Un carré de 4 lance une comète vers un coffre. Après chaque coup, de nouveaux blocs
+					entrent par le bord opposé et une gemme tombe au centre : les explosions s'enchaînent. Une explosion
+					à côté d'un coffre l'ouvre : ses pièces vont au butin, d'autant plus nombreuses que la chaîne est
+					longue (le double pour un coffre cadenassé). En fin de partie, le butin rejoint le trésor de Bijou, le
+					bébé dragon ; un niveau perdu le perd. Chaque gemme détruite remplit la jauge de souffle de Bijou :
+					pleine, touche Bijou (ou la barre d'espace) et il crache trois boules de feu, d'abord sur les coffres,
+					sinon là où les gemmes s'entassent. Ça ne compte pas comme un coup, et tant que la jauge est pleine,
+					un plateau plein n'est pas perdu. En mode Niveaux, les coups sont comptés : sans coup avant le dernier
+					coffre, le niveau est perdu (un niveau sur dix, marqué 🔥, est plus serré). Garde le doigt appuyé pour
+					accélérer une longue chaîne.
+				</p>
+			</details>
 
 			{lv.active && lv.menu && (
 				<LevelSelect
@@ -1747,6 +1830,8 @@ const CSS = `
 .ec-bigchest { filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.35)); }
 .ec-bigcoin { filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.3)); }
 .ec-tag { text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500; margin-bottom: 0.6rem; }
+.ec-goal { display: block; margin-top: 2px; color: var(--gray-100); font-size: 14px; font-weight: 700; }
+.ec-goal small { display: block; color: var(--gray-300); font-size: 12.5px; font-weight: 500; }
 .ec-novelty {
   margin: 0 0 0.6rem; max-width: 420px; text-align: center; font-size: 12.5px; line-height: 1.45;
   color: var(--gray-100); background: var(--accent-overlay); border: 1px solid var(--accent-regular);
@@ -1765,8 +1850,16 @@ const CSS = `
   font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums;
 }
 .ec-chip strong { color: var(--accent-regular); }
+:root.theme-dark .ec-chip:not(.gold):not(.low) strong { color: #d8b4fe; } /* the accent purple is too dark on a dark chip */
 .ec-chip.gold strong { color: #d99a0b; }
 .ec-chip small { color: var(--gray-300); font-weight: 500; }
+.ec-chip-ico { width: 19px; height: 19px; object-fit: contain; vertical-align: -4px; }
+/* The daily's five counters on one line on a phone, chrono and all. */
+@media (max-width: 420px) {
+  .ec-hud { gap: 4px; }
+  .ec-chip { padding: 4px 8px; }
+  .ec-sound { width: 28px; }
+}
 .ec-chip.low { background: rgba(214, 58, 31, 0.16); animation: ec-low 0.8s ease-in-out infinite alternate; }
 .ec-chip.low strong { color: #d63a1f; }
 .ec-sound { border: none; background: var(--gray-900); border-radius: 999px; width: 32px; height: 28px; cursor: pointer; font-size: 14px; }
@@ -1857,6 +1950,17 @@ span.ec-ember { border-radius: 50%; background: radial-gradient(circle, #fff6c8 
 }
 .game-page:fullscreen .ec-boardwrap { max-width: min(560px, calc(100dvh - 290px)); }
 .game-page:-webkit-full-screen .ec-boardwrap { max-width: min(560px, calc(100dvh - 290px)); }
+/* A computer screen has room for a bigger board, as long as the goal above it still shows. */
+@media (min-width: 900px) {
+  .ec-root { max-width: 600px; }
+  .ec-perch, .ec-boardwrap { max-width: min(580px, max(440px, calc(100vh - 300px))); }
+  .ec-bijou { --k: 1.45; }
+  .ec-tag { font-size: 13.5px; }
+  .ec-goal { font-size: 15.5px; }
+  .ec-chip { font-size: 14.5px; padding: 5px 13px; }
+  .ec-chip-ico { width: 21px; height: 21px; }
+  .ec-fire-name, .ec-next { font-size: 13px; }
+}
 .ec-svg { display: block; width: 100%; height: 100%; }
 .ec-svg.blurred { filter: blur(4px); opacity: 0.55; }
 .ec-svg.dimmed { filter: brightness(0.55) saturate(0.8); }
@@ -1962,8 +2066,23 @@ span.ec-ember { border-radius: 50%; background: radial-gradient(circle, #fff6c8 
   box-shadow: var(--shadow-lg);
 }
 .ec-start.sm { font-size: 14px; padding: 10px 24px; }
+/* The board stays readable behind: only his breath can play. */
+.ec-stuck { flex-direction: column; gap: 10px; background: rgba(10, 14, 24, 0.38); border-radius: 4%; }
+.ec-stuck .ec-start { background: linear-gradient(90deg, #ffb02e, #ff6a2b); color: #fff; text-shadow: 0 1px 2px rgba(122, 30, 0, 0.7); animation: ec-fire-glow 0.8s ease-in-out infinite alternate; }
+.ec-stuck-why {
+  margin: 0; padding: 6px 14px; border-radius: 999px; background: rgba(16, 20, 30, 0.88); color: #fff;
+  font-size: 13.5px; font-weight: 700; text-align: center;
+}
 
 .ec-help { max-width: 420px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.5; margin-top: 0.9rem; }
+.ec-help summary { list-style: none; cursor: pointer; }
+.ec-help summary::-webkit-details-marker { display: none; }
+.ec-help summary span { display: block; color: var(--gray-100); font-size: 13px; }
+.ec-help summary strong { display: inline-block; margin-top: 4px; color: var(--accent-regular); font-size: 12.5px; }
+.ec-help summary strong::after { content: ' ▾'; }
+.ec-help[open] summary strong::after { content: ' ▴'; }
+:root.theme-dark .ec-help summary strong { color: #d8b4fe; }
+.ec-help p { margin: 8px 0 0; }
 .game-page:fullscreen .ec-help { display: none; }
 .game-page:-webkit-full-screen .ec-help { display: none; }
 
@@ -2025,6 +2144,6 @@ span.ec-ember { border-radius: 50%; background: radial-gradient(circle, #fff6c8 
   .ec-dance img:nth-child(1) { animation: none; }
   .ec-dance img:nth-child(2) { display: none; }
   .ec-fire-fill { transition: none; }
-  .ec-fire-fill.pour, .ec-fire.full .ec-fire-track, .ec-fire.full .ec-fire-fill, .ec-fire.full .ec-fire-tip, .ec-chip.low { animation: none; }
+  .ec-fire-fill.pour, .ec-fire.full .ec-fire-track, .ec-fire.full .ec-fire-fill, .ec-fire.full .ec-fire-tip, .ec-chip.low, .ec-stuck .ec-start { animation: none; }
 }
 `;

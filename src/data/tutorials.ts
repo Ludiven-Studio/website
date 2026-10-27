@@ -124,14 +124,10 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '🔁', title: 'Expert', body: 'En Expert et à partir du niveau 101, les bords bouclent : un tuyau qui sort à droite ressort à gauche. Les indices du contour disparaissent — tout se déduit du réseau lui-même.' },
 	],
 	eclats: [
-		{ emoji: '👆', title: 'Glisse', body: 'Glisse le doigt sur le plateau (ou les flèches du clavier) : tous les blocs glissent jusqu’au bout, comme dans 2048. Pendant que tu glisses, les blocs qui vont exploser brillent.' },
-		{ emoji: '💥', title: 'Explose', body: '3 gemmes de la même couleur qui se touchent explosent. Tout reglisse dans le même sens, de nouveaux blocs entrent par le bord opposé et une gemme tombe au centre : les explosions s’enchaînent toutes seules.' },
-		{ emoji: '🎁', title: 'Les coffres', body: 'Une explosion juste à côté d’un coffre l’ouvre en grand. Ouvre le nombre de coffres demandé avant la fin de tes coups : plus il t’en reste, plus tu gagnes d’étoiles. Un niveau sur dix, marqué 🔥, est plus serré. La bande « À venir » annonce les prochains blocs, coffres compris.' },
-		{ emoji: '🐉', title: 'Le trésor de Bijou', body: 'Les pièces d’un coffre vont au butin : 10 par vague de la chaîne qui l’ouvre, le double pour un coffre cadenassé. En fin de partie, le butin rejoint le trésor de Bijou, le bébé dragon, et son tas d’or grandit. Un niveau perdu perd son butin !' },
-		{ emoji: '🔥', title: 'Le souffle de Bijou', body: 'Chaque gemme détruite remplit la jauge de souffle de Bijou. Pleine, touche Bijou : il crache trois boules de feu, d’abord sur les coffres, sinon là où les gemmes s’entassent. Ça ne compte pas comme un coup, et tant que la jauge est pleine, un plateau plein n’est pas perdu.' },
-		{ emoji: '👑', title: 'Fusionne', body: '4 gemmes ou plus fusionnent en une seule, plus forte : gemme chargée, puis joyau, puis couronne. Quand elle saute avec sa couleur, elle libère sa force : 3×3, 5×5, et la couronne fait sauter toute sa couleur. Fais-la grandir ou fais-la sauter : à toi de voir.' },
-		{ emoji: '☄️', title: 'Le carré', body: 'Un carré de 4 gemmes de la même couleur lance une comète : elle file vers le coffre le plus proche et explose autour de lui.' },
-		{ emoji: '⚡', title: 'Astuce', body: 'Garde le doigt appuyé sur le plateau pour accélérer une longue chaîne. En mode Libre, le plateau finit par se remplir : la cinquième couleur arrive petit à petit, à chaque palier.' },
+		{ emoji: '👆', title: 'Fais glisser le plateau', body: 'Glisse le doigt sur le plateau ou utilise les flèches du clavier : tous les blocs glissent jusqu’au bord, comme dans 2048. Réunis 3 gemmes de la même couleur pour les faire exploser : tout reglisse et les explosions s’enchaînent.' },
+		{ emoji: '🎁', title: 'Les coffres', body: 'Une explosion juste à côté d’un coffre l’ouvre en grand : ses pièces vont au butin, puis au trésor de Bijou, le bébé dragon, si tu réussis le niveau. Ouvre les coffres demandés avant la fin de tes coups : moins tu en joues, plus tu gagnes d’étoiles.' },
+		{ emoji: '🔥', title: 'Le souffle de Bijou', body: 'Chaque gemme détruite remplit la jauge de Bijou. Pleine, touche-le : il crache trois boules de feu, d’abord sur les coffres. Ça ne compte pas comme un coup, et ça sauve un plateau plein.' },
+		{ emoji: '👑', title: 'Fusionne', body: '4 gemmes ou plus fusionnent en une gemme plus forte (chargée, joyau, couronne) qui explose plus grand quand elle saute avec sa couleur. Un carré de 4 lance une comète vers un coffre. Les premiers niveaux te montrent tout ça en jouant.' },
 	],
 	bulles: [
 		{ emoji: '🫧', title: 'Le but', body: 'Un radeau de bulles de couleur est accroché en haut de l\'écran. Vide-le entièrement, en un minimum de tirs.' },
