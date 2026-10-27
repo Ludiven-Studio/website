@@ -66,8 +66,16 @@ const COMET_MS = 380;
 const SWIPE_PX = 16;
 const TUG_START_PX = 8; // a starting swipe tugs the blocks it would move once it has a direction
 const TUG = 0.25 * U;
-const TUG_MS = 200;
-const TUG_EVERY_MS = 1000; // a finger that holds tugs them again
+const TUG_OUT_MS = 500;
+const TUG_BACK_MS = 200;
+const TUG_EVERY_MS = 1000; // a finger that holds tugs them again, after 0.3 s at rest
+// The app's DOTween eases. Out: OutCubic, exact as this bezier, the elastic holding the block back. Back: OutBack
+// (overshoot 2.2), 15 % past its place at 108 ms, sampled since CSS linear() easing throws on iOS before 17.2.
+const TUG_OUT_EASE = 'cubic-bezier(.3333, 1, .6667, 1)';
+const TUG_BACK_CURVE = Array.from({ length: 21 }, (_, i) => {
+	const u = i / 20 - 1, s = 2.2;
+	return -(s + 1) * u ** 3 - s * u ** 2;
+});
 const DIR_VEC: Record<Dir, [number, number]> = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 const LB_ID = (gameId: string): string => `${gameId}-t`;
 const recordKey = (t: TierKey): string => `eclats-score-${t}`;
@@ -1146,20 +1154,25 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 		if (Math.abs(dx) < min && Math.abs(dy) < min) return null;
 		return Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'down' : 'up';
 	};
-	/** The blocks `dir` would move jump its way and spring straight back, the finger still down. */
+	/** The blocks `dir` would move stretch its way, held by an elastic, then bounce back, the finger still down. */
 	const tug = (dir: Dir) => {
 		const el = boardRef.current;
 		if (!el || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 		const ids = movingIds(dir);
 		const [vx, vy] = DIR_VEC[dir];
-		const at = (k: number) => ({ transform: `translate(${vx * TUG * k}px, ${vy * TUG * k}px)` });
+		const total = TUG_OUT_MS + TUG_BACK_MS;
+		const at = (k: number) => `translate(${vx * TUG * k}px, ${vy * TUG * k}px)`;
+		const keys: Keyframe[] = [
+			{ transform: at(0), offset: 0, easing: TUG_OUT_EASE },
+			...TUG_BACK_CURVE.map((k, i) => ({
+				transform: at(k),
+				offset: (TUG_OUT_MS + (i / (TUG_BACK_CURVE.length - 1)) * TUG_BACK_MS) / total,
+			})),
+		];
 		el.querySelectorAll<SVGGElement>('.ec-tug').forEach((g) => {
 			if (!ids.has(Number(g.dataset.id))) return;
 			// Added, not replaced: a tug the other way over one still running starts from where the block is.
-			g.animate(
-				[{ ...at(0), easing: 'cubic-bezier(.2, .8, .4, 1)' }, { ...at(1), offset: 0.35, easing: 'ease-in-out' }, { ...at(-0.12), offset: 0.7, easing: 'ease-out' }, at(0)],
-				{ duration: TUG_MS, composite: 'add' },
-			);
+			g.animate(keys, { duration: total, composite: 'add' });
 		});
 	};
 	const onPress = (x: number, y: number) => {

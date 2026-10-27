@@ -209,25 +209,51 @@ try {
 		await touch('touchStart', [[box.x, box.y]]);
 		await touch('touchMove', [[box.x + vx * 12, box.y + vy * 12]]);
 		const t0 = Date.now();
+		// Every frame of the first tug: how far the blocks go its way, and back past their place the other way.
+		const trace = page.evaluate(([vx, vy]) => new Promise((done) => {
+			const start = performance.now();
+			let most = 0, least = 0, side = 0;
+			const frame = () => {
+				for (const g of document.querySelectorAll('.ec-tug')) {
+					const m = new DOMMatrix(getComputedStyle(g).transform);
+					const a = m.e * vx + m.f * vy;
+					most = Math.max(most, a);
+					least = Math.min(least, a);
+					side = Math.max(side, Math.abs(m.e * vy) + Math.abs(m.f * vx));
+				}
+				if (performance.now() - start < 760) requestAnimationFrame(frame);
+				else done({ most, least, side });
+			};
+			requestAnimationFrame(frame);
+		}), [vx, vy]);
 		await page.waitForTimeout(60);
 		const pulled = (await tugs()).filter(off);
 		check('a starting swipe tugs the blocks it would move its way, and only those',
-			moving > 0 && pulled.length === moving && pulled.every((l) => along(l) > 0.5 && along(l) <= 2.5 + 1e-6 && across(l) < 0.01),
+			moving > 0 && pulled.length === moving && pulled.every((l) => along(l) > 0.5 && along(l) <= 2.5 * 1.15 && across(l) < 0.01),
 			`${pulled.length} tugged, ${moving} would move, ${pulled.length ? along(pulled[0]).toFixed(2) : '-'} of 2.5 units at 60 ms`);
 		for (let k = 2; k <= 4; k++) {
 			await page.waitForTimeout(20);
 			await touch('touchMove', [[box.x + vx * k * 12, box.y + vy * k * 12]]);
 		}
-		await page.waitForTimeout(250);
+		// Out to the reach and no further, then back 15 % past their place (-0.385) at about 610 ms.
+		const { most, least, side } = await trace;
+		check('the tug stretches to its reach, then bounces back a little past the blocks\' place',
+			most >= 2.45 && most <= 2.51 && least < -0.25 && least >= -0.5 && side < 0.01,
+			`${most.toFixed(2)} of 2.5 units out, ${least.toFixed(2)} back, ${side.toFixed(3)} across`);
+		// Out 0.5 s, back 0.2 s, then at rest until the next second. Timed, so before any screenshot (~0.5 s each).
+		await page.waitForTimeout(Math.max(0, 850 - (Date.now() - t0)));
+		const held = await tugs();
+		check('the tugged blocks are back in place while the finger is still down',
+			held.every((l) => !off(l) && !l.running), `${held.filter(off).length} still off, ${held.filter((l) => l.running).length} still running at ${Date.now() - t0} ms`);
+		// Nothing runs since the check above, so the next tug to start is the second one.
+		const againAt = await page.waitForFunction(() => [...document.querySelectorAll('.ec-tug')].some((g) => g.getAnimations().length > 0), null, { timeout: 1500, polling: 'raf' })
+			.then(() => Date.now() - t0, () => null);
+		const again = (await tugs()).filter((l) => l.running).length;
+		check('a finger that holds tugs them again every second', againAt !== null && againAt >= 900 && againAt <= 1300 && again === moving,
+			`${again} tugged again at ${againAt ?? '-'} ms, ${moving} would move`);
 		const lit = await page.locator('.ec-preview').count();
 		await page.screenshot({ path: `${OUT}/phone-preview.png` });
 		check('the blocks a swipe would explode light up while the finger is down', lit === Math.max(...counts), `${lit} lit, ${Math.max(...counts)} expected (${best})`);
-		const held = await tugs();
-		check('the tugged blocks are back in place while the finger is still down',
-			held.every((l) => !off(l) && !l.running), `${held.filter(off).length} still off, ${held.filter((l) => l.running).length} still running`);
-		await page.waitForTimeout(Math.max(0, 1060 - (Date.now() - t0)));
-		const again = (await tugs()).filter(off).length;
-		check('a finger that holds tugs them again every second', again === moving, `${again} tugged at ${Date.now() - t0} ms, ${moving} would move`);
 		const before = (await state(page)).moves;
 		await touch('touchEnd', []);
 		await page.waitForTimeout(80);
@@ -252,7 +278,7 @@ try {
 			await page.waitForTimeout(60);
 			const short = (await tugs()).filter(off).length;
 			await touch('touchEnd', []);
-			await page.waitForTimeout(300);
+			await page.waitForTimeout(Math.max(0, 850 - (Date.now() - t1)));
 			const after = await tugs();
 			check('a short drag tugs the blocks from 8 px, then they are back without a swipe',
 				still === 0 && short > 0 && after.every((l) => !off(l) && !l.running) && (await state(page)).moves === was,

@@ -1028,3 +1028,27 @@
   de l'utilisateur pour le commit
 - 15:22 : commité et poussé à la demande de l'utilisateur : mes 2 fichiers et cette section seulement ; l'app est faite
   par la session Unity. Statut : terminé. Réservations libérées.. Statut : terminé. Réservations libérées.
+
+## 2026-10-26 — Dragon's Gems Swipe : l'aller-retour devient élastique (0,5 s, retour 0,2 s, repos 0,3 s) (session website)
+- Statut : en cours (2026-10-26T15:35+01:00). Demande de l'utilisateur : (transmis par la session Unity) une impulsion
+  un peu élastique qui met 0.5s ensuite revient en 0,2s et attend 0.3s
+- Réservations actives : `src/games/eclats/EclatsGame.tsx`, `scripts/check-eclats.mjs`.
+- Ressources : serveur de dev sur le port 4473 ; eslint, `astro check`. Build annoncé ici avant.
+- 15:49 : fait, aligné sur l'app (c8e59cd) : l'aller dure 0,5 s avec l'OutElastic de DOTween (amplitude 1, période 0,35
+  s, échantillonné en 26 images clés car linear() casse avant iOS 17.2 : 11 % au-delà vers 140 ms, 1 % en deçà vers 350
+  ms), le retour 0,2 s en in-out quad, puis repos jusqu'à la seconde suivante. check-eclats.mjs : 29 contrôles OK sur 4
+  passages (dépassement 2,78/2,5 unités à 150 ms, en place à 860 ms, deuxième coup lancé vers 1,0-1,1 s, plus rien
+  après le lâcher) ; le contrôle du deuxième coup attend son départ au lieu d'un instant fixe (le minuteur part parfois
+  en retard dans Chromium sans écran). Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 15:51 : build complet OK (astro check 0 erreur, 166 pages, précache 324 entrées, liens OK) ; en attente du feu vert
+  de l'utilisateur pour le commit
+- 01:20 : réaligné sur la nouvelle version de l'app (session Unity, demande de l'utilisateur « 0.5 s où la gemme est
+  attirée mais retenue par un élastique, ensuite 0.2 s où elle revient avec un léger rebond, ensuite 0.3 s d'attente »)
+  : aller en OutCubic (cubic-bezier exact), retour en OutBack (dépassement 2.2, échantillonné : 15 % au-delà de sa
+  place vers 108 ms). check-eclats.mjs : le contrôle du pic à 140 ms devient un relevé image par image du premier coup
+  (2,50/2,5 à l'aller, −0,37 au retour, rien de travers), 29 contrôles OK sur 3 passages. Lancement du build complet
+  (écrit dist/, .astro/, public/vendor/)…
+- 01:23 : build complet OK (astro check 0 erreur, 166 pages, précache 324 entrées, liens OK) ; en attente du feu vert
+  de l'utilisateur pour le commit
+- 13:44 : commité et poussé à la demande de l'utilisateur (« pousse tout ») : les morceaux de l'aller-retour dans mes 2
+  fichiers, et cette section seulement. Statut : terminé. Réservations libérées.
