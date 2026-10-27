@@ -31,7 +31,8 @@ import LangSwitch from '../../../../components/LangSwitch.astro';
 			This policy covers <strong>the Pétanque Game mobile app</strong>
 			(<code>com.ludivenstudio.petanquegame</code>). The pétanque game on the website
 			(<a href="/jeux/petanque/">ludiven-studio.fr/jeux/petanque</a>) and the rest of the website have their
-			<a href="/confidentialite/">own policy</a>. Last updated: 26 October 2026.
+			<a href="/confidentialite/">own policy</a>. Last updated: 27 October 2026 (ads move from Google AdMob to Unity LevelPlay, and the game asks for your
+			consent in its own window).
 		</p>
 		<p class="updated">
 			This is a courtesy translation. In case of discrepancy, the
@@ -41,10 +42,10 @@ import LangSwitch from '../../../../components/LangSwitch.astro';
 		<div class="summary">
 			<p><strong>The essentials:</strong></p>
 			<ul>
-				<li>Against the computer or with two players on one phone, you play <strong>without an account</strong>, even offline. When the phone is online, only advertising, anonymous usage statistics and a few technical checks leave it (see §2).</li>
+				<li>Against the computer or with two players on one phone, you play <strong>without an account</strong>, even offline. When the phone is online, only advertising if you accepted it, anonymous usage statistics and a few technical checks leave it (see §2).</li>
 				<li>Coins, the shop, leagues and online play need a <strong>Google account</strong> (Android) <strong>or Apple account</strong> (iPhone). Your progress is then saved with <strong>Unity</strong>, our provider, so you can get it back on all your phones.</li>
 				<li><strong>Your name is public</strong>: in the list of public games, on your opponent's phone and in the ranking, with your rating. There is no chat.</li>
-				<li>Google's advertising is <strong>personalised only with your consent</strong>. No data is resold.</li>
+				<li>Ads are shown <strong>only with your consent</strong>, asked at first launch. Without it, you play as usual, with no ads. No data is resold.</li>
 				<li>You can <strong>delete your account</strong> at any time: Options › "Delete my account" (<a href="#suppression">see §11</a>).</li>
 			</ul>
 		</div>
@@ -70,7 +71,7 @@ import LangSwitch from '../../../../components/LangSwitch.astro';
 				when the phone is online:
 			</p>
 			<ul>
-				<li>Google's <strong>advertising</strong> (see §6);</li>
+				<li><strong>advertising</strong>, if you accepted it (see §6);</li>
 				<li><strong>usage statistics</strong> with no identifier (see §7);</li>
 				<li>reading the <strong>number of the latest version</strong> of the game on our website, and technical statistics from the Unity engine (see §9).</li>
 			</ul>
@@ -181,16 +182,16 @@ import LangSwitch from '../../../../components/LangSwitch.astro';
 							<td>Google Play or App Store; Unity (purchase module)</td>
 						</tr>
 						<tr>
-							<td>Advertising ID, IP address, interactions with ads, technical information (see §6)</td>
-							<td>Showing and measuring ads, fighting fraud</td>
-							<td>Your consent (Art. 6(1)(a)) for personalised ads; legitimate interest (Art. 6(1)(f)) otherwise</td>
-							<td>Google (AdMob) and, with your consent, its advertising partners</td>
+							<td>Advertising ID, other device identifiers, IP address, interactions with ads, usage time, in-game purchases (declared by Unity Ads), technical information (see §6)</td>
+							<td>Showing ads chosen from your interests, measuring them, fighting fraud</td>
+							<td>Your consent (Art. 6(1)(a)): without it, nothing starts</td>
+							<td>Unity Technologies and its subsidiary ironSource (Unity LevelPlay, ironSource Ads, Unity Ads); through their auctions, other ad buyers (see §6)</td>
 						</tr>
 						<tr>
-							<td>Your choice about advertising</td>
-							<td>Remembering it so you are not asked again</td>
+							<td>Your answer in the "Ads and privacy" window (accept or decline), its date and the version of the text</td>
+							<td>Remembering it and being able to prove your choice</td>
 							<td>Legal obligation</td>
-							<td>Stored on the phone; managed by Google (UMP)</td>
+							<td>Kept on your phone only; Umami counts the yeses and noes, with no identifier (see §7)</td>
 						</tr>
 						<tr>
 							<td>Usage statistics, with no account or identifier (see §7)</td>
@@ -216,35 +217,41 @@ import LangSwitch from '../../../../components/LangSwitch.astro';
 		<section class="stack gap-2">
 			<h2>6. Advertising</h2>
 			<p>
-				The game is free and funded by <strong>Google AdMob</strong> advertising: optional videos that you
-				choose to watch (to double your coins from a game or your daily bonus, or for free coins), and an ad
-				between two free-play games against the computer, at most once every two games.
+				The game is free and funded by advertising, served by <strong>Unity LevelPlay</strong> with the ad networks
+				<strong>ironSource Ads</strong> and <strong>Unity Ads</strong> (Unity Technologies and its subsidiary ironSource):
+				optional videos that you choose to watch (to double your coins from a game or your daily bonus, or for
+				free coins), and an ad between two free-play games against the computer, at most once every two games.
+				Google plays no part in this game's ads or in your consent.
 			</p>
 			<p>
-				To show the ads, measure them and fight fraud, Google's ad module receives your phone's
-				<strong>advertising ID</strong> and other identifiers specific to the app (on Android, the "app set
-				ID"), your <strong>IP address</strong> (which gives an approximate location, at city level), your
-				interactions with the app and the ads (launches, ads seen, taps) and technical information
-				(performance, crashes).
+				<strong>Your consent.</strong> At first launch, whatever your country, an "Ads and privacy" window asks
+				whether you accept that ironSource and Unity Ads (Unity Technologies) store and read information on your
+				phone, including its advertising ID, to show you ads chosen from your interests, inferred from your
+				activity in this game and in other apps, and to measure how they perform. "Accept" and "Decline" carry
+				the same weight.
 			</p>
+			<ul>
+				<li><strong>If you decline</strong>, no ad module starts: you play as usual, with no ads and without the videos that earn coins. If you tap a video offer, the game asks you again.</li>
+				<li><strong>Your answer</strong>, its date and the version of the text stay on your phone. The game asks again after 6 months, whether you accepted or declined, or sooner if our ad partners change.</li>
+				<li><strong>You can change your mind at any time</strong>: Options › "Ad choices". If you withdraw your consent during a session, the game stops loading ads at once; the ad module stays loaded until you close the game, then no longer starts.</li>
+				<li><strong>On iPhone</strong>, Apple's tracking permission is only asked for after an "Accept"; without it, the iPhone's advertising ID is not used.</li>
+			</ul>
 			<p>
-				<strong>Your consent.</strong> At first launch, where the law requires it (in particular in the
-				European Union), a Google form (UMP) asks whether you accept personalised ads. The ad module only
-				starts once you have been through this form. Without your consent, ads are not personalised. You can
-				change your mind at any time: Options › "Ad choices" (this button appears where this choice is asked
-				for). On iPhone, the game then asks for Apple's tracking permission; without it, the iPhone's
-				advertising ID is not used.
+				<strong>If you accepted</strong>, to show the ads, choose them, measure them and fight fraud, the ironSource
+				and Unity Ads modules receive your phone's <strong>advertising ID</strong> and other device identifiers, your
+				<strong>IP address</strong> (which gives an approximate location, at city level), your interactions with
+				the ads, your usage time, technical information (performance, crashes) and, according to Unity Ads, your
+				in-game purchases. Their auctions may pass the ad request on to other ad buyers.
 			</p>
 			<p>
 				<strong>"No ads"</strong>, a one-off purchase, removes the ads between games. The optional videos are
-				still offered to anyone who wants coins: so Google's ad module keeps running.
+				still offered to anyone who wants coins: if you accepted ads, the ad module therefore keeps running.
 			</p>
 			<p>
-				You can also reset or delete the advertising ID in your phone's settings. To learn more:
-				<a href="https://policies.google.com/technologies/partner-sites?hl=en" target="_blank" rel="noopener">how
-				Google uses data from partner apps</a> and
-				<a href="https://policies.google.com/privacy?hl=en" target="_blank" rel="noopener">Google's privacy
-				policy</a>.
+				You can also reset or delete the advertising ID in your phone's settings. To learn more, and for the
+				partners of ironSource and Unity Ads:
+				<a href="https://unity.com/legal/game-player-and-app-user-privacy-policy" target="_blank" rel="noopener">Unity's privacy
+				policy</a>, which covers Unity Ads, LevelPlay and ironSource.
 			</p>
 		</section>
 
@@ -261,6 +268,7 @@ import LangSwitch from '../../../../components/LangSwitch.astro';
 				<li><code>rated_end</code> — a ranked game ends (result, rating band);</li>
 				<li><code>daily_bonus</code>, <code>challenge_claim</code> — a daily bonus (streak) or a challenge (coins) is collected;</li>
 				<li><code>shop_buy</code>, <code>iap_buy</code> — an item is bought with coins (item, price), or with money (product);</li>
+				<li><code>ad_consent</code> — your answer in the "Ads and privacy" window (yes or no);</li>
 				<li><code>ad_offer</code>, <code>ad_rewarded</code>, <code>ad_interstitial</code> — a video is offered or watched, an ad is shown (placement, result);</li>
 				<li><code>account_gate</code>, <code>sign_in</code>, <code>sign_out</code>, <code>account_delete</code> — the account is asked for, a sign-in, a sign-out or a deletion takes place (Google or Apple, success);</li>
 				<li><code>reminders</code>, <code>review_ask</code>, <code>howto</code>, <code>update_prompt</code>, <code>update_tapped</code> — your answer about reminders, the store's review request, a "How to play" page, the update offer.</li>
@@ -325,7 +333,7 @@ import LangSwitch from '../../../../components/LangSwitch.astro';
 				<li>the copy of your progress (one per account, and the one for playing without an account);</li>
 				<li>the settings that stay with the phone: throwing hand, side of the pad, simple or expert throwing, game view, language, theme, sound, reminders;</li>
 				<li>your Unity session, if you are signed in;</li>
-				<li>your choice about advertising, written by Google's form, and the ad module's data (see §6).</li>
+				<li>your answer in the "Ads and privacy" window, its date and the version of the text, and, if you accepted, the ad modules' data (see §6).</li>
 			</ul>
 			<p>All of this disappears when you uninstall the app.</p>
 		</section>
@@ -374,8 +382,9 @@ import LangSwitch from '../../../../components/LangSwitch.astro';
 				providers:
 			</p>
 			<ul>
-				<li><strong>Unity Technologies</strong> — accounts (Authentication), saves (Cloud Save), online games (Multiplayer and Relay), ranking (Leaderboards), purchase module (In-App Purchasing) and engine statistics.</li>
-				<li><strong>Google</strong> (Google Ireland Limited, Google LLC) — sign-in on Android, advertising (AdMob), consent form (UMP), Google Play (distribution, payment, rating form).</li>
+				<li><strong>Unity Technologies</strong> — accounts (Authentication), saves (Cloud Save), online games (Multiplayer and Relay), ranking (Leaderboards), purchase module (In-App Purchasing), engine statistics and, if you accepted them, ads (Unity LevelPlay, Unity Ads).</li>
+				<li><strong>ironSource</strong>, a subsidiary of Unity Technologies — ads (ironSource Ads), if you accepted them. The auctions of ironSource and Unity Ads may pass the ad request on to other ad buyers (see §6).</li>
+				<li><strong>Google</strong> (Google Ireland Limited, Google LLC) — sign-in on Android, Google Play (distribution, payment, rating form).</li>
 				<li><strong>Apple Inc.</strong> — "Sign in with Apple", tracking permission, App Store (distribution, payment, rating form).</li>
 				<li><strong>Umami Software, Inc.</strong> — usage statistics, with no account or identifier (see §7).</li>
 				<li><strong>GitHub, Inc.</strong> — hosting of our website, read for the update check (see §9).</li>
@@ -394,7 +403,8 @@ import LangSwitch from '../../../../components/LangSwitch.astro';
 				<li><strong>Ranking</strong>: your rating and your name, until you have them removed (see §11).</li>
 				<li><strong>Online games</strong>: a public game leaves the list as soon as it starts or you close it; throws are not kept after the game.</li>
 				<li><strong>Usage statistics</strong>: erased by Umami after <strong>6 months</strong>.</li>
-				<li><strong>Advertising data</strong>: according to Google's rules.</li>
+				<li><strong>Advertising data</strong>: according to the rules of Unity and ironSource.</li>
+				<li><strong>Your answer about ads</strong>: 6 months on your phone, then the game asks again.</li>
 				<li><strong>Purchases</strong>: the transaction numbers stay in your progress, until the account is deleted; Google and Apple keep their own records.</li>
 				<li><strong>On the phone</strong>: until you uninstall the app or delete the account.</li>
 			</ul>
@@ -408,7 +418,7 @@ import LangSwitch from '../../../../components/LangSwitch.astro';
 			</p>
 			<ul>
 				<li><strong>Correct your name</strong>: "My character", from Options.</li>
-				<li><strong>Withdraw your consent to personalised ads</strong>: Options › "Ad choices"; on iPhone, Settings › Privacy &amp; Security › Tracking.</li>
+				<li><strong>Withdraw your consent to ads</strong>: Options › "Ad choices"; on iPhone, Settings › Privacy &amp; Security › Tracking.</li>
 				<li><strong>Erase your data</strong>: see <a href="#suppression">§11</a>.</li>
 				<li><strong>Everything else</strong> (a copy of your data, objection, a question): write to <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>, with your name and your type of account. We reply within one month.</li>
 			</ul>

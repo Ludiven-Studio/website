@@ -1,6 +1,7 @@
 ---
 import GamePage from '../../layouts/GamePage.astro';
 import PetanqueGame from '../../games/petanque/PetanqueGame.tsx';
+import { ICON, LANDING_PATHS } from '../../data/petanqueGame';
 ---
 
 <GamePage
@@ -10,6 +11,7 @@ import PetanqueGame from '../../games/petanque/PetanqueGame.tsx';
 	tagline="Pose le doigt à la hauteur de l'angle, glisse pour doser — premier à 13"
 	gameId="petanque"
 	fullscreen="auto"
+	app={{ href: LANDING_PATHS.fr, label: 'Aussi sur téléphone : Pétanque Game', note: 'Bientôt sur Android et iPhone · en ligne, en équipe, ligues', icon: ICON }}
 >
 	<PetanqueGame client:only="react" gameId="petanque" />
 	<p class="pe-scanner">
@@ -25,16 +27,25 @@ import PetanqueGame from '../../games/petanque/PetanqueGame.tsx';
 			'scanner-pre': 'Vous jouez pour de vrai ?',
 			'scanner-post': 'mesure vos points au téléphone.',
 			tagline: 'Pose le doigt à la hauteur de l’angle, glisse pour doser — premier à 13',
+			'app-label': 'Aussi sur téléphone : Pétanque Game',
+			'app-note': 'Bientôt sur Android et iPhone · en ligne, en équipe, ligues',
+			'app-href': '/petanque-game/',
 		},
 		en: {
 			'scanner-pre': 'Playing for real?',
 			'scanner-post': 'measures your points with your phone.',
 			tagline: 'Put your finger at the height of the angle, slide to set the power — first to 13',
+			'app-label': 'Also on your phone: Pétanque Game',
+			'app-note': 'Coming soon to Android and iPhone · online, teams, leagues',
+			'app-href': '/en/petanque-game/',
 		},
 		es: {
 			'scanner-pre': '¿Juegas de verdad?',
 			'scanner-post': 'mide tus puntos con el móvil.',
 			tagline: 'Pon el dedo a la altura del ángulo y desliza para dosificar — gana quien llega a 13',
+			'app-label': 'También en tu móvil: Pétanque Game',
+			'app-note': 'Próximamente en Android y iPhone · en línea, por equipos, ligas',
+			'app-href': '/es/petanque-game/',
 		},
 	};
 	const apply = (lang: string): void => {
@@ -44,6 +55,15 @@ import PetanqueGame from '../../games/petanque/PetanqueGame.tsx';
 		});
 		const pitch = document.querySelector<HTMLElement>('.game-pitch');
 		if (pitch) pitch.textContent = t.tagline;
+		// The app card under the board (GamePage's `app`).
+		const card = document.querySelector<HTMLAnchorElement>('.game-app');
+		if (card) {
+			card.href = t['app-href'];
+			const label = card.querySelector('strong');
+			const note = card.querySelector('small');
+			if (label) label.textContent = t['app-label'];
+			if (note) note.textContent = t['app-note'];
+		}
 	};
 	document.addEventListener('ludiven:lang', (e) => apply((e as CustomEvent<string>).detail));
 	if (document.documentElement.lang !== 'fr') apply(document.documentElement.lang);

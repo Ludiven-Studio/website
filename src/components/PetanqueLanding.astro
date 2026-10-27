@@ -1,34 +1,42 @@
 ---
-// The Pétanque Scanner product page, shared by its French, English and Spanish versions.
-// The portfolio entry at /work/petanque-scanner/ covers the research instead.
+// The product page of a pétanque app in its five languages: Pétanque Scanner by default, or the app passed in.
+// The portfolio entry (/work/<slug>/) covers how it was made instead.
 
 import Hero from './Hero.astro';
 import Icon from './Icon.astro';
 import ContactCTA from './ContactCTA.astro';
 import LangSwitch from './LangSwitch.astro';
-import { copy, APP_NAME, HEROES, SCREENS, LANDING_PATHS, type LandingLang } from '../data/petanqueScanner';
+import { SCANNER, type LandingLang, type PetanqueApp } from '../data/petanqueApps';
 
 interface Props {
 	lang: LandingLang;
+	app?: PetanqueApp;
 }
 
-const { lang } = Astro.props;
-const others = (Object.keys(LANDING_PATHS) as LandingLang[])
+const { lang, app = SCANNER } = Astro.props;
+const others = (Object.keys(app.landingPaths) as LandingLang[])
 	.filter((l) => l !== lang)
-	.map((l) => ({ lang: l, href: LANDING_PATHS[l] }));
-const t = copy[lang];
+	.map((l) => ({ lang: l, href: app.landingPaths[l] }));
+const t = app.copy[lang];
 const play = `/assets/badges/google-play-${lang}.png`;
 // No localized App Store badge on file for de/it: Apple allows the English one everywhere.
 const apple = `/assets/badges/app-store-${lang === 'de' || lang === 'it' ? 'en' : lang}.svg`;
+// A store with no link yet shows its badge faded, under « coming soon ».
+const badges = [
+	{ href: t.badges.play, src: play, cls: 'badge-play', alt: t.badges.playAlt, store: 'Google Play' },
+	{ href: t.badges.apple, src: apple, cls: 'badge-appstore', alt: t.badges.appleAlt, store: 'App Store' },
+];
+const soon = badges.some((b) => !b.href);
+const video = app.video?.(lang);
 
 const jsonLd = [
 	{
 		'@context': 'https://schema.org',
 		'@type': 'MobileApplication',
-		name: APP_NAME,
+		name: app.name,
 		description: t.description,
 		url: new URL(Astro.url.pathname, Astro.site).href,
-		applicationCategory: 'SportsApplication',
+		applicationCategory: app.category,
 		operatingSystem: 'Android, iOS',
 		inLanguage: lang,
 		author: { '@type': 'Organization', name: 'Ludiven Studio' },
@@ -50,16 +58,21 @@ const jsonLd = [
 	<main class="wrapper stack gap-15">
 		<div class="stack gap-8">
 			<LangSwitch lang={lang} links={others} />
-			<Hero title={APP_NAME} tagline={t.tagline} align="start" />
+			<Hero title={app.name} tagline={t.tagline} align="start" />
 			<div class="store-badges">
-				<a href={t.badges.play} target="_blank" rel="noopener">
-					<img class="badge-play" src={play} alt={t.badges.playAlt} />
-				</a>
-				<a href={t.badges.apple} target="_blank" rel="noopener">
-					<img class="badge-appstore" src={apple} alt={t.badges.appleAlt} />
-				</a>
+				{badges.map((b) => (b.href ? (
+					<a href={b.href} target="_blank" rel="noopener">
+						<img class={b.cls} src={b.src} alt={b.alt} />
+					</a>
+				) : (
+					<span class="soon">
+						<img class={b.cls} src={b.src} alt={`${b.store} — ${t.soonShort}`} />
+						<span class="soon-tag" aria-hidden="true">{t.soonShort}</span>
+					</span>
+				)))}
 			</div>
-			<img class="cover" src={HEROES[lang]} alt={t.heroAlt} />
+			{soon && t.soon && <p class="soon-note">{t.soon}</p>}
+			<img class="cover" src={app.heroes[lang]} alt={t.heroAlt} />
 		</div>
 
 		<section class="stack gap-4">
@@ -87,46 +100,52 @@ const jsonLd = [
 			</div>
 		</section>
 
-		<section class="stack gap-4">
-			<h2 class="section-title">{t.photoTitle}</h2>
-			<div class="box stack gap-2">
-				<p>{t.photoBody}</p>
-				<p>{t.photoNote}</p>
-			</div>
-		</section>
+		{t.photoTitle && (
+			<section class="stack gap-4">
+				<h2 class="section-title">{t.photoTitle}</h2>
+				<div class="box stack gap-2">
+					<p>{t.photoBody}</p>
+					<p>{t.photoNote}</p>
+				</div>
+			</section>
+		)}
 
 		<section class="screens stack gap-6">
 			<h2 class="section-title">{t.galleryTitle}</h2>
 			<div class="screens-grid">
 				{/* Muted loop, fetched only once scrolled into view: 5 MB nobody above the fold should pay for. */}
-				<video
-					class="screen-video"
-					data-src={`/assets/petanque-ar/video-${lang}.mp4`}
-					poster={`/assets/petanque-ar/video-${lang}.webp`}
-					width="554"
-					height="1200"
-					muted
-					loop
-					playsinline
-					preload="none"
-					aria-label={t.galleryTitle}
-				></video>
-				{SCREENS[lang].map((src) => <img src={src} alt="" loading="lazy" decoding="async" />)}
+				{video && (
+					<video
+						class="screen-video"
+						data-src={video.src}
+						poster={video.poster}
+						width="554"
+						height="1200"
+						muted
+						loop
+						playsinline
+						preload="none"
+						aria-label={t.galleryTitle}
+					></video>
+				)}
+				{app.screens[lang].map((src, i) => <img src={src} alt={t.screensAlt?.[i] ?? ''} loading="lazy" decoding="async" />)}
 			</div>
 		</section>
 
-		<section class="stack gap-4">
-			<h2 class="section-title">{t.limitsTitle}</h2>
-			<p class="lead">{t.limitsIntro}</p>
-			<div class="box grid-2">
-				{t.limits.map((l) => (
-					<div>
-						<h3>{l.title}</h3>
-						<p>{l.body}</p>
-					</div>
-				))}
-			</div>
-		</section>
+		{t.limits && (
+			<section class="stack gap-4">
+				<h2 class="section-title">{t.limitsTitle}</h2>
+				<p class="lead">{t.limitsIntro}</p>
+				<div class="box grid-2">
+					{t.limits.map((l) => (
+						<div>
+							<h3>{l.title}</h3>
+							<p>{l.body}</p>
+						</div>
+					))}
+				</div>
+			</section>
+		)}
 
 		<section class="stack gap-4">
 			<h2 class="section-title">{t.priceTitle}</h2>
@@ -147,26 +166,33 @@ const jsonLd = [
 			</div>
 		</section>
 
-		<section class="stack gap-4">
-			<h2 class="section-title">{t.makingOfTitle}</h2>
-			<div class="box">
-				<p>{t.makingOfBody}</p>
-				<p class="making-of-cta">
-					<a href={t.makingOfHref}>{t.makingOfCta} <Icon icon="arrow-right" size="1em" /></a>
-				</p>
-			</div>
-		</section>
+		{t.makingOfTitle && (
+			<section class="stack gap-4">
+				<h2 class="section-title">{t.makingOfTitle}</h2>
+				<div class="box">
+					<p>{t.makingOfBody}</p>
+					<p class="making-of-cta">
+						<a href={t.makingOfHref}>{t.makingOfCta} <Icon icon="arrow-right" size="1em" /></a>
+					</p>
+				</div>
+			</section>
+		)}
 
 		<section class="stack gap-4 closing">
 			<h2 class="section-title">{t.closing}</h2>
 			<div class="store-badges">
-				<a href={t.badges.play} target="_blank" rel="noopener">
-					<img class="badge-play" src={play} alt={t.badges.playAlt} />
-				</a>
-				<a href={t.badges.apple} target="_blank" rel="noopener">
-					<img class="badge-appstore" src={apple} alt={t.badges.appleAlt} />
-				</a>
+				{badges.map((b) => (b.href ? (
+					<a href={b.href} target="_blank" rel="noopener">
+						<img class={b.cls} src={b.src} alt={b.alt} />
+					</a>
+				) : (
+					<span class="soon">
+						<img class={b.cls} src={b.src} alt={`${b.store} — ${t.soonShort}`} />
+						<span class="soon-tag" aria-hidden="true">{t.soonShort}</span>
+					</span>
+				)))}
 			</div>
+			{soon && t.soon && <p class="soon-note">{t.soon}</p>}
 			<p class="legal" id="support">
 				{t.support} <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>
 			</p>
@@ -294,8 +320,9 @@ const jsonLd = [
 		margin-top: 1rem;
 	}
 
+	/* The site's link colour: --accent-text-over is white in the light theme, on a white box. */
 	.making-of-cta a {
-		color: var(--accent-text-over);
+		color: var(--link-color);
 		text-decoration: 1px solid underline transparent;
 		text-underline-offset: 0.25em;
 		transition: text-decoration-color var(--theme-transition);
@@ -313,6 +340,39 @@ const jsonLd = [
 	.legal {
 		color: var(--gray-400);
 		font-size: var(--text-sm);
+	}
+
+	/* A store not open yet: the badge faded, its tag on top at full strength. */
+	.soon {
+		position: relative;
+		display: block;
+		flex: none;
+	}
+
+	.soon img {
+		opacity: 0.45;
+		filter: grayscale(1);
+	}
+
+	.soon-tag {
+		position: absolute;
+		top: -0.85rem;
+		right: -0.5rem;
+		padding: 0.15rem 0.6rem;
+		border-radius: 999px;
+		background: var(--accent-regular);
+		color: var(--accent-text-over);
+		font-size: var(--text-sm);
+		font-weight: 700;
+		line-height: 1.3;
+		white-space: nowrap;
+		box-shadow: var(--shadow-sm);
+	}
+
+	.soon-note {
+		color: var(--gray-300);
+		font-weight: 600;
+		text-align: center;
 	}
 
 	@media (min-width: 50em) {

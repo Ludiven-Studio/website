@@ -5,6 +5,7 @@ import Icon from '../components/Icon.astro';
 import StoreBadges from '../components/StoreBadges.astro';
 import { MEET_STORES } from '../data/petanqueMeet';
 import { copy as scanner } from '../data/petanqueScanner';
+import { ICON as GAME_ICON, STORES as GAME_STORES } from '../data/petanqueGame';
 
 const apps = [
 	{
@@ -27,12 +28,23 @@ const apps = [
 		apple: scanner.fr.badges.apple,
 		href: '/petanque-scanner/telecharger/',
 	},
+	{
+		id: 'game',
+		name: 'Pétanque Game',
+		icon: GAME_ICON,
+		title: 'Jouer aux boules en 3D',
+		body: 'Une partie sur la place du village, contre l’ordinateur, à deux sur un téléphone ou en ligne, en tête-à-tête, doublette ou triplette. Bientôt sur Android et iPhone ; la version web se joue déjà sur ce site.',
+		play: GAME_STORES.play,
+		apple: GAME_STORES.apple,
+		href: '/petanque-game/telecharger/',
+		soon: 'Bientôt',
+	},
 ];
 ---
 
 <BaseLayout
 	title="Les applis de pétanque | Ludiven Studio"
-	description="Pétanque Meet pour trouver une partie près de chez soi, Pétanque Scanner pour savoir qui a le point : les applis de pétanque de Ludiven Studio, gratuites sur Android et iPhone."
+	description="Pétanque Meet pour trouver une partie près de chez soi, Pétanque Scanner pour savoir qui a le point, Pétanque Game pour jouer aux boules en 3D : les applis de pétanque de Ludiven Studio, gratuites sur Android et iPhone."
 	image="/assets/petanque/og.jpg"
 >
 	<main class="wrapper">
@@ -60,7 +72,7 @@ const apps = [
 						</div>
 						<p class="app-title">{a.title}</p>
 						<p class="app-body">{a.body}</p>
-						<StoreBadges playStore={a.play} appStore={a.apple} lang="fr" />
+						<StoreBadges playStore={a.play} appStore={a.apple} lang="fr" soon={a.soon} />
 						<a class="app-more" href={a.href}>
 							Découvrir l’appli <Icon icon="arrow-right" />
 						</a>
@@ -124,6 +136,19 @@ const apps = [
 		--app-soft: #d6e0f0;
 		--app-accent: #4ecdd6;
 		background: linear-gradient(160deg, #0d1526 30%, #1c2a44);
+	}
+
+	/* Night blue and amber, the square at dusk behind the words. */
+	.app--game {
+		--app-ink: #ffffff;
+		--app-soft: #d5dce8;
+		--app-accent: #f6c45d;
+		--soon-bg: #f6c45d;
+		--soon-ink: #0b1224;
+		background:
+			linear-gradient(100deg, #0b1224 35%, rgb(11 18 36 / 0.82) 60%, rgb(11 18 36 / 0.35)),
+			url('/assets/petanque-game/hero.webp') right center / cover no-repeat,
+			#0b1224;
 	}
 
 	.app-head {
@@ -193,6 +218,14 @@ const apps = [
 
 		.app {
 			padding: 2.25rem;
+		}
+
+		.app--game {
+			grid-column: 1 / -1;
+		}
+
+		.app--game .app-body {
+			max-width: 34rem;
 		}
 	}
 </style>

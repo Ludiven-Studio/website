@@ -1,0 +1,11 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PetanqueLanding from '../../components/PetanqueLanding.astro';
+import { GAME } from '../../data/petanqueGame';
+
+const t = GAME.copy.de;
+---
+
+<BaseLayout title={t.title} description={t.description} image={GAME.ogImages.de} lang="de" alternates={GAME.landingPaths}>
+	<PetanqueLanding lang="de" app={GAME} />
+</BaseLayout>

@@ -1,6 +1,7 @@
 ---
 // Official store badges, reused from the Pétanque Scanner landing (same assets +
-// global .store-badges styling). Renders whichever of the two URLs is provided.
+// global .store-badges styling). Renders whichever of the two URLs is provided;
+// with `soon`, a store with no URL yet shows its badge faded under that tag.
 type Lang = 'fr' | 'en' | 'es' | 'de' | 'it';
 
 interface Props {
@@ -8,9 +9,11 @@ interface Props {
 	playStore?: string | undefined;
 	lang?: Lang;
 	class?: string;
+	/** The « coming soon » tag, for an app not on every store yet. */
+	soon?: string;
 }
 
-const { appStore, playStore, lang = 'fr', class: className } = Astro.props;
+const { appStore, playStore, lang = 'fr', class: className, soon } = Astro.props;
 const play = `/assets/badges/google-play-${lang}.png`;
 // No localized App Store badge on file for de/it: Apple allows the English one everywhere.
 const apple = `/assets/badges/app-store-${lang === 'de' || lang === 'it' ? 'en' : lang}.svg`;
@@ -25,17 +28,56 @@ const ALT: Record<Lang, { play: string; apple: string }> = {
 const alt = ALT[lang];
 ---
 
-{(appStore || playStore) && (
+{(appStore || playStore || soon) && (
 	<div class:list={['store-badges', className]}>
-		{playStore && (
+		{playStore ? (
 			<a href={playStore} target="_blank" rel="noopener">
 				<img class="badge-play" src={play} alt={alt.play} />
 			</a>
+		) : soon && (
+			<span class="soon">
+				<img class="badge-play" src={play} alt={`Google Play — ${soon}`} />
+				<span class="soon-tag" aria-hidden="true">{soon}</span>
+			</span>
 		)}
-		{appStore && (
+		{appStore ? (
 			<a href={appStore} target="_blank" rel="noopener">
 				<img class="badge-appstore" src={apple} alt={alt.apple} />
 			</a>
+		) : soon && (
+			<span class="soon">
+				<img class="badge-appstore" src={apple} alt={`App Store — ${soon}`} />
+				<span class="soon-tag" aria-hidden="true">{soon}</span>
+			</span>
 		)}
 	</div>
 )}
+
+<style>
+	/* A store not open yet: the badge faded, its tag on top at full strength. */
+	.soon {
+		position: relative;
+		display: block;
+		flex: none;
+	}
+
+	.soon img {
+		opacity: 0.5;
+		filter: grayscale(1);
+	}
+
+	.soon-tag {
+		position: absolute;
+		top: -0.85rem;
+		right: -0.5rem;
+		padding: 0.15rem 0.6rem;
+		border-radius: 999px;
+		background: var(--soon-bg, var(--accent-regular));
+		color: var(--soon-ink, var(--accent-text-over));
+		font-size: var(--text-sm);
+		font-weight: 700;
+		line-height: 1.3;
+		white-space: nowrap;
+		box-shadow: 0 4px 12px rgb(0 0 0 / 0.3);
+	}
+</style>

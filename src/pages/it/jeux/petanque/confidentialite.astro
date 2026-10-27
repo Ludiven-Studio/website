@@ -31,7 +31,8 @@ import LangSwitch from '../../../../components/LangSwitch.astro';
 			Questa informativa riguarda <strong>l'app mobile Pétanque Game</strong>
 			(<code>com.ludivenstudio.petanquegame</code>). Il gioco di pétanque del sito
 			(<a href="/jeux/petanque/">ludiven-studio.fr/jeux/petanque</a>) e il resto del sito hanno una
-			<a href="/confidentialite/">propria informativa</a>. Ultimo aggiornamento: 26 ottobre 2026.
+			<a href="/confidentialite/">propria informativa</a>. Ultimo aggiornamento: 27 ottobre 2026 (la pubblicità passa da Google AdMob a Unity LevelPlay, e il
+			gioco ti chiede il consenso in una sua finestra).
 		</p>
 		<p class="updated">
 			Questa è una traduzione di cortesia. In caso di discordanza, prevale la
@@ -41,10 +42,10 @@ import LangSwitch from '../../../../components/LangSwitch.astro';
 		<div class="summary">
 			<p><strong>L'essenziale:</strong></p>
 			<ul>
-				<li>Contro il computer o in due su un telefono, giochi <strong>senza account</strong>, anche offline. Quando c'è internet, dal telefono partono solo la pubblicità, statistiche d'uso anonime e alcuni controlli tecnici (vedi §2).</li>
+				<li>Contro il computer o in due su un telefono, giochi <strong>senza account</strong>, anche offline. Quando c'è internet, dal telefono partono solo la pubblicità, se l'hai accettata, statistiche d'uso anonime e alcuni controlli tecnici (vedi §2).</li>
 				<li>Le monete, il negozio, le leghe e il gioco online richiedono un <strong>account Google</strong> (Android) <strong>o Apple</strong> (iPhone). I tuoi progressi vengono allora salvati da <strong>Unity</strong>, il nostro fornitore, per ritrovarli su tutti i tuoi telefoni.</li>
 				<li><strong>Il tuo nickname è pubblico</strong>: nell'elenco delle partite pubbliche, per il tuo avversario e in classifica, con il tuo punteggio. Non c'è chat.</li>
-				<li>La pubblicità di Google è <strong>personalizzata solo con il tuo consenso</strong>. Nessuna rivendita di dati.</li>
+				<li>La pubblicità compare <strong>solo con il tuo consenso</strong>, chiesto al primo avvio. Senza, giochi normalmente, senza pubblicità. Nessuna rivendita di dati.</li>
 				<li>Puoi <strong>eliminare il tuo account</strong> in qualsiasi momento: Opzioni › «Elimina il mio account» (<a href="#suppression">vedi §11</a>).</li>
 			</ul>
 		</div>
@@ -70,7 +71,7 @@ import LangSwitch from '../../../../components/LangSwitch.astro';
 				scambi quando il telefono ha internet:
 			</p>
 			<ul>
-				<li>la <strong>pubblicità</strong> di Google (vedi §6);</li>
+				<li>la <strong>pubblicità</strong>, se l'hai accettata (vedi §6);</li>
 				<li><strong>statistiche d'uso</strong> senza identificativo (vedi §7);</li>
 				<li>la lettura del <strong>numero dell'ultima versione</strong> del gioco sul nostro sito, e statistiche tecniche del motore Unity (vedi §9).</li>
 			</ul>
@@ -182,16 +183,16 @@ import LangSwitch from '../../../../components/LangSwitch.astro';
 							<td>Google Play o App Store; Unity (modulo di acquisto)</td>
 						</tr>
 						<tr>
-							<td>Identificativo pubblicitario, indirizzo IP, interazioni con gli annunci, informazioni tecniche (vedi §6)</td>
-							<td>Mostrare e misurare la pubblicità, contrastare le frodi</td>
-							<td>Il tuo consenso (art. 6.1.a) per gli annunci personalizzati; legittimo interesse (art. 6.1.f) negli altri casi</td>
-							<td>Google (AdMob) e, con il tuo consenso, i suoi partner pubblicitari</td>
+							<td>Identificativo pubblicitario, altri identificativi del dispositivo, indirizzo IP, interazioni con gli annunci, tempo di utilizzo, acquisti fatti nel gioco (dichiarati da Unity Ads), informazioni tecniche (vedi §6)</td>
+							<td>Mostrare annunci scelti in base ai tuoi interessi, misurarli, contrastare le frodi</td>
+							<td>Il tuo consenso (art. 6.1.a): senza, non si avvia nulla</td>
+							<td>Unity Technologies e la sua controllata ironSource (Unity LevelPlay, ironSource Ads, Unity Ads); tramite le loro aste, altri acquirenti di pubblicità (vedi §6)</td>
 						</tr>
 						<tr>
-							<td>La tua scelta sulla pubblicità</td>
-							<td>Ricordarla e non chiedertela di nuovo</td>
+							<td>La tua risposta nella finestra «Pubblicità e privacy» (accettare o rifiutare), la sua data e la versione del testo</td>
+							<td>Ricordarla e poter dimostrare la tua scelta</td>
 							<td>Obbligo legale</td>
-							<td>Memorizzata sul telefono; gestita da Google (UMP)</td>
+							<td>Conservata solo sul tuo telefono; Umami conta i sì e i no, senza identificativo (vedi §7)</td>
 						</tr>
 						<tr>
 							<td>Statistiche d'uso, senza account né identificativo (vedi §7)</td>
@@ -218,37 +219,44 @@ import LangSwitch from '../../../../components/LangSwitch.astro';
 		<section class="stack gap-2">
 			<h2>6. Pubblicità</h2>
 			<p>
-				Il gioco è gratuito ed è finanziato dalla pubblicità di <strong>Google AdMob</strong>: video facoltativi
-				che scegli di guardare (per raddoppiare le monete di una partita o il tuo bonus giornaliero, o per avere
-				monete gratis), e una pubblicità tra due partite libere contro il computer, al massimo una volta ogni
-				due partite.
+				Il gioco è gratuito ed è finanziato dalla pubblicità, servita da <strong>Unity LevelPlay</strong> con le
+				reti <strong>ironSource Ads</strong> e <strong>Unity Ads</strong> (Unity Technologies e la sua controllata
+				ironSource): video facoltativi che scegli di guardare (per raddoppiare le monete di una partita o il tuo
+				bonus giornaliero, o per avere monete gratis), e una pubblicità tra due partite libere contro il
+				computer, al massimo una volta ogni due partite. Google non interviene né nella pubblicità di questo
+				gioco né nel tuo consenso.
 			</p>
 			<p>
-				Per mostrare gli annunci, misurarli e contrastare le frodi, il modulo di Google riceve
-				l'<strong>identificativo pubblicitario</strong> del tuo telefono e altri identificativi propri
-				dell'applicazione (su Android, l'«app set ID»), il tuo <strong>indirizzo IP</strong> (che dà una
-				posizione approssimativa, a livello di città), le tue interazioni con l'applicazione e con gli annunci
-				(avvii, annunci visti, tocchi) e informazioni tecniche (prestazioni, arresti anomali).
+				<strong>Il tuo consenso.</strong> Al primo avvio, qualunque sia il tuo paese, una finestra «Pubblicità e
+				privacy» ti chiede se accetti che ironSource e Unity Ads (Unity Technologies) salvino e leggano
+				informazioni sul tuo telefono, tra cui il suo ID pubblicitario, per mostrarti annunci scelti in base ai
+				tuoi interessi, dedotti dalla tua attività in questo gioco e in altre app, e misurarne l'efficacia.
+				«Accetta» e «Rifiuta» hanno lo stesso peso.
 			</p>
+			<ul>
+				<li><strong>Se rifiuti</strong>, non si avvia nessun modulo pubblicitario: giochi normalmente, senza pubblicità e senza i video che fanno guadagnare monete. Se tocchi un'offerta di video, il gioco te lo chiede di nuovo.</li>
+				<li><strong>La tua risposta</strong>, la sua data e la versione del testo restano sul tuo telefono. Il gioco te la richiede dopo 6 mesi, che tu abbia accettato o rifiutato, o prima se i nostri partner pubblicitari cambiano.</li>
+				<li><strong>Puoi cambiare idea in qualsiasi momento</strong>: Opzioni › «Scelte pubblicitarie». Se revochi il consenso durante una sessione, il gioco smette subito di caricare pubblicità; il modulo pubblicitario resta caricato finché non chiudi il gioco, poi non si avvia più.</li>
+				<li><strong>Su iPhone</strong>, l'autorizzazione al tracciamento di Apple ti viene chiesta solo dopo un «Accetta»; senza di essa, l'identificativo pubblicitario dell'iPhone non viene usato.</li>
+			</ul>
 			<p>
-				<strong>Il tuo consenso.</strong> Al primo avvio, dove la legge lo richiede (in particolare nell'Unione
-				europea), una schermata di Google (UMP) ti chiede se accetti gli annunci personalizzati. Il modulo
-				pubblicitario si avvia solo dopo questa schermata. Senza il tuo consenso, gli annunci non sono
-				personalizzati. Puoi cambiare idea in qualsiasi momento: Opzioni › «Scelte pubblicitarie» (questo
-				pulsante compare dove questa scelta è richiesta). Su iPhone, il gioco ti chiede poi l'autorizzazione al
-				tracciamento di Apple; senza di essa, l'identificativo pubblicitario dell'iPhone non viene usato.
+				<strong>Se hai accettato</strong>, per mostrare gli annunci, sceglierli, misurarli e contrastare le frodi, i
+				moduli di ironSource e di Unity Ads ricevono l'<strong>identificativo pubblicitario</strong> del tuo
+				telefono e altri identificativi del dispositivo, il tuo <strong>indirizzo IP</strong> (che dà una
+				posizione approssimativa, a livello di città), le tue interazioni con gli annunci, il tuo tempo di
+				utilizzo, informazioni tecniche (prestazioni, arresti anomali) e, secondo Unity Ads, gli acquisti fatti
+				nel gioco. Le loro aste possono trasmettere la richiesta di annuncio ad altri acquirenti di pubblicità.
 			</p>
 			<p>
 				<strong>«Senza pubblicità»</strong>, un acquisto unico, toglie le pubblicità tra le partite. I video
-				facoltativi restano disponibili per chi vuole monete: il modulo di Google quindi continua a funzionare.
+				facoltativi restano disponibili per chi vuole monete: se hai accettato la pubblicità, il modulo
+				pubblicitario quindi continua a funzionare.
 			</p>
 			<p>
 				Puoi anche reimpostare o eliminare l'identificativo pubblicitario nelle impostazioni del tuo telefono.
-				Per saperne di più:
-				<a href="https://policies.google.com/technologies/partner-sites?hl=it" target="_blank" rel="noopener">come
-				Google utilizza i dati delle app partner</a> e le
-				<a href="https://policies.google.com/privacy?hl=it" target="_blank" rel="noopener">norme sulla privacy
-				di Google</a>.
+				Per saperne di più, anche sui partner di ironSource e di Unity Ads:
+				l'<a href="https://unity.com/legal/game-player-and-app-user-privacy-policy" target="_blank" rel="noopener">informativa sulla
+				privacy di Unity</a>, che copre Unity Ads, LevelPlay e ironSource.
 			</p>
 		</section>
 
@@ -265,6 +273,7 @@ import LangSwitch from '../../../../components/LangSwitch.astro';
 				<li><code>rated_end</code> — una partita classificata finisce (risultato, fascia del punteggio);</li>
 				<li><code>daily_bonus</code>, <code>challenge_claim</code> — si riceve un bonus giornaliero (serie) o una sfida (monete);</li>
 				<li><code>shop_buy</code>, <code>iap_buy</code> — un oggetto viene acquistato con monete (oggetto, prezzo), o con denaro (prodotto);</li>
+				<li><code>ad_consent</code> — la tua risposta nella finestra «Pubblicità e privacy» (sì o no);</li>
 				<li><code>ad_offer</code>, <code>ad_rewarded</code>, <code>ad_interstitial</code> — un video viene proposto o guardato, una pubblicità viene mostrata (posizione, risultato);</li>
 				<li><code>account_gate</code>, <code>sign_in</code>, <code>sign_out</code>, <code>account_delete</code> — viene richiesto l'account, avviene un accesso, un'uscita o un'eliminazione (Google o Apple, riuscita);</li>
 				<li><code>reminders</code>, <code>review_ask</code>, <code>howto</code>, <code>update_prompt</code>, <code>update_tapped</code> — la tua risposta sui promemoria, la richiesta di recensione dello store, una pagina di «Come si gioca», la proposta di aggiornamento.</li>
@@ -332,7 +341,7 @@ import LangSwitch from '../../../../components/LangSwitch.astro';
 				<li>la copia dei tuoi progressi (una per account, e quella del gioco senza account);</li>
 				<li>le impostazioni che restano con il telefono: mano che lancia, lato della pedana, lancio semplice o esperto, visuale di gioco, lingua, tema, audio, promemoria;</li>
 				<li>la tua sessione Unity, se hai fatto l'accesso;</li>
-				<li>la tua scelta sulla pubblicità, scritta dalla schermata di Google, e i dati del modulo pubblicitario (vedi §6).</li>
+				<li>la tua risposta nella finestra «Pubblicità e privacy», la sua data e la versione del testo, e, se hai accettato, i dati dei moduli pubblicitari (vedi §6).</li>
 			</ul>
 			<p>Tutto questo scompare quando disinstalli l'applicazione.</p>
 		</section>
@@ -381,8 +390,9 @@ import LangSwitch from '../../../../components/LangSwitch.astro';
 				questi fornitori:
 			</p>
 			<ul>
-				<li><strong>Unity Technologies</strong> — account (Authentication), salvataggio (Cloud Save), partite online (Multiplayer e Relay), classifica (Leaderboards), modulo di acquisto (In-App Purchasing) e statistiche del motore.</li>
-				<li><strong>Google</strong> (Google Ireland Limited, Google LLC) — accesso su Android, pubblicità (AdMob), schermata del consenso (UMP), Google Play (distribuzione, pagamento, scheda di valutazione).</li>
+				<li><strong>Unity Technologies</strong> — account (Authentication), salvataggio (Cloud Save), partite online (Multiplayer e Relay), classifica (Leaderboards), modulo di acquisto (In-App Purchasing), statistiche del motore e, se l'hai accettata, pubblicità (Unity LevelPlay, Unity Ads).</li>
+				<li><strong>ironSource</strong>, controllata di Unity Technologies — pubblicità (ironSource Ads), se l'hai accettata. Le aste di ironSource e di Unity Ads possono trasmettere la richiesta di annuncio ad altri acquirenti di pubblicità (vedi §6).</li>
+				<li><strong>Google</strong> (Google Ireland Limited, Google LLC) — accesso su Android, Google Play (distribuzione, pagamento, scheda di valutazione).</li>
 				<li><strong>Apple Inc.</strong> — «Accedi con Apple», autorizzazione al tracciamento, App Store (distribuzione, pagamento, scheda di valutazione).</li>
 				<li><strong>Umami Software, Inc.</strong> — statistiche d'uso, senza account né identificativo (vedi §7).</li>
 				<li><strong>GitHub, Inc.</strong> — hosting del nostro sito, letto per il controllo degli aggiornamenti (vedi §9).</li>
@@ -401,7 +411,8 @@ import LangSwitch from '../../../../components/LangSwitch.astro';
 				<li><strong>Classifica</strong>: il tuo punteggio e il tuo nickname, finché non li fai rimuovere (vedi §11).</li>
 				<li><strong>Partite online</strong>: una partita pubblica esce dall'elenco appena inizia o appena la chiudi; i lanci non vengono conservati dopo la partita.</li>
 				<li><strong>Statistiche d'uso</strong>: cancellate da Umami dopo <strong>6 mesi</strong>.</li>
-				<li><strong>Dati pubblicitari</strong>: secondo le regole di Google.</li>
+				<li><strong>Dati pubblicitari</strong>: secondo le regole di Unity e di ironSource.</li>
+				<li><strong>La tua risposta sulla pubblicità</strong>: 6 mesi sul tuo telefono, poi il gioco te la richiede.</li>
 				<li><strong>Acquisti</strong>: i numeri di transazione restano nei tuoi progressi, fino all'eliminazione dell'account; Google e Apple conservano le proprie ricevute.</li>
 				<li><strong>Sul telefono</strong>: fino alla disinstallazione o all'eliminazione dell'account.</li>
 			</ul>
@@ -415,7 +426,7 @@ import LangSwitch from '../../../../components/LangSwitch.astro';
 			</p>
 			<ul>
 				<li><strong>Correggere il tuo nickname</strong>: «Il mio personaggio», dalle Opzioni.</li>
-				<li><strong>Revocare il consenso alla pubblicità personalizzata</strong>: Opzioni › «Scelte pubblicitarie»; su iPhone, Impostazioni › Privacy e sicurezza › Tracciamento.</li>
+				<li><strong>Revocare il consenso alla pubblicità</strong>: Opzioni › «Scelte pubblicitarie»; su iPhone, Impostazioni › Privacy e sicurezza › Tracciamento.</li>
 				<li><strong>Cancellare i tuoi dati</strong>: vedi <a href="#suppression">§11</a>.</li>
 				<li><strong>Il resto</strong> (copia dei tuoi dati, opposizione, domande): scrivi a <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>, con il tuo nickname e il tuo tipo di account. Rispondiamo entro un mese.</li>
 			</ul>

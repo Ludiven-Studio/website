@@ -1146,3 +1146,38 @@
 - 13:45 : commité et poussé à la demande de l'utilisateur (« pousse tout ») : mes fichiers (pages, composants, données,
   fiches projet, images et vidéos, GamePage.astro, eclats.astro) et cette section seulement. Statut : terminé.
   Réservations libérées.
+
+## 2026-10-27 — Pétanque Game : app-ads.txt, pages légales LevelPlay, pages de l'appli (session PetanqueGame)
+- Statut : en cours (2026-10-27T14:36+01:00). Demande de l'utilisateur : (transmis par la session Unity, travail
+  approuvé, push non approuvé) app-ads.txt avec ironSource et Unity Ads ; politique de confidentialité, CGU (5 langues)
+  et mentions légales pour le passage d'AdMob à Unity LevelPlay et la fenêtre de consentement du jeu ; page de l'appli
+  /petanque-game/ et de téléchargement en 5 langues, fiche projet FR/EN, carte sur /petanque/, lien depuis
+  /jeux/petanque/
+- Réservations actives : `public/app-ads.txt`, `src/pages{,/en,/es,/de,/it}/jeux/petanque/{confidentialite,cgu}.astro`,
+  `src/pages/mentions-legales.astro`, `src/pages/jeux/petanque.astro` (un lien vers l'appli),
+  `src/data/petanqueGame.ts` (nouveau), `src/components/PetanqueLanding.astro` et
+  `src/components/ScannerDownload.astro` (une prop pour servir aussi le jeu, Scanner inchangé),
+  `src/pages/petanque-game.astro`, `src/pages/{en,es,de,it}/petanque-game.astro`,
+  `src/pages/petanque-game/telecharger.astro`,
+  `src/pages/{en,es,de,it}/petanque-game/{download,descargar,herunterladen,scarica}.astro` (nouveaux),
+  `src/content/work/petanque-game.md`, `src/content/work-en/petanque-game.md` (nouveaux), `src/pages/petanque.astro`,
+  `public/assets/petanque-game/` (nouveau).
+- Ressources : serveur de dev sur le port 4491 ; eslint, `astro check`. Build annoncé ici avant.
+- 14:49 : réservations ajoutées : `src/data/petanqueApps.ts` (nouveau : ce que les deux pages partagées lisent d'une
+  appli), `src/components/StoreBadges.astro` (une prop facultative pour les badges « bientôt »),
+  `public/assets/work/og/petanque-game.jpg` et `petanque-game-{en,es,de,it}.jpg` (nouveaux). Fait : app-ads.txt (ajouts
+  seuls), pages légales en 5 langues et mentions légales ; images converties (2,6 Mo).
+- 15:09 : pages écrites : /petanque-game/ et /petanque-game/telecharger/ en 5 langues (PetanqueLanding et
+  ScannerDownload prennent une prop app, Scanner par défaut ; lien « coulisses » du Scanner, blanc sur blanc en thème
+  clair, passé à la couleur des liens), fiche projet FR/EN, carte sur /petanque/, carte « Aussi sur téléphone » sous le
+  jeu web. eslint OK, astro check 0 erreur, captures sans erreur console. Lancement du build complet (écrit dist/,
+  .astro/, public/vendor/)…
+- 15:16 : 15:11 : build complet OK (astro check 0 erreur, 190 pages, précache 348 entrées, liens OK). Vérifié : pages
+  du Scanner identiques au site en ligne (captures comparées pixel à pixel) sauf son lien « coulisses » désormais
+  visible en thème clair ; HTML des pages de téléchargement du Scanner inchangé ; /jeux/petanque/ sur le build : pas
+  d'encart d'erreur, carte de l'appli sous le jeu hors plein écran. Deux mots changés dans la fiche projet : relance du
+  build complet (écrit dist/, .astro/, public/vendor/)…
+- 15:18 : 15:17 : build complet OK (astro check 0 erreur, 190 pages, précache 348 entrées, liens OK). Serveur 4491
+  arrêté. Non commité, non poussé : en attente du feu vert de l'utilisateur. Réservations gardées jusqu'au commit.
+- 16:43 : commité et poussé à la demande de l'utilisateur : mes 43 fichiers et cette section seulement. Statut :
+  terminé. Réservations libérées.
