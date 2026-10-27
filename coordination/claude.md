@@ -1116,3 +1116,33 @@
 - 13:45 : commité et poussé à la demande de l'utilisateur (« pousse tout ») : EclatsGame.tsx, sfx.ts, tutorials.ts
   (cartes eclats), check-eclats.mjs, tickets 0051 à 0058, LOG.md et cette section seulement. Statut : terminé.
   Réservations libérées.
+
+## 2026-10-27 — Dragon's Gems Swipe : page de l'appli, téléchargement, fiche projet et lien depuis le mini-jeu (session website)
+- Statut : en cours (2026-10-27T12:31+01:00). Demande de l'utilisateur : (transmis par la session Unity) tu peux
+  préparer des pages projets et téléchargements sur le siteweb de ludiven et aussi avec un lien en partant du mini jeu
+- Réservations actives : `src/data/dragonsGems.ts`, `src/components/DragonsGemsLanding.astro`,
+  `src/components/DragonsGemsDownload.astro` (nouveaux), `src/pages/dragons-gems.astro`,
+  `src/pages/{en,es,de,it}/dragons-gems.astro`, `src/pages/dragons-gems/telecharger.astro`,
+  `src/pages/en/dragons-gems/download.astro`, `src/pages/es/dragons-gems/descargar.astro`,
+  `src/pages/de/dragons-gems/herunterladen.astro`, `src/pages/it/dragons-gems/scarica.astro` (nouveaux),
+  `src/content/work/dragons-gems.md`, `src/content/work-en/dragons-gems.md` (nouveaux), `public/assets/dragons-gems/`
+  (nouveau), `src/layouts/GamePage.astro` (un lien vers l'appli, optionnel), `src/pages/jeux/eclats.astro`.
+- Ressources : serveur de dev sur le port 4473 ; eslint, `astro check`. Build annoncé ici avant.
+- 12:40 : écrit : page de l'appli /dragons-gems/ en FR, EN, ES, DE, IT (textes des fiches des stores + grotte de Bijou,
+  défi du sommet, prix), page de téléchargement (badges « bientôt » sans lien tant que STORES est vide, jeu web et APK
+  de test), fiche projet FR/EN (work/dragons-gems), carte « existe aussi en appli mobile » sous le mini-jeu (prop app
+  de GamePage, aucun autre jeu touché). Réservation ajoutée : `src/components/DragonsGemsBadges.astro` (nouveau).
+  Images converties depuis le dossier Marketing de l'app (36 images, 3 Mo) et vidéo verticale par langue réencodée à
+  480 px sans son (1,7 Mo chacune). eslint OK, captures bureau/téléphone/sombre sans erreur console. Lancement du build
+  complet (écrit dist/, .astro/, public/vendor/)…
+- 12:42 : build complet OK (astro check 0 erreur, 178 pages, précache 336 entrées dont aucune image ni vidéo, liens
+  OK). Non commité : en attente du feu vert de l'utilisateur.
+- 13:26 : build complet OK (178 pages, précache 336 entrées, liens OK).
+- 13:26 : accord de l'utilisateur relayé par la session Unity (« ok tu peux pousser si tu as mis en place les boutons
+  google et apple et que cela indique Comming Soon ») : une étiquette Bientôt / Coming soon / Próximamente / Demnächst
+  / Prossimamente sur chaque badge grisé, liens en couleur de lien du site (lisibles en sombre). Le build de 13:26
+  ci-dessus a tourné sans annonce préalable (note ratée) : il ne concernait que ces fichiers. Push en attente de
+  l'accord de l'utilisateur dans cette session.
+- 13:45 : commité et poussé à la demande de l'utilisateur (« pousse tout ») : mes fichiers (pages, composants, données,
+  fiches projet, images et vidéos, GamePage.astro, eclats.astro) et cette section seulement. Statut : terminé.
+  Réservations libérées.

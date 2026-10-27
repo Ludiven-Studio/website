@@ -19,9 +19,11 @@ interface Props {
 	fullscreen?: 'auto';
 	/** Keep the page out of search engines (unlisted partner pages). */
 	noindex?: boolean;
+	/** The same game as a mobile app: a card under the board leads to its page. */
+	app?: { href: string; label: string; note?: string; icon?: string };
 }
 
-const { title, description, heading, tagline, gameId, fullscreen, noindex } = Astro.props;
+const { title, description, heading, tagline, gameId, fullscreen, noindex, app } = Astro.props;
 // Every listed game has a backdrop (scripts/comfy-thumbs.mjs writes it next to the card);
 // the few unlisted pages don't.
 const hasArt = games.some((g) => g.id === gameId);
@@ -114,6 +116,16 @@ const hasDaily = gameId in DAILY_LB;
 
 		<footer class="game-foot stack gap-3">
 			<p class="game-pitch">{tagline}</p>
+			{app && (
+				<a class="game-app" href={app.href}>
+					{app.icon && <img src={app.icon} alt="" width="48" height="48" />}
+					<span>
+						<strong>{app.label}</strong>
+						{app.note && <small>{app.note}</small>}
+					</span>
+					<Icon icon="arrow-right" size="1em" />
+				</a>
+			)}
 			<GameTutorial gameId={gameId} />
 			<CocoinBar client:load />
 		</footer>
@@ -231,6 +243,49 @@ const hasDaily = gameId in DAILY_LB;
 		max-width: 60ch;
 		margin: 0;
 		color: var(--gray-300);
+	}
+	.game-app {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.8rem;
+		max-width: 100%;
+		padding: 0.6rem 1rem 0.6rem 0.6rem;
+		border: 1px solid var(--gray-800);
+		border-radius: 1rem;
+		background: var(--gray-999_40);
+		box-shadow: var(--shadow-sm);
+		color: var(--gray-0);
+		text-decoration: none;
+		text-align: start;
+		transition: border-color 0.15s ease, transform 0.15s ease;
+	}
+	.game-app:hover,
+	.game-app:focus-visible {
+		border-color: var(--accent-regular);
+		transform: translateY(-1px);
+	}
+	.game-app img {
+		flex: none;
+		width: 48px;
+		height: 48px;
+		border-radius: 22%;
+	}
+	.game-app span {
+		display: grid;
+		gap: 0.1rem;
+	}
+	.game-app small {
+		color: var(--gray-300);
+		font-size: var(--text-sm);
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.game-app {
+			transition: none;
+		}
+		.game-app:hover,
+		.game-app:focus-visible {
+			transform: none;
+		}
 	}
 	.back {
 		display: inline-flex;

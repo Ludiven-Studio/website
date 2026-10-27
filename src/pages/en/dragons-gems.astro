@@ -1,0 +1,11 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import DragonsGemsLanding from '../../components/DragonsGemsLanding.astro';
+import { copy, ogImage, LANDING_PATHS } from '../../data/dragonsGems';
+
+const t = copy.en;
+---
+
+<BaseLayout title={t.title} description={t.description} image={ogImage('en')} lang="en" alternates={LANDING_PATHS}>
+	<DragonsGemsLanding lang="en" />
+</BaseLayout>

@@ -1,0 +1,365 @@
+---
+// The Dragon's Gems Swipe product page, in five languages. The portfolio entry at /work/dragons-gems/ tells
+// the making-of; the download page is /dragons-gems/telecharger/.
+import Hero from './Hero.astro';
+import Icon from './Icon.astro';
+import CallToAction from './CallToAction.astro';
+import ContactCTA from './ContactCTA.astro';
+import LangSwitch from './LangSwitch.astro';
+import DragonsGemsBadges from './DragonsGemsBadges.astro';
+import {
+	APP_NAME,
+	CONTACT,
+	DOWNLOAD_PATHS,
+	ICON,
+	LANDING_PATHS,
+	MAKING_OF,
+	PRIVACY,
+	WEB_GAME,
+	copy,
+	feature,
+	screens,
+	typo,
+	video,
+	type Lang,
+} from '../data/dragonsGems';
+
+interface Props {
+	lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = copy[lang];
+const ty = (s: string) => typo(lang, s);
+const others = (Object.keys(LANDING_PATHS) as Lang[]).filter((l) => l !== lang).map((l) => ({ lang: l, href: LANDING_PATHS[l] }));
+const shots = screens(lang);
+const clip = video(lang);
+
+const jsonLd = [
+	{
+		'@context': 'https://schema.org',
+		'@type': ['VideoGame', 'MobileApplication'],
+		name: APP_NAME,
+		description: t.description,
+		url: new URL(Astro.url.pathname, Astro.site).href,
+		image: new URL(ICON, Astro.site).href,
+		applicationCategory: 'GameApplication',
+		genre: 'Puzzle',
+		operatingSystem: 'Android, iOS, iPadOS',
+		inLanguage: ['fr', 'en', 'es', 'de', 'it'],
+		author: { '@type': 'Organization', name: 'Ludiven Studio' },
+		offers: { '@type': 'Offer', price: '0', priceCurrency: 'EUR' },
+	},
+	{
+		'@context': 'https://schema.org',
+		'@type': 'FAQPage',
+		mainEntity: t.faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })),
+	},
+];
+---
+
+<div class="stack gap-20">
+	<main class="wrapper stack gap-15">
+		<div class="stack gap-8">
+			<LangSwitch lang={lang} links={others} />
+			<div class="dg-head">
+				<img class="dg-icon" src={ICON} alt="" width="96" height="96" />
+				<div class="stack gap-2">
+					<p class="dg-kicker">{t.kicker}</p>
+					<Hero title={APP_NAME} tagline={ty(t.tagline)} align="start" />
+				</div>
+			</div>
+			<p class="lead">{ty(t.intro)}</p>
+			<DragonsGemsBadges lang={lang} />
+			<div class="dg-ctas">
+				<CallToAction href={DOWNLOAD_PATHS[lang]}>
+					{t.download}
+					<Icon icon="arrow-right" size="1.1em" />
+				</CallToAction>
+				<a class="dg-alt" href={WEB_GAME}>{t.playWeb} <Icon icon="arrow-right" size="1em" /></a>
+			</div>
+			<img class="cover" src={feature(lang)} alt={`${APP_NAME} — ${t.tagline}`} width="1024" height="500" />
+		</div>
+
+		<section class="stack gap-4">
+			<p class="story">{ty(t.story)}</p>
+		</section>
+
+		<section class="stack gap-4">
+			<h2 class="section-title">{t.featuresTitle}</h2>
+			<div class="box grid-2">
+				{t.features.map((f) => (
+					<div>
+						<h3>{ty(f.title)}</h3>
+						<p>{ty(f.body)}</p>
+					</div>
+				))}
+			</div>
+		</section>
+
+		<section class="screens stack gap-6">
+			<h2 class="section-title">{t.galleryTitle}</h2>
+			<div class="screens-grid">
+				{/* Muted loop, fetched only once scrolled into view. */}
+				<video class="screen-video" data-src={clip.src} poster={clip.poster} width="480" height="854" muted loop playsinline preload="none" aria-label={t.videoLabel}></video>
+				{shots.map((src, i) => <img src={src} alt={ty(t.shotsAlt[i] ?? '')} width="540" height="1170" loading="lazy" decoding="async" />)}
+			</div>
+		</section>
+
+		<section class="stack gap-4">
+			<h2 class="section-title">{t.modesTitle}</h2>
+			<div class="box grid-2">
+				{t.modes.map((m) => (
+					<div>
+						<h3>{ty(m.title)}</h3>
+						<p>{ty(m.body)}</p>
+					</div>
+				))}
+			</div>
+		</section>
+
+		<section class="stack gap-4">
+			<h2 class="section-title">{t.priceTitle}</h2>
+			<div class="box stack gap-2">
+				{t.price.map((p) => <p>{ty(p)}</p>)}
+			</div>
+		</section>
+
+		<section class="stack gap-4">
+			<h2 class="section-title">{t.faqTitle}</h2>
+			<div class="box faq">
+				{t.faq.map((f) => (
+					<details>
+						<summary>{ty(f.q)}</summary>
+						<p>{ty(f.a)}</p>
+					</details>
+				))}
+			</div>
+		</section>
+
+		<section class="stack gap-4">
+			<h2 class="section-title">{t.makingOfTitle}</h2>
+			<div class="box">
+				<p>{ty(t.makingOf)}</p>
+				<p class="making-of-cta">
+					<a href={MAKING_OF[lang]}>{t.makingOfCta} <Icon icon="arrow-right" size="1em" /></a>
+				</p>
+			</div>
+		</section>
+
+		<section class="stack gap-4 closing">
+			<h2 class="section-title">{ty(t.soon)}</h2>
+			<div class="dg-ctas">
+				<CallToAction href={DOWNLOAD_PATHS[lang]}>
+					{t.download}
+					<Icon icon="arrow-right" size="1.1em" />
+				</CallToAction>
+				<a class="dg-alt" href={WEB_GAME}>{t.playWeb} <Icon icon="arrow-right" size="1em" /></a>
+			</div>
+			<p class="legal" id="support">{ty(t.support)} <a href={CONTACT[lang]}>{t.supportLink}</a> · <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a></p>
+			<p class="legal"><a href={PRIVACY[lang]}>{t.privacy}</a></p>
+		</section>
+	</main>
+
+	<ContactCTA lang={lang} />
+</div>
+
+<script type="application/ld+json" is:inline set:html={JSON.stringify(jsonLd)} />
+
+<script>
+	const clip = document.querySelector<HTMLVideoElement>('.screen-video');
+	if (clip?.dataset.src && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+		new IntersectionObserver((entries, observer) => {
+			if (!entries.some((e) => e.isIntersecting)) return;
+			observer.disconnect();
+			clip.src = clip.dataset.src!;
+			clip.play().catch(() => {});
+		}, { rootMargin: '200px' }).observe(clip);
+	}
+</script>
+
+<style>
+	.dg-head {
+		display: flex;
+		align-items: center;
+		gap: 1.25rem;
+	}
+
+	.dg-icon {
+		flex: none;
+		width: 5rem;
+		height: 5rem;
+		border-radius: 22%;
+		box-shadow: var(--shadow-md);
+	}
+
+	.dg-kicker {
+		color: var(--link-color);
+		font-weight: 600;
+		font-size: var(--text-sm);
+	}
+
+	.lead,
+	.story {
+		max-width: 60ch;
+		font-size: var(--text-lg);
+	}
+
+	.story {
+		color: var(--gray-200);
+	}
+
+	.dg-ctas {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 1rem 1.75rem;
+	}
+
+	.dg-alt {
+		color: var(--link-color);
+		font-weight: 600;
+		text-decoration: 1px solid underline transparent;
+		text-underline-offset: 0.25em;
+	}
+
+	.dg-alt:hover,
+	.dg-alt:focus {
+		text-decoration-color: currentColor;
+	}
+
+	.box {
+		border: 1px solid var(--gray-800);
+		border-radius: 0.75rem;
+		padding: 1.5rem;
+		background-color: var(--gray-999_40);
+		box-shadow: var(--shadow-sm);
+	}
+
+	.box p {
+		color: var(--gray-400);
+	}
+
+	.section-title {
+		font-size: var(--text-xl);
+		color: var(--gray-0);
+	}
+
+	.cover {
+		width: 100%;
+		height: auto;
+		border-radius: 1.5rem;
+		border: 1px solid var(--gray-800);
+		box-shadow: var(--shadow-sm);
+	}
+
+	.grid-2 {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 2.5rem;
+	}
+
+	.grid-2 h3 {
+		font-size: var(--text-lg);
+		color: var(--gray-0);
+	}
+
+	.screens {
+		text-align: center;
+	}
+
+	.screens-grid {
+		display: grid;
+		gap: 1.25rem;
+		align-items: start;
+		grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+	}
+
+	.screens-grid img,
+	.screens-grid video {
+		width: 100%;
+		height: auto;
+		border-radius: 1.25rem;
+		border: 1px solid var(--gray-800);
+		box-shadow: var(--shadow-sm);
+		background: var(--gradient-subtle);
+	}
+
+	.faq {
+		display: grid;
+		gap: 0.25rem;
+	}
+
+	.faq details {
+		border-bottom: 1px solid var(--gray-800);
+		padding: 0.75rem 0;
+	}
+
+	.faq details:last-child {
+		border-bottom: 0;
+	}
+
+	.faq summary {
+		cursor: pointer;
+		color: var(--gray-0);
+		font-family: var(--font-brand);
+		font-size: var(--text-md);
+	}
+
+	.faq details p {
+		margin-top: 0.75rem;
+		max-width: 65ch;
+	}
+
+	.making-of-cta {
+		margin-top: 1rem;
+	}
+
+	.making-of-cta a {
+		color: var(--link-color);
+		font-weight: 600;
+		text-decoration: 1px solid underline transparent;
+		text-underline-offset: 0.25em;
+	}
+
+	.making-of-cta a:hover,
+	.making-of-cta a:focus {
+		text-decoration-color: currentColor;
+	}
+
+	.closing {
+		align-items: center;
+		text-align: center;
+	}
+
+	.closing .dg-ctas {
+		justify-content: center;
+	}
+
+	.legal {
+		color: var(--gray-400);
+		font-size: var(--text-sm);
+	}
+
+	@media (min-width: 50em) {
+		.dg-icon {
+			width: 7rem;
+			height: 7rem;
+		}
+
+		.box {
+			border-radius: 1.5rem;
+			padding: 2.5rem;
+		}
+
+		.grid-2 {
+			grid-template-columns: repeat(2, 1fr);
+			gap: 2.5rem 5rem;
+		}
+
+		.screens-grid {
+			grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+			gap: 1.75rem;
+		}
+	}
+</style>

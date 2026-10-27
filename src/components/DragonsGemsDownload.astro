@@ -1,0 +1,213 @@
+---
+// The Dragon's Gems Swipe download page, in five languages. Until the stores list the game it says so, and points
+// to the web game and to the Android test build.
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Icon from './Icon.astro';
+import LangSwitch from './LangSwitch.astro';
+import DragonsGemsBadges from './DragonsGemsBadges.astro';
+import { APP_NAME, DOWNLOAD_PATHS, ICON, LANDING_PATHS, TEST_APK, WEB_GAME, copy, ogImage, screens, typo, type Lang } from '../data/dragonsGems';
+
+interface Props {
+	lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = copy[lang];
+const ty = (s: string) => typo(lang, s);
+const others = (Object.keys(DOWNLOAD_PATHS) as Lang[]).filter((l) => l !== lang).map((l) => ({ lang: l, href: DOWNLOAD_PATHS[l] }));
+const shots = screens(lang);
+const options = [
+	{ href: WEB_GAME, icon: 'eclats' as const, title: t.playWeb, note: t.playWebNote },
+	{ href: TEST_APK, icon: 'mobile' as const, title: t.testApk, note: t.testApkNote },
+];
+---
+
+<BaseLayout title={t.dl.title} description={t.description} image={ogImage(lang)} lang={lang} alternates={DOWNLOAD_PATHS}>
+	<main class="wrapper">
+		<div class="dg-dl stack gap-12">
+			<LangSwitch lang={lang} links={others} />
+
+			<section class="hero">
+				<div class="hero-copy stack gap-4">
+					<div class="title-row">
+						<img class="dg-icon" src={ICON} alt="" width="96" height="96" />
+						<div>
+							<p class="kicker">{t.dl.kicker}</p>
+							<h1>{APP_NAME}</h1>
+						</div>
+					</div>
+					<p class="lead">{ty(t.dl.lead)}</p>
+					<DragonsGemsBadges lang={lang} />
+					<p class="waiting">{ty(t.dl.waiting)}</p>
+					<div class="options">
+						{options.map((o) => (
+							<a class="option" href={o.href}>
+								<Icon icon={o.icon} color="var(--link-color)" size="1.8rem" />
+								<span>
+									<strong>{o.title}</strong>
+									<small>{ty(o.note)}</small>
+								</span>
+							</a>
+						))}
+					</div>
+					<a class="back" href={LANDING_PATHS[lang]}>{t.dl.back} <Icon icon="arrow-right" size="1em" /></a>
+				</div>
+				<img class="phone" src={shots[0]} alt={ty(t.shotsAlt[0] ?? '')} width="540" height="1170" />
+			</section>
+
+			<section class="stack gap-6">
+				<h2>{t.dl.screensTitle}</h2>
+				<div class="shots">
+					{/* The first one is the big phone above. */}
+					{shots.slice(1).map((src, i) => <img src={src} alt={ty(t.shotsAlt[i + 1] ?? '')} width="540" height="1170" loading="lazy" decoding="async" />)}
+				</div>
+			</section>
+		</div>
+	</main>
+</BaseLayout>
+
+<style>
+	.dg-dl {
+		padding-block: 1rem 4rem;
+	}
+
+	.hero {
+		display: grid;
+		gap: 2.5rem;
+		align-items: center;
+	}
+
+	.title-row {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+	}
+
+	.dg-icon {
+		flex: none;
+		width: 4.5rem;
+		height: 4.5rem;
+		border-radius: 22%;
+		box-shadow: var(--shadow-md);
+	}
+
+	.kicker {
+		color: var(--link-color);
+		font-weight: 600;
+		font-size: var(--text-sm);
+	}
+
+	h1 {
+		font-size: var(--text-3xl);
+		line-height: 1.1;
+		color: var(--gray-0);
+	}
+
+	h2 {
+		font-size: var(--text-xl);
+		color: var(--gray-0);
+		text-align: center;
+	}
+
+	.lead {
+		font-size: var(--text-lg);
+		max-width: 50ch;
+	}
+
+	.waiting {
+		color: var(--gray-200);
+		font-weight: 600;
+	}
+
+	.options {
+		display: grid;
+		gap: 0.75rem;
+	}
+
+	.option {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+		padding: 1rem 1.25rem;
+		border: 1px solid var(--gray-800);
+		border-radius: 1rem;
+		background-color: var(--gray-999_40);
+		box-shadow: var(--shadow-sm);
+		color: inherit;
+		text-decoration: none;
+		transition: transform 0.15s ease, border-color 0.15s ease;
+	}
+
+	.option:hover,
+	.option:focus-visible {
+		transform: translateY(-2px);
+		border-color: var(--accent-regular);
+	}
+
+	.option span {
+		display: grid;
+		gap: 0.15rem;
+	}
+
+	.option strong {
+		color: var(--gray-0);
+	}
+
+	.option small {
+		color: var(--gray-400);
+		font-size: var(--text-sm);
+	}
+
+	.back {
+		color: var(--link-color);
+		font-weight: 600;
+	}
+
+	.phone {
+		justify-self: center;
+		width: min(17rem, 70vw);
+		height: auto;
+		border-radius: 1.5rem;
+		border: 1px solid var(--gray-800);
+		box-shadow: var(--shadow-lg);
+	}
+
+	.shots {
+		display: grid;
+		gap: 1.25rem;
+		grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+	}
+
+	.shots img {
+		width: 100%;
+		height: auto;
+		border-radius: 1.25rem;
+		border: 1px solid var(--gray-800);
+		box-shadow: var(--shadow-sm);
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.option {
+			transition: none;
+		}
+
+		.option:hover,
+		.option:focus-visible {
+			transform: none;
+		}
+	}
+
+	@media (min-width: 50em) {
+		.hero {
+			grid-template-columns: 1.3fr 1fr;
+		}
+
+		.options {
+			grid-template-columns: 1fr 1fr;
+		}
+
+		.shots {
+			grid-template-columns: repeat(4, 1fr);
+		}
+	}
+</style>
