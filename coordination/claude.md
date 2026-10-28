@@ -1266,3 +1266,16 @@
   du feu vert de l'utilisateur.
 - 07:27 : commité et poussé à la demande de l'utilisateur (« Pousse ») : engine.ts, engine.test.ts, picks.ts,
   EclatsGame.tsx, scripts/eclats-levels.ts et cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-10-28 — Dragon's Gems Swipe : un glissé pendant une cascade est gardé (session website)
+- Statut : en cours (2026-10-28T09:16+01:00). Demande de l'utilisateur : (transmis par la session Unity) « Il faudrait
+  mettre ce comportement sur le site web pour tester d'abord » : glissé gardé pendant une cascade, cascade accélérée,
+  blocs tirés remis en place
+- Réservations actives : `src/games/eclats/EclatsGame.tsx`, `scripts/check-eclats.mjs`.
+- Ressources : serveur de dev sur le port 4473 ; eslint, `astro check`. Build annoncé ici avant.
+- 09:24 : fait : un glissé pendant une cascade est gardé (le dernier gagne) et joué dès qu'elle finit, la cascade
+  accélère pendant qu'il attend (comme le doigt appuyé), une nouvelle partie l'oublie ; au départ d'un glissé, les
+  blocs tirés reviennent à leur case. Vaut pour le jeu et la page de nuit (même composant). check-eclats.mjs : 1
+  contrôle de plus, 3 passages OK ; eslint, tsc, vitest OK.
+- 09:24 : commité et poussé à la demande de l'utilisateur (« Pousse direct une fois fini ») : mes 2 fichiers et cette
+  section seulement. Statut : terminé. Réservations libérées.

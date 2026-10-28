@@ -521,6 +521,8 @@ export default function EclatsGame({ gameId, night: nightTest = false }: { gameI
 	const quitRef = useRef(false); // the daily was given up mid-move: it ends once the move does
 	const dailyAsk = useRef(0); // the daily's latest seed request; a board change drops an older answer
 	const fastRef = useRef(false); // a finger held on the board speeds the cascade up
+	const queuedRef = useRef<Dir | null>(null); // a swipe made during a cascade: played once it ends, the latest wins
+	const doMoveRef = useRef<(dir: Dir) => void>(() => {});
 	const startRef = useRef(0);
 	const menuRef = useRef(false);
 	const fxId = useRef(0);
@@ -852,6 +854,7 @@ export default function EclatsGame({ gameId, night: nightTest = false }: { gameI
 	/** Deal a fresh game on `cfg`. `go` starts it at once (free play); else the ready gate. */
 	const deal = useCallback((cfg: EclatsCfg, go: boolean) => {
 		runRef.current++;
+		queuedRef.current = null;
 		dailyAsk.current++;
 		quitRef.current = false;
 		const st = createGame(cfg);
@@ -1039,7 +1042,7 @@ export default function EclatsGame({ gameId, night: nightTest = false }: { gameI
 		};
 		const token = showsRef.current.token;
 		// Later waves play quicker, and a finger held on the board quicker still.
-		const pace = (wave: number): number => Math.max(0.4, 1 - 0.12 * Math.max(0, wave - 1)) * (fastRef.current ? 0.45 : 1);
+		const pace = (wave: number): number => Math.max(0.4, 1 - 0.12 * Math.max(0, wave - 1)) * (fastRef.current || queuedRef.current !== null ? 0.45 : 1);
 		for (const step of steps) {
 			if (runRef.current !== my) return;
 			if (step.t === 'slide') {
@@ -1173,13 +1176,30 @@ export default function EclatsGame({ gameId, night: nightTest = false }: { gameI
 		}
 		settleShows();
 		bump();
+		// The swipe made while this one played goes now; a finished game drops it.
+		const next = queuedRef.current;
+		queuedRef.current = null;
+		if (next && st.status === 'playing') doMoveRef.current(next);
 		// chestShow, feedFire and fireballs only read refs and module state.
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [bump, gameId, setPhase, settleShows, reactTo]);
 
+	/** The tugged blocks back on their cells at once: a swipe slides them from there, not from where they lean. */
+	const untug = (): void => {
+		clearInterval(tugClock.current);
+		boardRef.current?.querySelectorAll<SVGGElement>('.ec-tug').forEach((g) => g.getAnimations().forEach((a) => a.cancel()));
+	};
+
 	const doMove = useCallback((dir: Dir) => {
 		const st = sRef.current;
-		if (!st || phaseRef.current !== 'idle' || menuRef.current || st.status !== 'playing') return;
+		if (!st || menuRef.current || st.status !== 'playing') return;
+		// A swipe during a cascade waits for it, and hurries it meanwhile.
+		if (phaseRef.current === 'busy') {
+			queuedRef.current = dir;
+			return;
+		}
+		if (phaseRef.current !== 'idle') return;
+		untug();
 		sfx.unlock();
 		const steps = play(st, dir);
 		setPreview([]);
@@ -1194,6 +1214,7 @@ export default function EclatsGame({ gameId, night: nightTest = false }: { gameI
 		if (st.moves === 1 && modeRef.current === 'free') trackGame(gameId, 'game_started');
 		void runSteps(steps, dir);
 	}, [gameId, runSteps]);
+	doMoveRef.current = doMove;
 
 	/** A tap on Bijou (or his gauge) once it is full: his fireballs. */
 	const doBreathe = useCallback(() => {

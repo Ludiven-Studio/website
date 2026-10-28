@@ -148,6 +148,20 @@ try {
 		check('a daily seed that comes back after leaving the daily changes nothing', late.mode === 'free' && late.phase === 'idle' && !gate,
 			`${late.mode} / ${late.phase}, ${gate ? 'a start gate' : 'no start gate'}`);
 		await until(page, (s) => s.mode === 'free' && s.phase === 'idle');
+		// A swipe made while the last one plays is kept, and plays once it ends: the opposite way always moves something.
+		{
+			const back = { up: 'down', down: 'up', left: 'right', right: 'left' };
+			const m0 = (await state(page)).moves;
+			const first = await page.evaluate((dirs) => dirs.find((d) => window.__eclats.movingCount(d) > 0), DIRS);
+			await page.evaluate((d) => window.__eclats.swipe(d), first);
+			await page.waitForTimeout(30);
+			const during = (await state(page)).phase;
+			await page.evaluate((d) => window.__eclats.swipe(d), back[first]);
+			await until(page, (s) => s.moves === m0 + 2 && (s.phase === 'idle' || s.phase === 'over'));
+			const after = await state(page);
+			check('a swipe made during a cascade is kept and played once it ends', during === 'busy' && after.moves === m0 + 2,
+				`${during} when the second came, moves ${m0} → ${after.moves}`);
+		}
 		await page.evaluate(() => {
 			window.__seen = { ember: false, ball: false };
 			new MutationObserver(() => {
