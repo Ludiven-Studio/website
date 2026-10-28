@@ -17,6 +17,7 @@ import {
 	play,
 	slide,
 	upcoming,
+	visible,
 	type Arrival,
 	type Block,
 	type Burst,
@@ -26,7 +27,7 @@ import {
 	type State,
 	type Step,
 } from './engine';
-import { DAILY, TIERS, TIER_ORDER, WORLDS, eclatsLevels, worldOf, type TierKey } from './levels';
+import { APP, DAILY, TIERS, TIER_ORDER, WORLDS, appNightConfig, eclatsLevels, worldOf, type TierKey } from './levels';
 import * as sfx from './sfx';
 import { encodePacked, fmtCentis, formatScore } from '../../lib/scoreFormat';
 import { DAILY_LB } from '../../data/dailyLb';
@@ -54,7 +55,7 @@ import { withExpert } from '../../lib/difficulty';
    timeline of steps that this file plays one by one.
    ===================================================== */
 
-type Mode = 'levels' | 'daily' | 'free';
+type Mode = 'levels' | 'daily' | 'free' | 'night'; // night: the app's night levels, on a hidden test page
 type Phase = 'ready' | 'idle' | 'busy' | 'over';
 
 const U = 10; // SVG units per cell
@@ -465,6 +466,19 @@ function timeFx(step: Burst, balls: number[] = []): Omit<Fx, 'id'> {
 	};
 }
 
+/**
+ * The dark over each cell at night: 0 where a light, a firefly or a glowing gem shows it, a faint veil over a chest
+ * or a rock seen only by its own glow, a thinner one where the light is about to go out, the night everywhere else.
+ */
+function veilOf(cells: (Block | null)[], light: number[], flies: number[]): number[] {
+	const see = (c: (Block | null)[], l: number[]): boolean[] => visible({ cfg: { night: true }, cells: c, light: l, flies } as unknown as State);
+	const all = see(cells, light);
+	const lit = see(cells.map((b) => (b && b.kind !== 'gem' ? null : b)), light);
+	const lasting = see(cells, light.map((l) => (l > 1 ? l : 0)));
+	return all.map((v, i) => (!v ? 0.94 : !lit[i] ? 0.55 : !lasting[i] ? 0.35 : 0));
+}
+const NIGHT_PICKS = [1, 3, 37, 120, 250];
+
 const HINT_WORDS: Record<Dir, string> = { up: 'le haut ↑', down: 'le bas ↓', left: 'la gauche ←', right: 'la droite →' };
 
 const DIR_KEYS: Record<string, Dir> = {
@@ -472,7 +486,7 @@ const DIR_KEYS: Record<string, Dir> = {
 	z: 'up', w: 'up', s: 'down', q: 'left', a: 'left', d: 'right',
 };
 
-export default function EclatsGame({ gameId }: { gameId: string }) {
+export default function EclatsGame({ gameId, night: nightTest = false }: { gameId: string; night?: boolean }) {
 	const [, setTick] = useState(0);
 	const bump = useCallback(() => setTick((t) => t + 1), []);
 	const [mode, setMode] = useState<Mode>('free');
@@ -504,6 +518,9 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 	const [endGain, setEndGain] = useState(0);
 	const [pour, setPour] = useState(false); // the gauge pours into Bijou as he breathes
 	const [said, setSaid] = useState(''); // what a screen reader is told after a move
+	const [nightLevel, setNightLevel] = useState(1);
+	const [seeAll, setSeeAll] = useState(false); // the night test's « voir tout »
+	const [dark, setDark] = useState<{ light: number[]; flies: number[] }>({ light: [], flies: [] });
 
 	const sRef = useRef<State | null>(null);
 	const phaseRef = useRef<Phase>('idle');
@@ -850,6 +867,7 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 		resetShows(0, 0, 0);
 		noteLocked(lockedRef.current, st.cells);
 		setCells(st.cells.map((b) => (b ? { ...b } : null)));
+		setDark({ light: st.light.slice(), flies: st.flies.slice() });
 		setGlow([]);
 		setPreview([]);
 		setFx(null);
@@ -878,9 +896,21 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 		deal({ ...TIERS[t].cfg, seed: (Math.random() * 2 ** 32) >>> 0 }, true);
 	}, [deal]);
 
+	/* The night test: the app's night levels, nothing saved. */
+	const startNight = useCallback((level: number) => {
+		const l = Math.max(1, Math.min(APP.count, Math.round(level) || 1));
+		setNightLevel(l);
+		setMode('night');
+		modeRef.current = 'night';
+		setAlreadyPlayed(false);
+		setDailyLoading(false);
+		deal(appNightConfig(l), true);
+	}, [deal]);
+
 	useEffect(() => {
-		newFree('facile');
-	}, [newFree]);
+		if (nightTest) startNight(1);
+		else newFree('facile');
+	}, [nightTest, newFree, startNight]);
 
 	/* Levels */
 	const startLevel = useCallback((level: number) => {
@@ -896,7 +926,7 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 
 	useEffect(() => {
 		const params = new URLSearchParams(location.search);
-		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		if (nightTest || params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
 		void lv.resume().then((next) => { if (next != null) startLevel(next); });
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
@@ -1036,6 +1066,8 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 				reactTo('breath');
 				sfx.breath();
 				if (fireballs(balls, token)) await wait(BALL_MS);
+			} else if (step.t === 'night') {
+				setDark({ light: step.light, flies: step.flies });
 			} else {
 				waves = step.wave;
 				if (!balls.length) {
@@ -1286,7 +1318,8 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 		const m = modeRef.current;
 		if (st.status === 'won') sfx.win(); else sfx.lose();
 		// The loot goes to Bijou's treasure; a lost level loses it.
-		const gain = m === 'levels' && st.status !== 'won' ? 0 : butinRef.current;
+		// A night test keeps nothing: its loot does not go to the treasure.
+		const gain = (m === 'levels' && st.status !== 'won') || m === 'night' ? 0 : butinRef.current;
 		setEndGain(gain);
 		if (gain > 0) {
 			hoardRef.current += gain;
@@ -1311,12 +1344,14 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 			};
 			saveDailyRun(gameId, snapshot);
 			setAlreadyPlayed(true);
+		} else if (m === 'night') {
+			// Nothing saved, nothing counted.
 		} else if (st.score > record) {
 			try { localStorage.setItem(recordKey(tierKey), String(st.score)); } catch { /* private mode */ }
 			setRecord(st.score);
 			setNewRecord(true);
 		}
-		trackGame(gameId, st.status === 'won' ? 'game_won' : 'game_over', { score: st.score });
+		if (m !== 'night') trackGame(gameId, st.status === 'won' ? 'game_won' : 'game_over', { score: st.score });
 	};
 
 	const giveUp = useCallback(() => {
@@ -1407,16 +1442,43 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 			<style>{CSS}</style>
 			<div ref={flyRef} className="ec-flylayer" aria-hidden="true" />
 
-			<ModeToggle
+			{!nightTest && <ModeToggle
 				daily={mode === 'daily'}
 				onFree={() => { if (mode !== 'free' || lv.active) { lv.exit(); newFree(tierKey); } }}
 				onDaily={() => { lv.exit(); void startDaily(); }}
 				showLevels
 				levelsActive={lv.active}
 				onLevels={() => lv.enter()}
-			/>
+			/>}
 
-			{mode === 'levels' ? (
+			{mode === 'night' ? (
+				<div className="ec-nightbar">
+					<p className="ec-tag">
+						Nuit · niveau {nightLevel} de l'appli · {s?.cfg.flies ?? 0} luciole{(s?.cfg.flies ?? 0) > 1 ? 's' : ''}
+						{s && <span className="ec-goal">Ouvre {chestsWord(s.cfg.goal)}{s.limit > 0 ? ` en ${s.limit} coups maximum` : ''}</span>}
+					</p>
+					<div className="ec-pills">
+						{NIGHT_PICKS.map((l) => (
+							<button key={l} className={`ec-pill ${nightLevel === l ? 'active' : ''}`} onClick={() => startNight(l)}>{l}</button>
+						))}
+						<input
+							className="ec-pill ec-nightnum"
+							type="number"
+							min={1}
+							max={APP.count}
+							aria-label="Niveau de nuit, de 1 à 250"
+							defaultValue={nightLevel}
+							key={nightLevel}
+							onKeyDown={(e) => { if (e.key === 'Enter') startNight(Number(e.currentTarget.value)); }}
+							onBlur={(e) => { if (Number(e.currentTarget.value) !== nightLevel) startNight(Number(e.currentTarget.value)); }}
+						/>
+					</div>
+					<div className="ec-pills">
+						<button className="ec-pill" onClick={() => startNight(nightLevel)}>Nouvelle partie</button>
+						<label className="ec-pill ec-seeall"><input type="checkbox" checked={seeAll} onChange={(e) => setSeeAll(e.currentTarget.checked)} /> Voir tout</label>
+					</div>
+				</div>
+			) : mode === 'levels' ? (
 				<div className="ec-tag">
 					{lv.menu ? 'Progression — réussis un niveau pour débloquer le suivant' : (
 						<>
@@ -1531,6 +1593,11 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 						aria-label="Plateau de Dragon's Gems Swipe : glisse pour tout faire glisser"
 					>
 						<defs>
+							<radialGradient id="ec-fly-glow">
+								<stop offset="0" stopColor="#f6ffb8" stopOpacity="1" />
+								<stop offset="0.35" stopColor="#d4f76a" stopOpacity="0.7" />
+								<stop offset="1" stopColor="#9be03a" stopOpacity="0" />
+							</radialGradient>
 							<radialGradient id="ec-halo">
 								<stop offset="0" stopColor="#fff6c8" stopOpacity="0.95" />
 								<stop offset="0.45" stopColor="#ffd24a" stopOpacity="0.45" />
@@ -1573,6 +1640,20 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 								) : null,
 							)}
 						</g>
+
+						{mode === 'night' && s?.cfg.night && (
+							<g className="ec-night" aria-hidden="true">
+								{!seeAll && veilOf(cells, dark.light, dark.flies).map((o, i) => (
+									<rect key={i} x={(i % N) * U + 0.1} y={Math.floor(i / N) * U + 0.1} width={U - 0.2} height={U - 0.2} rx={1.8} className="ec-veil" style={{ opacity: o }} />
+								))}
+								{dark.flies.map((f, k) => (
+									<g key={k} className="ec-firefly" style={{ transform: `translate(${cx(f)}px, ${cy(f)}px)` }}>
+										<circle r={3.6} className="ec-firefly-halo" style={{ animationDelay: `${-k * 0.37}s` }} />
+										<circle r={1.05} className="ec-firefly-core" />
+									</g>
+								))}
+							</g>
+						)}
 
 						{fx && (
 							<g key={fx.id}>
@@ -1721,6 +1802,20 @@ export default function EclatsGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
+				{over && mode === 'night' && s && (
+					<div className="ec-overlay">
+						<div className="ec-card" role="dialog" aria-label="Partie de nuit terminée">
+							<div className="ec-mark">{won ? '🌙' : '🌑'}</div>
+							<h2>{won ? `Nuit ${nightLevel} réussie !` : 'Échoué'}</h2>
+							<p className="ec-sub">{s.moves} coups · {s.opened} {s.opened > 1 ? 'coffres' : 'coffre'} sur {s.cfg.goal}{won ? ` · ★★★ ≤ ${appNightConfig(nightLevel).three}` : ''}</p>
+							<div className="ec-pills">
+								<button className="ec-start sm" onClick={() => startNight(nightLevel)}>Rejouer</button>
+								{nightLevel < APP.count && <button className="ec-start sm" onClick={() => startNight(nightLevel + 1)}>Nuit {nightLevel + 1} →</button>}
+							</div>
+						</div>
+					</div>
+				)}
+
 				{over && mode === 'free' && s && (
 					<div className="ec-overlay">
 						<div className="ec-card" role="dialog" aria-label="Partie terminée">
@@ -1843,6 +1938,15 @@ const CSS = `
   font: inherit; font-weight: 500; font-size: 13px; border-radius: 999px; padding: 6px 12px; cursor: pointer;
 }
 .ec-pill.active { background: var(--accent-regular); color: var(--accent-text-over); border-color: var(--accent-regular); }
+/* The night test page: its level picker, the dark over the cells and the fireflies. */
+.ec-nightbar { display: flex; flex-direction: column; align-items: center; }
+.ec-nightnum { width: 4.6rem; text-align: center; }
+.ec-seeall { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.ec-veil { fill: #0a1024; transition: opacity 0.45s ease; pointer-events: none; }
+.ec-firefly { transition: transform 0.55s ease-in-out; pointer-events: none; }
+.ec-firefly-halo { fill: url(#ec-fly-glow); animation: ec-firefly-blink 1.6s ease-in-out infinite alternate; }
+.ec-firefly-core { fill: #f4ffb0; }
+@keyframes ec-firefly-blink { from { opacity: 0.55; transform: scale(0.85); } to { opacity: 1; transform: scale(1.1); } }
 
 .ec-hud { width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; margin-bottom: 0.45rem; }
 .ec-chip {
@@ -2145,5 +2249,7 @@ span.ec-ember { border-radius: 50%; background: radial-gradient(circle, #fff6c8 
   .ec-dance img:nth-child(2) { display: none; }
   .ec-fire-fill { transition: none; }
   .ec-fire-fill.pour, .ec-fire.full .ec-fire-track, .ec-fire.full .ec-fire-fill, .ec-fire.full .ec-fire-tip, .ec-chip.low, .ec-stuck .ec-start { animation: none; }
+  .ec-firefly, .ec-veil { transition: none; }
+  .ec-firefly-halo { animation: none; }
 }
 `;

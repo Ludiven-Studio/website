@@ -10,6 +10,9 @@
 // fireballs on the board, a 3×3 blast each, chests first, and a full board is not lost while he can.
 // A level may limit the swipes: run out before the last chest and it is lost (unless Bijou can
 // still breathe); `revive` gives a lost level more swipes and a full gauge.
+// At night (cfg.night) nothing above changes; the board is only dark: explosions light their cells for a
+// couple of swipes, fireflies drift a step each swipe, chests, rocks and charged gems glow. `visible` says
+// what the player sees.
 //
 // play() returns a timeline of steps, each with a snapshot of the board after it, so the screen can
 // animate a move one step at a time while the engine stays a plain function.
@@ -30,6 +33,10 @@ export const LEAP_AT = 5;
 export const FIRE_FULL = 80;
 /** Fireballs in one breath, each a 3×3 blast. */
 export const FIREBALLS = 3;
+/** At night, the swipes a cell stays lit once an explosion beside it went off. */
+export const LIGHT_SWIPES = 2;
+/** At night, gems of this rank and up glow and light their neighbours. */
+export const GLOW_RANK = 2;
 
 export interface Block {
 	id: number;
@@ -53,6 +60,8 @@ export interface EclatsCfg {
 	limit?: number; // swipes allowed to open the chests (none when absent or 0)
 	layout?: string; // a hand-made starting board instead of the random one (LAYOUT_CODES, 49 cells by rows)
 	fire?: number; // Bijou's gauge at the start
+	night?: boolean; // a dark board: the rules are the same, `visible` says what shows
+	flies?: number; // fireflies at night
 }
 
 export type Status = 'playing' | 'won' | 'lost';
@@ -69,6 +78,8 @@ export interface State {
 	fire: number; // Bijou's gauge: gems destroyed since his last breath, up to FIRE_FULL
 	limit: number; // swipes allowed, 0 = no limit; a revive raises it
 	status: Status;
+	light: number[]; // at night, per cell, the swipes it stays lit (0 = dark); empty by day
+	flies: number[]; // at night, each firefly's cell; empty by day
 }
 
 export interface Popped {
@@ -100,7 +111,8 @@ export type Step =
 	| { t: 'slide'; cells: (Block | null)[] }
 	| Burst
 	| { t: 'arrive'; ids: number[]; centre: number; cells: (Block | null)[] } // centre: the id dropped there, or -1
-	| { t: 'breath'; balls: number[]; cells: (Block | null)[] }; // where Bijou's fireballs land, before they do
+	| { t: 'breath'; balls: number[]; cells: (Block | null)[] } // where Bijou's fireballs land, before they do
+	| { t: 'night'; light: number[]; flies: number[]; cells: (Block | null)[] }; // the lights and the fireflies once a move is over
 
 /* ---------- Helpers ---------- */
 
@@ -194,8 +206,9 @@ function groupSize(s: State, i: number): number {
 export function createGame(cfg: EclatsCfg): State {
 	const s: State = {
 		cfg, cells: new Array(N * N).fill(null), nextId: 1, moves: 0, arrivals: 0, centred: 0, opened: 0, score: 0,
-		fire: Math.min(FIRE_FULL, cfg.fire ?? 0), limit: cfg.limit ?? 0, status: 'playing',
+		fire: Math.min(FIRE_FULL, cfg.fire ?? 0), limit: cfg.limit ?? 0, status: 'playing', light: [], flies: [],
 	};
+	if (cfg.night) dusk(s);
 	if (cfg.layout) {
 		lay(s, cfg.layout);
 		return s;
@@ -225,6 +238,15 @@ export function createGame(cfg: EclatsCfg): State {
 	return s;
 }
 
+/** Night falls: every cell dark, the fireflies on distinct cells. */
+function dusk(s: State): void {
+	s.light = new Array(N * N).fill(0);
+	for (let k = 0; k < (s.cfg.flies ?? 0); k++) {
+		const free = s.light.map((_, i) => i).filter((i) => !s.flies.includes(i));
+		s.flies.push(free[hash2(hash2(s.cfg.seed, 0x1197), k) % free.length]);
+	}
+}
+
 /** Puts a hand-made board down (LAYOUT_CODES); the ids go in reading order. */
 function lay(s: State, layout: string): void {
 	if (layout.length !== N * N) throw new Error(`a layout has ${N * N} cells, not ${layout.length}`);
@@ -240,7 +262,7 @@ function lay(s: State, layout: string): void {
 }
 
 export function cloneState(s: State): State {
-	return { ...s, cells: snap(s) };
+	return { ...s, cells: snap(s), light: s.light.slice(), flies: s.flies.slice() };
 }
 
 /* ---------- Sliding ---------- */
@@ -539,6 +561,7 @@ const MAX_ROUNDS = 16;
 export function play(s: State, dir: Dir): Step[] | null {
 	if (s.status !== 'playing' || outOfMoves(s) || !slide(s, dir)) return null;
 	s.moves++;
+	if (s.cfg.night) s.light = s.light.map((l) => Math.max(0, l - 1));
 	const steps: Step[] = [{ t: 'slide', cells: snap(s) }];
 	const won = (): boolean => s.cfg.goal > 0 && s.opened >= s.cfg.goal;
 	let wave = 0;
@@ -548,6 +571,7 @@ export function play(s: State, dir: Dir): Step[] | null {
 			wave++;
 			burstNow = true;
 			steps.push(b);
+			if (s.cfg.night) lightUp(s, b);
 			s.fire = Math.min(FIRE_FULL, s.fire + b.popped.filter((p) => p.kind === 'gem').length);
 			if (won()) break; // the last chest ends the level at once
 			if (slide(s, dir)) steps.push({ t: 'slide', cells: snap(s) });
@@ -559,7 +583,45 @@ export function play(s: State, dir: Dir): Step[] | null {
 	}
 	if (won()) s.status = 'won';
 	else if ((!s.cells.some((b) => !b) || outOfMoves(s)) && !canBreathe(s)) s.status = 'lost';
+	if (s.cfg.night) {
+		flutter(s);
+		steps.push({ t: 'night', light: s.light.slice(), flies: s.flies.slice(), cells: snap(s) });
+	}
 	return steps;
+}
+
+/* ---------- Night ---------- */
+
+/** An explosion lights the cells of everything it took, and their neighbours, for LIGHT_SWIPES swipes. */
+function lightUp(s: State, b: Burst): void {
+	for (const p of b.popped) for (const j of around(p.cell)) s.light[j] = LIGHT_SWIPES;
+}
+
+/** Each firefly drifts one step, to a neighbour no other firefly is on (those that moved before it count). */
+function flutter(s: State): void {
+	const seed = hash2(s.cfg.seed, 0xf1e5);
+	s.flies.forEach((cell, f) => {
+		const free = around(cell).filter((j) => j !== cell && !s.flies.includes(j));
+		if (free.length) s.flies[f] = free[hash2(seed, s.moves * 8 + f) % free.length];
+	});
+}
+
+/**
+ * What the player sees, per cell. By day, everything. At night, a lit cell, a cell next to a firefly, a chest
+ * or a rock (they glow faintly, so the goal always shows), and a cell next to a gem of GLOW_RANK and up.
+ */
+export function visible(s: State): boolean[] {
+	if (!s.cfg.night) return new Array(N * N).fill(true);
+	const seen = s.light.map((l) => l > 0);
+	const glow = (i: number): void => {
+		for (const j of around(i)) seen[j] = true;
+	};
+	s.flies.forEach(glow);
+	s.cells.forEach((b, i) => {
+		if (b && b.kind !== 'gem') seen[i] = true;
+		else if (b && b.rank >= GLOW_RANK) glow(i);
+	});
+	return seen;
 }
 
 /** No swipe left: the level's limit is reached. */
@@ -629,9 +691,15 @@ export function breathe(s: State): Step[] | null {
 	s.fire = 0;
 	const balls = fireTargets(s);
 	const steps: Step[] = [{ t: 'breath', balls, cells: snap(s) }];
-	steps.push(burst(s, 'down', 1, balls.flatMap(around))!);
+	const fireballs = burst(s, 'down', 1, balls.flatMap(around))!;
+	steps.push(fireballs);
 	if (s.cfg.goal > 0 && s.opened >= s.cfg.goal) s.status = 'won';
 	else if (outOfMoves(s)) s.status = 'lost';
+	// Not a swipe: the lights do not fade and the fireflies stay, but the fireballs light like any explosion.
+	if (s.cfg.night) {
+		lightUp(s, fireballs);
+		steps.push({ t: 'night', light: s.light.slice(), flies: s.flies.slice(), cells: snap(s) });
+	}
 	return steps;
 }
 

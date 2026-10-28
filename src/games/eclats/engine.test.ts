@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
 	CENTRE_ORDER,
 	FIRE_FULL,
+	LIGHT_SWIPES,
 	MAX_RANK,
 	N,
 	arrivalAt,
@@ -20,6 +21,7 @@ import {
 	previewGroups,
 	slide,
 	upcoming,
+	visible,
 	STEP_MOVES,
 	type Block,
 	type Burst,
@@ -29,7 +31,7 @@ import {
 	type Step,
 } from './engine';
 import { playBot } from './bot';
-import { APP, FREE_LEVELS, SITE, eclatsLevels, levelConfig, starsLimit } from './levels';
+import { APP, FREE_LEVELS, SITE, appNightConfig, eclatsLevels, levelConfig, starsLimit } from './levels';
 
 const CFG: EclatsCfg = { seed: 7, fifth: 0, goal: 0, chests: 0, locked: 0, chestEvery: 0, rocks: 0, ice: 0, fill: 0 };
 const B = N - 1; // the bottom row
@@ -560,6 +562,123 @@ describe('levels', () => {
 			expect(eclatsLevels.stars(l, { won: true, score: cfg.two })).toBe(2);
 			expect(eclatsLevels.stars(l, { won: true, score: cfg.two + 1 })).toBe(1);
 			expect(eclatsLevels.stars(l, { won: false, score: 1 })).toBe(0);
+		}
+	});
+});
+
+describe('night', () => {
+	const SWIPES = ['left', 'down', 'right', 'up'] as const;
+	const cheb = (a: number, b: number): number => Math.max(Math.abs(Math.floor(a / N) - Math.floor(b / N)), Math.abs((a % N) - (b % N)));
+	/** The cells an explosion lights: what it took, and their neighbours. */
+	const litBy = (steps: Step[]): Set<number> => {
+		const out = new Set<number>();
+		for (const b of bursts(steps)) for (const p of b.popped) for (let j = 0; j < N * N; j++) if (cheb(j, p.cell) <= 1) out.add(j);
+		return out;
+	};
+	/** A swipe that moves something, in a fixed order. */
+	const anySwipe = (s: State, k: number): Step[] => {
+		for (let d = 0; d < 4; d++) {
+			const steps = play(s, SWIPES[(k + d) % 4]);
+			if (steps) return steps;
+		}
+		throw new Error('nothing moves');
+	};
+
+	it('by day nothing is dark: no lights, no fireflies, everything shows, no night step', () => {
+		const s = createGame(APP.levelConfig(37));
+		expect(s.light).toEqual([]);
+		expect(s.flies).toEqual([]);
+		expect(visible(s).every(Boolean)).toBe(true);
+		expect(anySwipe(s, 0).some((x) => x.t === 'night')).toBe(false);
+	});
+
+	it('plays every move exactly as by day', () => {
+		for (const level of [12, 37, 140, 230]) {
+			const cfg = APP.levelConfig(level);
+			const day = createGame(cfg);
+			const night = createGame({ ...cfg, night: true, flies: 3 });
+			expect(night.cells).toEqual(day.cells);
+			for (let k = 0; k < 14 && day.status === 'playing'; k++) {
+				const a = play(day, SWIPES[k % 4]);
+				const b = play(night, SWIPES[k % 4]);
+				expect(!!b).toBe(!!a);
+				if (b) expect(b.at(-1)!.t).toBe('night');
+				for (const key of ['cells', 'score', 'opened', 'fire', 'arrivals', 'centred', 'moves', 'status'] as const) expect(night[key]).toEqual(day[key]);
+			}
+		}
+	});
+
+	it('places its fireflies on distinct cells, the same every time, and moves each one step per swipe', () => {
+		const cfg: EclatsCfg = { ...APP.levelConfig(60), night: true, flies: 4 };
+		const a = createGame(cfg);
+		const b = createGame(cfg);
+		expect(a.flies).toEqual(b.flies);
+		expect(new Set(a.flies).size).toBe(4);
+		for (let k = 0; k < 10 && a.status === 'playing'; k++) {
+			const before = a.flies.slice();
+			anySwipe(a, k);
+			anySwipe(b, k);
+			expect(a.flies).toEqual(b.flies);
+			expect(new Set(a.flies).size).toBe(4);
+			a.flies.forEach((f, i) => expect(cheb(f, before[i])).toBe(1));
+		}
+	});
+
+	it('lights what an explosion took and its neighbours for two swipes', () => {
+		const s = blank({ night: true });
+		for (let c = 0; c < 3; c++) put(s, B, c, 'gem', 0);
+		swipeDown(s);
+		expect(s.light[at(B, 0)]).toBe(LIGHT_SWIPES);
+		expect(s.light[at(B - 1, 3)]).toBe(LIGHT_SWIPES);
+		expect(s.light[at(B - 2, 0)]).toBe(0);
+		for (let k = 0; k < 3; k++) {
+			const before = s.light.slice();
+			const lit = litBy(anySwipe(s, k));
+			s.light.forEach((l, i) => expect(l).toBe(lit.has(i) ? LIGHT_SWIPES : Math.max(0, before[i] - 1)));
+		}
+	});
+
+	it('a breath lights like any explosion, but fades nothing and leaves the fireflies where they are', () => {
+		const s = createGame({ ...APP.levelConfig(60), night: true, flies: 2, fire: FIRE_FULL });
+		anySwipe(s, 0);
+		const light = s.light.slice();
+		const flies = s.flies.slice();
+		const moves = s.moves;
+		const steps = breathe(s)!;
+		expect(steps.at(-1)!.t).toBe('night');
+		expect(s.flies).toEqual(flies);
+		expect(s.moves).toBe(moves);
+		const lit = litBy(steps);
+		expect(lit.size).toBeGreaterThan(0);
+		s.light.forEach((l, i) => expect(l).toBe(lit.has(i) ? LIGHT_SWIPES : light[i]));
+	});
+
+	it('shows lit cells, the fireflies and their neighbours, chests and rocks, and around glowing gems', () => {
+		const s = blank({ night: true });
+		put(s, 0, 0, 'chest');
+		put(s, 0, 6, 'rock');
+		put(s, 3, 3, 'gem', 1, { rank: 2 });
+		put(s, 6, 6, 'gem', 0);
+		s.flies = [at(6, 0)];
+		s.light[at(0, 3)] = 1;
+		const v = visible(s);
+		const shows = (r: number, c: number): boolean => v[at(r, c)];
+		expect([shows(0, 3), shows(1, 3)]).toEqual([true, false]); // lit
+		expect([shows(5, 1), shows(6, 1), shows(4, 0)]).toEqual([true, true, false]); // firefly
+		expect([shows(0, 0), shows(1, 0), shows(0, 6), shows(1, 6)]).toEqual([true, false, true, false]); // chest, rock
+		expect([shows(2, 2), shows(4, 4), shows(5, 5), shows(6, 6)]).toEqual([true, true, false, false]); // glow, plain gem
+	});
+
+	it("the app's night run replays its boards, fireflies four to one, two more swipes where limited", () => {
+		expect(appNightConfig(1).flies).toBe(4);
+		expect(appNightConfig(250).flies).toBe(1);
+		for (const level of [5, 20, 21, 120, 250]) {
+			const day = APP.levelConfig(level);
+			const n = appNightConfig(level);
+			expect(n.night).toBe(true);
+			expect([n.seed, n.layout, n.goal, n.lesson]).toEqual([day.seed, day.layout, day.goal, day.lesson]);
+			const more = day.limit > 0 ? 2 : 0;
+			expect([n.limit, n.three, n.two]).toEqual([day.limit + more, day.three + more, day.two + more]);
 		}
 	});
 });

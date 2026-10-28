@@ -1181,3 +1181,33 @@
   arrêté. Non commité, non poussé : en attente du feu vert de l'utilisateur. Réservations gardées jusqu'au commit.
 - 16:43 : commité et poussé à la demande de l'utilisateur : mes 43 fichiers et cette section seulement. Statut :
   terminé. Réservations libérées.
+
+## 2026-10-27 — Dragon's Gems Swipe : la nuit et les lucioles (moteur) (session website)
+- Statut : en cours (2026-10-27T15:28+01:00). Demande de l'utilisateur : (transmis par la session Unity) règle choisie
+  par l'utilisateur : « La nuit et les lucioles », d'abord dans le moteur du site, puis portée dans l'app
+- Réservations actives : `src/games/eclats/engine.ts`, `src/games/eclats/engine.test.ts`, `src/games/eclats/levels.ts`,
+  `src/games/eclats/EclatsGame.tsx` (ignorer l'étape de nuit).
+- Ressources : serveur de dev sur le port 4473 ; eslint, `astro check`. Build annoncé ici avant.
+- 15:33 : fait (non commité) : engine.ts : cfg night/flies, état light/flies (vides le jour), LIGHT_SWIPES = 2,
+  GLOW_RANK = 2, lucioles posées au hasard du seed (hash2(hash2(seed, 0x1197), k)), lumière qui baisse à chaque coup
+  accepté, chaque explosion allume ses cases et leurs voisines, lucioles qui bougent d'une case en fin de coup
+  (hash2(hash2(seed, 0xf1e5), moves*8+f)), étape { t: 'night', light, flies, cells } en fin de coup et après un souffle
+  (qui allume sans éteindre ni bouger les lucioles), visible(s). levels.ts : appNightConfig(level). EclatsGame.tsx
+  ignore l'étape de nuit. vitest eclats 51/51 (7 nouveaux, dont « une partie de nuit joue exactement les mêmes coups
+  que de jour »), levels.stress 166/166, tsc sans erreur, check-eclats.mjs OK. Les fixtures de parité de l'app ne
+  bougent pas (gen_fixtures.mts n'enregistre que des champs nommés).
+- 18:41 : demande de l'utilisateur (transmise par la session Unity) : « pour la règle de la nuit sur le site, il
+  faudrait pouvoir tester facilement pour que je valide ». Réservation ajoutée : `src/pages/jeux/eclats/nuit.astro`
+  (nouveau, page de test cachée, noindex, hors sitemap) ; `astro.config.mjs` (une ligne du filtre du sitemap).
+- 18:50 : page de test /jeux/eclats/nuit/ (noindex, hors sitemap) : les niveaux de nuit de l'appli (appNightConfig)
+  dans le jeu du site, choix du niveau (1, 3, 37, 120, 250 ou un numéro), Nouvelle partie, Voir tout ; cases sombres
+  (voile bleu nuit), faibles autour des coffres et rochers, qui s'éteignent quand la lumière finit, lucioles qui
+  glissent d'une case à l'étape de nuit ; souffle normal. Rien n'est enregistré (ni progression, ni trésor, ni score,
+  ni statistiques). eslint OK, vitest eclats 51/51, check-eclats.mjs OK, essai Playwright sans erreur. Lancement du
+  build complet (écrit dist/, .astro/, public/vendor/)…
+- 18:57 : build complet OK (191 pages, précache 349 entrées, liens OK ; la page de nuit hors sitemap). check-eclats.mjs
+  : un passage a échoué sur 3 mesures de temps pendant une forte charge de la machine (processeur à 43 % par d'autres
+  sessions), puis 2 passages OK. Non commité : en attente du feu vert de l'utilisateur.
+- 01:26 : commité et poussé à la demande de l'utilisateur (« Go et push ») : engine.ts, engine.test.ts, levels.ts,
+  EclatsGame.tsx, la page jeux/eclats/nuit.astro, la ligne du sitemap dans astro.config.mjs et cette section seulement.
+  Statut : terminé. Réservations libérées.

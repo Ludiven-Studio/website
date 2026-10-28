@@ -196,6 +196,17 @@ export const SITE = levelSet(LEVEL_COUNT, PICKS_SITE);
 /** The Unity app: the same climb over 250 levels, five lands of 50, the Expert pack 251-500. */
 export const APP = levelSet(250, PICKS_APP);
 
+/**
+ * The app's night run, after its second ending: its levels 1-250 again, the same boards in the dark. The
+ * fireflies thin out from four to one; a level with a limit gets two more swipes, and so do its stars.
+ */
+export function appNightConfig(level: number): EclatsLevelCfg {
+	const day = APP.levelConfig(level);
+	const flies = Math.round(lerp(4, 1, (Math.min(APP.count, Math.max(1, level)) - 1) / (APP.count - 1)));
+	const more = day.limit > 0 ? 2 : 0;
+	return { ...day, night: true, flies, limit: day.limit + more, three: day.three + more, two: day.two + more };
+}
+
 export const COUNT = SITE.count;
 export const WORLDS = SITE.worlds;
 export const { worldOf, levelBoard, boardFor, targetPar, levelConfig } = SITE;

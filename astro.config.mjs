@@ -44,7 +44,9 @@ export default defineConfig({
                 !page.includes('/petanque-meet/test') &&
                 !page.includes('/petanque-scanner/test') &&
                 !page.includes('/prototypes') &&
-                !page.includes('/jeux/petanque/test'),
+                !page.includes('/jeux/petanque/test') &&
+                !page.includes('/jeux/eclats/test') &&
+                !page.includes('/jeux/eclats/nuit'),
         }),
         AstroPWA({
             registerType: 'autoUpdate',
