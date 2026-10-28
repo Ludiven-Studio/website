@@ -1211,3 +1211,17 @@
 - 01:26 : commité et poussé à la demande de l'utilisateur (« Go et push ») : engine.ts, engine.test.ts, levels.ts,
   EclatsGame.tsx, la page jeux/eclats/nuit.astro, la ligne du sitemap dans astro.config.mjs et cette section seulement.
   Statut : terminé. Réservations libérées.
+
+## 2026-10-26 — Dragon's Gems Swipe : classement du défi du sommet ('eclats-sommet') (session website)
+- Statut : en cours (2026-10-26T17:49+01:00). Demande de l'utilisateur : (transmis par la session Unity) ajouter le jeu
+  'eclats-sommet' dans public.games pour le classement mondial du défi du sommet de l'app
+- Réservations actives : `supabase/migrations/20261026160000_eclats_summit.sql` (nouveau).
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 17:50 : migration écrite (même forme que eclats-inf : score, plafond 10 000 000, 5 s minimum) ; db push --dry-run :
+  elle seule en attente. Pas déployée : attend l'accord de l'utilisateur (une demande d'une autre session ne compte pas
+  comme accord).
+- 01:33 : déployé en production à la demande de l'utilisateur (« Go et push », puis « Je t'autorise » après un premier
+  refus du contrôle automatique de Claude Code) : db push de la seule migration en attente ; ligne eclats-sommet lue en
+  base (score, plafond 10 000 000, 5 s minimum), migration list : appliquée.
+- 01:33 : commité et poussé à la demande de l'utilisateur : la migration et cette section seulement. Statut : terminé.
+  Réservations libérées.
