@@ -75,26 +75,47 @@ function pickAll(name: string, set: LevelSet): Pick[] {
 }
 
 /**
- * The app's night run: each day board again, with its own bot count and limit. The bot breathes, as a player will:
- * frozen chests do not slide, and a board left without its breath fills up. The day's deal when the bot clears it at
- * night, else the deal it clears nearest the day's count plus NIGHT_EXTRA.
+ * The app's night run: each day board again, harder. Perle's gauge fills at NIGHT_FIRE_FULL; the bot and the typical
+ * player breathe as soon as it is full (frozen chests do not slide, a board left without its breath fills up). The
+ * limit is the count the typical player wins within NIGHT_WIN of the time (NIGHT_WIN_HARD on a hard level), over more
+ * runs than by day. The day's deal when that works, else the deal of the same level nearest the day's count plus
+ * NIGHT_EXTRA: a deal the bot cannot clear, or that beats the typical player more often than the share, is skipped.
  */
-const NIGHT_EXTRA = 6; // the bot's mean extra swipes at night, measured over the 250 levels
+const NIGHT_PLAYERS = 200; // 60 swung from 43 % to 87 % between neighbouring levels
+const NIGHT_WIN = 0.6;
+const NIGHT_WIN_HARD = 0.5;
+const NIGHT_EXTRA = 6; // the bot's mean extra swipes at night, to pick a replacement deal near the day's climb
+
+/** The night limit of a deal, or null when the board beats the typical player more often than the share allows. */
+function nightLimitFor(level: number, cfg: EclatsCfg, par: number): number | null {
+	if (level <= FREE_LEVELS) return 0;
+	const runs = Array.from({ length: NIGHT_PLAYERS }, (_, i) => typical(cfg, hash2(level, i))).sort((a, b) => a - b);
+	const at = runs[Math.ceil((isHard(level) ? NIGHT_WIN_HARD : NIGHT_WIN) * NIGHT_PLAYERS) - 1];
+	return isFinite(at) ? Math.max(par + 2, at) : null;
+}
+
 function pickNight(): Pick[] {
 	const picks: Pick[] = [];
 	for (let l = 1; l <= APP.count; l++) {
 		const [dayK, dayPar] = APP.picks[l - 1];
-		let best: [number, number] | null = null;
-		const day = playBot(appNightBoard(l, dayK), { breathe: true });
-		if (day.won) best = [dayK, day.moves];
-		for (let k = 0; !best && k < CANDIDATES; k++) {
-			const run = playBot(appNightBoard(l, k), { breathe: true });
-			if (run.won && (!best || Math.abs(run.moves - dayPar - NIGHT_EXTRA) < Math.abs(best[1] - dayPar - NIGHT_EXTRA))) best = [k, run.moves];
+		const deal = (k: number): Pick | null => {
+			const board = appNightBoard(l, k);
+			const run = playBot(board, { breathe: true });
+			if (!run.won) return null;
+			const limit = nightLimitFor(l, board, run.moves);
+			return limit === null ? null : [k, run.moves, limit];
+		};
+		let pick = deal(dayK);
+		if (!pick) {
+			for (let k = 0; k < CANDIDATES; k++) {
+				const p = k === dayK ? null : deal(k);
+				if (p && (!pick || Math.abs(p[1] - dayPar - NIGHT_EXTRA) < Math.abs(pick[1] - dayPar - NIGHT_EXTRA))) pick = p;
+			}
 		}
-		if (!best) throw new Error(`night level ${l}: the bot clears none of its ${CANDIDATES} deals`);
-		if (best[0] !== dayK) console.log(`night level ${l}: deal ${best[0]} instead of the day's ${dayK}`);
-		picks.push([...best, l <= FREE_LEVELS ? 0 : limitFor(l, appNightBoard(l, best[0]), best[1])]);
-		if (l % 50 === 0) console.log(`night level ${l}…`);
+		if (!pick) throw new Error(`night level ${l}: none of its ${CANDIDATES} deals works at night`);
+		if (pick[0] !== dayK) console.log(`night level ${l}: deal ${pick[0]} instead of the day's ${dayK}`);
+		picks.push(pick);
+		if (l % 25 === 0) console.log(`night level ${l}…`);
 	}
 	return picks;
 }

@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useRef, useCallback, ty
 import {
 	CENTRE_ORDER,
 	FIRE_FULL,
+	fireFull,
 	MAX_RANK,
 	N,
 	STEP_MOVES,
@@ -729,7 +730,7 @@ export default function EclatsGame({ gameId, night: nightTest = false }: { gameI
 		if (!gems.length) return;
 		const shows = showsRef.current;
 		const add = (n: number): void => {
-			shownRef.current.fire = Math.min(FIRE_FULL, shownRef.current.fire + n);
+			shownRef.current.fire = Math.min(sRef.current ? fireFull(sRef.current.cfg) : FIRE_FULL, shownRef.current.fire + n);
 			bump();
 		};
 		const layer = flyRef.current;
@@ -745,7 +746,7 @@ export default function EclatsGame({ gameId, night: nightTest = false }: { gameI
 		const tr = track.getBoundingClientRect();
 		const k = br.width / (N * U + 3);
 		const w = U * k * 0.55;
-		const tx = tr.left - rr.left + tr.width * Math.min(1, (shownRef.current.fire + gems.length / 2) / FIRE_FULL);
+		const tx = tr.left - rr.left + tr.width * Math.min(1, (shownRef.current.fire + gems.length / 2) / (sRef.current ? fireFull(sRef.current.cfg) : FIRE_FULL));
 		const ty = tr.top - rr.top + tr.height / 2;
 		const n = Math.min(4, gems.length);
 		for (let i = 0; i < n; i++) {
@@ -1399,7 +1400,7 @@ export default function EclatsGame({ gameId, night: nightTest = false }: { gameI
 					goal: st.cfg.goal, score: st.score, empty: st.cells.filter((b) => !b).length,
 					ranks: [2, 3, 4].map((r) => st.cells.filter((b) => b?.kind === 'gem' && b.rank === r).length),
 					butin: butinRef.current, shown: { ...shownRef.current }, shows: showsRef.current.started, flying: showsRef.current.pending,
-					hoard: hoardRef.current, mood: moodRef.current, fire: st.fire, fireFull: FIRE_FULL, limit: st.limit,
+					hoard: hoardRef.current, mood: moodRef.current, fire: st.fire, fireFull: fireFull(st.cfg), limit: st.limit,
 				};
 			},
 			swipe(dir: Dir) { doMove(dir); },
@@ -1433,12 +1434,13 @@ export default function EclatsGame({ gameId, night: nightTest = false }: { gameI
 	const inFrom = { up: [0, U], down: [0, -U], left: [U, 0], right: [-U, 0] }[enter.dir];
 	const crowded = phase !== 'ready' && cells.length > 0 && cells.filter((b) => !b).length <= 5;
 	const shownFire = shownRef.current.fire;
-	const fireFull = !!s && s.status === 'playing' && phase !== 'ready' && !pour && shownFire >= FIRE_FULL;
-	const canTap = fireFull && phase === 'idle' && !lv.menu && !!s && canBreathe(s);
+	const FULL = s ? fireFull(s.cfg) : FIRE_FULL; // Bijou's gauge, or Perle's at night
+	const gaugeFull = !!s && s.status === 'playing' && phase !== 'ready' && !pour && shownFire >= FULL;
+	const canTap = gaugeFull && phase === 'idle' && !lv.menu && !!s && canBreathe(s);
 	// No swipe can play any more: only his breath saves the run, so it is said over the board.
 	const stuck = canTap && !!s && (s.cells.every((b) => b) || outOfMoves(s));
-	useEffect(() => { if (fireFull) sfx.ready(); }, [fireFull]);
-	const mood: Mood = over ? (won ? 'dance' : 'sad') : react ?? (fireFull ? 'ready' : crowded ? 'scared' : sleepy ? 'sleep' : 'idle');
+	useEffect(() => { if (gaugeFull) sfx.ready(); }, [gaugeFull]);
+	const mood: Mood = over ? (won ? 'dance' : 'sad') : react ?? (gaugeFull ? 'ready' : crowded ? 'scared' : sleepy ? 'sleep' : 'idle');
 	moodRef.current = mood;
 	const shownOpened = shownRef.current.opened;
 	const goldChipEl = (
@@ -1521,7 +1523,7 @@ export default function EclatsGame({ gameId, night: nightTest = false }: { gameI
 			{lesson && !over && (
 				<p className="ec-novelty ec-lesson">
 					{/* The breath's lesson says what to do once its first swipe has filled the gauge. */}
-					💡 {fireFull && cfgLv?.fire != null ? 'La jauge est pleine ! Touche Bijou : il crache trois boules de feu, d’abord sur les coffres.' : lesson}
+					💡 {gaugeFull && cfgLv?.fire != null ? 'La jauge est pleine ! Touche Bijou : il crache trois boules de feu, d’abord sur les coffres.' : lesson}
 					{guide.length > 0 && cfgLv?.hint ? <strong> Essaie vers {HINT_WORDS[cfgLv.hint]}.</strong> : null}
 				</p>
 			)}
@@ -1558,15 +1560,15 @@ export default function EclatsGame({ gameId, night: nightTest = false }: { gameI
 						{/* Bijou's gauge fills toward him; full, it is a button like him. */}
 						<button
 							type="button"
-							className={`ec-fire${fireFull ? ' full' : ''}`}
+							className={`ec-fire${gaugeFull ? ' full' : ''}`}
 							onClick={doBreathe}
 							disabled={!canTap}
-							aria-label={canTap ? 'Souffle de Bijou : la jauge est pleine, touche pour cracher trois boules de feu' : `Souffle de Bijou : ${shownFire} gemmes sur ${FIRE_FULL}`}
+							aria-label={canTap ? 'Souffle de Bijou : la jauge est pleine, touche pour cracher trois boules de feu' : `Souffle de Bijou : ${shownFire} gemmes sur ${FULL}`}
 						>
 							<span className="ec-fire-name">Souffle</span>
 							<span ref={fireTrack} className="ec-fire-track">
-								<span key={pour ? 'pour' : 'fill'} className={`ec-fire-fill${pour ? ' pour' : ''}`} style={{ width: `${pour ? 100 : (100 * shownFire) / FIRE_FULL}%` }} />
-								{fireFull && <span className="ec-fire-cta">Touche Bijou !</span>}
+								<span key={pour ? 'pour' : 'fill'} className={`ec-fire-fill${pour ? ' pour' : ''}`} style={{ width: `${pour ? 100 : (100 * shownFire) / FULL}%` }} />
+								{gaugeFull && <span className="ec-fire-cta">Touche Bijou !</span>}
 							</span>
 							{extra.has('fx-flame') ? <img src={art('fx-flame')} alt="" className="ec-fire-tip" /> : <span className="ec-fire-tip">🔥</span>}
 						</button>

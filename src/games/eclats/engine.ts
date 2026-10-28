@@ -31,6 +31,8 @@ export const FUSE_AT = 4;
 export const LEAP_AT = 5;
 /** Gems to destroy to fill Bijou's gauge: the bot fills it near the end of a level, in 83 % of them (a player taking more swipes, sooner). */
 export const FIRE_FULL = 80;
+/** At night Perle's gauge fills sooner: the night run is harder, so its breath comes more often. */
+export const NIGHT_FIRE_FULL = 50;
 /** Fireballs in one breath, each a 3×3 blast. */
 export const FIREBALLS = 3;
 
@@ -71,7 +73,7 @@ export interface State {
 	centred: number; // gems dropped at the centre so far
 	opened: number;
 	score: number;
-	fire: number; // Bijou's gauge: gems destroyed since his last breath, up to FIRE_FULL
+	fire: number; // the dragon's gauge: gems destroyed since the last breath, up to fireFull(cfg)
 	limit: number; // swipes allowed, 0 = no limit; a revive raises it
 	status: Status;
 }
@@ -200,7 +202,7 @@ function groupSize(s: State, i: number): number {
 export function createGame(cfg: EclatsCfg): State {
 	const s: State = {
 		cfg, cells: new Array(N * N).fill(null), nextId: 1, moves: 0, arrivals: 0, centred: 0, opened: 0, score: 0,
-		fire: Math.min(FIRE_FULL, cfg.fire ?? 0), limit: cfg.limit ?? 0, status: 'playing',
+		fire: Math.min(fireFull(cfg), cfg.fire ?? 0), limit: cfg.limit ?? 0, status: 'playing',
 	};
 	if (cfg.layout) {
 		lay(s, cfg.layout);
@@ -558,7 +560,7 @@ export function play(s: State, dir: Dir): Step[] | null {
 			wave++;
 			burstNow = true;
 			steps.push(b);
-			s.fire = Math.min(FIRE_FULL, s.fire + b.popped.filter((p) => p.kind === 'gem').length);
+			s.fire = Math.min(fireFull(s.cfg), s.fire + b.popped.filter((p) => p.kind === 'gem').length);
 			if (won()) break; // the last chest ends the level at once
 			if (slide(s, dir)) steps.push({ t: 'slide', cells: snap(s) });
 		}
@@ -586,7 +588,7 @@ export const movesLeft = (s: State): number => (s.limit > 0 ? Math.max(0, s.limi
 export function revive(s: State, more: number): boolean {
 	if (s.status !== 'lost') return false;
 	if (s.limit > 0) s.limit = Math.max(s.limit, s.moves) + more;
-	s.fire = FIRE_FULL;
+	s.fire = fireFull(s.cfg);
 	s.status = 'playing';
 	return true;
 }
@@ -601,7 +603,10 @@ function around(i: number): number[] {
 	return out;
 }
 
-export const canBreathe = (s: State): boolean => s.status === 'playing' && s.fire >= FIRE_FULL;
+/** The gems that fill the dragon's gauge on this board: Bijou's by day, Perle's at night. */
+export const fireFull = (cfg: EclatsCfg): number => (cfg.night ? NIGHT_FIRE_FULL : FIRE_FULL);
+
+export const canBreathe = (s: State): boolean => s.status === 'playing' && s.fire >= fireFull(s.cfg);
 
 /** Where the fireballs land: on the chests first, nearest Bijou's corner (top right), then on the 3×3 with the most gems left. */
 export function fireTargets(s: State): number[] {

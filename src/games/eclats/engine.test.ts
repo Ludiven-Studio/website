@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
 	CENTRE_ORDER,
 	FIRE_FULL,
+	NIGHT_FIRE_FULL,
+	fireFull,
 	MAX_RANK,
 	N,
 	arrivalAt,
@@ -649,6 +651,19 @@ describe('night: frozen chests and Perle', () => {
 		expect(waves.map((w) => w.wave)).toEqual(waves.map((_, i) => i + 1));
 		expect(waves[0].popped.map((p) => p.cell).sort((a, b) => a - b)).toEqual(expect.arrayContaining([at(1, 3), at(2, 3), at(3, 3)]));
 		expect(s.cells.filter(Boolean)).toEqual([]);
+	});
+
+	it("Perle's gauge fills at NIGHT_FIRE_FULL gems, Bijou's still at FIRE_FULL", () => {
+		expect([fireFull(CFG), fireFull({ ...CFG, night: true })]).toEqual([FIRE_FULL, NIGHT_FIRE_FULL]);
+		const night = createGame({ ...CFG, night: true, fire: FIRE_FULL });
+		expect(night.fire).toBe(NIGHT_FIRE_FULL);
+		expect(canBreathe(night)).toBe(true);
+		const day = createGame({ ...CFG, fire: NIGHT_FIRE_FULL });
+		expect(canBreathe(day)).toBe(false);
+		const lost = createGame({ ...CFG, night: true, limit: 1, fill: 0.5 });
+		lost.status = 'lost';
+		revive(lost, 3);
+		expect(lost.fire).toBe(NIGHT_FIRE_FULL);
 	});
 
 	it('by day the dragon is still Bijou, and his fireballs are unchanged', () => {

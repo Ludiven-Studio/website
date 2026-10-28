@@ -1249,3 +1249,20 @@
 - 06:38 : commité et poussé à la demande de l'utilisateur (« Pousse ») : engine.ts, engine.test.ts, levels.ts,
   picks.ts, bot.ts, EclatsGame.tsx, scripts/eclats-levels.ts et cette section seulement. Statut : terminé. Réservations
   libérées.
+
+## 2026-10-28 — Dragon's Gems Swipe : la nuit plus dure (jauge à 50, limites à 60 %) (session website)
+- Statut : en cours (2026-10-28T06:51+01:00). Demande de l'utilisateur : (transmis par la session Unity) « 60% et 50
+  gems oui » : jauge de Perle pleine à 50 gemmes la nuit, limites au 60e centile du joueur type (50 % sur les niveaux
+  difficiles)
+- Réservations actives : `src/games/eclats/engine.ts`, `src/games/eclats/engine.test.ts`, `src/games/eclats/levels.ts`,
+  `src/games/eclats/picks.ts`, `src/games/eclats/bot.ts`, `src/games/eclats/EclatsGame.tsx`,
+  `scripts/eclats-levels.ts`.
+- Ressources : serveur de dev sur le port 4473 ; eslint, `astro check`. Build annoncé ici avant.
+- 07:09 : fait : NIGHT_FIRE_FULL = 50 et fireFull(cfg) (création, coup, relance, souffle possible ; l'écran dessine la
+  jauge sur ce plein) ; scripts/eclats-levels.ts night : 200 parties du joueur type par niveau, limite au 60e centile
+  (50 % sur les niveaux difficiles), au moins par + 2, tirage remplacé quand le robot ne le finit pas ou que le joueur
+  type le perd trop souvent (13 niveaux, dont 240) ; limites de nuit +8,1 coups en moyenne sur le jour (au lieu de
+  +10,1). vitest 219, tsc 0 erreur, check-eclats.mjs 2 passages OK, page de nuit sans erreur. Non commité : en attente
+  du feu vert de l'utilisateur.
+- 07:27 : commité et poussé à la demande de l'utilisateur (« Pousse ») : engine.ts, engine.test.ts, picks.ts,
+  EclatsGame.tsx, scripts/eclats-levels.ts et cette section seulement. Statut : terminé. Réservations libérées.
