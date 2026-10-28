@@ -1225,3 +1225,27 @@
   base (score, plafond 10 000 000, 5 s minimum), migration list : appliquée.
 - 01:33 : commité et poussé à la demande de l'utilisateur : la migration et cette section seulement. Statut : terminé.
   Réservations libérées.
+
+## 2026-10-28 — Dragon's Gems Swipe : la nuit devient coffres gelés et souffle de Perle (moteur) (session website)
+- Statut : en cours (2026-10-28T01:43+01:00). Demande de l'utilisateur : (transmis par la session Unity, après essai de
+  /jeux/eclats/nuit/) « je ne suis pas convaincu par la mécanique du mode nuit, ça devient du hasard, la difficulté
+  n'est pas dans la réflexion » ; « Le pouvoir de Perle est de fusionner la moitié des gemmes du plateau. Le changement
+  : les coffres sont glacés et doivent exploser une fois pour être accessibles et une autre fois pour s'ouvrir »
+- Réservations actives : `src/games/eclats/engine.ts`, `src/games/eclats/engine.test.ts`, `src/games/eclats/levels.ts`,
+  `src/games/eclats/EclatsGame.tsx`, `src/pages/jeux/eclats/nuit.astro`.
+- Ressources : serveur de dev sur le port 4473 ; eslint, `astro check`. Build annoncé ici avant.
+- 01:47 : réservations ajoutées : `src/games/eclats/picks.ts` (table de la nuit, générée), `scripts/eclats-levels.ts`
+  (plan night), `src/games/eclats/bot.ts` (option breathe du robot, pour la nuit seulement).
+- 02:01 : fait (non commité) : l'obscurité retirée (light, flies, LIGHT_SWIPES, GLOW_RANK, visible, étape night, voile
+  et lucioles de la page) ; cfg.frostChests : chaque coffre arrive gelé (posé, dessiné ou arrivé), ne glisse pas, une
+  explosion le dégèle seulement (thawed), la suivante l'ouvre, un cadenassé en prend trois ; souffle de Perle la nuit
+  (étape pearl, paires par couleur dans l'ordre de lecture, la première monte d'un rang, la seconde part, puis les
+  vagues sans glissé, sans remplir la jauge). appNightBoard / appNightConfig, table PICKS_APP_NIGHT générée par
+  scripts/eclats-levels.ts night (même méthode que le jour, robot qui souffle ; niveau 203 sur un autre tirage, le sien
+  se remplit au 7e coup) : limite +10 coups en moyenne (3 à 26), 3 étoiles +7,5. Page de test : coffres givrés, fonte
+  au dégel, paires qui se rejoignent. vitest 218 (eclats + niveaux), check-eclats.mjs 2 passages OK, essai de la page
+  sans erreur. Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 02:02 : build complet OK. Non commité : en attente du feu vert de l'utilisateur.
+- 06:38 : commité et poussé à la demande de l'utilisateur (« Pousse ») : engine.ts, engine.test.ts, levels.ts,
+  picks.ts, bot.ts, EclatsGame.tsx, scripts/eclats-levels.ts et cette section seulement. Statut : terminé. Réservations
+  libérées.

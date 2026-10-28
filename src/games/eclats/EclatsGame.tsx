@@ -17,7 +17,6 @@ import {
 	play,
 	slide,
 	upcoming,
-	visible,
 	type Arrival,
 	type Block,
 	type Burst,
@@ -88,6 +87,7 @@ const BIG = 2.2; // how much an opening chest grows
 const REACT_MS = 1500;
 const BALL_MS = 420; // a fireball's flight from Bijou to the board
 const BALL_GAP = 170; // between two fireballs
+const PEARL_MS = 620; // Perle's breath: the pairs fly together and the kept gems grow
 
 /** Gem colours, each with its own cut so they read without the colours. */
 const GEMS = [
@@ -375,6 +375,7 @@ function Piece({ b, small = false }: { b: Pick<Block, 'kind' | 'color' | 'ice' |
 		return (
 			<g className={b.kind === 'chest' && !small ? 'ec-chest' : undefined}>
 				<image href={art(b.kind === 'rock' ? 'rock' : b.lock ? 'chest-locked' : 'chest')} x={-5} y={-5} width={10} height={10} />
+				{b.ice && <rect className="ec-ice frost" x={-4.8} y={-4.8} width={9.6} height={9.6} rx={2.2} />}
 			</g>
 		);
 	}
@@ -399,6 +400,7 @@ function Piece({ b, small = false }: { b: Pick<Block, 'kind' | 'color' | 'ice' |
 						<rect x={-2} y={-1.8} width={4} height={3.2} rx={0.6} fill="#9aa3ad" stroke="#4d545c" strokeWidth={0.4} />
 					</g>
 				)}
+				{b.ice && <rect className="ec-ice frost" x={-4.8} y={-4.8} width={9.6} height={9.6} rx={2.2} />}
 			</g>
 		);
 	}
@@ -429,6 +431,7 @@ interface Fx {
 	bolts: { from: number; to: number; delay: number }[]; // a crown striking every gem of its colour
 	comets: { from: number; to: number }[];
 	fused: { cell: number; rank: number; delay: number }[];
+	melts: { cell: number; delay: number }[]; // ice thawing: a frozen gem or chest
 }
 
 const cheb = (a: number, b: number): number => Math.max(Math.abs((a % N) - (b % N)), Math.abs(Math.floor(a / N) - Math.floor(b / N)));
@@ -463,20 +466,10 @@ function timeFx(step: Burst, balls: number[] = []): Omit<Fx, 'id'> {
 		bolts,
 		comets: step.comets,
 		fused: step.fused.map((f) => ({ cell: f.cell, rank: f.rank, delay: 200 })),
+		melts: step.thawed.map((cell) => ({ cell, delay: delayOf(cell, false) })),
 	};
 }
 
-/**
- * The dark over each cell at night: 0 where a light, a firefly or a glowing gem shows it, a faint veil over a chest
- * or a rock seen only by its own glow, a thinner one where the light is about to go out, the night everywhere else.
- */
-function veilOf(cells: (Block | null)[], light: number[], flies: number[]): number[] {
-	const see = (c: (Block | null)[], l: number[]): boolean[] => visible({ cfg: { night: true }, cells: c, light: l, flies } as unknown as State);
-	const all = see(cells, light);
-	const lit = see(cells.map((b) => (b && b.kind !== 'gem' ? null : b)), light);
-	const lasting = see(cells, light.map((l) => (l > 1 ? l : 0)));
-	return all.map((v, i) => (!v ? 0.94 : !lit[i] ? 0.55 : !lasting[i] ? 0.35 : 0));
-}
 const NIGHT_PICKS = [1, 3, 37, 120, 250];
 
 const HINT_WORDS: Record<Dir, string> = { up: 'le haut ↑', down: 'le bas ↓', left: 'la gauche ←', right: 'la droite →' };
@@ -519,8 +512,6 @@ export default function EclatsGame({ gameId, night: nightTest = false }: { gameI
 	const [pour, setPour] = useState(false); // the gauge pours into Bijou as he breathes
 	const [said, setSaid] = useState(''); // what a screen reader is told after a move
 	const [nightLevel, setNightLevel] = useState(1);
-	const [seeAll, setSeeAll] = useState(false); // the night test's « voir tout »
-	const [dark, setDark] = useState<{ light: number[]; flies: number[] }>({ light: [], flies: [] });
 
 	const sRef = useRef<State | null>(null);
 	const phaseRef = useRef<Phase>('idle');
@@ -867,7 +858,6 @@ export default function EclatsGame({ gameId, night: nightTest = false }: { gameI
 		resetShows(0, 0, 0);
 		noteLocked(lockedRef.current, st.cells);
 		setCells(st.cells.map((b) => (b ? { ...b } : null)));
-		setDark({ light: st.light.slice(), flies: st.flies.slice() });
 		setGlow([]);
 		setPreview([]);
 		setFx(null);
@@ -1039,6 +1029,7 @@ export default function EclatsGame({ gameId, night: nightTest = false }: { gameI
 		let waves = 0;
 		let opened = 0;
 		let balls: number[] = []; // Bijou's fireballs, when this is his breath
+		let pearled = false; // Perle's breath, at night: its waves feed no gauge either
 		let shown = steps[0].cells;
 		const show = (c: (Block | null)[]): void => {
 			shown = c;
@@ -1066,8 +1057,26 @@ export default function EclatsGame({ gameId, night: nightTest = false }: { gameI
 				reactTo('breath');
 				sfx.breath();
 				if (fireballs(balls, token)) await wait(BALL_MS);
-			} else if (step.t === 'night') {
-				setDark({ light: step.light, flies: step.flies });
+			} else if (step.t === 'pearl') {
+				// Perle's breath: the gauge pours into the dragon, each pair's second gem flies into the first, which grows.
+				pearled = true;
+				shownRef.current.fire = 0;
+				setPour(true);
+				window.setTimeout(() => setPour(false), 450);
+				reactTo('breath');
+				sfx.breath();
+				// The pair is one colour: the gem that flies is drawn from the one it joins, a rank below.
+				setFx({
+					id: ++fxId.current,
+					pops: step.pairs.map(([keep, gone], k) => ({ cell: gone, color: step.cells[keep]!.color, kind: 'gem' as const, rank: Math.max(1, step.cells[keep]!.rank - 1), into: keep, delay: 120 + k * 18 })),
+					zones: [],
+					bolts: [],
+					comets: [],
+					fused: step.pairs.map(([keep], k) => ({ cell: keep, rank: step.cells[keep]!.rank, delay: 330 + k * 18 })),
+					melts: [],
+				});
+				show(step.cells);
+				await wait(PEARL_MS + step.pairs.length * 18);
 			} else {
 				waves = step.wave;
 				if (!balls.length) {
@@ -1090,7 +1099,7 @@ export default function EclatsGame({ gameId, night: nightTest = false }: { gameI
 				};
 				showAt(0);
 				// A fireball thumps as it lands; its gems feed nothing, the gauge was just spent.
-				if (!balls.length) {
+				if (!balls.length && !pearled) {
 					sfx.pop(step.wave, step.popped.filter((p) => p.kind === 'gem').length);
 					feedFire(step, token);
 				}
@@ -1140,7 +1149,7 @@ export default function EclatsGame({ gameId, night: nightTest = false }: { gameI
 		setEnter({ ids: new Set(), centre: -1, dir });
 		const gained = st.score - pointsBefore;
 		const parts = [
-			balls.length ? '🔥 Souffle de Bijou' : '',
+			balls.length ? '🔥 Souffle de Bijou' : pearled ? '✨ Souffle de Perle' : '',
 			waves >= 2 ? `Chaîne ×${waves}` : '',
 			modeRef.current === 'free' ? `+${gained} points` : '',
 			opened ? `🎁 ${opened} coffre${opened > 1 ? 's' : ''}` : '',
@@ -1454,7 +1463,7 @@ export default function EclatsGame({ gameId, night: nightTest = false }: { gameI
 			{mode === 'night' ? (
 				<div className="ec-nightbar">
 					<p className="ec-tag">
-						Nuit · niveau {nightLevel} de l'appli · {s?.cfg.flies ?? 0} luciole{(s?.cfg.flies ?? 0) > 1 ? 's' : ''}
+						Nuit · niveau {nightLevel} de l'appli · coffres gelés · souffle de Perle
 						{s && <span className="ec-goal">Ouvre {chestsWord(s.cfg.goal)}{s.limit > 0 ? ` en ${s.limit} coups maximum` : ''}</span>}
 					</p>
 					<div className="ec-pills">
@@ -1475,7 +1484,6 @@ export default function EclatsGame({ gameId, night: nightTest = false }: { gameI
 					</div>
 					<div className="ec-pills">
 						<button className="ec-pill" onClick={() => startNight(nightLevel)}>Nouvelle partie</button>
-						<label className="ec-pill ec-seeall"><input type="checkbox" checked={seeAll} onChange={(e) => setSeeAll(e.currentTarget.checked)} /> Voir tout</label>
 					</div>
 				</div>
 			) : mode === 'levels' ? (
@@ -1593,11 +1601,6 @@ export default function EclatsGame({ gameId, night: nightTest = false }: { gameI
 						aria-label="Plateau de Dragon's Gems Swipe : glisse pour tout faire glisser"
 					>
 						<defs>
-							<radialGradient id="ec-fly-glow">
-								<stop offset="0" stopColor="#f6ffb8" stopOpacity="1" />
-								<stop offset="0.35" stopColor="#d4f76a" stopOpacity="0.7" />
-								<stop offset="1" stopColor="#9be03a" stopOpacity="0" />
-							</radialGradient>
 							<radialGradient id="ec-halo">
 								<stop offset="0" stopColor="#fff6c8" stopOpacity="0.95" />
 								<stop offset="0.45" stopColor="#ffd24a" stopOpacity="0.45" />
@@ -1640,20 +1643,6 @@ export default function EclatsGame({ gameId, night: nightTest = false }: { gameI
 								) : null,
 							)}
 						</g>
-
-						{mode === 'night' && s?.cfg.night && (
-							<g className="ec-night" aria-hidden="true">
-								{!seeAll && veilOf(cells, dark.light, dark.flies).map((o, i) => (
-									<rect key={i} x={(i % N) * U + 0.1} y={Math.floor(i / N) * U + 0.1} width={U - 0.2} height={U - 0.2} rx={1.8} className="ec-veil" style={{ opacity: o }} />
-								))}
-								{dark.flies.map((f, k) => (
-									<g key={k} className="ec-firefly" style={{ transform: `translate(${cx(f)}px, ${cy(f)}px)` }}>
-										<circle r={3.6} className="ec-firefly-halo" style={{ animationDelay: `${-k * 0.37}s` }} />
-										<circle r={1.05} className="ec-firefly-core" />
-									</g>
-								))}
-							</g>
-						)}
 
 						{fx && (
 							<g key={fx.id}>
@@ -1744,6 +1733,9 @@ export default function EclatsGame({ gameId, night: nightTest = false }: { gameI
 											</>
 										)}
 									</g>
+								))}
+								{fx.melts.map((m, k) => (
+									<rect key={`m${k}`} x={cx(m.cell) - 4.8} y={cy(m.cell) - 4.8} width={9.6} height={9.6} rx={2.2} className="ec-melt" style={{ animationDelay: `${m.delay}ms` }} />
 								))}
 								{fx.fused.map((f, k) => (
 									<g key={`f${k}`}>
@@ -1941,12 +1933,7 @@ const CSS = `
 /* The night test page: its level picker, the dark over the cells and the fireflies. */
 .ec-nightbar { display: flex; flex-direction: column; align-items: center; }
 .ec-nightnum { width: 4.6rem; text-align: center; }
-.ec-seeall { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
-.ec-veil { fill: #0a1024; transition: opacity 0.45s ease; pointer-events: none; }
-.ec-firefly { transition: transform 0.55s ease-in-out; pointer-events: none; }
-.ec-firefly-halo { fill: url(#ec-fly-glow); animation: ec-firefly-blink 1.6s ease-in-out infinite alternate; }
-.ec-firefly-core { fill: #f4ffb0; }
-@keyframes ec-firefly-blink { from { opacity: 0.55; transform: scale(0.85); } to { opacity: 1; transform: scale(1.1); } }
+
 
 .ec-hud { width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; margin-bottom: 0.45rem; }
 .ec-chip {
@@ -2092,6 +2079,10 @@ span.ec-ember { border-radius: 50%; background: radial-gradient(circle, #fff6c8 
 .ec-nudge { animation: ec-nudge 0.22s ease-out; }
 
 .ec-ice { fill: rgba(190, 232, 255, 0.5); stroke: #e8f7ff; stroke-width: 0.6; }
+.ec-ice.frost { fill: rgba(200, 236, 255, 0.58); stroke-width: 0.8; }
+/* Ice thawing: the sheet lifts off and fades as the explosion reaches it. */
+.ec-melt { fill: rgba(205, 238, 255, 0.7); stroke: #f2fbff; stroke-width: 0.6; opacity: 0; pointer-events: none; transform-box: fill-box; transform-origin: center; animation: ec-melt 0.5s ease-out both; }
+@keyframes ec-melt { 0% { opacity: 0.9; transform: scale(1); } 100% { opacity: 0; transform: scale(1.35); } }
 .ec-rock { fill: #8b9099; stroke: #4c5059; stroke-width: 0.55; stroke-linejoin: round; }
 .ec-rock-crack { fill: none; stroke: #4c5059; stroke-width: 0.45; stroke-linecap: round; }
 .ec-core { fill: #fff; animation: ec-core 0.9s ease-in-out infinite alternate; }
@@ -2243,13 +2234,11 @@ span.ec-ember { border-radius: 50%; background: radial-gradient(circle, #fff6c8 
 @media (prefers-reduced-motion: reduce) {
   .ec-cell { transition: none; }
   .ec-sweep { display: none; }
-  .ec-in, .ec-drop, .ec-grow, .ec-glow, .ec-pop, .ec-burst, .ec-sparkfly, .ec-shard, .ec-coin, .ec-fly, .ec-zone, .ec-wave, .ec-bolt, .ec-born, .ec-chain, .ec-label { animation-duration: 0.01s; }
+  .ec-in, .ec-drop, .ec-grow, .ec-glow, .ec-pop, .ec-burst, .ec-sparkfly, .ec-shard, .ec-coin, .ec-fly, .ec-melt, .ec-zone, .ec-wave, .ec-bolt, .ec-born, .ec-chain, .ec-label { animation-duration: 0.01s; }
   .ec-core, .ec-charged, .ec-rank.r2 > g > path, .ec-rank.r2 > g > circle:first-child, .ec-twinkle, .ec-halo, .ec-orbit, .ec-rays, .ec-comet-star, .ec-chest, .ec-preview, .ec-boardwrap.shake-a, .ec-boardwrap.shake-b, .ec-nudge, .ec-drake, .ec-dance img, .ec-pile { animation: none; }
   .ec-dance img:nth-child(1) { animation: none; }
   .ec-dance img:nth-child(2) { display: none; }
   .ec-fire-fill { transition: none; }
   .ec-fire-fill.pour, .ec-fire.full .ec-fire-track, .ec-fire.full .ec-fire-fill, .ec-fire.full .ec-fire-tip, .ec-chip.low, .ec-stuck .ec-start { animation: none; }
-  .ec-firefly, .ec-veil { transition: none; }
-  .ec-firefly-halo { animation: none; }
 }
 `;

@@ -12,7 +12,7 @@
 import type { LevelPlan, LevelResult } from '../../lib/progression';
 import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import { FIRE_FULL, hash2, type Dir, type EclatsCfg } from './engine';
-import { PICKS_APP, PICKS_SITE, type Pick } from './picks';
+import { PICKS_APP, PICKS_APP_NIGHT, PICKS_SITE, type Pick } from './picks';
 
 export interface World {
 	from: number;
@@ -197,14 +197,21 @@ export const SITE = levelSet(LEVEL_COUNT, PICKS_SITE);
 export const APP = levelSet(250, PICKS_APP);
 
 /**
- * The app's night run, after its second ending: its levels 1-250 again, the same boards in the dark. The
- * fireflies thin out from four to one; a level with a limit gets two more swipes, and so do its stars.
+ * The app's night run, after its second ending: its levels 1-250 again, frozen chests and Perle's breath. The board is
+ * the day's, with the day's deal unless that one cannot be cleared at night (scripts/eclats-levels.ts picks another).
  */
+export function appNightBoard(level: number, candidate?: number): EclatsLevelCfg {
+	const l = Math.max(1, Math.min(APP.count, level));
+	const k = candidate ?? PICKS_APP_NIGHT[l - 1]?.[0] ?? APP.picks[l - 1][0];
+	// No limit yet: that is what the night run measures on it.
+	return { ...APP.levelConfig(l), seed: pickSeed(APP.boardFor(l).seed, k), night: true, frostChests: true, limit: 0 };
+}
+
+/** A night level with its own swipe limit and stars, measured like the day's (scripts/eclats-levels.ts night). */
 export function appNightConfig(level: number): EclatsLevelCfg {
-	const day = APP.levelConfig(level);
-	const flies = Math.round(lerp(4, 1, (Math.min(APP.count, Math.max(1, level)) - 1) / (APP.count - 1)));
-	const more = day.limit > 0 ? 2 : 0;
-	return { ...day, night: true, flies, limit: day.limit + more, three: day.three + more, two: day.two + more };
+	const board = appNightBoard(level);
+	const [, par, limit] = PICKS_APP_NIGHT[Math.max(1, Math.min(APP.count, level)) - 1] ?? [0, board.three, board.limit];
+	return { ...board, limit, ...starsFor(par, limit || starsLimit(par)) };
 }
 
 export const COUNT = SITE.count;

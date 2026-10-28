@@ -2,16 +2,17 @@
 // number of swipes nearest the level's target, so the climb is smooth rather than a run of lucky
 // and unlucky draws. Then the level's swipe limit: a typical player (the bot, a share of its swipes
 // random, breathing when it can) plays the board PLAYERS times, and the limit is the count it wins
-// within WIN of the time (WIN_HARD on a hard level); levels 1-FREE_LEVELS have none (0). Writes both
-// plans of src/games/eclats/picks.ts, the website's (SITE) and the app's (APP); rerun it after
+// within WIN of the time (WIN_HARD on a hard level); levels 1-FREE_LEVELS have none (0). Writes the
+// plans of src/games/eclats/picks.ts, the website's (SITE), the app's (APP) and the app's night run
+// (NIGHT: the same boards with frozen chests and Perle's breath, measured the same way); rerun it after
 // any change to the engine, the bot or a level's board (the engine test fails until you do).
-// Usage: node node_modules/esbuild/bin/esbuild scripts/eclats-levels.ts --bundle --platform=node --format=esm --outfile=$TEMP/eclats-levels.mjs && node $TEMP/eclats-levels.mjs [site] [app]
+// Usage: node node_modules/esbuild/bin/esbuild scripts/eclats-levels.ts --bundle --platform=node --format=esm --outfile=$TEMP/eclats-levels.mjs && node $TEMP/eclats-levels.mjs [site] [app] [night]
 // A plan left out of the arguments keeps its table; none named redoes both.
 import { writeFileSync } from 'node:fs';
 import { bestMove, playBot } from '../src/games/eclats/bot';
 import { DIRS, breathe, canBreathe, cloneState, createGame, hash2, play, type EclatsCfg } from '../src/games/eclats/engine';
-import { APP, FREE_LEVELS, SITE, isHard, pickSeed, type LevelSet } from '../src/games/eclats/levels';
-import { PICKS_APP, PICKS_SITE, type Pick } from '../src/games/eclats/picks';
+import { APP, FREE_LEVELS, SITE, appNightBoard, isHard, pickSeed, type LevelSet } from '../src/games/eclats/levels';
+import { PICKS_APP, PICKS_APP_NIGHT, PICKS_SITE, type Pick } from '../src/games/eclats/picks';
 import { mulberry32 } from '../src/games/prng';
 
 const CANDIDATES = 16;
@@ -73,10 +74,36 @@ function pickAll(name: string, set: LevelSet): Pick[] {
 	return picks;
 }
 
+/**
+ * The app's night run: each day board again, with its own bot count and limit. The bot breathes, as a player will:
+ * frozen chests do not slide, and a board left without its breath fills up. The day's deal when the bot clears it at
+ * night, else the deal it clears nearest the day's count plus NIGHT_EXTRA.
+ */
+const NIGHT_EXTRA = 6; // the bot's mean extra swipes at night, measured over the 250 levels
+function pickNight(): Pick[] {
+	const picks: Pick[] = [];
+	for (let l = 1; l <= APP.count; l++) {
+		const [dayK, dayPar] = APP.picks[l - 1];
+		let best: [number, number] | null = null;
+		const day = playBot(appNightBoard(l, dayK), { breathe: true });
+		if (day.won) best = [dayK, day.moves];
+		for (let k = 0; !best && k < CANDIDATES; k++) {
+			const run = playBot(appNightBoard(l, k), { breathe: true });
+			if (run.won && (!best || Math.abs(run.moves - dayPar - NIGHT_EXTRA) < Math.abs(best[1] - dayPar - NIGHT_EXTRA))) best = [k, run.moves];
+		}
+		if (!best) throw new Error(`night level ${l}: the bot clears none of its ${CANDIDATES} deals`);
+		if (best[0] !== dayK) console.log(`night level ${l}: deal ${best[0]} instead of the day's ${dayK}`);
+		picks.push([...best, l <= FREE_LEVELS ? 0 : limitFor(l, appNightBoard(l, best[0]), best[1])]);
+		if (l % 50 === 0) console.log(`night level ${l}…`);
+	}
+	return picks;
+}
+
 const only = process.argv.slice(2);
 const redo = (name: string): boolean => only.length === 0 || only.includes(name);
 const site = redo('site') ? pickAll('site', SITE) : PICKS_SITE;
 const app = redo('app') ? pickAll('app', APP) : PICKS_APP;
+const night = redo('night') ? pickNight() : PICKS_APP_NIGHT;
 const table = (picks: Pick[]): string => {
 	const rows: string[] = [];
 	for (let i = 0; i < picks.length; i += 10) rows.push('\t' + picks.slice(i, i + 10).map(([k, p, m]) => `[${k}, ${p}, ${m}]`).join(', ') + ',');
@@ -95,6 +122,11 @@ ${table(site)}
 /** The Unity app's levels 1-${2 * APP.count} (levels.ts APP). */
 export const PICKS_APP: Pick[] = [
 ${table(app)}
+];
+
+/** The app's night run, levels 1-${APP.count}: the day's seed, the bot's swipes and the limit with frozen chests. */
+export const PICKS_APP_NIGHT: Pick[] = [
+${table(night)}
 ];
 `,
 );

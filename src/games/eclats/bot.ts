@@ -3,7 +3,7 @@
 // Used by the tests to prove every level winnable and by scripts/eclats-levels.ts to set each
 // level's par. `casual` mixes in random swipes to stand in for a player who is not optimising.
 
-import { DIRS, N, cloneState, countWaves, createGame, emptyCells, play, type Dir, type EclatsCfg, type State } from './engine';
+import { DIRS, N, breathe, canBreathe, cloneState, countWaves, createGame, emptyCells, play, type Dir, type EclatsCfg, type State } from './engine';
 import { mulberry32 } from '../prng';
 
 /** Pairs of same-colour neighbours: groups in the making. */
@@ -65,12 +65,17 @@ export interface BotRun {
 	waves: number[]; // per move
 }
 
-export function playBot(cfg: EclatsCfg, opts: { casual?: number; maxMoves?: number; seed?: number } = {}): BotRun {
+/** `breathe`: the dragon breathes as soon as the gauge is full, as the night run is measured (a breath is not a swipe). */
+export function playBot(cfg: EclatsCfg, opts: { casual?: number; maxMoves?: number; seed?: number; breathe?: boolean } = {}): BotRun {
 	const s = createGame(cfg);
 	const rng = mulberry32(opts.seed ?? 1);
 	const max = opts.maxMoves ?? 400;
 	const waves: number[] = [];
 	while (s.status === 'playing' && s.moves < max) {
+		if (opts.breathe && canBreathe(s)) {
+			breathe(s);
+			continue;
+		}
 		let d = bestMove(s);
 		if (!d) break;
 		if (opts.casual && rng() >= opts.casual) {

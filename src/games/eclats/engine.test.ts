@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import {
 	CENTRE_ORDER,
 	FIRE_FULL,
-	LIGHT_SWIPES,
 	MAX_RANK,
 	N,
 	arrivalAt,
@@ -21,7 +20,6 @@ import {
 	previewGroups,
 	slide,
 	upcoming,
-	visible,
 	STEP_MOVES,
 	type Block,
 	type Burst,
@@ -31,7 +29,8 @@ import {
 	type Step,
 } from './engine';
 import { playBot } from './bot';
-import { APP, FREE_LEVELS, SITE, appNightConfig, eclatsLevels, levelConfig, starsLimit } from './levels';
+import { APP, FREE_LEVELS, SITE, appNightBoard, appNightConfig, eclatsLevels, levelConfig, starsLimit } from './levels';
+import { PICKS_APP_NIGHT } from './picks';
 
 const CFG: EclatsCfg = { seed: 7, fifth: 0, goal: 0, chests: 0, locked: 0, chestEvery: 0, rocks: 0, ice: 0, fill: 0 };
 const B = N - 1; // the bottom row
@@ -566,119 +565,119 @@ describe('levels', () => {
 	});
 });
 
-describe('night', () => {
-	const SWIPES = ['left', 'down', 'right', 'up'] as const;
-	const cheb = (a: number, b: number): number => Math.max(Math.abs(Math.floor(a / N) - Math.floor(b / N)), Math.abs((a % N) - (b % N)));
-	/** The cells an explosion lights: what it took, and their neighbours. */
-	const litBy = (steps: Step[]): Set<number> => {
-		const out = new Set<number>();
-		for (const b of bursts(steps)) for (const p of b.popped) for (let j = 0; j < N * N; j++) if (cheb(j, p.cell) <= 1) out.add(j);
-		return out;
-	};
-	/** A swipe that moves something, in a fixed order. */
-	const anySwipe = (s: State, k: number): Step[] => {
-		for (let d = 0; d < 4; d++) {
-			const steps = play(s, SWIPES[(k + d) % 4]);
-			if (steps) return steps;
-		}
-		throw new Error('nothing moves');
-	};
+describe('night: frozen chests and Perle', () => {
+	const FROST: Partial<EclatsCfg> = { night: true, frostChests: true };
+	const pearl = (steps: Step[]): Extract<Step, { t: 'pearl' }> => steps.find((x): x is Extract<Step, { t: 'pearl' }> => x.t === 'pearl')!;
 
-	it('by day nothing is dark: no lights, no fireflies, everything shows, no night step', () => {
-		const s = createGame(APP.levelConfig(37));
-		expect(s.light).toEqual([]);
-		expect(s.flies).toEqual([]);
-		expect(visible(s).every(Boolean)).toBe(true);
-		expect(anySwipe(s, 0).some((x) => x.t === 'night')).toBe(false);
+	it('freezes every chest: dealt, laid out and arriving', () => {
+		const dealt = createGame({ ...CFG, ...FROST, chests: 3, locked: 1, fill: 0.5 });
+		const chests = dealt.cells.filter((b) => b?.kind === 'chest');
+		expect(chests).toHaveLength(3);
+		expect(chests.every((b) => b!.ice)).toBe(true);
+		const laid = createGame({ ...CFG, ...FROST, layout: 'C' + 'L' + '.'.repeat(N * N - 2) });
+		expect([laid.cells[0]!.ice, laid.cells[1]!.ice, laid.cells[1]!.lock]).toEqual([true, true, true]);
+		const day = createGame({ ...CFG, chests: 3, fill: 0.5 });
+		expect(day.cells.some((b) => b?.kind === 'chest' && b.ice)).toBe(false);
+		// The arrival stream: a chest every 2 arrivals here.
+		const s = blank({ ...FROST, chestEvery: 2 });
+		put(s, B, 3, 'gem', 1);
+		play(s, 'left');
+		const came = s.cells.filter((b) => b?.kind === 'chest');
+		expect(came.length).toBeGreaterThan(0);
+		expect(came.every((b) => b!.ice)).toBe(true);
 	});
 
-	it('plays every move exactly as by day', () => {
-		for (const level of [12, 37, 140, 230]) {
-			const cfg = APP.levelConfig(level);
-			const day = createGame(cfg);
-			const night = createGame({ ...cfg, night: true, flies: 3 });
-			expect(night.cells).toEqual(day.cells);
-			for (let k = 0; k < 14 && day.status === 'playing'; k++) {
-				const a = play(day, SWIPES[k % 4]);
-				const b = play(night, SWIPES[k % 4]);
-				expect(!!b).toBe(!!a);
-				if (b) expect(b.at(-1)!.t).toBe('night');
-				for (const key of ['cells', 'score', 'opened', 'fire', 'arrivals', 'centred', 'moves', 'status'] as const) expect(night[key]).toEqual(day[key]);
-			}
-		}
+	it('a frozen chest does not slide', () => {
+		const s = blank(FROST);
+		const chest = put(s, 2, 3, 'chest', 0, { ice: true });
+		put(s, 0, 0, 'gem', 1);
+		expect(play(s, 'down')![0].cells[at(2, 3)]?.id).toBe(chest.id);
 	});
 
-	it('places its fireflies on distinct cells, the same every time, and moves each one step per swipe', () => {
-		const cfg: EclatsCfg = { ...APP.levelConfig(60), night: true, flies: 4 };
-		const a = createGame(cfg);
-		const b = createGame(cfg);
-		expect(a.flies).toEqual(b.flies);
-		expect(new Set(a.flies).size).toBe(4);
-		for (let k = 0; k < 10 && a.status === 'playing'; k++) {
-			const before = a.flies.slice();
-			anySwipe(a, k);
-			anySwipe(b, k);
-			expect(a.flies).toEqual(b.flies);
-			expect(new Set(a.flies).size).toBe(4);
-			a.flies.forEach((f, i) => expect(cheb(f, before[i])).toBe(1));
-		}
+	it('a locked frozen chest takes three explosions: it thaws, then it unlocks, then it opens', () => {
+		const hitOnce = (extra: Partial<Block>): Burst => {
+			const s = blank(FROST);
+			[0, 1, 2].forEach((c) => put(s, B, c, 'gem', 0));
+			put(s, B - 1, 1, 'chest', 0, extra);
+			return swipeDown(s);
+		};
+		const cell = [at(B - 1, 1)];
+		const thaw = hitOnce({ ice: true, lock: true });
+		expect([thaw.thawed, thaw.unlocked, thaw.opened]).toEqual([cell, [], []]);
+		const unlock = hitOnce({ lock: true });
+		expect([unlock.thawed, unlock.unlocked, unlock.opened]).toEqual([[], cell, []]);
+		const open = hitOnce({});
+		expect([open.thawed, open.unlocked, open.opened]).toEqual([[], [], cell]);
 	});
 
-	it('lights what an explosion took and its neighbours for two swipes', () => {
+	it("Perle pairs each colour's unfrozen gems in reading order and fuses them a rank up, an odd one left", () => {
 		const s = blank({ night: true });
-		for (let c = 0; c < 3; c++) put(s, B, c, 'gem', 0);
-		swipeDown(s);
-		expect(s.light[at(B, 0)]).toBe(LIGHT_SWIPES);
-		expect(s.light[at(B - 1, 3)]).toBe(LIGHT_SWIPES);
-		expect(s.light[at(B - 2, 0)]).toBe(0);
-		for (let k = 0; k < 3; k++) {
-			const before = s.light.slice();
-			const lit = litBy(anySwipe(s, k));
-			s.light.forEach((l, i) => expect(l).toBe(lit.has(i) ? LIGHT_SWIPES : Math.max(0, before[i] - 1)));
-		}
-	});
-
-	it('a breath lights like any explosion, but fades nothing and leaves the fireflies where they are', () => {
-		const s = createGame({ ...APP.levelConfig(60), night: true, flies: 2, fire: FIRE_FULL });
-		anySwipe(s, 0);
-		const light = s.light.slice();
-		const flies = s.flies.slice();
-		const moves = s.moves;
+		put(s, 0, 0, 'gem', 1);
+		put(s, 0, 2, 'gem', 1, { rank: 2 });
+		put(s, 0, 4, 'gem', 1);
+		put(s, 2, 0, 'gem', 2, { ice: true });
+		put(s, 2, 2, 'gem', 2);
+		put(s, 4, 0, 'gem', 3, { rank: 4 });
+		put(s, 4, 3, 'gem', 3, { rank: 4 });
+		put(s, 6, 6, 'chest');
+		s.fire = FIRE_FULL;
 		const steps = breathe(s)!;
-		expect(steps.at(-1)!.t).toBe('night');
-		expect(s.flies).toEqual(flies);
-		expect(s.moves).toBe(moves);
-		const lit = litBy(steps);
-		expect(lit.size).toBeGreaterThan(0);
-		s.light.forEach((l, i) => expect(l).toBe(lit.has(i) ? LIGHT_SWIPES : light[i]));
+		const p = pearl(steps);
+		expect(p.pairs).toEqual([[at(0, 0), at(0, 2)], [at(4, 0), at(4, 3)]]);
+		expect(s.cells[at(0, 0)]!.rank).toBe(3); // max(1, 2) + 1
+		expect(s.cells[at(0, 2)]).toBeNull();
+		expect(s.cells[at(0, 4)]!.rank).toBe(1); // the odd one out
+		expect([s.cells[at(2, 0)]!.ice, s.cells[at(2, 2)]!.rank]).toEqual([true, 1]); // frozen ones sit out
+		expect(s.cells[at(4, 0)]!.rank).toBe(4); // a crown stays a crown
+		expect(s.cells[at(4, 3)]).toBeNull();
+		expect([s.fire, s.moves]).toEqual([0, 0]);
+		expect(steps.some((x) => x.t === 'breath')).toBe(false);
 	});
 
-	it('shows lit cells, the fireflies and their neighbours, chests and rocks, and around glowing gems', () => {
+	it("Perle's fusions set off the groups they make, wave after wave, nothing sliding", () => {
+		// Three pairs of one colour whose kept gems stand in a column: once fused, those three go off.
 		const s = blank({ night: true });
-		put(s, 0, 0, 'chest');
-		put(s, 0, 6, 'rock');
-		put(s, 3, 3, 'gem', 1, { rank: 2 });
-		put(s, 6, 6, 'gem', 0);
-		s.flies = [at(6, 0)];
-		s.light[at(0, 3)] = 1;
-		const v = visible(s);
-		const shows = (r: number, c: number): boolean => v[at(r, c)];
-		expect([shows(0, 3), shows(1, 3)]).toEqual([true, false]); // lit
-		expect([shows(5, 1), shows(6, 1), shows(4, 0)]).toEqual([true, true, false]); // firefly
-		expect([shows(0, 0), shows(1, 0), shows(0, 6), shows(1, 6)]).toEqual([true, false, true, false]); // chest, rock
-		expect([shows(2, 2), shows(4, 4), shows(5, 5), shows(6, 6)]).toEqual([true, true, false, false]); // glow, plain gem
+		for (const r of [1, 2, 3]) {
+			put(s, r, 3, 'gem', 0);
+			put(s, r, 5, 'gem', 0);
+		}
+		s.fire = FIRE_FULL;
+		const steps = breathe(s)!;
+		expect(pearl(steps).pairs).toEqual([[at(1, 3), at(1, 5)], [at(2, 3), at(2, 5)], [at(3, 3), at(3, 5)]]);
+		expect(steps.filter((x) => x.t === 'slide')).toEqual([]);
+		const waves = bursts(steps);
+		expect(waves.map((w) => w.wave)).toEqual(waves.map((_, i) => i + 1));
+		expect(waves[0].popped.map((p) => p.cell).sort((a, b) => a - b)).toEqual(expect.arrayContaining([at(1, 3), at(2, 3), at(3, 3)]));
+		expect(s.cells.filter(Boolean)).toEqual([]);
 	});
 
-	it("the app's night run replays its boards, fireflies four to one, two more swipes where limited", () => {
-		expect(appNightConfig(1).flies).toBe(4);
-		expect(appNightConfig(250).flies).toBe(1);
-		for (const level of [5, 20, 21, 120, 250]) {
+	it('by day the dragon is still Bijou, and his fireballs are unchanged', () => {
+		const s = createGame({ ...APP.levelConfig(60), fire: FIRE_FULL });
+		const steps = breathe(s)!;
+		expect(steps[0].t).toBe('breath');
+		expect(steps.some((x) => x.t === 'pearl')).toBe(false);
+	});
+
+	it("the app's night run: the same boards, frozen chests, its own limits and stars", () => {
+		expect(PICKS_APP_NIGHT).toHaveLength(APP.count);
+		for (const level of [1, 5, 20, 21, 120, 203, 250]) {
 			const day = APP.levelConfig(level);
 			const n = appNightConfig(level);
-			expect(n.night).toBe(true);
-			expect([n.seed, n.layout, n.goal, n.lesson]).toEqual([day.seed, day.layout, day.goal, day.lesson]);
-			const more = day.limit > 0 ? 2 : 0;
-			expect([n.limit, n.three, n.two]).toEqual([day.limit + more, day.three + more, day.two + more]);
+			expect([n.night, n.frostChests]).toEqual([true, true]);
+			expect([n.layout, n.goal, n.chests, n.locked, n.rocks, n.ice, n.lesson]).toEqual([day.layout, day.goal, day.chests, day.locked, day.rocks, day.ice, day.lesson]);
+			expect(n.limit === 0).toBe(level <= FREE_LEVELS);
+			expect(n.two).toBeGreaterThan(n.three);
 		}
+		expect(appNightBoard(120).seed).toBe(APP.levelConfig(120).seed); // the day's deal where the night can clear it
 	});
+
+	it('picks.ts matches the engine at night too: the breathing bot clears each night level in its recorded swipes', () => {
+		// Fails after a change to the engine, the bot or a board: rerun scripts/eclats-levels.ts night.
+		const stale: number[] = [];
+		for (let l = 1; l <= APP.count; l++) {
+			const run = playBot(appNightConfig(l), { breathe: true });
+			if (!run.won || run.moves !== PICKS_APP_NIGHT[l - 1][1]) stale.push(l);
+		}
+		expect(stale).toEqual([]);
+	}, 120_000);
 });
