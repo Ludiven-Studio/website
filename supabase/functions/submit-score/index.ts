@@ -1,6 +1,8 @@
 // submit-score — the ONLY write path for game_scores (service_role, bypasses RLS).
 // Validates every submission against the per-game rules stored in `games`, enforces
 // the daily-challenge quota, and keeps the player's best score per challenge date.
+// A run sent with a `submission_id` and sent again (a reply lost to the network) gets its first
+// answer back, without a second row or a second daily attempt (score_submissions).
 //
 // Deploy:  supabase functions deploy submit-score
 // Local:   supabase functions serve submit-score
@@ -23,6 +25,8 @@ interface SubmitPayload {
 	duration_seconds: number;
 	raw_data?: Record<string, unknown>;
 	is_daily_challenge?: boolean;
+	challenge_date?: string; // the Paris day the daily board was dealt on: today, or yesterday until 01:00
+	submission_id?: string; // one per run, the same on every retry
 }
 
 interface GameRules {
@@ -93,6 +97,22 @@ Deno.serve(async (req) => {
 		Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
 	);
 
+	// ---- A retry gets the first answer back ----
+	const submissionId = typeof payload.submission_id === 'string' && UUID_RE.test(payload.submission_id) ? payload.submission_id : null;
+	if (submissionId) {
+		const { data: seen } = await supabase.from('score_submissions').select('response')
+			.eq('player_id', player_id).eq('submission_id', submissionId).maybeSingle<{ response: unknown }>();
+		if (seen) return json(seen.response);
+	}
+	/** The answer, remembered for a retry of the same run. */
+	const answer = async (body: Record<string, unknown>): Promise<Response> => {
+		if (submissionId) {
+			await supabase.from('score_submissions').insert({ player_id, submission_id: submissionId, response: body })
+				.then(() => {}, () => {}); // a lost memo only means a retry is counted again
+		}
+		return json(body);
+	};
+
 	// ---- Load the game's rules ----
 	const { data: game, error: gameErr } = await supabase
 		.from('games')
@@ -131,19 +151,20 @@ Deno.serve(async (req) => {
 			raw_data: payload.raw_data ?? null, challenge_date: null,
 		});
 		if (error) return json({ error: 'insert failed' }, 500);
-		return json({ retained: true, best_score: score, attempts_left: null, name_refused: nameRefused });
+		return answer({ retained: true, best_score: score, attempts_left: null, name_refused: nameRefused });
 	}
 
 	// ---- Daily challenge: quota + best-score-retained upsert ----
-	// The server decides the challenge date — never trust a client-sent date. Europe/Paris,
-	// mirroring src/lib/day.ts: the puzzle, the local keys and these rows must roll over at
-	// the same instant, otherwise midnight-to-2am players get yesterday's leaderboard.
-	const challengeDate = new Intl.DateTimeFormat('en-CA', {
-		timeZone: 'Europe/Paris',
-		year: 'numeric',
-		month: '2-digit',
-		day: '2-digit',
-	}).format(new Date());
+	// The server decides the challenge date. Europe/Paris, mirroring src/lib/day.ts: the puzzle, the
+	// local keys and these rows must roll over at the same instant. A run dealt before midnight and
+	// sent just after may name the day of its board: yesterday is accepted until 01:00, else today.
+	const parisDay = (at: Date): string =>
+		new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(at);
+	const now = new Date();
+	const today = parisDay(now);
+	const parisHour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', hour: '2-digit', hourCycle: 'h23' }).format(now));
+	const yesterday = parisDay(new Date(now.getTime() - 86_400_000));
+	const challengeDate = payload.challenge_date === yesterday && parisHour < 1 ? yesterday : today;
 
 	const { data: existing, error: exErr } = await supabase
 		.from('game_scores')
@@ -197,7 +218,7 @@ Deno.serve(async (req) => {
 		.eq('challenge_date', challengeDate);
 	const { count } = await (isTime ? rankQuery.lt('score', bestScore) : rankQuery.gt('score', bestScore));
 
-	return json({
+	return answer({
 		retained,
 		best_score: bestScore,
 		attempts_left: game.max_attempts_per_day != null ? game.max_attempts_per_day - (attemptsUsed + 1) : null,

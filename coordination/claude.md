@@ -1279,3 +1279,30 @@
   contrôle de plus, 3 passages OK ; eslint, tsc, vitest OK.
 - 09:24 : commité et poussé à la demande de l'utilisateur (« Pousse direct une fois fini ») : mes 2 fichiers et cette
   section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-10-29 — Dragon's Gems Swipe : garde-fous des sauvegardes et scores renvoyés (serveur) (session website)
+- Statut : en cours (2026-10-29T10:56+01:00). Demande de l'utilisateur : (transmis par la session Unity, choix de
+  l'utilisateur) « Garde-fous simples : le serveur refuse les sauvegardes impossibles » ; « Scores renvoyés : un score
+  perdu sur erreur réseau est gardé, puis renvoyé […] sans doublon. Le score du défi part aussi avec la date de son
+  plateau »
+- Réservations actives : `supabase/functions/app-save/index.ts`, `supabase/functions/submit-score/index.ts`,
+  `supabase/migrations/*_score_submissions.sql` (nouveau).
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 10:57 : écrit (non déployé, non commité) : app-save borne la copie de dragonsgems champ par champ (Stars ≤ 750
+  valeurs de 0 à 3, Hoard, Played, EndlessBest/SummitBest au plafond de eclats-inf/eclats-sommet, Cave/PerleCave,
+  CaveFound, StarChests, GiftStreak, GiftDay ≤ demain, DailyPlayed vide ou date ≤ demain à Paris) au lieu de refuser ;
+  submit-score : challenge_date (veille acceptée jusqu'à 1 h à Paris, sinon aujourd'hui), submission_id (une nouvelle
+  tentative du même coup reçoit la première réponse, sans nouvelle ligne ni essai du jour) ; migration
+  score_submissions (RLS sans politique). deno check OK ; db push --dry-run : elle seule en attente. Attend l'accord de
+  l'utilisateur pour la migration et le déploiement des deux fonctions.
+- 07:36 : l'utilisateur dit « Ok pour les 2 et go » : déploiement serveur refusé par le contrôle automatique (à lancer
+  par l'utilisateur) ; renommage « Dragon Gems Swipe » sur le site (15 fichiers + games.ts) ; niveaux du site plus
+  faciles en cours (réserve aussi `src/games/eclats/levels.ts`, `picks.ts`, `scripts/eclats-levels.ts`,
+  `src/data/games.ts`, les pages et composants Dragon Gems)
+- 07:49 : niveaux du site plus faciles : 15 % de coffres en moins (ease 0.85), cinquième couleur deux fois plus rare
+  (0.5), limites à 90 % des joueurs (80 % sur un niveau dur) ; picks du site regénérés ; joueur type, graines neuves :
+  21-60 88→92 %, 61-100 76→82 %, 101-150 64→80 %, 151-200 58→74 %. 53 tests, check-eclats, eslint, astro check OK.
+  Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 07:51 : commité et poussé à la demande de l'utilisateur (« Ok pour les 2 et go ») : renommage, niveaux du site, code
+  serveur ; migration et déploiement des deux fonctions à lancer par l'utilisateur (refusés par le contrôle
+  automatique). Statut : terminé. Réservations libérées.
