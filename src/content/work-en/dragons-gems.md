@@ -1,8 +1,8 @@
 ---
-title: Dragon's Gems Swipe - 2026
+title: Dragon Gems Swipe - 2026
 publishDate: 2026-10-27 00:00:00
 img: /assets/dragons-gems/feature-en.webp
-img_alt: Dragon's Gems Swipe — Bijou, the baby dragon, on his pile of gold, in front of a board of gems
+img_alt: Dragon Gems Swipe — Bijou, the baby dragon, on his pile of gold, in front of a board of gems
 role: Developer
 org: Ludiven Studio
 appPage: /en/dragons-gems/
@@ -34,7 +34,7 @@ gallery:
     alt: "The daily challenge"
 ---
 <p>
-  This page tells how Dragon's Gems Swipe is <strong>made</strong>. For the game itself — what it offers,
+  This page tells how Dragon Gems Swipe is <strong>made</strong>. For the game itself — what it offers,
   what it costs, where to get it — the <a href="/en/dragons-gems/">app page</a> is the place, and the
   <a href="/jeux/eclats/">web version</a> plays right away (in French).
 </p>

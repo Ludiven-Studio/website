@@ -1621,7 +1621,7 @@ export default function EclatsGame({ gameId, night: nightTest = false }: { gameI
 						viewBox={`-1.5 -1.5 ${N * U + 3} ${N * U + 3}`}
 						className={`ec-svg ${phase === 'ready' ? 'blurred' : ''} ${over && mode !== 'levels' ? 'dimmed' : ''}`}
 						role="application"
-						aria-label="Plateau de Dragon's Gems Swipe : glisse pour tout faire glisser"
+						aria-label="Plateau de Dragon Gems Swipe : glisse pour tout faire glisser"
 					>
 						<defs>
 							<radialGradient id="ec-halo">

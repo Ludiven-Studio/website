@@ -1,4 +1,4 @@
-// Dragon's Gems Swipe (gameId eclats) in a real browser: the level opens on its ready gate, its drawn gems
+// Dragon Gems Swipe (gameId eclats) in a real browser: the level opens on its ready gate, its drawn gems
 // and Bijou load, the arrow keys swipe the board, a finger swipe does too (CDP touch events on a
 // phone-sized page), the blocks a swipe would explode light up while the finger is still down, the ones
 // it would move get a tug its way as the drag starts and are back in place before it ends, a played

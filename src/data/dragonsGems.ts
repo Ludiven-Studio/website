@@ -1,10 +1,10 @@
-// Dragon's Gems Swipe, the mobile app: its product page and download page in five languages.
+// Dragon Gems Swipe, the mobile app: its product page and download page in five languages.
 // The texts follow the store listings (DragonsGemsSwipe docs/store.md, "Listing copy"); the cave, the summit
 // challenge and the shop prices come from the app itself. The web mini-game is /jeux/eclats/.
 
 export type Lang = 'fr' | 'en' | 'es' | 'de' | 'it';
 
-export const APP_NAME = "Dragon's Gems Swipe";
+export const APP_NAME = "Dragon Gems Swipe";
 export const ANDROID_ID = 'com.ludivenstudio.dragonsgems';
 
 /** The store listings, once the game is on them: the badges link there instead of « coming soon ». */
@@ -83,7 +83,7 @@ export interface Copy {
 
 export const copy: Record<Lang, Copy> = {
 	fr: {
-		title: "Dragon's Gems Swipe — le puzzle de gemmes du bébé dragon",
+		title: "Dragon Gems Swipe — le puzzle de gemmes du bébé dragon",
 		description: "Glisse le plateau, fais exploser les gemmes et remplis le trésor de Bijou, le bébé dragon : 500 niveaux, un défi du jour, un mode infini. Bientôt sur iPhone, iPad et Android.",
 		kicker: 'Jeu mobile · iPhone, iPad et Android',
 		tagline: 'Puzzle de gemmes à glisser',
@@ -135,7 +135,7 @@ export const copy: Record<Lang, Copy> = {
 		supportLink: 'Écris-nous',
 		privacy: 'Politique de confidentialité',
 		dl: {
-			title: "Télécharger Dragon's Gems Swipe",
+			title: "Télécharger Dragon Gems Swipe",
 			kicker: 'Bientôt sur les stores',
 			lead: 'Glisse le plateau, fais exploser les gemmes et remplis le trésor du bébé dragon.',
 			waiting: "Le jeu arrive bientôt sur l'App Store et Google Play. En attendant :",
@@ -144,7 +144,7 @@ export const copy: Record<Lang, Copy> = {
 		},
 	},
 	en: {
-		title: "Dragon's Gems Swipe — the baby dragon's gem puzzle",
+		title: "Dragon Gems Swipe — the baby dragon's gem puzzle",
 		description: "Slide the board, blast the gems and fill the treasure of Bijou, the baby dragon: 500 levels, a daily challenge, an endless mode. Coming soon to iPhone, iPad and Android.",
 		kicker: 'Mobile game · iPhone, iPad and Android',
 		tagline: 'Gem puzzle: slide and blast',
@@ -196,7 +196,7 @@ export const copy: Record<Lang, Copy> = {
 		supportLink: 'Write to us',
 		privacy: 'Privacy policy',
 		dl: {
-			title: "Download Dragon's Gems Swipe",
+			title: "Download Dragon Gems Swipe",
 			kicker: 'Coming soon to the stores',
 			lead: "Slide the board, blast the gems and fill the baby dragon's treasure.",
 			waiting: 'The game is coming soon to the App Store and Google Play. Until then:',
@@ -205,7 +205,7 @@ export const copy: Record<Lang, Copy> = {
 		},
 	},
 	es: {
-		title: "Dragon's Gems Swipe — el puzle de gemas del dragón bebé",
+		title: "Dragon Gems Swipe — el puzle de gemas del dragón bebé",
 		description: 'Desliza el tablero, haz explotar las gemas y llena el tesoro de Bijou, el dragón bebé: 500 niveles, un reto del día y un modo infinito. Muy pronto en iPhone, iPad y Android.',
 		kicker: 'Juego para móvil · iPhone, iPad y Android',
 		tagline: 'Puzle de gemas para deslizar',
@@ -257,7 +257,7 @@ export const copy: Record<Lang, Copy> = {
 		supportLink: 'Escríbenos',
 		privacy: 'Política de privacidad (en inglés)',
 		dl: {
-			title: "Descargar Dragon's Gems Swipe",
+			title: "Descargar Dragon Gems Swipe",
 			kicker: 'Muy pronto en las tiendas',
 			lead: 'Desliza el tablero, haz explotar las gemas y llena el tesoro del dragón bebé.',
 			waiting: 'El juego llega muy pronto al App Store y a Google Play. Mientras tanto:',
@@ -266,7 +266,7 @@ export const copy: Record<Lang, Copy> = {
 		},
 	},
 	de: {
-		title: "Dragon's Gems Swipe — das Edelstein-Puzzle des Babydrachen",
+		title: "Dragon Gems Swipe — das Edelstein-Puzzle des Babydrachen",
 		description: 'Wisch das Spielfeld, spreng die Edelsteine und füll den Schatz von Bijou, dem Babydrachen: 500 Level, eine Tagesaufgabe und ein Endlosmodus. Bald für iPhone, iPad und Android.',
 		kicker: 'Handyspiel · iPhone, iPad und Android',
 		tagline: 'Puzzle: Edelsteine wischen',
@@ -318,7 +318,7 @@ export const copy: Record<Lang, Copy> = {
 		supportLink: 'Schreib uns',
 		privacy: 'Datenschutzerklärung (auf Englisch)',
 		dl: {
-			title: "Dragon's Gems Swipe herunterladen",
+			title: "Dragon Gems Swipe herunterladen",
 			kicker: 'Bald in den Stores',
 			lead: 'Wisch das Spielfeld, spreng die Edelsteine und füll den Schatz des Babydrachen.',
 			waiting: 'Das Spiel kommt bald in den App Store und zu Google Play. Bis dahin:',
@@ -327,7 +327,7 @@ export const copy: Record<Lang, Copy> = {
 		},
 	},
 	it: {
-		title: "Dragon's Gems Swipe — il puzzle di gemme del cucciolo di drago",
+		title: "Dragon Gems Swipe — il puzzle di gemme del cucciolo di drago",
 		description: 'Fai scorrere il tabellone, fai esplodere le gemme e riempi il tesoro di Bijou, il cucciolo di drago: 500 livelli, una sfida del giorno e una modalità infinita. Presto su iPhone, iPad e Android.',
 		kicker: 'Gioco per cellulare · iPhone, iPad e Android',
 		tagline: 'Puzzle di gemme da scorrere',
@@ -379,7 +379,7 @@ export const copy: Record<Lang, Copy> = {
 		supportLink: 'Scrivici',
 		privacy: 'Informativa sulla privacy (in inglese)',
 		dl: {
-			title: "Scarica Dragon's Gems Swipe",
+			title: "Scarica Dragon Gems Swipe",
 			kicker: 'Presto negli store',
 			lead: 'Fai scorrere il tabellone, fai esplodere le gemme e riempi il tesoro del cucciolo di drago.',
 			waiting: 'Il gioco arriva presto su App Store e Google Play. Nel frattempo:',

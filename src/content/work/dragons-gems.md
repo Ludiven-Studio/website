@@ -1,8 +1,8 @@
 ---
-title: Dragon's Gems Swipe - 2026
+title: Dragon Gems Swipe - 2026
 publishDate: 2026-10-27 00:00:00
 img: /assets/dragons-gems/feature-fr.webp
-img_alt: Dragon's Gems Swipe — Bijou, le bébé dragon, sur son tas d'or, devant un plateau de gemmes
+img_alt: Dragon Gems Swipe — Bijou, le bébé dragon, sur son tas d'or, devant un plateau de gemmes
 role: Développeur
 org: Ludiven Studio
 appPage: /dragons-gems/
@@ -34,7 +34,7 @@ gallery:
     alt: "Le défi du jour"
 ---
 <p>
-  Cette page raconte la <strong>fabrication</strong> de Dragon's Gems Swipe. Pour le jeu lui-même — ce qu'il
+  Cette page raconte la <strong>fabrication</strong> de Dragon Gems Swipe. Pour le jeu lui-même — ce qu'il
   propose, ce qu'il coûte, où le télécharger — la <a href="/dragons-gems/">page de l'appli</a> est faite pour
   ça, et la <a href="/jeux/eclats/">version web</a> se joue tout de suite.
 </p>

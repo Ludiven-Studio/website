@@ -199,7 +199,7 @@ export const games: GameTile[] = [
 	},
 	{
 		id: 'eclats',
-		title: 'Dragon’s Gems Swipe',
+		title: 'Dragon Gems Swipe',
 		pitch: 'Aide Bijou, le bébé dragon, à remplir son trésor : glisse tout le plateau comme dans 2048, trois gemmes de la même couleur explosent, quatre fusionnent en une gemme plus forte, et les explosions s’enchaînent. Chaque coffre ouvert remplit le butin.',
 		icon: 'eclats',
 		href: '/jeux/eclats/',
