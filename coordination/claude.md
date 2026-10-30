@@ -1306,3 +1306,22 @@
 - 07:51 : commité et poussé à la demande de l'utilisateur (« Ok pour les 2 et go ») : renommage, niveaux du site, code
   serveur ; migration et déploiement des deux fonctions à lancer par l'utilisateur (refusés par le contrôle
   automatique). Statut : terminé. Réservations libérées.
+
+## 2026-10-30 — Pétanque : règles officielles (but à 1 m des bords, égalité alternée, cercle après but mort) (session PetanqueGame)
+- Statut : en cours (2026-10-30T07:39+01:00). Demande de l'utilisateur : Ok pour tenir compte des vraies règles
+  officielles d'ailleurs je crois que c'est 1m des bords […] Ok pour faire toutes les modifications citées
+- Réservations actives : `src/games/petanque/rules13.ts`, `src/games/petanque/rules13.test.ts`,
+  `src/games/petanque/ai.ts`, `src/games/petanque/PetanqueGame.tsx`, `src/games/petanque/daily.ts`,
+  `src/games/petanque/render3d.ts`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 07:47 : réservé aussi : `src/games/petanque/i18n.tsx`, `src/games/petanque/ai.test.ts`, `scripts/petanque-match.ts`
+  (appel de applyPlacedJack). Fait : but à 1 m des planches (verdict 'edge', message dans les 3 langues), 6-10 m depuis
+  le bord intérieur du cercle (JACK_LO/JACK_HI), cercle à 1 m des planches, égalité qui persiste = les équipes
+  alternent (art. 28), cercle de la mène suivante là où était le but, un but mort à sa dernière place en jeu,
+  millimètre d'égalité aussi au comptage, l'IA vise le but dans le couloir. Parcours du jour inchangé (COURSE_CIRCLE
+  fixé). vitest petanque 117/117, eslint OK.
+- 08:39 : l'utilisateur dit « Oui informer le site » (pousser les règles). Lancement du build complet (écrit dist/,
+  .astro/, public/vendor/)…
+- 08:41 : build complet OK (astro check 0 erreur, 191 pages, precache et liens OK).
+- 08:41 : commité et poussé à la demande de l'utilisateur (« Oui informer le site ») : mes 9 fichiers et cette section
+  seulement. Statut : terminé. Réservations libérées.

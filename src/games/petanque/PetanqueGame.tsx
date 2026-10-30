@@ -9,7 +9,7 @@ import {
 } from './engine';
 import {
 	initMatch13, applyJack, applyPlacedJack, applySettled, finishEnd, jackCheck, pointHolder, endScore, other,
-	MIN_JACK, MAX_JACK, EDGE, BOULES_PER_SIDE, type Match13, type Side, type Played,
+	MIN_JACK, MAX_JACK, JACK_LO, JACK_HI, EDGE, BOULES_PER_SIDE, type Match13, type Side, type Played,
 } from './rules13';
 import { planThrow, planJack, jackThrow, JACK_SPREAD_PLAYER, launch } from './ai';
 import { swayAt, swayAmp } from './sway';
@@ -277,7 +277,7 @@ const PREVIEW_FOV = 50;
      6.15 m 22.5 %   6.30 m 5.2 %   6.40 m 3.3 %   6.50 m 1.0 %
      8.80 m  0.4 %   9.00 m 1.9 %   9.15 m 1.9 %   9.60 m 15.6 %   9.85 m 36.9 %
    It used to stop at ~2 % either side (6.5 / 9 m); the player now picks the risk. */
-const AIM_LO = MIN_JACK, AIM_HI = MAX_JACK;
+const AIM_LO = JACK_LO, AIM_HI = JACK_HI;
 
 const AIM_DEAD_PX = 8; // sideways slack before a power pull counts as a direction change
 /* The launch board: a FIXED pad, centred on the bottom edge, where a full-width band used to take
@@ -800,7 +800,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		killGroup(g.rings);
 		g.circle.add(groundRing(s.t, c.x, c.y, CIRCLE_R, 0xf2e9d8));
 		const dir = matchRef.current.dir;
-		for (const r of [MIN_JACK, MAX_JACK]) {
+		for (const [r, m] of [[JACK_LO, MIN_JACK], [JACK_HI, MAX_JACK]]) {
 			// Dashed: they are rules drawn on the ground, not an object; solid read as a rope.
 			g.rings.add(groundRing(s.t, c.x, c.y, r, 0xffd166, 0.016, 1, 0.3));
 			// The legend stands on the line near a side line, clear of the lane the eye looks down.
@@ -809,7 +809,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 				if (Math.abs(dx) >= r) continue;
 				const ly = c.y + dir * Math.sqrt(r * r - dx * dx);
 				if (ly < 0.2 || ly > PITCH_L - 0.2) continue;
-				const label = groundLabel(`${r} m`, '#ffd166');
+				const label = groundLabel(`${m} m`, '#ffd166');
 				label.position.set(wx(lx), heightAt(s.t, lx, ly) + 0.16, wz(ly));
 				g.rings.add(label as unknown as THREE.Mesh);
 				break;
@@ -1550,7 +1550,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 			j.y = m.circle.y + m.dir * 7.4;
 			j.live = true;
 			place(s.t, j);
-			matchRef.current = applyPlacedJack(m);
+			matchRef.current = applyPlacedJack(m, j);
 			setMatch(matchRef.current);
 			statusRef.current = 'aim';
 			setStatus('aim');
@@ -1853,7 +1853,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 			if (!s || !j || statusRef.current !== 'placing') return;
 			j.x = mv.msg.x; j.y = mv.msg.y; j.live = true;
 			place(s.t, j);
-			matchRef.current = applyPlacedJack(matchRef.current);
+			matchRef.current = applyPlacedJack(matchRef.current, j);
 			movesRef.current++;
 			setMatch(matchRef.current);
 			placeRef.current = null;
@@ -1930,7 +1930,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 			if (!s || !j || statusRef.current !== 'placing' || matchRef.current.turn === mySideRef.current) return;
 			j.x = p.x; j.y = p.y; j.live = true;
 			place(s.t, j);
-			matchRef.current = applyPlacedJack(matchRef.current);
+			matchRef.current = applyPlacedJack(matchRef.current, j);
 			movesRef.current++;
 			setMatch(matchRef.current);
 			placeRef.current = null;
@@ -2135,7 +2135,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 	 * margin is for HAND placing, where the spot is exact. Aiming is a different question — see
 	 * `AIM_LO` / `AIM_HI`.
 	 */
-	const legalise = useCallback((p: { x: number; y: number }, lo = MIN_JACK + 0.15, hi = MAX_JACK - 0.15):
+	const legalise = useCallback((p: { x: number; y: number }, lo = JACK_LO + 0.15, hi = JACK_HI - 0.15):
 	{ x: number; y: number } => {
 		const c = matchRef.current.circle;
 		const x = Math.min(PITCH_W - EDGE, Math.max(EDGE, p.x));
@@ -2153,7 +2153,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		place(s.t, j);
 		if (jackCheck(matchRef.current.circle, j) !== 'ok') return; // legalise() should make this dead code
 		if (onlineRef.current) sendMove({ kind: 'place', msg: { x: p.x, y: p.y, n: movesRef.current } });
-		matchRef.current = applyPlacedJack(matchRef.current);
+		matchRef.current = applyPlacedJack(matchRef.current, j);
 		movesRef.current++;
 		setMatch(matchRef.current);
 		placeRef.current = null;

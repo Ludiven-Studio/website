@@ -9,8 +9,8 @@
  */
 
 import { type Sim, type Boule, type Velocity, makeBoule, makeJack, release, throwVelocity, settle, blindSim, BOULE_R } from './engine';
-import { type GroundSample, hashN, surfaceAt } from './terrain';
-import { type Match13, type Side, other, MIN_JACK, MAX_JACK } from './rules13';
+import { type GroundSample, hashN, surfaceAt, PITCH_W } from './terrain';
+import { type Match13, type Side, other, JACK_LO, JACK_HI, EDGE } from './rules13';
 
 export type Intent = 'point' | 'shoot' | 'jack';
 
@@ -37,6 +37,7 @@ const COMFORT = 0.55; // m — beyond this, pointing is the obvious play
 const LANE_R = 0.13; // m — a boule this close to the path blocks it
 const JACK_SHOT_SKILL = 0.8; // shooting the jack out is a strong player's move: Difficile and up
 const JACK_ELEVS = [0.15, 0.25]; // low shots: a lob comes down on the jack and pins it
+const AIM_SIDE = 0.4; // m inside the side limit the jack is aimed at most
 const JACK_SPD_LO = 6, JACK_SPD_HI = 14, JACK_SPD_STEP = 0.5;
 const JACK_RUN = 3; // speeds in a row that must all kill it: ~1 m/s, a margin the AI's error fits in
 
@@ -291,9 +292,11 @@ export function jackThrow(
 export function planJack(s: Sim, state: Match13, skill: number, rng: number): { vx: number; vy: number; vz: number; aim: { x: number; y: number } } {
 	const k = norm(skill);
 	const from = state.circle;
-	const want = (MIN_JACK + MAX_JACK) / 2 + gauss(rng + 77, s.t.seed) * 0.6;
+	const want = (JACK_LO + JACK_HI) / 2 + gauss(rng + 77, s.t.seed) * 0.6;
+	// Aimed inside the metre the rules keep from the side boards, as a player does.
 	const lateral = gauss(rng + 313, s.t.seed) * 0.35;
-	return jackThrow(s, state, { x: from.x + lateral, y: from.y + state.dir * want }, {
+	const x = Math.max(EDGE + AIM_SIDE, Math.min(PITCH_W - EDGE - AIM_SIDE, from.x + lateral));
+	return jackThrow(s, state, { x, y: from.y + state.dir * want }, {
 		ang: (ANG_WORST + (ANG_BEST - ANG_WORST) * k) * 6,
 		spd: (SPD_WORST + (SPD_BEST - SPD_WORST) * k) * 1.5,
 	}, rng);

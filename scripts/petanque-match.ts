@@ -57,7 +57,7 @@ export function playMatch(o: MatchOpts): MatchResult {
 			place(t, jack);
 			if (jackCheck(state.circle, jack) !== 'ok')
 				throw new Error(`hand-placed jack is illegal: circle ${state.circle.y.toFixed(2)} jack ${jack.y.toFixed(2)}`);
-			state = applyPlacedJack(state);
+			state = applyPlacedJack(state, jack);
 		}
 
 		while (state.phase === 'play') {

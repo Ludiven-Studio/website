@@ -14,9 +14,16 @@ import { BOULE_R } from './engine';
 export type Side = 0 | 1;
 export type Phase = 'throw-jack' | 'place-jack' | 'play' | 'end-done' | 'match-done';
 
-export const MIN_JACK = 6; // m from the circle
+/* The official rules (FIPJP art. 7): the jack 6 to 10 m from the circle's inner edge, a metre at
+   least from every board, and the circle's rim a metre from them too. */
+export const MIN_JACK = 6; // m from the circle's inner edge
 export const MAX_JACK = 10;
-export const EDGE = 0.5; // m the jack must keep from the pitch limits
+export const CIRCLE_R = 0.25; // m, the circle's inner radius: the official one is 50 cm across
+/** The window measured from the circle's middle, where the game draws and aims it. */
+export const JACK_LO = MIN_JACK + CIRCLE_R;
+export const JACK_HI = MAX_JACK + CIRCLE_R;
+export const EDGE = 1; // m the jack must keep from the boards
+export const CIRCLE_EDGE = EDGE + CIRCLE_R; // m from the boards to the circle's middle
 export const BOULES_PER_SIDE = 3;
 const TIE_EPS = 0.001; // 1 mm — below this the umpire calls it equal
 
@@ -38,6 +45,8 @@ export interface Match13 {
 	circle: { x: number; y: number };
 	dir: 1 | -1; // ends alternate direction, otherwise the circle walks off the pitch
 	left: [number, number]; // boules still in hand
+	lastJack: { x: number; y: number } | null; // where the jack last lay in play, a dead one before it went out
+	tied: boolean; // the point was tied after the last boule: a tie that holds makes the sides take turns
 	endNo: number;
 	winner: Side | null;
 	lastEvent: MatchEvent | null;
@@ -46,7 +55,7 @@ export interface Match13 {
 /** What the umpire just called. Data, not words: the UI says it in the player's language and from
  *  the player's own seat, which online is not always side 0. */
 export type MatchEvent =
-	| { k: 'jack-short' | 'jack-long' | 'jack-out' }
+	| { k: 'jack-short' | 'jack-long' | 'jack-out' | 'jack-edge' }
 	| { k: 'jack-dead'; side: Side | null; points: number }
 	| { k: 'match-won'; side: Side; points: number }
 	| { k: 'end'; side: Side | null; points: number };
@@ -63,14 +72,14 @@ const dist = (a: { x: number; y: number }, b: { x: number; y: number }): number 
 const gap = (b: Played, jack: Played): number => dist(b, jack) - ((b.r ?? BOULE_R) - BOULE_R);
 
 /**
- * Keep the circle where a legal throw still fits on the pitch. Real play moves it back too.
- * The margin matters: clamping to exactly MIN_JACK leaves a single legal distance, so a hand
- * placed jack would have nowhere to go.
+ * Keep the circle a metre from the boards and where a legal throw still fits on the pitch. Real
+ * play moves it back too. The margin matters: clamping to exactly JACK_LO leaves a single legal
+ * distance, so a hand placed jack would have nowhere to go.
  */
 const ROOM = 1.5;
 export function nextCircle(jackY: number, dir: 1 | -1): number {
-	const lo = dir === 1 ? EDGE : EDGE + MIN_JACK + ROOM;
-	const hi = dir === 1 ? PITCH_L - EDGE - MIN_JACK - ROOM : PITCH_L - EDGE;
+	const lo = dir === 1 ? CIRCLE_EDGE : EDGE + JACK_LO + ROOM;
+	const hi = dir === 1 ? PITCH_L - EDGE - JACK_LO - ROOM : PITCH_L - CIRCLE_EDGE;
 	return jackY < lo ? lo : jackY > hi ? hi : jackY;
 }
 
@@ -81,24 +90,26 @@ export function initMatch13(target = 13, firstThrower: Side = 0): Match13 {
 		phase: 'throw-jack',
 		turn: firstThrower,
 		jackThrower: firstThrower,
-		circle: { x: 2, y: EDGE + 0.5 },
+		circle: { x: PITCH_W / 2, y: CIRCLE_EDGE },
 		dir: 1,
 		left: [BOULES_PER_SIDE, BOULES_PER_SIDE],
+		lastJack: null,
+		tied: false,
 		endNo: 1,
 		winner: null,
 		lastEvent: null,
 	};
 }
 
-export type JackVerdict = 'ok' | 'short' | 'long' | 'out';
+export type JackVerdict = 'ok' | 'short' | 'long' | 'out' | 'edge';
 
 export function jackCheck(circle: { x: number; y: number }, jack: { x: number; y: number }): JackVerdict {
 	if (!inPitch(jack.x, jack.y)) return 'out';
-	// All four limits: the side lines were missed, and a jack against a side plank was accepted.
-	if (jack.x < EDGE || jack.x > PITCH_W - EDGE || jack.y < EDGE || jack.y > PITCH_L - EDGE) return 'out';
+	// All four boards: the side ones were missed, and a jack against a side plank was accepted.
+	if (jack.x < EDGE || jack.x > PITCH_W - EDGE || jack.y < EDGE || jack.y > PITCH_L - EDGE) return 'edge';
 	const d = dist(circle, jack);
-	if (d < MIN_JACK) return 'short';
-	if (d > MAX_JACK) return 'long';
+	if (d < JACK_LO) return 'short';
+	if (d > JACK_HI) return 'long';
 	return 'ok';
 }
 
@@ -129,18 +140,21 @@ export function endScore(bs: Played[], jack: Played): { side: Side | null; point
 	if (Math.abs(b0 - b1) < TIE_EPS) return { side: null, points: 0 };
 	const side: Side = b0 < b1 ? 0 : 1;
 	const rival = side === 0 ? b1 : b0;
-	return { side, points: ds[side].filter((d) => d < rival).length };
+	// The same millimetre as the point: a boule that close to the rival's best is level with it.
+	return { side, points: ds[side].filter((d) => d < rival - TIE_EPS).length };
 }
 
 /**
  * Who plays next, `state.turn` being the side that just played. The side without the point, if it
  * still has boules; otherwise the other side plays out its hand; `null` once both are empty. On a
- * tie the side that just played replays. With no live boule on the ground (the one just thrown
- * went out), nobody holds the point, so the turn passes to the other side.
+ * tie the side that just played replays, then, while the tie holds, the sides take turns (FIPJP
+ * art. 28): `state.tied` says it was tied before this boule. With no live boule on the ground (the
+ * one just thrown went out), nobody holds the point, so the turn passes to the other side.
  */
 export function whoPlays(state: Match13, bs: Played[], jack: Played): Side | null {
 	const h = pointHolder(bs, jack);
-	const want: Side = h === null ? other(state.turn) : h === 'tie' ? state.turn : other(h);
+	const want: Side = h === null ? other(state.turn)
+		: h === 'tie' ? (state.tied ? other(state.turn) : state.turn) : other(h);
 	if (state.left[want] > 0) return want;
 	const o = other(want);
 	return state.left[o] > 0 ? o : null;
@@ -149,18 +163,20 @@ export function whoPlays(state: Match13, bs: Played[], jack: Played): Side | nul
 /** The jack has landed. Valid → play; invalid → the opponent places it by hand. */
 export function applyJack(state: Match13, jack: { x: number; y: number }): Match13 {
 	const v = jackCheck(state.circle, jack);
-	if (v === 'ok') return { ...state, phase: 'play', turn: state.jackThrower, lastEvent: null };
+	if (v === 'ok') {
+		return { ...state, phase: 'play', turn: state.jackThrower, lastJack: { x: jack.x, y: jack.y }, tied: false, lastEvent: null };
+	}
 	return {
 		...state,
 		phase: 'place-jack',
 		turn: other(state.jackThrower),
-		lastEvent: { k: v === 'short' ? 'jack-short' : v === 'long' ? 'jack-long' : 'jack-out' },
+		lastEvent: { k: v === 'short' ? 'jack-short' : v === 'long' ? 'jack-long' : v === 'edge' ? 'jack-edge' : 'jack-out' },
 	};
 }
 
-/** The opponent has placed the jack by hand. The thrower still plays the first boule. */
-export const applyPlacedJack = (state: Match13): Match13 =>
-	({ ...state, phase: 'play', turn: state.jackThrower, lastEvent: null });
+/** The opponent has placed the jack by hand, at `jack`. The thrower still plays the first boule. */
+export const applyPlacedJack = (state: Match13, jack: { x: number; y: number }): Match13 =>
+	({ ...state, phase: 'play', turn: state.jackThrower, lastJack: { x: jack.x, y: jack.y }, tied: false, lastEvent: null });
 
 /**
  * A dead jack. Null if both sides still hold boules, or neither does; otherwise the only side still
@@ -187,8 +203,9 @@ export function applySettled(state: Match13, bs: Played[], jack: Played): Match1
 	}
 
 	const t = whoPlays(next, bs, jack);
-	if (t === null) return { ...next, phase: 'end-done' };
-	return { ...next, turn: t };
+	const after: Match13 = { ...next, lastJack: { x: jack.x, y: jack.y }, tied: pointHolder(bs, jack) === 'tie' };
+	if (t === null) return { ...after, phase: 'end-done' };
+	return { ...after, turn: t };
 }
 
 /** Close the end: award the points, set up the next one, or end the match. */
@@ -204,13 +221,14 @@ export function finishEnd(state: Match13, bs: Played[], jack: Played): Match13 {
 		};
 	}
 
-	// A null end is replayed by the same thrower, from the same circle, in the same direction.
+	/* The next end is thrown from where the jack lay (FIPJP art. 7), a dead one from its last place
+	   in play, by the winner, or after a null end by the same side; the circle a metre from the
+	   boards. The ends go back and forth, otherwise the circle walks off the pitch. */
 	const won = res.side;
 	const thrower: Side = won === null ? state.jackThrower : won;
-	const dir: 1 | -1 = won === null ? state.dir : state.dir === 1 ? -1 : 1;
-	// A dead jack lies past a line, so the circle is pulled back inside the pitch.
-	const circle = won === null ? state.circle
-		: { x: Math.max(EDGE, Math.min(PITCH_W - EDGE, jack.x)), y: nextCircle(jack.y, dir) };
+	const dir: 1 | -1 = state.dir === 1 ? -1 : 1;
+	const at = jack.live ? jack : state.lastJack ?? state.circle;
+	const circle = { x: Math.max(CIRCLE_EDGE, Math.min(PITCH_W - CIRCLE_EDGE, at.x)), y: nextCircle(at.y, dir) };
 
 	return {
 		...state,
@@ -221,6 +239,8 @@ export function finishEnd(state: Match13, bs: Played[], jack: Played): Match13 {
 		circle,
 		dir,
 		left: [BOULES_PER_SIDE, BOULES_PER_SIDE],
+		lastJack: null,
+		tied: false,
 		endNo: state.endNo + 1,
 		lastEvent: { k: 'end', side: won, points: res.points },
 	};

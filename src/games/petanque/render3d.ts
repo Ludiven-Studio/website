@@ -1302,7 +1302,7 @@ export function layFlat(m: THREE.Mesh, t: Terrain, x: number, y: number): void {
 	m.position.set(wx(x), heightAt(t, x, y) + CONTACT_LIFT, wz(y));
 }
 
-export const CIRCLE_R = 0.25; // m — the official throwing circle is 35 to 50 cm across
+export { CIRCLE_R } from './rules13';
 
 /**
  * A ring laid ON the ground: every vertex is sampled on the heightfield. A flat disc does not work

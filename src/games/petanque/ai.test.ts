@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { makeTerrain, SURFACES, type SurfaceId } from './terrain';
 import { makeBoule, makeJack, place, settle, cloneSim, throwVelocity, type Sim, type Boule } from './engine';
-import { initMatch13, jackCheck, MIN_JACK, MAX_JACK, type Match13 } from './rules13';
+import { initMatch13, jackCheck, JACK_LO, JACK_HI, type Match13 } from './rules13';
 import {
 	planThrow, planJack, jackThrow, JACK_SPREAD_PLAYER, solveSpeed, launch, laneBlocked, decide,
 	skillForLevel, MIN_SKILL, MAX_SKILL,
@@ -281,9 +281,9 @@ describe('the jack throw', () => {
 			}
 			return out / n;
 		};
-		expect(rate(MIN_JACK + 0.5)).toBeLessThan(0.05); // the near end of the ring
-		expect(rate(MAX_JACK - 1.0)).toBeLessThan(0.05); // and the far one
-		expect(rate(MAX_JACK - 0.15)).toBeGreaterThan(0.1); // the raw edge really is the trap
+		expect(rate(JACK_LO + 0.5)).toBeLessThan(0.05); // the near end of the ring
+		expect(rate(JACK_HI - 1.0)).toBeLessThan(0.05); // and the far one
+		expect(rate(JACK_HI - 0.15)).toBeGreaterThan(0.1); // the raw edge really is the trap
 	});
 
 	it('is the one code path the AI uses, so the AI jack is unchanged', () => {

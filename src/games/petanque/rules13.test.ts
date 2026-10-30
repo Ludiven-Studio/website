@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
 	initMatch13, applyJack, applyPlacedJack, applySettled, finishEnd,
 	jackCheck, pointHolder, endScore, whoPlays, nextCircle, other,
-	MIN_JACK, MAX_JACK, EDGE, BOULES_PER_SIDE, type Match13, type Played, type Side,
+	MIN_JACK, JACK_LO, JACK_HI, EDGE, CIRCLE_EDGE, BOULES_PER_SIDE, type Match13, type Played, type Side,
 } from './rules13';
 import { PITCH_L, PITCH_W } from './terrain';
 
@@ -15,13 +15,23 @@ describe('the jack', () => {
 	it('must land between 6 and 10 m and off the limits', () => {
 		expect(jackCheck(circle, { x: 2, y: 1 + MIN_JACK + 1 })).toBe('ok');
 		expect(jackCheck(circle, { x: 2, y: 1 + MIN_JACK - 0.2 })).toBe('short');
-		expect(jackCheck(circle, { x: 2, y: 1 + MAX_JACK + 0.2 })).toBe('long');
+		expect(jackCheck(circle, { x: 2, y: 1 + JACK_HI + 0.2 })).toBe('long');
 		expect(jackCheck(circle, { x: 2, y: PITCH_L + 1 })).toBe('out');
-		expect(jackCheck(circle, { x: 2, y: PITCH_L - EDGE / 2 })).toBe('out'); // inside, but hugging the line
-		// The side lines too: an AI jack was accepted against the side plank.
-		expect(jackCheck(circle, { x: EDGE / 2, y: 1 + MIN_JACK + 1 })).toBe('out');
-		expect(jackCheck(circle, { x: PITCH_W - EDGE / 2, y: 1 + MIN_JACK + 1 })).toBe('out');
+		expect(jackCheck(circle, { x: 2, y: PITCH_L - EDGE / 2 })).toBe('edge'); // inside, but hugging the board
+		// The side boards too: an AI jack was accepted against the side plank.
+		expect(jackCheck(circle, { x: EDGE / 2, y: 1 + MIN_JACK + 1 })).toBe('edge');
+		expect(jackCheck(circle, { x: PITCH_W - EDGE / 2, y: 1 + MIN_JACK + 1 })).toBe('edge');
 		expect(jackCheck(circle, { x: EDGE + 0.05, y: 1 + MIN_JACK + 1 })).toBe('ok');
+	});
+
+	it('keeps the official metre from the boards and measures from the circle’s inner edge', () => {
+		expect(EDGE).toBe(1);
+		expect(jackCheck(circle, { x: 0.8, y: 1 + MIN_JACK + 1 })).toBe('edge');
+		// 6.1 m from the middle is 5.85 m from the inner edge: short.
+		expect(jackCheck(circle, { x: 2, y: 1 + MIN_JACK + 0.1 })).toBe('short');
+		expect(jackCheck(circle, { x: 2, y: 1 + JACK_LO + 0.01 })).toBe('ok');
+		expect(jackCheck(circle, { x: 2, y: 1 + JACK_HI - 0.01 })).toBe('ok');
+		expect(initMatch13().circle.y).toBe(CIRCLE_EDGE);
 	});
 
 	it('an invalid jack hands the placing to the opponent, not the throw', () => {
@@ -30,8 +40,9 @@ describe('the jack', () => {
 		expect(bad.phase).toBe('place-jack');
 		expect(bad.turn).toBe(1); // the opponent places it
 		// ...but the thrower still plays the first boule of the end.
-		expect(applyPlacedJack(bad).turn).toBe(0);
-		expect(applyPlacedJack(bad).phase).toBe('play');
+		expect(applyPlacedJack(bad, { x: 2, y: 8 }).turn).toBe(0);
+		expect(applyPlacedJack(bad, { x: 2, y: 8 }).phase).toBe('play');
+		expect(applyPlacedJack(bad, { x: 2, y: 8 }).lastJack).toEqual({ x: 2, y: 8 });
 	});
 });
 
@@ -88,6 +99,27 @@ describe('who plays next — the rule that makes the game', () => {
 		expect(whoPlays(state(1, [3, 3]), [at(2, 8.4, 0), at(2, 7.6, 1)], j)).toBe(1);
 	});
 
+	it('while the tie holds, the sides then take turns (FIPJP art. 28)', () => {
+		let m: Match13 = { ...initMatch13(13, 0), phase: 'play', turn: 0, left: [3, 3] };
+		const bs: Played[] = [at(2, 8.4, 0)];
+		m = applySettled(m, bs, j);
+		expect(m.turn).toBe(1);
+		bs.push(at(2, 7.6, 1)); // 1 levels it: 1 replays
+		m = applySettled(m, bs, j);
+		expect(m.turn).toBe(1);
+		expect(m.tied).toBe(true);
+		bs.push(at(2, 9.5, 1)); // still level: now 0
+		m = applySettled(m, bs, j);
+		expect(m.turn).toBe(0);
+		bs.push(at(2, 9.6, 0)); // still level: back to 1
+		m = applySettled(m, bs, j);
+		expect(m.turn).toBe(1);
+		bs.push(at(2, 8.1, 1)); // 1 takes the point: the side without it, 0, plays
+		m = applySettled(m, bs, j);
+		expect(m.turn).toBe(0);
+		expect(m.tied).toBe(false);
+	});
+
 	it('a first boule that goes out hands the turn to the other side', () => {
 		const dead = { ...at(2, 8.2, 0), live: false };
 		expect(whoPlays(state(0, [2, 3]), [dead], j)).toBe(1);
@@ -122,9 +154,14 @@ describe('scoring an end', () => {
 		expect(endScore([at(2, 8.4, 0), at(2, 7.6, 1)], j).side).toBe(null);
 	});
 
-	it('a jack knocked out while both sides still hold boules is a null end, replayed by the same thrower', () => {
-		const m: Match13 = { ...initMatch13(13, 0), phase: 'play', turn: 0, left: [2, 2] };
-		const dead = { ...jackAt(2, 8), live: false };
+	it('a second boule within the millimetre of the rival’s best is level with it, not a point', () => {
+		const bs = [at(2, 8.1, 0), at(2, 8.5, 0), at(2, 8.5005, 1)];
+		expect(endScore(bs, j)).toEqual({ side: 0, points: 1 });
+	});
+
+	it('a jack knocked out while both sides still hold boules is a null end, thrown again by the same side from where the jack last lay', () => {
+		const m: Match13 = { ...initMatch13(13, 0), phase: 'play', turn: 0, left: [2, 2], lastJack: { x: 2.4, y: 9 } };
+		const dead = { ...jackAt(4.2, 9), live: false };
 		const after = applySettled(m, [at(2, 8.1, 0)], dead);
 		expect(after.phase).toBe('end-done');
 		const next = finishEnd(after, [at(2, 8.1, 0)], dead);
@@ -132,11 +169,14 @@ describe('scoring an end', () => {
 		expect(next.jackThrower).toBe(0);
 		expect(next.endNo).toBe(2);
 		expect(next.left).toEqual([BOULES_PER_SIDE, BOULES_PER_SIDE]);
+		expect(next.dir).toBe(-1);
+		expect(next.circle).toEqual({ x: 2.4, y: nextCircle(9, -1) });
+		expect(next.lastJack).toBe(null);
 	});
 
 	it('a jack knocked out when only one side holds boules gives it a point per boule in hand', () => {
 		// Side 0 throws its last boule and knocks the jack out; side 1 still holds two.
-		const m: Match13 = { ...initMatch13(13, 0), phase: 'play', turn: 0, left: [1, 2] };
+		const m: Match13 = { ...initMatch13(13, 0), phase: 'play', turn: 0, left: [1, 2], lastJack: { x: 2, y: 13.5 } };
 		const dead = { ...jackAt(2, PITCH_L + 0.2), live: false };
 		const after = applySettled(m, [at(2, 8.1, 0)], dead);
 		expect(after.phase).toBe('end-done');
@@ -144,7 +184,8 @@ describe('scoring an end', () => {
 		const next = finishEnd(after, [at(2, 8.1, 0)], dead);
 		expect(next.scores).toEqual([0, 2]);
 		expect(next.jackThrower).toBe(1);
-		expect(next.circle.y).toBeLessThanOrEqual(PITCH_L - EDGE);
+		expect(next.circle.y).toBeCloseTo(13.5, 6); // its last place in play, not past the end board
+		expect(next.circle.y).toBeLessThanOrEqual(PITCH_L - CIRCLE_EDGE);
 	});
 
 	it('a jack knocked out with no boule left anywhere is a null end', () => {
@@ -154,11 +195,11 @@ describe('scoring an end', () => {
 		expect(finishEnd(after, [], dead).scores).toEqual([0, 0]);
 	});
 
-	it('the next circle stays on the pitch when the dead jack went out sideways', () => {
-		const m: Match13 = { ...initMatch13(13, 0), phase: 'end-done', turn: 0, left: [0, 2] };
+	it('the next circle keeps a metre from the side board when the jack last lay against it', () => {
+		const m: Match13 = { ...initMatch13(13, 0), phase: 'end-done', turn: 0, left: [0, 2], lastJack: { x: 0.3, y: 8 } };
 		const next = finishEnd(m, [], { ...jackAt(-0.3, 8), live: false });
 		expect(next.scores).toEqual([0, 2]);
-		expect(next.circle.x).toBeGreaterThanOrEqual(EDGE);
+		expect(next.circle.x).toBe(CIRCLE_EDGE);
 	});
 });
 
@@ -174,9 +215,11 @@ describe('the match', () => {
 		expect(next.phase).toBe('throw-jack');
 	});
 
-	it('keeps the circle far enough from the end line for a 6 m throw', () => {
-		expect(nextCircle(14.9, 1)).toBeLessThanOrEqual(PITCH_L - EDGE - MIN_JACK);
-		expect(nextCircle(0.1, -1)).toBeGreaterThanOrEqual(EDGE + MIN_JACK);
+	it('keeps the circle far enough from the end board for a 6 m throw, and a metre from it', () => {
+		expect(nextCircle(14.9, 1)).toBeLessThanOrEqual(PITCH_L - EDGE - JACK_LO);
+		expect(nextCircle(0.1, -1)).toBeGreaterThanOrEqual(EDGE + JACK_LO);
+		expect(nextCircle(0.1, 1)).toBe(CIRCLE_EDGE);
+		expect(nextCircle(14.9, -1)).toBe(PITCH_L - CIRCLE_EDGE);
 		expect(nextCircle(4, 1)).toBeCloseTo(4, 6); // already fine, left alone
 	});
 
@@ -198,7 +241,7 @@ describe('the match', () => {
 	// One end, start to finish, checking the alternation is the official one at every boule.
 	it('plays a whole end and hands out the right score', () => {
 		let m = initMatch13(13, 0);
-		const j = jackAt(2, 7.5);
+		const j = jackAt(2, 7.6);
 		m = applyJack(m, j);
 		expect(m.phase).toBe('play');
 		expect(m.turn).toBe(0);

@@ -213,6 +213,7 @@ const fr = {
 			case 'jack-short': return 'Bouchon trop court — à l’adversaire de le placer';
 			case 'jack-long': return 'Bouchon trop long — à l’adversaire de le placer';
 			case 'jack-out': return 'Bouchon hors du terrain — à l’adversaire de le placer';
+			case 'jack-edge': return 'Bouchon à moins d’un mètre du bord — à l’adversaire de le placer';
 			case 'jack-dead': return ev.side === null ? 'Bouchon sorti — mène nulle' : `Bouchon sorti — ${fr.points(ev.points)} ${who(ev.side)}`;
 			case 'match-won': return `${fr.points(ev.points)} — partie gagnée`;
 			case 'end': return ev.side === null ? 'Mène nulle — on rejoue' : `${fr.points(ev.points)} ${who(ev.side)}`;
@@ -444,6 +445,7 @@ const en: Strings = {
 			case 'jack-short': return 'Jack too short — your opponent places it';
 			case 'jack-long': return 'Jack too long — your opponent places it';
 			case 'jack-out': return 'Jack off the pitch — your opponent places it';
+			case 'jack-edge': return 'Jack within a metre of the edge — your opponent places it';
 			case 'jack-dead': return ev.side === null ? 'Jack out — dead end' : `Jack out — ${en.points(ev.points)} ${who(ev.side)}`;
 			case 'match-won': return `${en.points(ev.points)} — game won`;
 			case 'end': return ev.side === null ? 'Dead end — replayed' : `${en.points(ev.points)} ${who(ev.side)}`;
@@ -673,6 +675,7 @@ const es: Strings = {
 			case 'jack-short': return 'Boliche demasiado corto — lo coloca el rival';
 			case 'jack-long': return 'Boliche demasiado largo — lo coloca el rival';
 			case 'jack-out': return 'Boliche fuera del terreno — lo coloca el rival';
+			case 'jack-edge': return 'Boliche a menos de un metro del borde — lo coloca el rival';
 			case 'jack-dead': return ev.side === null ? 'Boliche fuera — mano nula' : `Boliche fuera — ${es.points(ev.points)} ${who(ev.side)}`;
 			case 'match-won': return `${es.points(ev.points)} — partida ganada`;
 			case 'end': return ev.side === null ? 'Mano nula — se repite' : `${es.points(ev.points)} ${who(ev.side)}`;

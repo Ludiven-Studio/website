@@ -8,7 +8,6 @@
 
 import { BOULE_R, G, makeBoule, place, type Boule } from './engine';
 import { hashN, type SurfaceId, type Terrain } from './terrain';
-import { EDGE } from './rules13';
 import { encodePacked } from '../../lib/scoreFormat';
 
 export const STATIONS = 12;
@@ -21,7 +20,7 @@ export const TOOK_PLACE = 0.5; // m the shooter may end from where the target st
 export const CARREAU = 0.15;
 
 /** Where the thrower stands. Matches the opening circle of a match, so the lane reads the same. */
-export const COURSE_CIRCLE = { x: 2, y: EDGE + 0.5 };
+export const COURSE_CIRCLE = { x: 2, y: 1 }; // where the courses were drawn: the jack's rules do not move it
 
 /* The speed that LANDS the boule on the target — a tir au fer, which is the shot this course asks
    for. The boule leaves the hand at ground level, so the carry is the plain ballistic range and
