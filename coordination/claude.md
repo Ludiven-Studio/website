@@ -1306,6 +1306,10 @@
 - 07:51 : commité et poussé à la demande de l'utilisateur (« Ok pour les 2 et go ») : renommage, niveaux du site, code
   serveur ; migration et déploiement des deux fonctions à lancer par l'utilisateur (refusés par le contrôle
   automatique). Statut : terminé. Réservations libérées.
+- 07:57 : déployé par la session dragonsgemsswipe à la demande de l'utilisateur : migration 20261029120000 appliquée,
+  submit-score v15 et app-save v2 actives (vérifié en lecture : migration list, functions list)
+- 14:10 : APK de test 0.1.10 publié (« Dragon Gems Dev ») : la page /jeux/eclats/test/ prend ce nom ; commité et poussé
+  à la demande de l'utilisateur (« Pousse »)
 
 ## 2026-10-30 — Pétanque : règles officielles (but à 1 m des bords, égalité alternée, cercle après but mort) (session PetanqueGame)
 - Statut : en cours (2026-10-30T07:39+01:00). Demande de l'utilisateur : Ok pour tenir compte des vraies règles
