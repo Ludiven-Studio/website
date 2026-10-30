@@ -20,6 +20,8 @@ const PLAYERS = 60;
 const CASUAL = 0.6; // share of the typical player's swipes played at random: between the bot (≈ the best) and a random swiper
 const WIN = 0.8;
 const WIN_HARD = 0.65; // a hard level, one in ten from 30: a bit harder, not a wall
+const SITE_WIN = 0.9; // the website's levels are a taste of the app: easier
+const SITE_WIN_HARD = 0.8;
 
 /** The typical player's swipes to win, or Infinity when the board fills up first. */
 function typical(cfg: EclatsCfg, seed: number): number {
@@ -42,9 +44,10 @@ function typical(cfg: EclatsCfg, seed: number): number {
 }
 
 /** The swipes the typical player wins within `share` of the time; never under the bot's count + 2. */
-function limitFor(level: number, cfg: EclatsCfg, par: number): number {
+function limitFor(level: number, cfg: EclatsCfg, par: number, easy: boolean): number {
 	const runs = Array.from({ length: PLAYERS }, (_, i) => typical(cfg, hash2(level, i))).sort((a, b) => a - b);
-	const at = runs[Math.ceil((isHard(level) ? WIN_HARD : WIN) * PLAYERS) - 1];
+	const share = easy ? (isHard(level) ? SITE_WIN_HARD : SITE_WIN) : isHard(level) ? WIN_HARD : WIN;
+	const at = runs[Math.ceil(share * PLAYERS) - 1];
 	// A board that beats the player that often already: the limit must not bite on top.
 	const wins = runs.filter((x) => isFinite(x));
 	return Math.max(par + 2, isFinite(at) ? at : Math.max(...wins));
@@ -67,7 +70,7 @@ function pickAll(name: string, set: LevelSet): Pick[] {
 		}
 		if (!best) throw new Error(`${name} level ${l}: the bot clears none of its ${CANDIDATES} boards`);
 		off += Math.abs(best[1] - want);
-		picks.push([...best, l <= FREE_LEVELS ? 0 : limitFor(l, { ...b, seed: pickSeed(b.seed, best[0]) }, best[1])]);
+		picks.push([...best, l <= FREE_LEVELS ? 0 : limitFor(l, { ...b, seed: pickSeed(b.seed, best[0]) }, best[1], set === SITE)]);
 		if (l % 50 === 0) console.log(`${name} level ${l}…`);
 	}
 	console.log(`${name}: ${levels} levels picked, mean distance to target ${(off / levels).toFixed(2)} swipes`);

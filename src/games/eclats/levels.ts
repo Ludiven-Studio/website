@@ -104,6 +104,10 @@ export const starsLimit = (par: number): number => par + 4 + Math.round(par / 2)
 /** One plan of levels: `count` in five worlds, the Expert pack doubling it. */
 export interface LevelSet {
 	count: number;
+	/** Chests to open and the bot's target swipes, scaled: under 1 makes the plan easier. */
+	ease: number;
+	/** How often the fifth colour falls, scaled: it is what fills a board up most. */
+	fifth: number;
 	worlds: World[];
 	worldOf(level: number): World;
 	/** The board of level 1-count, before its candidate is picked. */
@@ -118,7 +122,7 @@ export interface LevelSet {
 	levels: LevelPlan<EclatsLevelCfg>;
 }
 
-function levelSet(count: number, picks: Pick[]): LevelSet {
+function levelSet(count: number, picks: Pick[], ease = 1, fifth = 1): LevelSet {
 	const size = count / 5;
 	const worlds: World[] = WORLD_TEXTS.map((w, i) => ({ from: i < 5 ? 1 + i * size : count + 1, ...w }));
 	const worldOf = (level: number): World => [...worlds].reverse().find((w) => level >= w.from) ?? worlds[0];
@@ -132,8 +136,8 @@ function levelSet(count: number, picks: Pick[]): LevelSet {
 		const g = (l - 1) / (count - 1);
 		return {
 			seed: levelSeed(l),
-			fifth: at(4, 0.06, 0.16, 0.16),
-			goal: Math.round(lerp(6, 10, t) + w * 1.2),
+			fifth: at(4, 0.06, 0.16, 0.16) * fifth,
+			goal: Math.round((lerp(6, 10, t) + w * 1.2) * ease),
 			chests: 3,
 			locked: Math.round(at(1, 1, 3, 2)),
 			chestEvery: Math.round(lerp(12, 9, g)),
@@ -146,7 +150,7 @@ function levelSet(count: number, picks: Pick[]): LevelSet {
 	/** The Expert pack, past count: everything at once, five colours, more chests. */
 	function expertBoard(level: number): EclatsCfg {
 		const t = (Math.min(2 * count, level) - count - 1) / (count - 1);
-		return { seed: levelSeed(level), fifth: lerp(0.08, 0.14, t), goal: Math.round(lerp(12, 16, t)), chests: 3, locked: 3, chestEvery: 9, rocks: 2, ice: 3, fill: 0.5 };
+		return { seed: levelSeed(level), fifth: lerp(0.08, 0.14, t) * fifth, goal: Math.round(lerp(12, 16, t) * ease), chests: 3, locked: 3, chestEvery: 9, rocks: 2, ice: 3, fill: 0.5 };
 	}
 
 	function boardFor(level: number): EclatsCfg {
@@ -156,7 +160,7 @@ function levelSet(count: number, picks: Pick[]): LevelSet {
 	}
 
 	const targetPar = (level: number): number =>
-		level > count ? Math.round(lerp(14, 20, (level - count - 1) / (count - 1))) : Math.round(lerp(6, 16, (level - 1) / (count - 1)));
+		Math.round(ease * (level > count ? lerp(14, 20, (level - count - 1) / (count - 1)) : lerp(6, 16, (level - 1) / (count - 1))));
 
 	function levelConfig(level: number): EclatsLevelCfg {
 		const b = boardFor(level);
@@ -188,11 +192,11 @@ function levelSet(count: number, picks: Pick[]): LevelSet {
 
 	// The Expert pack's levels are their own boards (expertBoard), not a reseeded replay of the upper half.
 	const levels = extendPlan('eclats', basePlan, { configExt: (_base, level) => levelConfig(level) });
-	return { count, worlds, worldOf, levelBoard, boardFor, targetPar, levelConfig, picks, levels };
+	return { count, ease, fifth, worlds, worldOf, levelBoard, boardFor, targetPar, levelConfig, picks, levels };
 }
 
-/** The website: 100 levels in five worlds of 20, the Expert pack 101-200. */
-export const SITE = levelSet(LEVEL_COUNT, PICKS_SITE);
+/** The website, a taste of the app: 100 easier levels in five worlds of 20, the Expert pack 101-200. */
+export const SITE = levelSet(LEVEL_COUNT, PICKS_SITE, 0.85, 0.5);
 /** The Unity app: the same climb over 250 levels, five lands of 50, the Expert pack 251-500. */
 export const APP = levelSet(250, PICKS_APP);
 
