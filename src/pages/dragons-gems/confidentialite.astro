@@ -6,7 +6,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 
 <BaseLayout
 	title="Confidentialité de l'application Dragon Gems Swipe | Ludiven Studio"
-	description="Politique de confidentialité de l'application mobile Dragon Gems Swipe : jeu sans compte, compte Google ou Apple facultatif, classements publics, aucune publicité ni pistage, suppression du compte, droits RGPD."
+	description="Politique de confidentialité de l'application mobile Dragon Gems Swipe : jeu sans compte, compte Google ou Apple facultatif, classements publics, vidéos publicitaires facultatives, achats intégrés, suppression du compte, droits RGPD."
 	alternates={{ fr: '/dragons-gems/confidentialite/', en: '/en/dragons-gems/confidentialite/' }}
 >
 	<div class="wrapper stack gap-12 legal">
@@ -14,7 +14,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			<LangSwitch lang="fr" href="/en/dragons-gems/confidentialite/" />
 			<Hero
 				title="Confidentialité — Dragon Gems Swipe"
-				tagline="Seuls ton pseudo et ton score sont publics. Pas de publicité, pas de pistage."
+				tagline="Seuls ton pseudo et ton score sont publics. Les vidéos publicitaires, c'est toi qui choisis."
 			/>
 		</div>
 
@@ -22,7 +22,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			Cette politique concerne <strong>l'application mobile Dragon Gems Swipe</strong>
 			(<code>com.ludivenstudio.dragonsgems</code>) et ses classements, partagés avec le jeu du site
 			(<a href="/jeux/eclats/">ludiven-studio.fr/jeux/eclats</a>). Le reste du site a sa
-			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 26 octobre 2026.
+			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 31 octobre 2026.
 		</p>
 
 		<div class="summary">
@@ -30,8 +30,9 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			<ul>
 				<li>Le jeu se joue <strong>sans compte</strong>. Ta progression est gardée sur ton téléphone.</li>
 				<li>Un <strong>compte Google ou Apple</strong>, facultatif, sauvegarde ta progression en ligne pour la retrouver sur tous tes appareils.</li>
-				<li>Les classements du défi du jour et du mode infini montrent <strong>ton pseudo et ton score</strong>, à tout le monde. Rien d'autre.</li>
-				<li><strong>Pas de publicité, pas de statistiques d'usage, pas de pistage.</strong> L'application ne demande ni ta position, ni tes contacts, ni tes photos.</li>
+				<li>Les classements du défi du jour, du mode infini et du défi du sommet montrent <strong>ton pseudo et ton score</strong>, à tout le monde. Rien d'autre.</li>
+				<li>Des <strong>vidéos publicitaires facultatives</strong> (Unity) offrent des cœurs et des pièces. Elles ne sont adaptées à tes centres d'intérêt qu'avec ton accord. Pas de statistiques d'usage. L'application ne demande ni ta position, ni tes contacts, ni tes photos.</li>
+				<li>Des <strong>achats intégrés</strong> facultatifs (pièces, cœurs illimités), payés par Google Play ou l'App Store.</li>
 				<li>Tu peux <strong>supprimer ton compte</strong> à tout moment depuis les Réglages de l'application.</li>
 			</ul>
 		</div>
@@ -56,14 +57,17 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				enregistrés <strong>sur ton téléphone</strong>. Les niveaux se jouent sans connexion.
 			</p>
 			<p>
-				Quand tu termines un défi du jour ou une partie du mode infini, l'application envoie ton résultat au
-				classement mondial&nbsp;:
+				Quand tu termines un défi du jour, une partie du mode infini ou le défi du sommet, l'application envoie
+				ton résultat au classement mondial&nbsp;:
 			</p>
 			<ul>
 				<li>ton <strong>pseudo</strong>&nbsp;: «&nbsp;Dragon&nbsp;» suivi de quatre chiffres tant que tu n'en choisis pas un dans les Réglages («&nbsp;Ton pseudo pour les classements&nbsp;»), 20 caractères au plus&nbsp;;</li>
-				<li>ton <strong>score</strong> (pour le défi du jour, tes coups puis ton temps&nbsp;; pour le mode infini, tes points) et la durée de la partie&nbsp;;</li>
-				<li>un <strong>identifiant technique</strong>, tiré au hasard à l'installation de l'application. Il sert à compter ton essai du jour et à rattacher tes scores entre eux. Il n'est jamais affiché, ni lié à ton compte, et il change si tu réinstalles l'application.</li>
+				<li>ton <strong>score</strong> (pour le défi du jour, tes coups puis ton temps&nbsp;; pour le mode infini et le défi du sommet, tes points) et la durée de la partie&nbsp;;</li>
+				<li>pour le défi du jour, <strong>sa date</strong>&nbsp;;</li>
+				<li>un <strong>identifiant technique</strong>, tiré au hasard à l'installation de l'application. Il sert à compter ton essai du jour et à rattacher tes scores entre eux. Il n'est jamais affiché, ni lié à ton compte, et il change si tu réinstalles l'application&nbsp;;</li>
+				<li>un <strong>numéro d'envoi</strong>, tiré au hasard à chaque partie. Si la réponse du serveur se perd, l'application renvoie le même résultat, et ce numéro évite de le compter deux fois. Le serveur garde ce numéro avec sa réponse.</li>
 			</ul>
+			<p>Sans réseau, le résultat attend sur ton téléphone et part quand la connexion revient.</p>
 		</section>
 
 		<section class="stack gap-2">
@@ -82,8 +86,10 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			</p>
 			<p>
 				Une fois connecté, ta progression est copiée en ligne&nbsp;: tes étoiles à chaque niveau, le trésor de
-				Bijou, le nombre de parties jouées et ton meilleur score du mode infini. Tes cœurs et tes réglages
-				restent sur le téléphone. Ton adresse mail n'est montrée qu'à toi, dans les Réglages.
+				Bijou, le nombre de parties jouées, tes meilleurs scores du mode infini et du défi du sommet, les coffres
+				d'étoiles ouverts, ton cadeau du jour (jour et série), le jour de ton dernier défi du jour, tes cœurs
+				illimités si tu les as achetés et les trésors des grottes de Bijou et de Perle. Tes cœurs et tes
+				réglages restent sur le téléphone. Ton adresse mail n'est montrée qu'à toi, dans les Réglages.
 			</p>
 		</section>
 
@@ -113,8 +119,8 @@ import LangSwitch from '../../components/LangSwitch.astro';
 					</thead>
 					<tbody>
 						<tr>
-							<td>Pseudo, score, durée de la partie, identifiant technique</td>
-							<td>Classements du défi du jour et du mode infini&nbsp;; un seul essai par jour</td>
+							<td>Pseudo, score, durée de la partie, date du défi, identifiant technique, numéro d'envoi</td>
+							<td>Classements du défi du jour, du mode infini et du défi du sommet&nbsp;; un seul essai par jour</td>
 							<td>Intérêt légitime (art. 6.1.f RGPD) à proposer des classements</td>
 							<td>Supabase&nbsp;; pseudo et score publics</td>
 						</tr>
@@ -131,44 +137,104 @@ import LangSwitch from '../../components/LangSwitch.astro';
 							<td>Supabase</td>
 						</tr>
 						<tr>
-							<td>Sauvegarde&nbsp;: étoiles, trésor, parties jouées, meilleur score du mode infini (si tu te connectes)</td>
+							<td>Sauvegarde (si tu te connectes)&nbsp;: étoiles, trésor, parties jouées, meilleurs scores du mode infini et du défi du sommet, coffres d'étoiles ouverts, cadeau du jour (jour et série), jour du dernier défi du jour, cœurs illimités achetés, trésors des grottes de Bijou et de Perle</td>
 							<td>Retrouver ta progression sur tous tes appareils</td>
 							<td>Exécution du contrat</td>
 							<td>Supabase</td>
 						</tr>
 						<tr>
+							<td>Identifiant publicitaire (sur iPhone, seulement si tu autorises le suivi), autres identifiants de l'appareil et de l'application, adresse IP (position approximative), interactions avec les annonces, durée d'utilisation, historique d'achats, informations techniques (modèle, langue, écran, connexion, performances) et, sur Android, les magasins d'applications installés</td>
+							<td>Afficher les vidéos que tu demandes, les mesurer, lutter contre la fraude&nbsp;; les adapter à tes centres d'intérêt si tu l'acceptes</td>
+							<td>Ton consentement (art. 6.1.a) pour les annonces adaptées&nbsp;; intérêt légitime (art. 6.1.f) sinon</td>
+							<td>Unity (LevelPlay, Unity Ads, ironSource Ads), qui les partage avec des annonceurs</td>
+						</tr>
+						<tr>
+							<td>Ton choix sur la publicité</td>
+							<td>T'en souvenir et le transmettre à Unity</td>
+							<td>Obligation légale</td>
+							<td>Ton téléphone&nbsp;; Unity</td>
+						</tr>
+						<tr>
+							<td>Produit acheté, reçu du store, numéro de transaction</td>
+							<td>Vendre, créditer et restaurer tes achats</td>
+							<td>Exécution du contrat</td>
+							<td>Google Play ou App Store&nbsp;; Unity (module d'achat)</td>
+						</tr>
+						<tr>
 							<td>Adresse IP</td>
 							<td>Acheminer les échanges</td>
 							<td>Intérêt légitime</td>
-							<td>Supabase&nbsp;; Google ou Apple pendant une connexion</td>
+							<td>Supabase&nbsp;; Unity&nbsp;; Google ou Apple pendant une connexion</td>
 						</tr>
 					</tbody>
 				</table>
 			</div>
 		</section>
 
-		<section class="stack gap-2">
-			<h2>6. Ce que l'application ne fait pas</h2>
-			<ul>
-				<li><strong>Aucune publicité</strong> et aucun identifiant publicitaire lu.</li>
-				<li><strong>Aucune statistique d'usage</strong>, aucun rapport de plantage envoyé.</li>
-				<li><strong>Aucun pistage</strong> entre applications ou sites.</li>
-				<li>Ni position, ni contacts, ni photos, ni fichiers&nbsp;: l'application ne demande aucune de ces autorisations.</li>
-				<li>Aucun achat dans l'application.</li>
-			</ul>
+		<section class="stack gap-2" id="publicite">
+			<h2>6. Publicité</h2>
 			<p>
-				Si l'une de ces réponses change (une publicité ou un achat à l'avenir), cette page sera mise à jour
-				avant la version qui l'apporte.
+				Le jeu est gratuit. Des vidéos publicitaires de <strong>Unity Ads</strong> et
+				d'<strong>ironSource Ads</strong>, deux réseaux de Unity, par la médiation <strong>Unity LevelPlay</strong>,
+				te sont proposées, toujours à ton choix&nbsp;: un cœur quand il ne t'en reste plus, continuer un niveau
+				perdu, doubler ton cadeau du jour, des pièces dans la boutique, quelques fois par jour. Jamais pendant
+				le défi du jour, le mode infini ou le défi du sommet.
+			</p>
+			<p>
+				Pour afficher ces vidéos, les mesurer et lutter contre la fraude, le module de Unity reçoit
+				l'identifiant publicitaire de ton téléphone (sur iPhone, seulement si tu autorises le suivi) et
+				d'autres identifiants de l'appareil et de l'application, ton adresse IP (qui donne une position
+				approximative), tes interactions avec les annonces, ta durée d'utilisation, l'historique de tes achats,
+				des informations techniques (modèle, langue, taille d'écran, type de connexion, performances) et, sur
+				Android, les magasins d'applications installés sur ton téléphone (Google Play, Samsung, Huawei…). Nous
+				ne lui transmettons ni ton compte, ni ton pseudo, ni ta progression.
+			</p>
+			<p>
+				<strong>Ton accord.</strong> Avant la première vidéo, le jeu te demande si les vidéos peuvent être
+				adaptées à tes centres d'intérêt («&nbsp;Oui, adaptées&nbsp;» ou «&nbsp;Non merci&nbsp;»). Le module de
+				Unity ne démarre qu'une fois que tu as répondu&nbsp;; sans ton accord, les vidéos ne sont pas
+				personnalisées. «&nbsp;Non merci&nbsp;» vaut aussi, pour Unity, refus de la vente de tes données au sens
+				des lois des États américains. Tu peux changer d'avis à tout moment&nbsp;: Réglages ›
+				«&nbsp;Choix publicitaires&nbsp;». Sur iPhone, après un oui, Apple te demande l'autorisation de
+				suivi&nbsp;; sans elle, l'identifiant publicitaire de l'iPhone n'est pas utilisé. Tu peux aussi
+				réinitialiser ou supprimer l'identifiant publicitaire dans les réglages de ton téléphone. Pour en
+				savoir plus&nbsp;: la
+				<a href="https://unity.com/legal/game-player-and-app-user-privacy-policy" target="_blank" rel="noopener">politique de confidentialité de Unity</a>.
 			</p>
 		</section>
 
 		<section class="stack gap-2">
-			<h2>7. Ce qui est stocké sur ton téléphone</h2>
+			<h2>7. Achats intégrés</h2>
+			<p>
+				La boutique vend des packs de pièces et les «&nbsp;Cœurs illimités&nbsp;» (un achat unique). Le
+				paiement est traité entièrement par Google Play ou l'App Store&nbsp;: nous ne voyons jamais tes moyens
+				de paiement, ni ton adresse de facturation. Le module d'achat de Unity reçoit du store la preuve
+				d'achat&nbsp;; le jeu crédite ton achat et garde son numéro de transaction sur ton téléphone. Selon
+				Unity, ce module peut aussi lui transmettre l'historique d'achats et des informations techniques sur
+				l'appareil.
+			</p>
+			<p>
+				Un achat ne demande pas de compte&nbsp;; connecté, tes cœurs illimités suivent ton compte.
+				«&nbsp;Restaurer mes achats&nbsp;», dans la boutique, les rend après une réinstallation.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>8. Ce que l'application ne fait pas</h2>
+			<ul>
+				<li><strong>Aucune statistique d'usage</strong> ni aucun rapport de plantage de notre part.</li>
+				<li>Ni position précise, ni contacts, ni photos, ni fichiers&nbsp;: l'application ne demande aucune de ces autorisations.</li>
+			</ul>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>9. Ce qui est stocké sur ton téléphone</h2>
 			<ul>
 				<li>ta progression&nbsp;: niveaux, étoiles, trésor, cœurs, défi du jour joué, cadeau du jour&nbsp;;</li>
 				<li>ta session de connexion et ton adresse mail, si tu es connecté&nbsp;;</li>
 				<li>ton pseudo et l'identifiant technique des classements&nbsp;;</li>
-				<li>tes réglages&nbsp;: langue, thème et rappels.</li>
+				<li>tes réglages&nbsp;: langue, thème et rappels&nbsp;;</li>
+				<li>ton choix sur la publicité, le nombre de vidéos regardées dans la journée, les numéros de tes derniers achats et les résultats en attente d'envoi aux classements&nbsp;; les modules de Unity y gardent aussi leurs propres données.</li>
 			</ul>
 			<p>
 				Tout cela reste sur l'appareil et disparaît quand tu désinstalles l'application.
@@ -181,28 +247,30 @@ import LangSwitch from '../../components/LangSwitch.astro';
 		</section>
 
 		<section class="stack gap-2">
-			<h2>8. Destinataires, transferts et durées</h2>
+			<h2>10. Destinataires, transferts et durées</h2>
 			<p>
-				Tes données ne sont ni vendues ni cédées. Elles ne sont traitées que par&nbsp;:
+				Nous ne vendons pas tes données. Elles ne sont traitées que par&nbsp;:
 			</p>
 			<ul>
 				<li><strong>Supabase</strong> — base de données, comptes et sauvegardes. Données hébergées dans l'Union européenne (Irlande).</li>
-				<li><strong>Google</strong> et <strong>Apple</strong> — connexion à ton compte et distribution de l'application.</li>
+				<li><strong>Unity Technologies</strong> (et sa filiale ironSource) — vidéos publicitaires (LevelPlay, Unity Ads) et module d'achat. Pour la publicité, Unity agit aussi pour son propre compte et partage des données avec des annonceurs (voir <a href="#publicite">Publicité</a>).</li>
+				<li><strong>Google</strong> et <strong>Apple</strong> — connexion à ton compte, distribution de l'application et paiement des achats.</li>
 			</ul>
 			<p>
-				Supabase est une société américaine. Ce transfert est encadré par les mécanismes du chapitre V du
-				RGPD (clauses contractuelles types).
+				Supabase et Unity sont des sociétés américaines. Ce transfert est encadré par les mécanismes du
+				chapitre V du RGPD (clauses contractuelles types).
 			</p>
 			<p>Durées de conservation&nbsp;:</p>
 			<ul>
 				<li><strong>Compte et sauvegarde</strong>&nbsp;: jusqu'à ce que tu supprimes ton compte.</li>
-				<li><strong>Scores des classements</strong>&nbsp;: tant que le classement est en ligne. Sur simple demande, nous retirons ton pseudo et tes scores (voir §10).</li>
+				<li><strong>Scores des classements</strong> et leurs numéros d'envoi&nbsp;: tant que le classement est en ligne. Sur simple demande, nous retirons ton pseudo et tes scores (voir §12).</li>
 				<li><strong>Adresse IP</strong>&nbsp;: uniquement dans les journaux techniques de Supabase, effacés par lui au bout de quelques jours.</li>
+				<li><strong>Données publicitaires</strong>&nbsp;: chez Unity, selon sa politique.</li>
 			</ul>
 		</section>
 
 		<section class="stack gap-2" id="suppression">
-			<h2>9. Supprimer ton compte</h2>
+			<h2>11. Supprimer ton compte</h2>
 			<p>
 				Dans l'application&nbsp;: <strong>Réglages → «&nbsp;Supprimer mon compte&nbsp;»</strong> (le bouton
 				apparaît une fois connecté). C'est immédiat et définitif&nbsp;:
@@ -220,6 +288,11 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				les faire retirer, écris-nous en donnant ton pseudo.
 			</p>
 			<p>
+				Tes cœurs illimités restent liés à ton compte Google Play ou Apple&nbsp;: «&nbsp;Restaurer mes
+				achats&nbsp;» les rend. Les données publicitaires sont chez Unity&nbsp;: demande-lui leur effacement
+				(<a href="#publicite">lien ci-dessus</a>) ou écris-nous, nous transmettrons.
+			</p>
+			<p>
 				Tu peux aussi demander la suppression de ton compte par e-mail à
 				<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>, depuis l'adresse de ton
 				compte.
@@ -227,7 +300,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 		</section>
 
 		<section class="stack gap-2">
-			<h2>10. Tes droits</h2>
+			<h2>12. Tes droits</h2>
 			<p>
 				Conformément au RGPD, tu disposes d'un droit d'accès, de rectification, d'effacement, de limitation,
 				d'opposition et de portabilité. Pour les exercer, ou pour faire retirer un pseudo d'un classement,
@@ -242,16 +315,17 @@ import LangSwitch from '../../components/LangSwitch.astro';
 		</section>
 
 		<section class="stack gap-2">
-			<h2>11. Mineurs</h2>
+			<h2>13. Mineurs</h2>
 			<p>
-				Le jeu convient à tous les âges et se joue sans compte. Si tu as moins de 15 ans, demande à tes
-				parents avant de te connecter avec un compte. Choisis un pseudo qui n'est pas ton vrai nom. Si tu es
+				Le jeu ne s'adresse pas aux enfants de moins de 13 ans et se joue sans compte. Si tu as moins de
+				15 ans, demande à tes parents avant de répondre «&nbsp;Oui, adaptées&nbsp;» sur les vidéos, avant un
+				achat et avant de te connecter avec un compte. Choisis un pseudo qui n'est pas ton vrai nom. Si tu es
 				parent et souhaites faire supprimer un compte ou un pseudo, écris-nous&nbsp;: nous le supprimerons.
 			</p>
 		</section>
 
 		<section class="stack gap-2">
-			<h2>12. Sécurité</h2>
+			<h2>14. Sécurité</h2>
 			<p>
 				Tous les échanges sont chiffrés (HTTPS). Les sauvegardes ne sont accessibles que par notre
 				serveur&nbsp;: aucun accès direct à la base n'est ouvert. L'identifiant technique des classements n'est
@@ -260,7 +334,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 		</section>
 
 		<section class="stack gap-2">
-			<h2>13. Changements</h2>
+			<h2>15. Changements</h2>
 			<p>
 				Nous mettrons cette page à jour à chaque changement de l'application qui touche à tes données, avec
 				sa date en haut de page.

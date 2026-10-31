@@ -1329,3 +1329,18 @@
 - 08:41 : build complet OK (astro check 0 erreur, 191 pages, precache et liens OK).
 - 08:41 : commité et poussé à la demande de l'utilisateur (« Oui informer le site ») : mes 9 fichiers et cette section
   seulement. Statut : terminé. Réservations libérées.
+
+## 2026-10-31 — Dragon Gems Swipe : politique de confidentialité (pubs, achats) et nom dans games (session website)
+- Statut : en cours (2026-10-31T14:10+01:00). Demande de l'utilisateur : demande-site-2026-10-31.md (fichier de
+  l'utilisateur) : politique de confidentialité FR/EN de l'app à jour (vidéos LevelPlay/Unity Ads/ironSource, achats
+  Unity IAP, date et numéro d'envoi des scores, 13 ans) ; migration renommant les lignes eclats* de games ; pousser et
+  dire quand c'est en ligne
+- Réservations actives : `src/pages/dragons-gems/confidentialite.astro`,
+  `src/pages/en/dragons-gems/confidentialite.astro`, `supabase/migrations/*_dragon_gems_name.sql` (nouveau).
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 14:19 : pages FR/EN réécrites selon la demande (pubs Unity LevelPlay/Unity Ads/ironSource, achats, date et numéro
+  d'envoi, grottes, 13 ans ; §6 éclaté en Publicité, Achats intégrés, Ce que l'application ne fait pas ; id suppression
+  gardé) ; migration 20261031120000_dragon_gems_name.sql ; astro check 0 erreur ; captures clair, sombre, téléphone
+  vues ; build complet OK (191 pages, précache 349, liens OK)
+- 14:19 : commité et poussé à la demande de l'utilisateur (demande-site-2026-10-31.md : « pousse et dis-moi quand c'est
+  en ligne ») : mes 3 fichiers et cette section seulement. Statut : terminé. Réservations libérées.

@@ -6,7 +6,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 
 <BaseLayout
 	title="Privacy policy of the Dragon Gems Swipe app | Ludiven Studio"
-	description="Privacy policy of the Dragon Gems Swipe mobile app: no account needed, optional Google or Apple account, public leaderboards, no ads or tracking, account deletion, GDPR rights."
+	description="Privacy policy of the Dragon Gems Swipe mobile app: no account needed, optional Google or Apple account, public leaderboards, optional video ads, in-app purchases, account deletion, GDPR rights."
 	lang="en"
 	alternates={{ fr: '/dragons-gems/confidentialite/', en: '/en/dragons-gems/confidentialite/' }}
 >
@@ -15,7 +15,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<LangSwitch lang="en" href="/dragons-gems/confidentialite/" />
 			<Hero
 				title="Privacy — Dragon Gems Swipe"
-				tagline="Only your name and your score are public. No ads, no tracking."
+				tagline="Only your name and your score are public. Video ads only when you choose them."
 			/>
 		</div>
 
@@ -23,7 +23,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			This policy covers <strong>the Dragon Gems Swipe mobile app</strong>
 			(<code>com.ludivenstudio.dragonsgems</code>) and its leaderboards, shared with the game on the website
 			(<a href="/jeux/eclats/">ludiven-studio.fr/jeux/eclats</a>). The rest of the website has its
-			<a href="/confidentialite/">own policy</a> (in French). Last updated: October 26, 2026.
+			<a href="/confidentialite/">own policy</a> (in French). Last updated: October 31, 2026.
 		</p>
 		<p class="updated">
 			This is a courtesy translation. In case of discrepancy, the
@@ -35,8 +35,9 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<ul>
 				<li>The game is played <strong>without an account</strong>. Your progress is kept on your phone.</li>
 				<li>An optional <strong>Google or Apple account</strong> saves your progress online, to find it on all your devices.</li>
-				<li>The daily challenge and endless mode leaderboards show <strong>your name and your score</strong> to everyone. Nothing else.</li>
-				<li><strong>No ads, no usage analytics, no tracking.</strong> The app asks for neither your location, nor your contacts, nor your photos.</li>
+				<li>The daily challenge, endless mode and summit challenge leaderboards show <strong>your name and your score</strong> to everyone. Nothing else.</li>
+				<li><strong>Optional video ads</strong> (Unity) give hearts and coins. They are tailored to your interests only if you agree. No usage analytics. The app asks for neither your location, nor your contacts, nor your photos.</li>
+				<li>Optional <strong>in-app purchases</strong> (coins, unlimited hearts), paid through Google Play or the App Store.</li>
 				<li>You can <strong>delete your account</strong> at any time from the app's Settings.</li>
 			</ul>
 		</div>
@@ -61,14 +62,17 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<strong>on your phone</strong>. Levels play without a connection.
 			</p>
 			<p>
-				When you finish a daily challenge or an endless game, the app sends your result to the world
-				leaderboard:
+				When you finish a daily challenge, an endless game or the summit challenge, the app sends your result
+				to the world leaderboard:
 			</p>
 			<ul>
 				<li>your <strong>name</strong>: "Dragon" followed by four digits until you pick one in Settings ("Your name on the rankings"), 20 characters at most;</li>
-				<li>your <strong>score</strong> (for the daily challenge, your moves then your time; for endless mode, your points) and how long the game lasted;</li>
-				<li>a <strong>technical id</strong>, drawn at random when the app is installed. It counts your daily try and ties your scores together. It is never shown, never linked to your account, and it changes if you reinstall the app.</li>
+				<li>your <strong>score</strong> (for the daily challenge, your moves then your time; for endless mode and the summit challenge, your points) and how long the game lasted;</li>
+				<li>for the daily challenge, <strong>its date</strong>;</li>
+				<li>a <strong>technical id</strong>, drawn at random when the app is installed. It counts your daily try and ties your scores together. It is never shown, never linked to your account, and it changes if you reinstall the app;</li>
+				<li>a <strong>submission number</strong>, drawn at random for each game. If the server's answer gets lost, the app sends the same result again, and this number keeps it from being counted twice. The server keeps this number with its answer.</li>
 			</ul>
+			<p>Without a network, the result waits on your phone and goes out when the connection comes back.</p>
 		</section>
 
 		<section class="stack gap-2">
@@ -86,7 +90,9 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			</p>
 			<p>
 				Once you are signed in, your progress is copied online: your stars on each level, Bijou's treasure,
-				the number of games played and your best endless score. Your hearts and your settings stay on the
+				the number of games played, your best endless and summit challenge scores, the star chests opened,
+				your daily gift (day and streak), the day of your last daily challenge, your unlimited hearts if you
+				bought them, and the treasures of Bijou's and Perle's caves. Your hearts and your settings stay on the
 				phone. Your email address is shown only to you, in Settings.
 			</p>
 		</section>
@@ -116,8 +122,8 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 					</thead>
 					<tbody>
 						<tr>
-							<td>Name, score, game length, technical id</td>
-							<td>The daily challenge and endless mode leaderboards; one daily try</td>
+							<td>Name, score, game length, challenge date, technical id, submission number</td>
+							<td>The daily challenge, endless mode and summit challenge leaderboards; one daily try</td>
 							<td>Legitimate interest (GDPR art. 6.1.f) in offering leaderboards</td>
 							<td>Supabase; name and score public</td>
 						</tr>
@@ -134,44 +140,99 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 							<td>Supabase</td>
 						</tr>
 						<tr>
-							<td>Save: stars, treasure, games played, best endless score (if you sign in)</td>
+							<td>Save (if you sign in): stars, treasure, games played, best endless and summit challenge scores, star chests opened, daily gift (day and streak), day of the last daily challenge, unlimited hearts bought, treasures of Bijou's and Perle's caves</td>
 							<td>Find your progress on all your devices</td>
 							<td>Performance of a contract</td>
 							<td>Supabase</td>
 						</tr>
 						<tr>
+							<td>Advertising id (on iPhone, only if you allow tracking), other device and app ids, IP address (approximate location), ad interactions, time of use, purchase history, technical information (model, language, screen, connection, performance) and, on Android, the app stores installed</td>
+							<td>Show the videos you ask for, measure them, fight fraud; tailor them to your interests if you agree</td>
+							<td>Your consent (art. 6.1.a) for tailored ads; legitimate interest (art. 6.1.f) otherwise</td>
+							<td>Unity (LevelPlay, Unity Ads, ironSource Ads), which shares them with advertisers</td>
+						</tr>
+						<tr>
+							<td>Your choice about ads</td>
+							<td>Remember it and pass it on to Unity</td>
+							<td>Legal obligation</td>
+							<td>Your phone; Unity</td>
+						</tr>
+						<tr>
+							<td>Product bought, store receipt, transaction number</td>
+							<td>Sell, credit and restore your purchases</td>
+							<td>Performance of a contract</td>
+							<td>Google Play or App Store; Unity (purchase module)</td>
+						</tr>
+						<tr>
 							<td>IP address</td>
 							<td>Carry the exchanges</td>
 							<td>Legitimate interest</td>
-							<td>Supabase; Google or Apple during a sign-in</td>
+							<td>Supabase; Unity; Google or Apple during a sign-in</td>
 						</tr>
 					</tbody>
 				</table>
 			</div>
 		</section>
 
-		<section class="stack gap-2">
-			<h2>6. What the app does not do</h2>
-			<ul>
-				<li><strong>No ads</strong>, and no advertising id read.</li>
-				<li><strong>No usage analytics</strong>, no crash reports sent.</li>
-				<li><strong>No tracking</strong> across apps or websites.</li>
-				<li>No location, contacts, photos or files: the app asks for none of these permissions.</li>
-				<li>No in-app purchases.</li>
-			</ul>
+		<section class="stack gap-2" id="publicite">
+			<h2>6. Ads</h2>
 			<p>
-				If any of these answers changes (ads or purchases in the future), this page will be updated before
-				the version that brings it.
+				The game is free. Video ads from <strong>Unity Ads</strong> and <strong>ironSource Ads</strong>, two
+				Unity networks, through the <strong>Unity LevelPlay</strong> mediation, are offered to you, always by
+				your choice: a heart when you have none left, continuing a lost level, doubling your daily gift, coins
+				in the shop, a few times a day. Never during the daily challenge, endless mode or the summit
+				challenge.
+			</p>
+			<p>
+				To show these videos, measure them and fight fraud, Unity's module receives your phone's advertising
+				id (on iPhone, only if you allow tracking) and other device and app ids, your IP address (which gives
+				an approximate location), your interactions with the ads, your time of use, your purchase history,
+				technical information (model, language, screen size, connection type, performance) and, on Android,
+				the app stores installed on your phone (Google Play, Samsung, Huawei…). We pass on neither your
+				account, nor your name, nor your progress.
+			</p>
+			<p>
+				<strong>Your consent.</strong> Before the first video, the game asks whether videos may be tailored to
+				your interests ("Yes, tailored" or "No thanks"). Unity's module starts only once you have answered;
+				without your consent, the videos are not personalized. For Unity, "No thanks" also opts you out of the
+				sale of your data under US state laws. You can change your mind at any time: Settings › "Ad choices".
+				On iPhone, after a yes, Apple asks for your permission to track; without it, the iPhone's advertising
+				id is not used. You can also reset or delete the advertising id in your phone's settings. To learn
+				more: <a href="https://unity.com/legal/game-player-and-app-user-privacy-policy" target="_blank" rel="noopener">Unity's privacy policy</a>.
 			</p>
 		</section>
 
 		<section class="stack gap-2">
-			<h2>7. What is stored on your phone</h2>
+			<h2>7. In-app purchases</h2>
+			<p>
+				The shop sells coin packs and "Unlimited hearts" (a one-time purchase). Payment is handled entirely by
+				Google Play or the App Store: we never see your payment method or your billing address. Unity's
+				purchase module receives the proof of purchase from the store; the game credits your purchase and
+				keeps its transaction number on your phone. According to Unity, this module may also send it your
+				purchase history and technical information about the device.
+			</p>
+			<p>
+				A purchase needs no account; signed in, your unlimited hearts follow your account. "Restore purchases",
+				in the shop, gives them back after a reinstall.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>8. What the app does not do</h2>
+			<ul>
+				<li><strong>No usage analytics</strong> and no crash reports of our own.</li>
+				<li>No precise location, contacts, photos or files: the app asks for none of these permissions.</li>
+			</ul>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>9. What is stored on your phone</h2>
 			<ul>
 				<li>your progress: levels, stars, treasure, hearts, daily challenge played, daily gift;</li>
 				<li>your sign-in session and your email address, if you are signed in;</li>
 				<li>your name and the leaderboards' technical id;</li>
-				<li>your settings: language, theme and reminders.</li>
+				<li>your settings: language, theme and reminders;</li>
+				<li>your choice about ads, the number of videos watched that day, the numbers of your latest purchases and the results waiting to be sent to the leaderboards; Unity's modules also keep their own data there.</li>
 			</ul>
 			<p>
 				All of this stays on the device and is erased when you uninstall the app.
@@ -184,28 +245,30 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 		</section>
 
 		<section class="stack gap-2">
-			<h2>8. Recipients, transfers and retention</h2>
+			<h2>10. Recipients, transfers and retention</h2>
 			<p>
-				Your data is neither sold nor handed over. It is processed only by:
+				We do not sell your data. It is processed only by:
 			</p>
 			<ul>
 				<li><strong>Supabase</strong> — database, accounts and saves. Data hosted in the European Union (Ireland).</li>
-				<li><strong>Google</strong> and <strong>Apple</strong> — signing in to your account and distributing the app.</li>
+				<li><strong>Unity Technologies</strong> (and its subsidiary ironSource) — video ads (LevelPlay, Unity Ads) and purchase module. For ads, Unity also acts on its own behalf and shares data with advertisers (see <a href="#publicite">Ads</a>).</li>
+				<li><strong>Google</strong> and <strong>Apple</strong> — signing in to your account, distributing the app and paying for purchases.</li>
 			</ul>
 			<p>
-				Supabase is an American company. This transfer is covered by the mechanisms of chapter V of the GDPR
-				(standard contractual clauses).
+				Supabase and Unity are American companies. This transfer is covered by the mechanisms of chapter V of
+				the GDPR (standard contractual clauses).
 			</p>
 			<p>Retention:</p>
 			<ul>
 				<li><strong>Account and save</strong>: until you delete your account.</li>
-				<li><strong>Leaderboard scores</strong>: as long as the leaderboard is online. On request, we remove your name and your scores (see §10).</li>
+				<li><strong>Leaderboard scores</strong> and their submission numbers: as long as the leaderboard is online. On request, we remove your name and your scores (see §12).</li>
 				<li><strong>IP address</strong>: only in Supabase's technical logs, which it erases within a few days.</li>
+				<li><strong>Advertising data</strong>: at Unity, under its policy.</li>
 			</ul>
 		</section>
 
 		<section class="stack gap-2" id="suppression">
-			<h2>9. Delete your account</h2>
+			<h2>11. Delete your account</h2>
 			<p>
 				In the app: <strong>Settings → "Delete my account"</strong> (the button shows once you are signed in).
 				It is immediate and final:
@@ -223,13 +286,18 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				removed, write to us with your name.
 			</p>
 			<p>
+				Your unlimited hearts stay tied to your Google Play or Apple account: "Restore purchases" gives them
+				back. Advertising data is held by Unity: ask Unity to erase it (<a href="#publicite">link above</a>) or
+				write to us and we will pass it on.
+			</p>
+			<p>
 				You can also ask for your account to be deleted by email at
 				<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>, from your account's address.
 			</p>
 		</section>
 
 		<section class="stack gap-2">
-			<h2>10. Your rights</h2>
+			<h2>12. Your rights</h2>
 			<p>
 				Under the GDPR, you have the right of access, rectification, erasure, restriction, objection and
 				portability. To use them, or to have a name removed from a leaderboard, write to
@@ -243,16 +311,17 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 		</section>
 
 		<section class="stack gap-2">
-			<h2>11. Children</h2>
+			<h2>13. Children</h2>
 			<p>
-				The game suits all ages and is played without an account. If you are under 15, ask your parents
-				before signing in with an account. Pick a name that is not your real name. If you are a parent and
-				want an account or a name removed, write to us: we will delete it.
+				The game is not meant for children under 13 and is played without an account. If you are under 15,
+				ask your parents before answering "Yes, tailored" to videos, before a purchase and before signing in
+				with an account. Pick a name that is not your real name. If you are a parent and want an account or a
+				name removed, write to us: we will delete it.
 			</p>
 		</section>
 
 		<section class="stack gap-2">
-			<h2>12. Security</h2>
+			<h2>14. Security</h2>
 			<p>
 				All exchanges are encrypted (HTTPS). Saves can only be reached through our server: no direct access
 				to the database is open. The leaderboards' technical id is never published. Your session is kept in
@@ -261,7 +330,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 		</section>
 
 		<section class="stack gap-2">
-			<h2>13. Changes</h2>
+			<h2>15. Changes</h2>
 			<p>
 				We will update this page with every change of the app that touches your data, with its date at the
 				top.
