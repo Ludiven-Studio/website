@@ -1344,3 +1344,5 @@
   vues ; build complet OK (191 pages, précache 349, liens OK)
 - 14:19 : commité et poussé à la demande de l'utilisateur (demande-site-2026-10-31.md : « pousse et dis-moi quand c'est
   en ligne ») : mes 3 fichiers et cette section seulement. Statut : terminé. Réservations libérées.
+- 14:29 : pages en ligne (3a1b33b, 5 min 11 s) ; migration 20261031120000 appliquée sur l'accord de l'utilisateur (« ok
+  push et deploie la base supabase ») : les 4 lignes eclats* s'appellent Dragon Gems Swipe (relu en lecture publique)
