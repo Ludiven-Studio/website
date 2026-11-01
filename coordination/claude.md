@@ -1346,3 +1346,18 @@
   en ligne ») : mes 3 fichiers et cette section seulement. Statut : terminé. Réservations libérées.
 - 14:29 : pages en ligne (3a1b33b, 5 min 11 s) ; migration 20261031120000 appliquée sur l'accord de l'utilisateur (« ok
   push et deploie la base supabase ») : les 4 lignes eclats* s'appellent Dragon Gems Swipe (relu en lecture publique)
+
+## 2026-11-01 — Nino Rush : page de téléchargement de l'APK de test (session RushBall)
+- Statut : en cours (2026-11-01T21:16+01:00). Demande de l'utilisateur : Tu peux préparer une page de téléchargement
+  sur mon site web, utiliser gitlab pour enregistrer la release
+- Réservations actives : `src/pages/nino-rush/telecharger.astro` (nouveau), `src/data/ninoRush.ts` (nouveau),
+  `public/nino-rush/` (nouveau).
+- Ressources : serveur de dev sur le port 4478 ; eslint, `astro check`. Build annoncé ici avant.
+- 21:19 : page et images prêtes, eslint OK, astro check 0 erreur, captures clair, sombre et téléphone vues. Rien de
+  commité : la release GitLab doit d'abord exister (projet public à créer, accès GitLab à donner par l'utilisateur).
+  Réservations gardées.
+- 21:57 : release GitLab en ligne (RaphBen/nino-rush-releases, v1.0.0-dev), lien vérifié sans connexion, mêmes octets.
+  L'utilisateur a dit « publie une version dev ». Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 21:59 : build complet OK : astro check 0 erreur, 192 pages, précache 350 entrées, liens OK ; page en noindex.
+- 21:59 : commité et poussé à la demande de l'utilisateur (« Ok publie une version dev ») : mes fichiers et cette
+  section seulement. Statut : terminé. Réservations libérées.

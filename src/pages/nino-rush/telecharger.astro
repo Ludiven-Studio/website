@@ -1,0 +1,185 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { APK_SIZE, APK_URL, APK_VERSION, ICON, LOGO, SCREENS, SHARE_IMAGE } from '../../data/ninoRush';
+---
+
+<BaseLayout
+	title="Nino Rush — version de test Android | Ludiven Studio"
+	description="Télécharge la version de test Android de Nino Rush : 100 niveaux, 10 mondes, des casse-têtes à la pelle et un atelier de niveaux."
+	image={SHARE_IMAGE}
+	noindex
+>
+	<main class="wrapper">
+		<div class="nino-dl stack gap-12">
+			<section class="hero">
+				<div class="hero-copy stack gap-4">
+					<div class="title-row">
+						<img class="app-icon" src={ICON} alt="" width="96" height="96" />
+						<div>
+							<p class="kicker">Version de test Android</p>
+							<h1>Nino Rush</h1>
+						</div>
+					</div>
+					<p class="lead">Nino le tatou roule vers son terrier à travers 10 mondes et 100 niveaux. Trouve les étoiles, échappe au gros rocher, creuse dans 10 casse-têtes et dessine tes propres niveaux.</p>
+					<div class="stack gap-2">
+						<a class="download" href={APK_URL}>Télécharger pour Android</a>
+						<p class="meta">Version {APK_VERSION} · {APK_SIZE} · Android 8 ou plus récent, 64 bits</p>
+					</div>
+					<p class="meta">Se joue en paysage. Sans pub et sans compte.</p>
+				</div>
+				<img class="logo" src={LOGO} alt="Logo de Nino Rush" width="640" height="335" />
+			</section>
+
+			<section class="stack gap-6">
+				<h2>Dans le jeu</h2>
+				<div class="shots">
+					{SCREENS.map((shot) => <img src={shot.src} alt={shot.alt} width="1280" height="720" loading="lazy" decoding="async" />)}
+				</div>
+			</section>
+
+			<section class="columns">
+				<div class="card stack gap-3">
+					<h2>Installer sur Android</h2>
+					<ol>
+						<li>Ouvre cette page sur ton téléphone et touche « Télécharger pour Android ».</li>
+						<li>Ouvre le fichier téléchargé. Si Android bloque, autorise ton navigateur à installer des applis inconnues, puis réessaie.</li>
+						<li>Pour une nouvelle version, refais la même chose : elle s'installe par-dessus et garde ta progression.</li>
+					</ol>
+				</div>
+				<div class="card stack gap-3">
+					<h2>Bon à savoir</h2>
+					<ul>
+						<li>Cette version de test s'installe à côté de la future version des stores.</li>
+						<li>L'achat du grand dressing ne fonctionne pas ici : tout le reste se gagne en jouant.</li>
+						<li>Pas encore de version iPhone.</li>
+						<li>Un souci ? <a href="/contact/">Écris-nous</a>.</li>
+					</ul>
+				</div>
+			</section>
+		</div>
+	</main>
+</BaseLayout>
+
+<style>
+	.nino-dl {
+		padding-block: 1rem 4rem;
+	}
+
+	.hero {
+		display: grid;
+		gap: 2.5rem;
+		align-items: center;
+	}
+
+	.title-row {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+	}
+
+	.app-icon {
+		flex: none;
+		width: 4.5rem;
+		height: 4.5rem;
+		border-radius: 22%;
+		box-shadow: var(--shadow-md);
+	}
+
+	.kicker {
+		color: var(--link-color);
+		font-weight: 600;
+		font-size: var(--text-sm);
+	}
+
+	h1 {
+		font-size: var(--text-3xl);
+		line-height: 1.1;
+		color: var(--gray-0);
+	}
+
+	h2 {
+		font-size: var(--text-xl);
+		color: var(--gray-0);
+	}
+
+	.lead {
+		font-size: var(--text-lg);
+		max-width: 50ch;
+	}
+
+	.meta {
+		color: var(--gray-300);
+		font-size: var(--text-sm);
+	}
+
+	.download {
+		display: inline-block;
+		padding: 0.9rem 1.6rem;
+		border-radius: 999px;
+		background: var(--accent-regular);
+		color: var(--accent-text-over);
+		font-weight: 600;
+		text-align: center;
+		text-decoration: none;
+	}
+
+	.download:hover,
+	.download:focus-visible {
+		background: var(--accent-dark);
+	}
+
+	.logo {
+		justify-self: center;
+		width: min(24rem, 80vw);
+		height: auto;
+	}
+
+	.shots {
+		display: grid;
+		gap: 1.25rem;
+	}
+
+	.shots img {
+		width: 100%;
+		height: auto;
+		border-radius: 1rem;
+		border: 1px solid var(--gray-800);
+		box-shadow: var(--shadow-sm);
+	}
+
+	.columns {
+		display: grid;
+		gap: 1.25rem;
+	}
+
+	.card {
+		padding: 1.5rem;
+		border: 1px solid var(--gray-800);
+		border-radius: 1rem;
+		background: var(--gray-999_40);
+	}
+
+	ol,
+	ul {
+		padding-inline-start: 1.25rem;
+	}
+
+	li + li {
+		margin-top: 0.4rem;
+	}
+
+	@media (min-width: 50em) {
+		.hero {
+			grid-template-columns: 1.2fr 1fr;
+		}
+
+		.download {
+			align-self: flex-start;
+		}
+
+		.shots,
+		.columns {
+			grid-template-columns: 1fr 1fr;
+		}
+	}
+</style>
