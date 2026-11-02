@@ -1428,3 +1428,42 @@
 - 12:19 : correction : code commité et poussé (3136622), mais les fonctions ne sont PAS encore déployées (déploiement
   en production refusé par le mode automatique) ; à faire sur l'accord de l'utilisateur : npx supabase functions deploy
   app-save meetups apple-revoke
+
+## 2026-11-02 — Pétanque Scan : nouveau nom et icônes « collection pétanque » (session website)
+- Statut : en cours (2026-11-02T14:42+01:00). Demande de l'utilisateur : (transmis par la session Pétanque Scanner,
+  brief collection-petanque-site.md) oui tu peux mettre a jour les icones et il faudra relancer le marketing pour
+  prendre en compte les modifs. Pétanque Scanner doit s'appeler maintenant "Pétanque Scan"
+- Réservations actives : `src/data/petanqueScanner.ts`,
+  `src/pages{,/en,/es,/de,/it}/petanque-scanner/{cgu,confidentialite}.astro`, `src/pages/petanque-scanner/test.astro`,
+  `src/pages/petanque.astro`, `src/pages/tournoi-petanque.astro`, `src/pages/{,en/}contact.astro`,
+  `src/pages/confidentialite.astro`, `src/pages/petanque-meet/confidentialite.astro`, `src/pages/jeux/petanque.astro`,
+  `src/content/work{,-en}/petanque-scanner.md`, `src/components/rencontres/EventPanel.tsx`,
+  `src/games/petanque/i18n.tsx`, `src/games/petanque/PetanqueGame.tsx` (texte de la carte Scanner),
+  `public/assets/petanque/icon-scanner.webp`, `public/assets/petanque-meet/icon.webp`,
+  `public/assets/petanque-game/icon.webp`.
+- Ressources : serveur de dev sur le port 4505 ; eslint, `astro check`. Build annoncé ici avant.
+- 14:47 : réservé aussi : `public/assets/petanque/banner.webp`, `public/assets/petanque/og.jpg` (bannière et image de
+  partage du hub, refaites avec le script de couverture de PetanqueMeet copié hors dépôt : témoin avec l'ancien nom
+  identique à la bannière en ligne). Fait : « Pétanque Scan » dans 24 fichiers (74 mentions, 5 langues), «
+  (anciennement Pétanque Scanner) » une fois sur chacune des 10 pages légales, build Dev « Pétanque Scan Dev » (réponse
+  de la session Scan) ; icônes nuit_trait en 256 px aux trois chemins existants. Restent sur l'ancien nom : les
+  bandeaux et images de partage de Scan (feature graphic, refaite par la session Scan)
+- 14:51 : eslint OK, astro check 0 erreur, captures clair, sombre et téléphone sans erreur console (hub, pages Scan,
+  légales, fiche projet, Meet, mini-jeu). Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 14:53 : build complet OK : astro check 0 erreur, 192 pages, précache 362 entrées, liens OK ; « Pétanque Scanner » ne
+  reste dans dist/ que dans la mention « anciennement » des 10 pages légales. Rien de commité : en attente de l'accord
+  de l'utilisateur, et des feature graphics « PÉTANQUE SCAN » de la session Scan pour les bandeaux et images de partage
+- 15:10 : réservé aussi : `public/assets/petanque-ar/hero-*`, `public/assets/work/og/petanque-scanner*.jpg` (feature
+  graphics « PÉTANQUE SCAN » de la session Scan, store_v1.2.13)
+- 15:11 : bandeaux Scan (5 langues, ?v=1213) et images de partage refaits depuis les feature graphics 1.2.13 (réglages
+  de generate-work-og.mjs) ; captures sans erreur console. Mais la zone où « NER » a été effacé reste visible (tache en
+  blocs) : signalé à la session Scan, qui peut les refaire depuis la photo sans texte ; conversion à relancer alors.
+  Rien de commité
+- 15:17 : feature graphics refaites par la session Scan (fond reconstruit sous tout le texte, plus de tache) : bandeaux
+  et images de partage reconvertis, captures sans erreur console. Lancement du build complet (écrit dist/, .astro/,
+  public/vendor/)…
+- 15:19 : build complet OK : astro check 0 erreur, 192 pages, précache 362 entrées, liens OK. Rien de commité : en
+  attente de l'accord de l'utilisateur pour pousser
+- 20:10 : commité et poussé à la demande de l'utilisateur (« ok pousse ») : mes 24 fichiers (pour les 7 pages de
+  confidentialité partagées avec la section Umami, le renommage seulement), les 15 images et cette section seulement.
+  Statut : terminé. Réservations libérées.

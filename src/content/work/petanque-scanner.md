@@ -1,8 +1,8 @@
 ---
-title: Pétanque Scanner - 2026
+title: Pétanque Scan - 2026
 publishDate: 2026-08-22 00:00:00
 img: /assets/petanque-ar/hero-fr.avif
-img_alt: Pétanque Scanner — mesurer le point avec son téléphone, en réalité augmentée
+img_alt: Pétanque Scan — mesurer le point avec son téléphone, en réalité augmentée
 role: Développeur
 org: Ludiven Studio
 appPage: /petanque-scanner/telecharger/
@@ -37,7 +37,7 @@ gallery:
     alt: "Visuel Premium à vie — mesures illimitées, sans publicité"
 ---
 <p>
-  Cette page décrit la <strong>démarche technique</strong> derrière Pétanque Scanner. Si vous cherchez
+  Cette page décrit la <strong>démarche technique</strong> derrière Pétanque Scan. Si vous cherchez
   l'application elle-même — ce qu'elle fait, ce qu'elle coûte, où la télécharger — la
   <a href="/petanque-scanner/">page de l'application</a> est faite pour ça.
 </p>

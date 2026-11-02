@@ -1,4 +1,4 @@
-// Copy for the Pétanque Scanner landing pages (French, English and Spanish).
+// Copy for the Pétanque Scan landing pages (French, English and Spanish).
 // Kept in one file so the languages can't drift apart when the app changes.
 
 // App Store links carry no country code on purpose: Apple then redirects to the
@@ -40,9 +40,9 @@ export interface LandingCopy {
 	closing: string;
 }
 
-export const APP_NAME = 'Pétanque Scanner';
+export const APP_NAME = 'Pétanque Scan';
 export const OG_IMAGE = '/assets/work/og/petanque-scanner.jpg';
-export const HERO = '/assets/petanque-ar/hero-fr.avif';
+export const HERO = '/assets/petanque-ar/hero-fr.avif?v=1213';
 
 /** The store visuals carry their caption and the app's own UI, so each language gets its set. */
 const screens = (suffix: string) =>
@@ -69,10 +69,10 @@ export const LANDING_PATHS: Record<LandingLang, string> = {
 /** The hero has its strapline baked into the pixels, so each language gets a repainted copy and its own share card. */
 export const HEROES: Record<LandingLang, string> = {
 	fr: HERO,
-	en: '/assets/petanque-ar/hero-en.webp?v=1211',
-	es: '/assets/petanque-ar/hero-es.webp?v=1211',
-	de: '/assets/petanque-ar/hero-de.webp',
-	it: '/assets/petanque-ar/hero-it.webp',
+	en: '/assets/petanque-ar/hero-en.webp?v=1213',
+	es: '/assets/petanque-ar/hero-es.webp?v=1213',
+	de: '/assets/petanque-ar/hero-de.webp?v=1213',
+	it: '/assets/petanque-ar/hero-it.webp?v=1213',
 };
 export const OG_IMAGES: Record<LandingLang, string> = {
 	fr: OG_IMAGE,
@@ -84,7 +84,7 @@ export const OG_IMAGES: Record<LandingLang, string> = {
 
 export const copy: Record<LandingLang, LandingCopy> = {
 	fr: {
-		title: 'Pétanque Scanner — savoir qui a le point avec votre téléphone',
+		title: 'Pétanque Scan — savoir qui a le point avec votre téléphone',
 		description:
 			'Application gratuite de réalité augmentée : visez le cochonnet, passez au-dessus des boules, et lisez la distance de chaque boule au cochonnet. Un mode photo prend le relais sur les téléphones sans AR. Tout est calculé sur le téléphone, sans réseau ni compte.',
 		tagline:
@@ -143,7 +143,7 @@ export const copy: Record<LandingLang, LandingCopy> = {
 		limits: [
 			{
 				title: 'Elle n\'a aucune valeur officielle',
-				body: 'En compétition, la mesure de l\'arbitre fait foi. Pétanque Scanner est fait pour les parties entre amis, en vacances ou au club.',
+				body: 'En compétition, la mesure de l\'arbitre fait foi. Pétanque Scan est fait pour les parties entre amis, en vacances ou au club.',
 			},
 			{
 				title: 'Elle a besoin de voir les boules',
@@ -201,7 +201,7 @@ export const copy: Record<LandingLang, LandingCopy> = {
 		closing: 'Disponible sur Android et iOS',
 	},
 	en: {
-		title: 'Pétanque Scanner — see who has the point with your phone',
+		title: 'Pétanque Scan — see who has the point with your phone',
 		description:
 			'Free augmented reality app: aim at the jack, hold the phone above the boules, and read each boule\'s distance to the jack. A photo mode takes over on phones without AR. Everything is computed on the phone, with no network or account.',
 		tagline:
@@ -318,7 +318,7 @@ export const copy: Record<LandingLang, LandingCopy> = {
 		closing: 'Available on Android and iOS',
 	},
 	es: {
-		title: 'Pétanque Scanner — saber quién tiene el punto con el móvil',
+		title: 'Pétanque Scan — saber quién tiene el punto con el móvil',
 		description:
 			'Aplicación gratuita de realidad aumentada: apunta al boliche, colócate encima de las bolas y lee la distancia de cada bola al boliche. Un modo foto toma el relevo en los móviles sin RA. Todo se calcula en el teléfono, sin red ni cuenta.',
 		tagline:
@@ -377,7 +377,7 @@ export const copy: Record<LandingLang, LandingCopy> = {
 		limits: [
 			{
 				title: 'No tiene ningún valor oficial',
-				body: 'En competición, la medida del árbitro es la que cuenta. Pétanque Scanner está pensado para partidas entre amigos, de vacaciones o en el club.',
+				body: 'En competición, la medida del árbitro es la que cuenta. Pétanque Scan está pensado para partidas entre amigos, de vacaciones o en el club.',
 			},
 			{
 				title: 'Necesita ver las bolas',
@@ -439,7 +439,7 @@ export const copy: Record<LandingLang, LandingCopy> = {
 		closing: 'Disponible para Android e iOS',
 	},
 	de: {
-		title: 'Pétanque Scanner — mit dem Handy sehen, wer den Punkt hat',
+		title: 'Pétanque Scan — mit dem Handy sehen, wer den Punkt hat',
 		description:
 			'Kostenlose Augmented-Reality-App: Ziel auf die Zielkugel, halte das Handy über die Kugeln und lies den Abstand jeder Kugel zur Zielkugel ab. Ein Fotomodus springt auf Handys ohne AR ein. Alles wird auf dem Handy berechnet, ohne Netz und ohne Konto.',
 		tagline:
@@ -498,7 +498,7 @@ export const copy: Record<LandingLang, LandingCopy> = {
 		limits: [
 			{
 				title: 'Sie ist nicht offiziell',
-				body: 'Im Wettkampf zählt allein die Messung des Schiedsrichters. Pétanque Scanner ist für Partien unter Freunden gedacht, im Urlaub oder im Verein.',
+				body: 'Im Wettkampf zählt allein die Messung des Schiedsrichters. Pétanque Scan ist für Partien unter Freunden gedacht, im Urlaub oder im Verein.',
 			},
 			{
 				title: 'Sie muss die Kugeln sehen',
@@ -556,7 +556,7 @@ export const copy: Record<LandingLang, LandingCopy> = {
 		closing: 'Erhältlich für Android und iOS',
 	},
 	it: {
-		title: 'Pétanque Scanner — scopri chi ha il punto con il telefono',
+		title: 'Pétanque Scan — scopri chi ha il punto con il telefono',
 		description:
 			'App gratuita di realtà aumentata: inquadra il pallino, tieni il telefono sopra le bocce e leggi la distanza di ogni boccia dal pallino. Una modalità foto subentra sui telefoni senza AR. Tutto è calcolato sul telefono, senza rete né account.',
 		tagline:
@@ -615,7 +615,7 @@ export const copy: Record<LandingLang, LandingCopy> = {
 		limits: [
 			{
 				title: 'Non ha alcun valore ufficiale',
-				body: 'In gara fa fede la misura dell\'arbitro. Pétanque Scanner è pensata per le partite tra amici, in vacanza o al circolo.',
+				body: 'In gara fa fede la misura dell\'arbitro. Pétanque Scan è pensata per le partite tra amici, in vacanza o al circolo.',
 			},
 			{
 				title: 'Ha bisogno di vedere le bocce',
@@ -697,7 +697,7 @@ export interface DownloadCopy {
 // The download page takes the rest from `copy`: title, description, features, steps, price, closing, legal.
 export const download: Record<LandingLang, DownloadCopy> = {
 	fr: {
-		title: 'Télécharger Pétanque Scanner sur Android et iPhone | Ludiven Studio',
+		title: 'Télécharger Pétanque Scan sur Android et iPhone | Ludiven Studio',
 		kicker: 'Réalité augmentée',
 		shots: [
 			'Qui a le point ? L’écart de chaque boule, jusqu’au millimètre.',
@@ -712,7 +712,7 @@ export const download: Record<LandingLang, DownloadCopy> = {
 		more: 'Tout savoir sur l’application',
 	},
 	en: {
-		title: 'Download Pétanque Scanner for Android and iPhone | Ludiven Studio',
+		title: 'Download Pétanque Scan for Android and iPhone | Ludiven Studio',
 		kicker: 'Augmented reality',
 		shots: [
 			'Who has the point? Each boule’s gap, down to the millimetre.',
@@ -727,7 +727,7 @@ export const download: Record<LandingLang, DownloadCopy> = {
 		more: 'All about the app',
 	},
 	es: {
-		title: 'Descargar Pétanque Scanner para Android y iPhone | Ludiven Studio',
+		title: 'Descargar Pétanque Scan para Android y iPhone | Ludiven Studio',
 		kicker: 'Realidad aumentada',
 		shots: [
 			'¿Quién tiene el punto? La distancia de cada bola, hasta el milímetro.',
@@ -742,7 +742,7 @@ export const download: Record<LandingLang, DownloadCopy> = {
 		more: 'Todo sobre la aplicación',
 	},
 	de: {
-		title: 'Pétanque Scanner für Android und iPhone herunterladen | Ludiven Studio',
+		title: 'Pétanque Scan für Android und iPhone herunterladen | Ludiven Studio',
 		kicker: 'Erweiterte Realität',
 		shots: [
 			'Wer hat den Punkt? Der Abstand jeder Kugel, bis auf den Millimeter.',
@@ -757,7 +757,7 @@ export const download: Record<LandingLang, DownloadCopy> = {
 		more: 'Alles über die App',
 	},
 	it: {
-		title: 'Scarica Pétanque Scanner per Android e iPhone | Ludiven Studio',
+		title: 'Scarica Pétanque Scan per Android e iPhone | Ludiven Studio',
 		kicker: 'Realtà aumentata',
 		shots: [
 			'Chi ha il punto? La distanza di ogni boccia, fino al millimetro.',

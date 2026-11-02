@@ -145,7 +145,7 @@ const PAD_EDGE = 12; // px, same margin the pad's width clamp leaves
 const PAD_GAP = 8; // px kept clear of a side gauge
 const PAD_HEAD = 40; // px above the pad: power bar then state line
 const PAD_GRIP_W = 22;
-// The Pétanque Scanner card in the free side of the band. Closed for the session with its ×.
+// The Pétanque Scan card in the free side of the band. Closed for the session with its ×.
 const PROMO_KEY = 'petanque-promo-shut';
 const TUTO_KEY = 'petanque-tuto-throw'; // set once the player has thrown a boule by themselves
 const EFFET_KEY = 'petanque-effet'; // expert mode: where the finger lands across the board gives spin
@@ -3775,7 +3775,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 						>
 							<span className="pe-promo-pic" aria-hidden="true" style={{ backgroundImage: `url(/assets/petanque-ar/screen-01-${lang}.webp)` }} />
 							<span className="pe-promo-txt">
-								<strong>Pétanque Scanner</strong>
+								<strong>Pétanque Scan</strong>
 								<span>{t.promoLine}</span>
 								<em>{t.promoFree}</em>
 							</span>
@@ -4222,7 +4222,7 @@ const CSS = `
 /* Finger down, nothing pulled yet: letting go here throws nothing. Said in words AND in colour,
    because the board looks identical whether it is armed or merely touched. */
 .pe-arm-label.warn { background: rgba(120,34,28,0.72); color: #ffd7d2; font-weight: 700; }
-/* The Pétanque Scanner card: same band as the pad, laid out by layoutPad. The screenshot is cropped
+/* The Pétanque Scan card: same band as the pad, laid out by layoutPad. The screenshot is cropped
    on the measured distances, which say what the app does faster than any sentence. */
 .pe-promo { display: none; position: absolute; bottom: var(--pe-arm-b); height: var(--pe-arm-h); z-index: 3; }
 .game-page.gf-full .pe-promo { display: block; }

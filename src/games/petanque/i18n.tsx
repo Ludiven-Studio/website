@@ -114,7 +114,7 @@ const fr = {
 	gripTitle: 'Glisse pour déplacer la planche',
 	promoLine: 'Qui a le point ? Mesurez en vrai, au téléphone.',
 	promoFree: 'Appli gratuite ›',
-	promoClose: 'Fermer la publicité Pétanque Scanner',
+	promoClose: 'Fermer la publicité Pétanque Scan',
 	placeHere: '✓ Poser ici',
 	throwJackHere: '🎯 Lancer le bouchon ici',
 	continue: 'Continuer ›',
@@ -228,7 +228,7 @@ const fr = {
 	barTitle: '🍺 La buvette',
 	close: 'Fermer',
 	scannerTitle: 'Tu joues pour de vrai ?',
-	scannerBtn: '📱 Pétanque Scanner mesure tes points',
+	scannerBtn: '📱 Pétanque Scan mesure tes points',
 	scannerHref: '/petanque-scanner/',
 
 	help: (daily: boolean, stations: number, target: number): ReactNode => (
@@ -346,7 +346,7 @@ const en: Strings = {
 	gripTitle: 'Drag to move the board',
 	promoLine: 'Who has the point? Measure it for real, with your phone.',
 	promoFree: 'Free app ›',
-	promoClose: 'Close the Pétanque Scanner ad',
+	promoClose: 'Close the Pétanque Scan ad',
 	placeHere: '✓ Place here',
 	throwJackHere: '🎯 Throw the jack here',
 	continue: 'Continue ›',
@@ -460,7 +460,7 @@ const en: Strings = {
 	barTitle: '🍺 The bar',
 	close: 'Close',
 	scannerTitle: 'Playing for real?',
-	scannerBtn: '📱 Pétanque Scanner measures your points',
+	scannerBtn: '📱 Pétanque Scan measures your points',
 	scannerHref: '/en/petanque-scanner/',
 
 	help: (daily, stations, target) => (
@@ -576,7 +576,7 @@ const es: Strings = {
 	gripTitle: 'Desliza para mover la tabla',
 	promoLine: '¿Quién tiene el punto? Mídelo de verdad, con el móvil.',
 	promoFree: 'App gratuita ›',
-	promoClose: 'Cerrar el anuncio de Pétanque Scanner',
+	promoClose: 'Cerrar el anuncio de Pétanque Scan',
 	placeHere: '✓ Colocar aquí',
 	throwJackHere: '🎯 Lanzar el boliche aquí',
 	continue: 'Continuar ›',
@@ -690,7 +690,7 @@ const es: Strings = {
 	barTitle: '🍺 El bar',
 	close: 'Cerrar',
 	scannerTitle: '¿Juegas de verdad?',
-	scannerBtn: '📱 Pétanque Scanner mide tus puntos',
+	scannerBtn: '📱 Pétanque Scan mide tus puntos',
 	scannerHref: '/es/petanque-scanner/',
 
 	help: (daily, stations, target) => (

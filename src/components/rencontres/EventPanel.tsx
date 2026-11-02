@@ -307,8 +307,8 @@ export default function EventPanel({
 				onClick={() => trackEvent('meetup_scanner_click')}
 			>
 				{tr(
-					<>Vous jouez le {day.toLowerCase()}&nbsp;? <strong>Pétanque Scanner</strong> compte les points au téléphone.</>,
-					<>Playing on {day}? <strong>Pétanque Scanner</strong> counts the points with your phone.</>,
+					<>Vous jouez le {day.toLowerCase()}&nbsp;? <strong>Pétanque Scan</strong> compte les points au téléphone.</>,
+					<>Playing on {day}? <strong>Pétanque Scan</strong> counts the points with your phone.</>,
 				)}
 			</a>
 		</section>

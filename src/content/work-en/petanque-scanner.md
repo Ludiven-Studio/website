@@ -1,8 +1,8 @@
 ---
-title: Pétanque Scanner - 2026
+title: Pétanque Scan - 2026
 publishDate: 2026-08-22 00:00:00
-img: /assets/petanque-ar/hero-en.webp?v=1211
-img_alt: Pétanque Scanner — measure the point with your phone, in augmented reality
+img: /assets/petanque-ar/hero-en.webp?v=1213
+img_alt: Pétanque Scan — measure the point with your phone, in augmented reality
 role: Developer
 org: Ludiven Studio
 appPage: /en/petanque-scanner/download/
@@ -35,7 +35,7 @@ gallery:
     alt: "Premium screen — three free scans a day, or lifetime Premium with no subscription"
 ---
 <p>
-  This page covers the <strong>engineering behind</strong> Pétanque Scanner. If you're after the app
+  This page covers the <strong>engineering behind</strong> Pétanque Scan. If you're after the app
   itself — what it does, what it costs, where to get it — the
   <a href="/en/petanque-scanner/">app page</a> is the one you want.
 </p>
