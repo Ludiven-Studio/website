@@ -28,6 +28,18 @@ export default defineConfig({
         '/petanque-ar/confidentialite': '/petanque-scanner/confidentialite/',
         '/es/petanque-ar/cgu': '/es/petanque-scanner/cgu/',
         '/es/petanque-ar/confidentialite': '/es/petanque-scanner/confidentialite/',
+        // Pétanque Game's legal pages lived under the web game before the app had its own page.
+        // Builds up to Android 1.0.6 and iOS 1.0.0 open the old URLs: keep them for good.
+        '/jeux/petanque/cgu': '/petanque-game/cgu/',
+        '/jeux/petanque/confidentialite': '/petanque-game/confidentialite/',
+        '/en/jeux/petanque/cgu': '/en/petanque-game/cgu/',
+        '/en/jeux/petanque/confidentialite': '/en/petanque-game/confidentialite/',
+        '/es/jeux/petanque/cgu': '/es/petanque-game/cgu/',
+        '/es/jeux/petanque/confidentialite': '/es/petanque-game/confidentialite/',
+        '/de/jeux/petanque/cgu': '/de/petanque-game/cgu/',
+        '/de/jeux/petanque/confidentialite': '/de/petanque-game/confidentialite/',
+        '/it/jeux/petanque/cgu': '/it/petanque-game/cgu/',
+        '/it/jeux/petanque/confidentialite': '/it/petanque-game/confidentialite/',
     },
     integrations: [
         react(),

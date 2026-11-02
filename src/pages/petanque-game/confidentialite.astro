@@ -1,23 +1,23 @@
 ---
-import BaseLayout from '../../../layouts/BaseLayout.astro';
-import Hero from '../../../components/Hero.astro';
-import LangSwitch from '../../../components/LangSwitch.astro';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Hero from '../../components/Hero.astro';
+import LangSwitch from '../../components/LangSwitch.astro';
 ---
 
 <BaseLayout
 	title="Confidentialité de l'application Pétanque Game | Ludiven Studio"
 	description="Politique de confidentialité du jeu mobile Pétanque Game : jeu sans compte, compte Google ou Apple, jeu en ligne et classement, publicité, achats, suppression du compte, droits RGPD."
-	alternates={{ fr: '/jeux/petanque/confidentialite/', en: '/en/jeux/petanque/confidentialite/', es: '/es/jeux/petanque/confidentialite/', de: '/de/jeux/petanque/confidentialite/', it: '/it/jeux/petanque/confidentialite/' }}
+	alternates={{ fr: '/petanque-game/confidentialite/', en: '/en/petanque-game/confidentialite/', es: '/es/petanque-game/confidentialite/', de: '/de/petanque-game/confidentialite/', it: '/it/petanque-game/confidentialite/' }}
 >
 	<div class="wrapper stack gap-12 legal">
 		<div class="stack gap-8">
 			<LangSwitch
 				lang="fr"
 				links={[
-					{ lang: 'en', href: '/en/jeux/petanque/confidentialite/' },
-					{ lang: 'es', href: '/es/jeux/petanque/confidentialite/' },
-					{ lang: 'de', href: '/de/jeux/petanque/confidentialite/' },
-					{ lang: 'it', href: '/it/jeux/petanque/confidentialite/' },
+					{ lang: 'en', href: '/en/petanque-game/confidentialite/' },
+					{ lang: 'es', href: '/es/petanque-game/confidentialite/' },
+					{ lang: 'de', href: '/de/petanque-game/confidentialite/' },
+					{ lang: 'it', href: '/it/petanque-game/confidentialite/' },
 				]}
 			/>
 			<Hero
@@ -459,7 +459,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				Cette politique peut évoluer avec le jeu. La date de dernière mise à jour figure en haut de page. En
 				cas de changement important, le jeu te le signalera.
 			</p>
-			<p>Voir aussi les <a href="/jeux/petanque/cgu/">conditions d'utilisation du jeu</a>.</p>
+			<p>Voir aussi les <a href="/petanque-game/cgu/">conditions d'utilisation du jeu</a>.</p>
 		</section>
 	</div>
 </BaseLayout>

@@ -1361,3 +1361,19 @@
 - 21:59 : build complet OK : astro check 0 erreur, 192 pages, précache 350 entrées, liens OK ; page en noindex.
 - 21:59 : commité et poussé à la demande de l'utilisateur (« Ok publie une version dev ») : mes fichiers et cette
   section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-02 — Pétanque Game : pages légales sous /petanque-game/ (session PetanqueGame)
+- Statut : en cours (2026-11-02T09:05+01:00). Demande de l'utilisateur : pourquoi les pages de confidentialité ne sont
+  pas dans l'arborescence https://www.ludiven-studio.fr/petanque-game/ (puis « oui » au déplacement avec redirections)
+- Réservations actives : `src/pages{,/en,/es,/de,/it}/jeux/petanque/{confidentialite,cgu}.astro` (déplacées),
+  `src/pages{,/en,/es,/de,/it}/petanque-game/{confidentialite,cgu}.astro` (nouvelles), `src/data/petanqueGame.ts`,
+  `src/pages/confidentialite.astro`, `astro.config.mjs` (redirections).
+- Ressources : serveur de dev sur le port 4486 ; eslint, `astro check`. Build annoncé ici avant.
+- 09:07 : 10 pages déplacées de jeux/petanque/ vers petanque-game/ (5 langues), liens et alternates suivis, 10
+  redirections dans astro.config.mjs ; eslint OK, astro check 0 erreur, captures bureau et téléphone sombre vues.
+  Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 09:09 : build complet OK : astro check 0 erreur, 192 pages, précache 360 entrées, liens OK ; les 10 anciennes
+  adresses servent une redirection vers les nouvelles. Rien de commité : en attente de l'accord de l'utilisateur pour
+  pousser.
+- 09:10 : commité et poussé à la demande de l'utilisateur (« ok commit push le site web ») : mes 23 fichiers et cette
+  section seulement. Statut : terminé. Réservations libérées.

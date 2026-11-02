@@ -1,24 +1,24 @@
 ---
-import BaseLayout from '../../../../layouts/BaseLayout.astro';
-import Hero from '../../../../components/Hero.astro';
-import LangSwitch from '../../../../components/LangSwitch.astro';
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import Hero from '../../../components/Hero.astro';
+import LangSwitch from '../../../components/LangSwitch.astro';
 ---
 
 <BaseLayout
 	title="Datenschutzerklärung der App Pétanque Game | Ludiven Studio"
 	description="Datenschutzerklärung des Handyspiels Pétanque Game: Spielen ohne Konto, Google- oder Apple-Konto, Online-Spiel und Rangliste, Werbung, Käufe, Löschen des Kontos, Rechte nach der DSGVO."
 	lang="de"
-	alternates={{ fr: '/jeux/petanque/confidentialite/', en: '/en/jeux/petanque/confidentialite/', es: '/es/jeux/petanque/confidentialite/', de: '/de/jeux/petanque/confidentialite/', it: '/it/jeux/petanque/confidentialite/' }}
+	alternates={{ fr: '/petanque-game/confidentialite/', en: '/en/petanque-game/confidentialite/', es: '/es/petanque-game/confidentialite/', de: '/de/petanque-game/confidentialite/', it: '/it/petanque-game/confidentialite/' }}
 >
 	<div class="wrapper stack gap-12 legal">
 		<div class="stack gap-8">
 			<LangSwitch
 				lang="de"
 				links={[
-					{ lang: 'fr', href: '/jeux/petanque/confidentialite/' },
-					{ lang: 'en', href: '/en/jeux/petanque/confidentialite/' },
-					{ lang: 'es', href: '/es/jeux/petanque/confidentialite/' },
-					{ lang: 'it', href: '/it/jeux/petanque/confidentialite/' },
+					{ lang: 'fr', href: '/petanque-game/confidentialite/' },
+					{ lang: 'en', href: '/en/petanque-game/confidentialite/' },
+					{ lang: 'es', href: '/es/petanque-game/confidentialite/' },
+					{ lang: 'it', href: '/it/petanque-game/confidentialite/' },
 				]}
 			/>
 			<Hero
@@ -36,7 +36,7 @@ import LangSwitch from '../../../../components/LangSwitch.astro';
 		</p>
 		<p class="updated">
 			Dies ist eine Höflichkeitsübersetzung. Bei Abweichungen gilt die
-			<a href="/jeux/petanque/confidentialite/" hreflang="fr">französische Originalfassung</a>.
+			<a href="/petanque-game/confidentialite/" hreflang="fr">französische Originalfassung</a>.
 		</p>
 
 		<div class="summary">
@@ -464,7 +464,7 @@ import LangSwitch from '../../../../components/LangSwitch.astro';
 				Diese Erklärung kann sich mit dem Spiel ändern. Das Datum der letzten Aktualisierung steht oben auf der
 				Seite. Bei einer wichtigen Änderung weist dich das Spiel darauf hin.
 			</p>
-			<p>Siehe auch die <a href="/de/jeux/petanque/cgu/">Nutzungsbedingungen des Spiels</a>.</p>
+			<p>Siehe auch die <a href="/de/petanque-game/cgu/">Nutzungsbedingungen des Spiels</a>.</p>
 		</section>
 	</div>
 </BaseLayout>
