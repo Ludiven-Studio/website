@@ -1401,3 +1401,13 @@
 - 10:41 : commité et poussé à la demande de l'utilisateur (« oui il faut renommer le nom et pousser ») : mes 10
   fichiers, les 20 images et vidéos de public/assets/dragons-gems/ et cette section seulement. Statut : terminé.
   Réservations libérées.
+
+## 2026-11-02 — Pétanque Game : version.json de l'invite de mise à jour (session PetanqueGame)
+- Statut : en cours (2026-11-02T12:13+01:00). Demande de l'utilisateur : Ok pour les 3 (dont : créer
+  /jeux/petanque/version.json, que le jeu lit pour proposer ses mises à jour)
+- Réservations actives : `public/jeux/petanque/version.json` (nouveau).
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 12:13 : fichier écrit (Android 1.0.6 en production, iOS 1.0.0 à venir, min 1.0.0, lien Play) ; JSON relu ; pas de
+  build : un fichier de public/ copié tel quel
+- 12:13 : commité et poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé.
+  Réservations libérées.
