@@ -1377,3 +1377,27 @@
   pousser.
 - 09:10 : commité et poussé à la demande de l'utilisateur (« ok commit push le site web ») : mes 23 fichiers et cette
   section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-02 — Dragon Gems Swipe et Pétanque Game : sortie sur Google Play (session website)
+- Statut : en cours (2026-11-02T10:25+01:00). Demande de l'utilisateur : ok j'ai 2 jeux google qui sont sortis : Dragon
+  Gems et Pétanque Game. est-ce que tu peux mettre a jour les pages web de téléchargement ?
+- Réservations actives : `src/data/dragonsGems.ts`, `src/data/petanqueGame.ts`,
+  `src/components/DragonsGemsLanding.astro`, `src/components/DragonsGemsDownload.astro`, `src/pages/petanque.astro`,
+  `src/pages/jeux/petanque.astro`, `src/content/work{,-en}/{dragons-gems,petanque-game}.md`.
+- Ressources : serveur de dev sur le port 4493 ; eslint, `astro check`. Build annoncé ici avant.
+- 10:29 : liens Google Play (fiches vérifiées en ligne) dans STORES des deux jeux ; textes « bientôt » passés à « sur
+  Google Play, bientôt sur l'App Store » en 5 langues (description, FAQ, kicker, closing) ; badge Play sur les fiches
+  projet FR/EN et le hub /petanque/ ; eslint OK, astro check 0 erreur, captures clair, sombre et téléphone vues
+- 10:29 : Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 10:30 : build complet OK : astro check 0 erreur, 192 pages, précache 360 entrées, liens OK. Rien de commité : en
+  attente de l'accord de l'utilisateur pour pousser.
+- 10:38 : l'utilisateur dit « oui il faut renommer le nom et pousser ». Réservé aussi :
+  `public/assets/dragons-gems/{feature,og,video}-*` (bannière, images de partage et vidéo refaites depuis Marketing/ de
+  l'app, qui porte déjà « Dragon Gems Swipe »).
+- 10:39 : bannière, images de partage et vidéos (5 langues) refaites depuis Marketing/ de l'app : nom entier, carte de
+  fin « Dragon Gems Swipe ». Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 10:41 : build complet OK : astro check 0 erreur, 192 pages, précache 360 entrées, liens OK ; captures vues (fiche
+  projet, page de l'appli)
+- 10:41 : commité et poussé à la demande de l'utilisateur (« oui il faut renommer le nom et pousser ») : mes 10
+  fichiers, les 20 images et vidéos de public/assets/dragons-gems/ et cette section seulement. Statut : terminé.
+  Réservations libérées.
