@@ -1425,3 +1425,6 @@
   clé de test
 - 12:18 : commité, poussé et fonctions déployées à la demande de l'utilisateur : mes 5 fichiers et cette section
   seulement. Statut : terminé. Réservations libérées.
+- 12:19 : correction : code commité et poussé (3136622), mais les fonctions ne sont PAS encore déployées (déploiement
+  en production refusé par le mode automatique) ; à faire sur l'accord de l'utilisateur : npx supabase functions deploy
+  app-save meetups apple-revoke
