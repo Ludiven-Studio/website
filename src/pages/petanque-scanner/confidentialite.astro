@@ -17,7 +17,7 @@ import Hero from '../../components/Hero.astro';
 		<p class="updated">
 			Cette politique concerne <strong>l'application mobile Pétanque Scan</strong>
 			(anciennement Pétanque Scanner, <code>com.raphbenpro.petanquear</code>), et non le site ludiven-studio.fr, qui dispose de sa
-			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 10 septembre 2026.
+			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 2 novembre 2026.
 		</p>
 
 		<div class="summary">
@@ -101,7 +101,7 @@ import Hero from '../../components/Hero.astro';
 							<td>Les mêmes événements d'usage (voir §5), accompagnés de&nbsp;: plateforme (Android ou iOS), version de l'application, langue du téléphone, définition de l'écran, système d'exploitation</td>
 							<td>Mesure d'audience, en complément de la précédente&nbsp;: obtenir un tableau de bord simple et sans cookie</td>
 							<td>Consentement</td>
-							<td>Umami Software, Inc. (Umami Cloud)</td>
+							<td>Umami, sur notre propre serveur (Hetzner Online GmbH, Allemagne)</td>
 						</tr>
 						<tr>
 							<td>Jeton de notification push</td>
@@ -178,7 +178,7 @@ import Hero from '../../components/Hero.astro';
 			<p>
 				Depuis septembre 2026, ces événements sont adressés à <strong>deux</strong> outils de mesure, qui
 				reçoivent exactement la même liste&nbsp;: <strong>Firebase Analytics</strong> (Google) et
-				<strong>Umami Cloud</strong>. Le second est un outil de statistiques sans cookie, utilisé parce qu'il
+				<strong>Umami</strong>, installé sur notre propre serveur. Le second est un outil de statistiques sans cookie, utilisé parce qu'il
 				donne une vue simple et lisible de l'usage&nbsp;; il est décrit en détail plus bas.
 			</p>
 			<ul>
@@ -213,14 +213,14 @@ import Hero from '../../components/Hero.astro';
 			</p>
 			<p>
 				<strong>Ce qu'Umami reçoit, précisément.</strong> Chaque événement est envoyé à
-				<code>cloud.umami.is</code> avec, et rien de plus&nbsp;: le nom de l'événement, un identifiant de site
+				<code>stats.ludiven-studio.fr</code>, notre serveur, avec, et rien de plus&nbsp;: le nom de l'événement, un identifiant de site
 				qui nous appartient, la plateforme (<code>android</code> ou <code>ios</code>), la version de
 				l'application, la langue de votre téléphone, la définition de votre écran, et le nom de votre système
 				d'exploitation. <strong>Aucun identifiant publicitaire, aucun numéro d'appareil, aucun cookie, aucun
 				identifiant persistant</strong> n'y figure. Comme pour toute requête sur Internet, le serveur voit
-				nécessairement votre adresse IP&nbsp;; selon la documentation d'Umami, celle-ci n'est pas conservée&nbsp;:
-				elle sert uniquement à déduire un pays et à calculer une empreinte anonyme renouvelée chaque jour, qui ne
-				permet ni de vous suivre d'un jour à l'autre, ni de vous reconnaître dans une autre application.
+				nécessairement votre adresse IP&nbsp;; notre serveur ne la conserve pas&nbsp;: elle sert
+				uniquement à déduire le pays, la région et la ville, et à calculer une empreinte anonyme renouvelée chaque
+				mois, qui ne permet ni de vous suivre d'un mois à l'autre, ni de vous reconnaître dans une autre application.
 			</p>
 			<p>
 				<strong>Une exception, en toute transparence&nbsp;:</strong> si vous <em>refusez</em> le consentement, un
@@ -291,7 +291,7 @@ import Hero from '../../components/Hero.astro';
 			</p>
 			<ul>
 				<li><strong>Google Ireland Limited / Google LLC</strong> — publicité (AdMob), mesure d'audience (Firebase Analytics), notifications (Firebase Cloud Messaging), gestion du consentement (UMP), heure de référence (Firebase Realtime Database).</li>
-				<li><strong>Umami Software, Inc.</strong> (société de droit américain) — mesure d'audience sans cookie, via le service Umami Cloud.</li>
+				<li><strong>Hetzner Online GmbH</strong> (Allemagne) — hébergement de notre serveur de mesure d'audience Umami. Les versions de l'application pas encore mises à jour envoient encore ces mesures à <strong>Umami Software, Inc.</strong> (société de droit américain), via le service Umami Cloud.</li>
 				<li><strong>Apple Inc.</strong> et <strong>Google LLC</strong> — distribution de l'application et traitement des achats intégrés.</li>
 			</ul>
 			<p>
@@ -306,7 +306,7 @@ import Hero from '../../components/Hero.astro';
 			<ul>
 				<li><strong>Images de la caméra</strong>&nbsp;: le temps du calcul, en mémoire vive uniquement (quelques millisecondes).</li>
 				<li><strong>Données de mesure d'audience — Firebase</strong>&nbsp;: conservées par Firebase Analytics <strong>14 mois au maximum</strong>, selon la durée paramétrée dans la console Firebase. Les rapports agrégés (non rattachables à un appareil) peuvent être conservés au-delà.</li>
-				<li><strong>Données de mesure d'audience — Umami</strong>&nbsp;: conservées sous forme de statistiques d'événements tant que notre compte de mesure reste actif. Ces données ne sont rattachées à aucun identifiant d'appareil et ne permettent pas de reconstituer le parcours d'une personne.</li>
+				<li><strong>Données de mesure d'audience — Umami</strong>&nbsp;: conservées sous forme de statistiques d'événements <strong>24 mois</strong> sur notre serveur, puis effacées&nbsp;; ses sauvegardes sont gardées 14 jours. Celles que reçoit encore Umami Cloud, depuis les versions pas encore à jour, y sont effacées au bout de 6 mois. Ces données ne sont rattachées à aucun identifiant d'appareil et ne permettent pas de reconstituer le parcours d'une personne.</li>
 				<li><strong>Compteur de scans</strong>&nbsp;: réinitialisé chaque jour.</li>
 				<li><strong>Indicateur de Premium et choix de consentement</strong>&nbsp;: conservés sur l'appareil jusqu'à la désinstallation ou jusqu'au retrait de votre consentement.</li>
 			</ul>

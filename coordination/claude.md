@@ -1493,3 +1493,28 @@
   build (preview). Rien de commité : en attente de l'accord de l'utilisateur pour pousser.
 - 20:10 : commité et poussé à la demande de l'utilisateur (« ok pousse ») : mes 8 fichiers et cette section seulement.
   Statut : terminé. Réservations libérées.
+
+## 2026-11-02 — Site et applis : statistiques sur le serveur Umami du studio (session website)
+- Statut : en cours (2026-11-02T19:18+01:00). Demande de l'utilisateur : (transmis par la session Dragon Gems) il
+  faudrait modifier tous les projets pour repointer sur ce serveur et ajouter des événements pour les nouveaux projets
+- Réservations actives : `src/data/site.ts`, `src/components/MainHead.astro`,
+  `src/pages{,/en,/es,/de,/it}/petanque-game/confidentialite.astro`,
+  `src/pages{,/en}/dragons-gems/confidentialite.astro` ; et, déjà à moi (Pétanque Scan) :
+  `src/pages/confidentialite.astro`, `src/pages/petanque-meet/confidentialite.astro`,
+  `src/pages{,/en,/es,/de,/it}/petanque-scanner/confidentialite.astro`.
+- Ressources : serveur de dev sur le port 4507 ; eslint, `astro check`. Build annoncé ici avant.
+- 19:30 : site.ts (UMAMI_HOST, nouvel identifiant) et MainHead (script et CSP : stats.ludiven-studio.fr, cloud.umami.is
+  et api-gateway.umami.dev retirés) ; politiques : Game (5 langues), Scan (5 langues, IP : ville et empreinte
+  mensuelle), Meet, site : Umami sur notre serveur loué à Hetzner (Allemagne), phrase de transition pour les versions
+  pas encore à jour ; Dragon Gems FR/EN : nouvelle §8 Statistiques d'usage (événements de sa prochaine version), §8-15
+  deviennent 9-16. Reste : la durée de conservation (l'utilisateur choisit, 24 mois proposés par la session Dragon
+  Gems). eslint OK, astro check 0 erreur, captures sans erreur console. Rien de commité
+- 19:42 : durée choisie par l'utilisateur (transmis par la session Dragon Gems : « ok ça me va ! go ! ») : 24 mois sur
+  le serveur puis effacées (tâche mensuelle), sauvegardes 14 jours, 6 mois chez Umami Cloud pour les versions pas
+  encore à jour ; écrit dans les 14 pages. Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 19:49 : build complet OK : astro check 0 erreur, 192 pages, précache 362 entrées, liens OK ; plus aucune adresse
+  Umami Cloud dans dist/ ; check-csp : 211 pages, 0 blocage (témoin : script étranger refusé) ; le script se charge
+  depuis stats.ludiven-studio.fr sur le build, rien n'est envoyé hors du domaine. Rien de commité : en attente de
+  l'accord de l'utilisateur pour pousser
+- 20:11 : commité et poussé à la demande de l'utilisateur (« ok pousse ») : mes 16 fichiers et cette section seulement.
+  Statut : terminé. Réservations libérées.

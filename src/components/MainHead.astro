@@ -1,6 +1,6 @@
 ---
 import '../styles/global.css';
-import { UMAMI_WEBSITE_ID, SUPABASE_URL } from '../data/site';
+import { UMAMI_HOST, UMAMI_WEBSITE_ID, SUPABASE_URL } from '../data/site';
 import { getImage } from 'astro:assets';
 import logo from '../assets/LudivenStudioLogo.png';
 
@@ -34,12 +34,12 @@ const {
 const supabaseWs = SUPABASE_URL.replace(/^https:/, 'wss:');
 const csp = [
 	"default-src 'self'",
-	"script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cloud.umami.is",
+	`script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' ${UMAMI_HOST}`,
 	"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
 	"font-src 'self' data: https://fonts.gstatic.com",
 	// Tournament posters: approved ones (public bucket) and pending ones for the moderator (signed URLs).
 	`img-src 'self' data: blob: https://*.tile.openstreetmap.org ${SUPABASE_URL}/storage/v1/object/public/posters/ ${SUPABASE_URL}/storage/v1/object/sign/posters-pending/`,
-	`connect-src 'self' data: blob: ${SUPABASE_URL} ${supabaseWs} https://cloud.umami.is https://api-gateway.umami.dev https://api.web3forms.com https://*.tile.openstreetmap.org`,
+	`connect-src 'self' data: blob: ${SUPABASE_URL} ${supabaseWs} ${UMAMI_HOST} https://api.web3forms.com https://*.tile.openstreetmap.org`,
 	"media-src 'self' data: blob:",
 	"worker-src 'self' blob:",
 	"object-src 'none'",
@@ -128,7 +128,7 @@ if (image) {
 		<script
 			is:inline
 			defer
-			src="https://cloud.umami.is/script.js"
+			src={`${UMAMI_HOST}/script.js`}
 			data-website-id={UMAMI_WEBSITE_ID}
 			data-domains="www.ludiven-studio.fr"
 			data-exclude-search="true"

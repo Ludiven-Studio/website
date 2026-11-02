@@ -22,7 +22,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			Cette politique concerne <strong>l'application mobile Dragon Gems Swipe</strong>
 			(<code>com.ludivenstudio.dragonsgems</code>) et ses classements, partagés avec le jeu du site
 			(<a href="/jeux/eclats/">ludiven-studio.fr/jeux/eclats</a>). Le reste du site a sa
-			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 31 octobre 2026.
+			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 2 novembre 2026.
 		</p>
 
 		<div class="summary">
@@ -31,7 +31,8 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li>Le jeu se joue <strong>sans compte</strong>. Ta progression est gardée sur ton téléphone.</li>
 				<li>Un <strong>compte Google ou Apple</strong>, facultatif, sauvegarde ta progression en ligne pour la retrouver sur tous tes appareils.</li>
 				<li>Les classements du défi du jour, du mode infini et du défi du sommet montrent <strong>ton pseudo et ton score</strong>, à tout le monde. Rien d'autre.</li>
-				<li>Des <strong>vidéos publicitaires facultatives</strong> (Unity) offrent des cœurs et des pièces. Elles ne sont adaptées à tes centres d'intérêt qu'avec ton accord. Pas de statistiques d'usage. L'application ne demande ni ta position, ni tes contacts, ni tes photos.</li>
+				<li>Des <strong>vidéos publicitaires facultatives</strong> (Unity) offrent des cœurs et des pièces. Elles ne sont adaptées à tes centres d'intérêt qu'avec ton accord. L'application ne demande ni ta position, ni tes contacts, ni tes photos.</li>
+				<li>Des <strong>statistiques d'usage</strong> sans identifiant (niveaux joués, vidéos, achats…) partent sur notre propre serveur, en Allemagne.</li>
 				<li>Des <strong>achats intégrés</strong> facultatifs (pièces, cœurs illimités), payés par Google Play ou l'App Store.</li>
 				<li>Tu peux <strong>supprimer ton compte</strong> à tout moment depuis les Réglages de l'application.</li>
 			</ul>
@@ -68,6 +69,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li>un <strong>numéro d'envoi</strong>, tiré au hasard à chaque partie. Si la réponse du serveur se perd, l'application renvoie le même résultat, et ce numéro évite de le compter deux fois. Le serveur garde ce numéro avec sa réponse.</li>
 			</ul>
 			<p>Sans réseau, le résultat attend sur ton téléphone et part quand la connexion revient.</p>
+			<p>L'application envoie aussi des statistiques d'usage, sans identifiant (voir §8).</p>
 		</section>
 
 		<section class="stack gap-2">
@@ -152,7 +154,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 							<td>Ton choix sur la publicité</td>
 							<td>T'en souvenir et le transmettre à Unity</td>
 							<td>Obligation légale</td>
-							<td>Ton téléphone&nbsp;; Unity</td>
+							<td>Ton téléphone&nbsp;; Unity&nbsp;; Umami compte les oui et les non, sans identifiant (voir §8)</td>
 						</tr>
 						<tr>
 							<td>Produit acheté, reçu du store, numéro de transaction</td>
@@ -161,10 +163,16 @@ import LangSwitch from '../../components/LangSwitch.astro';
 							<td>Google Play ou App Store&nbsp;; Unity (module d'achat)</td>
 						</tr>
 						<tr>
+							<td>Statistiques d'usage, sans compte ni identifiant (voir §8)</td>
+							<td>Savoir quelles fonctions servent et améliorer le jeu</td>
+							<td>Intérêt légitime</td>
+							<td>Umami, sur notre serveur (Hetzner, Allemagne)</td>
+						</tr>
+						<tr>
 							<td>Adresse IP</td>
 							<td>Acheminer les échanges</td>
 							<td>Intérêt légitime</td>
-							<td>Supabase&nbsp;; Unity&nbsp;; Google ou Apple pendant une connexion</td>
+							<td>Supabase&nbsp;; Unity&nbsp;; Google ou Apple pendant une connexion&nbsp;; notre serveur de statistiques</td>
 						</tr>
 					</tbody>
 				</table>
@@ -220,15 +228,48 @@ import LangSwitch from '../../components/LangSwitch.astro';
 		</section>
 
 		<section class="stack gap-2">
-			<h2>8. Ce que l'application ne fait pas</h2>
+			<h2>8. Statistiques d'usage</h2>
+			<p>
+				L'application envoie à <strong>Umami</strong>, un outil de statistiques sans cookie installé sur notre
+				propre serveur, le nom de certaines actions, avec quelques précisions&nbsp;:
+			</p>
 			<ul>
-				<li><strong>Aucune statistique d'usage</strong> ni aucun rapport de plantage de notre part.</li>
+				<li><code>app_open</code> — l'application démarre (avec ton choix sur la publicité&nbsp;: oui, non ou pas encore demandé)&nbsp;;</li>
+				<li><code>level_start</code> / <code>level_end</code> — un niveau commence ou finit (mode de jeu, numéro du niveau, gagné ou perdu, coups joués, étoiles)&nbsp;;</li>
+				<li><code>run_end</code> — une partie du défi du jour, du mode infini ou du défi du sommet finit (mode, résultat, score, coups joués)&nbsp;;</li>
+				<li><code>tutorial_end</code> — un tutoriel finit (lequel, passé ou non, étape atteinte)&nbsp;;</li>
+				<li><code>ad_rewarded</code> — une vidéo proposée (pour un cœur, continuer un niveau, doubler le cadeau ou des pièces de la boutique) est regardée, passée ou indisponible&nbsp;;</li>
+				<li><code>continue_buy</code>, <code>breath_buy</code> — des pièces sont dépensées pour continuer un niveau ou pour un souffle (mode, niveau)&nbsp;;</li>
+				<li><code>iap_buy</code> — un achat avec de l'argent (produit acheté)&nbsp;;</li>
+				<li><code>daily_gift</code> — le cadeau du jour est reçu (jour de la série)&nbsp;;</li>
+				<li><code>reminders</code>, <code>ad_consent</code> — ta réponse sur les rappels et sur la publicité (oui ou non)&nbsp;;</li>
+				<li><code>sign_in</code>, <code>sign_out</code>, <code>account_delete</code> — une connexion (Google ou Apple&nbsp;; réussie, annulée ou échouée), une déconnexion, une suppression de compte (réussie ou non).</li>
+			</ul>
+			<p>
+				Chaque envoi porte aussi la plateforme, le type de version (test ou publique), la version de
+				l'application et du système, le modèle de téléphone, la langue du téléphone et la taille de l'écran.
+				<strong>Aucun</strong> identifiant de joueur, pseudo, compte, adresse mail ni identifiant publicitaire
+				n'y figure&nbsp;: ces statistiques ne sont reliées ni à ton compte ni à ton identité.
+			</p>
+			<p>
+				Comme tout service web, notre serveur voit l'adresse IP de ton téléphone. Il ne la conserve pas, mais
+				en déduit le pays, la région et la ville. Pour compter les visiteurs, il regroupe les actions faites
+				depuis une même connexion et un même modèle de téléphone, pendant un mois calendaire au plus. Ce
+				serveur est loué à <strong>Hetzner Online GmbH</strong>, qui l'héberge en Allemagne&nbsp;; personne
+				d'autre ne reçoit ces statistiques.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>9. Ce que l'application ne fait pas</h2>
+			<ul>
+				<li><strong>Aucun rapport de plantage</strong> de notre part.</li>
 				<li>Ni position précise, ni contacts, ni photos, ni fichiers&nbsp;: l'application ne demande aucune de ces autorisations.</li>
 			</ul>
 		</section>
 
 		<section class="stack gap-2">
-			<h2>9. Ce qui est stocké sur ton téléphone</h2>
+			<h2>10. Ce qui est stocké sur ton téléphone</h2>
 			<ul>
 				<li>ta progression&nbsp;: niveaux, étoiles, trésor, cœurs, défi du jour joué, cadeau du jour&nbsp;;</li>
 				<li>ta session de connexion et ton adresse mail, si tu es connecté&nbsp;;</li>
@@ -247,7 +288,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 		</section>
 
 		<section class="stack gap-2">
-			<h2>10. Destinataires, transferts et durées</h2>
+			<h2>11. Destinataires, transferts et durées</h2>
 			<p>
 				Nous ne vendons pas tes données. Elles ne sont traitées que par&nbsp;:
 			</p>
@@ -255,6 +296,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li><strong>Supabase</strong> — base de données, comptes et sauvegardes. Données hébergées dans l'Union européenne (Irlande).</li>
 				<li><strong>Unity Technologies</strong> (et sa filiale ironSource) — vidéos publicitaires (LevelPlay, Unity Ads) et module d'achat. Pour la publicité, Unity agit aussi pour son propre compte et partage des données avec des annonceurs (voir <a href="#publicite">Publicité</a>).</li>
 				<li><strong>Google</strong> et <strong>Apple</strong> — connexion à ton compte, distribution de l'application et paiement des achats.</li>
+				<li><strong>Hetzner Online GmbH</strong> — hébergement de notre serveur de statistiques d'usage, en Allemagne (voir §8).</li>
 			</ul>
 			<p>
 				Supabase et Unity sont des sociétés américaines. Ce transfert est encadré par les mécanismes du
@@ -263,14 +305,15 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			<p>Durées de conservation&nbsp;:</p>
 			<ul>
 				<li><strong>Compte et sauvegarde</strong>&nbsp;: jusqu'à ce que tu supprimes ton compte.</li>
-				<li><strong>Scores des classements</strong> et leurs numéros d'envoi&nbsp;: tant que le classement est en ligne. Sur simple demande, nous retirons ton pseudo et tes scores (voir §12).</li>
+				<li><strong>Scores des classements</strong> et leurs numéros d'envoi&nbsp;: tant que le classement est en ligne. Sur simple demande, nous retirons ton pseudo et tes scores (voir §13).</li>
 				<li><strong>Adresse IP</strong>&nbsp;: uniquement dans les journaux techniques de Supabase, effacés par lui au bout de quelques jours.</li>
+				<li><strong>Statistiques d'usage</strong>&nbsp;: gardées <strong>24 mois</strong> sur notre serveur, puis effacées&nbsp;; ses sauvegardes, 14 jours.</li>
 				<li><strong>Données publicitaires</strong>&nbsp;: chez Unity, selon sa politique.</li>
 			</ul>
 		</section>
 
 		<section class="stack gap-2" id="suppression">
-			<h2>11. Supprimer ton compte</h2>
+			<h2>12. Supprimer ton compte</h2>
 			<p>
 				Dans l'application&nbsp;: <strong>Réglages → «&nbsp;Supprimer mon compte&nbsp;»</strong> (le bouton
 				apparaît une fois connecté). C'est immédiat et définitif&nbsp;:
@@ -300,7 +343,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 		</section>
 
 		<section class="stack gap-2">
-			<h2>12. Tes droits</h2>
+			<h2>13. Tes droits</h2>
 			<p>
 				Conformément au RGPD, tu disposes d'un droit d'accès, de rectification, d'effacement, de limitation,
 				d'opposition et de portabilité. Pour les exercer, ou pour faire retirer un pseudo d'un classement,
@@ -315,7 +358,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 		</section>
 
 		<section class="stack gap-2">
-			<h2>13. Mineurs</h2>
+			<h2>14. Mineurs</h2>
 			<p>
 				Le jeu ne s'adresse pas aux enfants de moins de 13 ans et se joue sans compte. Si tu as moins de
 				15 ans, demande à tes parents avant de répondre «&nbsp;Oui, adaptées&nbsp;» sur les vidéos, avant un
@@ -325,7 +368,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 		</section>
 
 		<section class="stack gap-2">
-			<h2>14. Sécurité</h2>
+			<h2>15. Sécurité</h2>
 			<p>
 				Tous les échanges sont chiffrés (HTTPS). Les sauvegardes ne sont accessibles que par notre
 				serveur&nbsp;: aucun accès direct à la base n'est ouvert. L'identifiant technique des classements n'est
@@ -334,7 +377,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 		</section>
 
 		<section class="stack gap-2">
-			<h2>15. Changements</h2>
+			<h2>16. Changements</h2>
 			<p>
 				Nous mettrons cette page à jour à chaque changement de l'application qui touche à tes données, avec
 				sa date en haut de page.

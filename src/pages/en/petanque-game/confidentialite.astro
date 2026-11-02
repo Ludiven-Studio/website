@@ -31,8 +31,8 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			This policy covers <strong>the Pétanque Game mobile app</strong>
 			(<code>com.ludivenstudio.petanquegame</code>). The pétanque game on the website
 			(<a href="/jeux/petanque/">ludiven-studio.fr/jeux/petanque</a>) and the rest of the website have their
-			<a href="/confidentialite/">own policy</a>. Last updated: 27 October 2026 (ads move from Google AdMob to Unity LevelPlay, and the game asks for your
-			consent in its own window).
+			<a href="/confidentialite/">own policy</a>. Last updated: 2 November 2026 (usage statistics move from Umami Cloud to our own Umami server, in
+			Germany).
 		</p>
 		<p class="updated">
 			This is a courtesy translation. In case of discrepancy, the
@@ -197,7 +197,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 							<td>Usage statistics, with no account or identifier (see §7)</td>
 							<td>Knowing which features are used and improving the game</td>
 							<td>Legitimate interest</td>
-							<td>Umami Cloud</td>
+							<td>Umami, on our own server (Hetzner, Germany)</td>
 						</tr>
 						<tr>
 							<td>IP address, as for any connection</td>
@@ -258,7 +258,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 		<section class="stack gap-2">
 			<h2>7. Usage statistics</h2>
 			<p>
-				The game sends <strong>Umami Cloud</strong>, a cookie-free statistics tool, the name of certain
+				The game sends <strong>Umami</strong>, a cookie-free statistics tool installed on our own server, the name of certain
 				actions, with a few details:
 			</p>
 			<ul>
@@ -282,6 +282,11 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				Like any web service, Umami sees your phone's IP address. It does not keep it, but infers the country,
 				the region and the city from it. To count visitors, it groups the actions made from the same connection
 				and the same phone model, for one calendar month at most.
+			</p>
+			<p>
+				This server is rented from <strong>Hetzner Online GmbH</strong>, which hosts it in Germany. No one else
+				receives these statistics. Versions of the game not yet updated still send them to Umami Cloud (Umami
+				Software, Inc., United States).
 			</p>
 		</section>
 
@@ -378,7 +383,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 		<section class="stack gap-2">
 			<h2>12. Recipients and transfers outside the European Union</h2>
 			<p>
-				We have no server of our own. Your data is neither sold nor passed on. It is processed only by these
+				Our only server is the one for usage statistics (see §7). Your data is neither sold nor passed on. It is processed only by these
 				providers:
 			</p>
 			<ul>
@@ -386,11 +391,11 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>ironSource</strong>, a subsidiary of Unity Technologies — ads (ironSource Ads), if you accepted them. The auctions of ironSource and Unity Ads may pass the ad request on to other ad buyers (see §6).</li>
 				<li><strong>Google</strong> (Google Ireland Limited, Google LLC) — sign-in on Android, Google Play (distribution, payment, rating form).</li>
 				<li><strong>Apple Inc.</strong> — "Sign in with Apple", tracking permission, App Store (distribution, payment, rating form).</li>
-				<li><strong>Umami Software, Inc.</strong> — usage statistics, with no account or identifier (see §7).</li>
+				<li><strong>Hetzner Online GmbH</strong> (Germany) — hosting of our usage statistics server (see §7). Versions of the game not yet updated still send these statistics to <strong>Umami Software, Inc.</strong> (Umami Cloud).</li>
 				<li><strong>GitHub, Inc.</strong> — hosting of our website, read for the update check (see §9).</li>
 			</ul>
 			<p>
-				These providers are US companies or their subsidiaries. These transfers are governed by the mechanisms
+				Apart from Hetzner, these providers are US companies or their subsidiaries. These transfers are governed by the mechanisms
 				of Chapter V of the GDPR: standard contractual clauses and, for the providers concerned, certification
 				under the <em>EU-U.S. Data Privacy Framework</em>.
 			</p>
@@ -402,7 +407,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Account and progress</strong> (Unity Authentication and Cloud Save): until you delete your account.</li>
 				<li><strong>Ranking</strong>: your rating and your name, until you have them removed (see §11).</li>
 				<li><strong>Online games</strong>: a public game leaves the list as soon as it starts or you close it; throws are not kept after the game.</li>
-				<li><strong>Usage statistics</strong>: erased by Umami after <strong>6 months</strong>.</li>
+				<li><strong>Usage statistics</strong>: kept <strong>24 months</strong> on our server, then erased; its backups, 14 days. Those Umami Cloud still receives from versions not yet updated are erased there after 6 months.</li>
 				<li><strong>Advertising data</strong>: according to the rules of Unity and ironSource.</li>
 				<li><strong>Your answer about ads</strong>: 6 months on your phone, then the game asks again.</li>
 				<li><strong>Purchases</strong>: the transaction numbers stay in your progress, until the account is deleted; Google and Apple keep their own records.</li>

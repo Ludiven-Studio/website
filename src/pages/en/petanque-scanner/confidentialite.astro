@@ -18,7 +18,7 @@ import Hero from '../../../components/Hero.astro';
 		<p class="updated">
 			This policy covers <strong>the Pétanque Scan mobile app</strong>
 			(formerly Pétanque Scanner, <code>com.raphbenpro.petanquear</code>), not the ludiven-studio.fr website, which has its
-			<a href="/confidentialite/">own policy</a>. Last updated: 10 September 2026.
+			<a href="/confidentialite/">own policy</a>. Last updated: 2 November 2026.
 		</p>
 		<p class="updated">
 			This is a courtesy translation. In case of discrepancy, the
@@ -104,7 +104,7 @@ import Hero from '../../../components/Hero.astro';
 							<td>The same usage events (see §5), together with: platform (Android or iOS), app version, phone language, screen resolution, operating system</td>
 							<td>Analytics, in addition to the above: getting a simple, cookie-free dashboard</td>
 							<td>Consent</td>
-							<td>Umami Software, Inc. (Umami Cloud)</td>
+							<td>Umami, on our own server (Hetzner Online GmbH, Germany)</td>
 						</tr>
 						<tr>
 							<td>Push notification token</td>
@@ -179,7 +179,7 @@ import Hero from '../../../components/Hero.astro';
 			</p>
 			<p>
 				Since September 2026, these events are sent to <strong>two</strong> analytics tools, which receive exactly
-				the same list: <strong>Firebase Analytics</strong> (Google) and <strong>Umami Cloud</strong>. The second
+				the same list: <strong>Firebase Analytics</strong> (Google) and <strong>Umami</strong>, installed on our own server. The second
 				is a cookie-free statistics tool, used because it gives a simple, readable view of usage; it is described
 				in detail below.
 			</p>
@@ -213,14 +213,14 @@ import Hero from '../../../components/Hero.astro';
 				system version, app version, country inferred from the IP address, first open, session duration).
 			</p>
 			<p>
-				<strong>What Umami receives, precisely.</strong> Each event is sent to <code>cloud.umami.is</code> with the
+				<strong>What Umami receives, precisely.</strong> Each event is sent to <code>stats.ludiven-studio.fr</code>, our server, with the
 				following, and nothing more: the event name, a site identifier that belongs to us, the platform
 				(<code>android</code> or <code>ios</code>), the app version, your phone's language, your screen
 				resolution, and the name of your operating system. <strong>No advertising identifier, no device number, no
 				cookie and no persistent identifier</strong> is included. As with any request on the Internet, the server
-				necessarily sees your IP address; according to Umami's documentation, it is not stored: it is used only to
-				infer a country and to compute an anonymous fingerprint renewed every day, which can neither track you from
-				one day to the next nor recognise you in another app.
+				necessarily sees your IP address; our server does not store it: it is used only to infer the country, the
+				region and the city, and to compute an anonymous fingerprint renewed every month, which can neither track
+				you from one month to the next nor recognise you in another app.
 			</p>
 			<p>
 				<strong>One exception, in full transparency:</strong> if you <em>refuse</em> consent, a single
@@ -287,7 +287,7 @@ import Hero from '../../../components/Hero.astro';
 			</p>
 			<ul>
 				<li><strong>Google Ireland Limited / Google LLC</strong> — advertising (AdMob), analytics (Firebase Analytics), notifications (Firebase Cloud Messaging), consent management (UMP), reference time (Firebase Realtime Database).</li>
-				<li><strong>Umami Software, Inc.</strong> (a US company) — cookie-free analytics, via the Umami Cloud service.</li>
+				<li><strong>Hetzner Online GmbH</strong> (Germany) — hosting of our Umami analytics server. Versions of the app not yet updated still send this analytics data to <strong>Umami Software, Inc.</strong> (a US company), via the Umami Cloud service.</li>
 				<li><strong>Apple Inc.</strong> and <strong>Google LLC</strong> — distribution of the app and processing of in-app purchases.</li>
 			</ul>
 			<p>
@@ -302,7 +302,7 @@ import Hero from '../../../components/Hero.astro';
 			<ul>
 				<li><strong>Camera images</strong>: for the duration of the computation, in RAM only (a few milliseconds).</li>
 				<li><strong>Analytics data — Firebase</strong>: kept by Firebase Analytics for <strong>14 months at most</strong>, according to the period set in the Firebase console. Aggregated reports (which cannot be linked to a device) may be kept longer.</li>
-				<li><strong>Analytics data — Umami</strong>: kept as event statistics for as long as our analytics account remains active. This data is not linked to any device identifier and does not allow anyone's journey to be reconstructed.</li>
+				<li><strong>Analytics data — Umami</strong>: kept as event statistics for <strong>24 months</strong> on our server, then erased; its backups are kept 14 days. Those Umami Cloud still receives from versions not yet updated are erased there after 6 months. This data is not linked to any device identifier and does not allow anyone's journey to be reconstructed.</li>
 				<li><strong>Scan counter</strong>: reset every day.</li>
 				<li><strong>Premium flag and consent choice</strong>: kept on the device until uninstallation or until you withdraw your consent.</li>
 			</ul>

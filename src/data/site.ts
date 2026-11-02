@@ -1,5 +1,6 @@
 // Public IDs (rendered into the HTML). Fill once the accounts are created.
-export const UMAMI_WEBSITE_ID = '7035161f-a068-493c-afe8-abb8c29bc7c4'; // Umami Cloud → Settings → Websites
+export const UMAMI_HOST = 'https://stats.ludiven-studio.fr'; // the studio's own Umami (Hetzner, Germany)
+export const UMAMI_WEBSITE_ID = '371c514d-01e2-4a14-bd13-b87702bf8f8b'; // Umami → Settings → Websites
 export const WEB3FORMS_ACCESS_KEY = '64c95337-adf5-4a54-83de-28fd548efc48'; // web3forms.com (tied to the receiving email)
 
 // Supabase — daily leaderboard. Public values (anon key is safe to expose). The

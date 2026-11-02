@@ -18,7 +18,7 @@ import Hero from '../../components/Hero.astro';
 			Cette politique concerne <strong>l'application mobile Pétanque Meet</strong>
 			(<code>com.ludivenstudio.petanquemeet</code>) et la carte des rencontres qu'elle partage avec le site
 			(<a href="/petanque-meet/">ludiven-studio.fr/petanque-meet</a>). Le reste du site a sa
-			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 24 octobre 2026.
+			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 2 novembre 2026.
 		</p>
 
 		<div class="summary">
@@ -156,7 +156,7 @@ import Hero from '../../components/Hero.astro';
 							<td>Statistiques d'usage, sans compte ni identifiant (voir §8)</td>
 							<td>Savoir quelles fonctions servent et améliorer l'application</td>
 							<td>Intérêt légitime</td>
-							<td>Umami Cloud</td>
+							<td>Umami, sur notre serveur (Hetzner, Allemagne)</td>
 						</tr>
 						<tr>
 							<td>Identifiant publicitaire, adresse IP, interactions avec les annonces, informations techniques (voir §9)</td>
@@ -235,7 +235,7 @@ import Hero from '../../components/Hero.astro';
 		<section class="stack gap-2">
 			<h2>8. Statistiques d'usage</h2>
 			<p>
-				L'application envoie à <strong>Umami Cloud</strong>, un outil de statistiques sans cookie, le nom des
+				L'application envoie à <strong>Umami</strong>, un outil de statistiques sans cookie installé sur notre propre serveur, le nom des
 				actions faites (ouvrir l'application, ouvrir une partie, s'inscrire, publier, se connecter, partager,
 				signaler…), avec la plateforme, la version de l'application et du système, la langue, la taille de
 				l'écran et le modèle de téléphone.
@@ -250,8 +250,9 @@ import Hero from '../../components/Hero.astro';
 				depuis une même connexion et un même modèle de téléphone, pendant un mois calendaire au plus.
 			</p>
 			<p>
-				Ces statistiques sont rangées dans le même compte que celles de Pétanque Scan, notre autre
-				application, chaque application à part.
+				Ce serveur est loué à <strong>Hetzner Online GmbH</strong>, qui l'héberge en Allemagne. Chaque application du
+				studio y a ses statistiques à part, et personne d'autre ne les reçoit. Les versions de l'application qui
+				n'ont pas encore été mises à jour les envoient encore à Umami Cloud (Umami Software, Inc., États-Unis).
 			</p>
 		</section>
 
@@ -322,7 +323,7 @@ import Hero from '../../components/Hero.astro';
 				<li><strong>komoot</strong> (service Photon, Allemagne) — recherche de lieux dans le monde&nbsp;: chaque recherche lui est envoyée, avec le centre de la carte affichée arrondi à une dizaine de kilomètres et la langue de l'application.</li>
 				<li><strong>Fondation OpenStreetMap</strong> — nom d'un nouveau terrain (service Nominatim). Seules les coordonnées du terrain lui sont envoyées, par notre serveur.</li>
 				<li><strong>Resend</strong> — envoi des e-mails de modération et des réponses aux demandes «&nbsp;C'est mon club&nbsp;».</li>
-				<li><strong>Umami Software, Inc.</strong> — statistiques d'usage, sans compte ni identifiant (voir §8).</li>
+				<li><strong>Hetzner Online GmbH</strong> (Allemagne) — hébergement de notre serveur de statistiques d'usage (voir §8). Les versions de l'application pas encore mises à jour envoient encore ces statistiques à <strong>Umami Software, Inc.</strong> (Umami Cloud).</li>
 			</ul>
 			<p>
 				Le bouton «&nbsp;Itinéraire&nbsp;» ouvre Google Maps ou Plans (Apple) avec l'adresse du terrain. Le
@@ -346,7 +347,7 @@ import Hero from '../../components/Hero.astro';
 				<li><strong>Demandes «&nbsp;C'est mon club&nbsp;»</strong>&nbsp;: gardées avec ton compte, effacées quand tu le supprimes.</li>
 				<li><strong>Compteurs anti-abus</strong>&nbsp;: effacés au bout de 30 jours.</li>
 				<li><strong>Suspension d'un compte</strong>&nbsp;: l'identifiant technique est conservé tant que la suspension dure.</li>
-				<li><strong>Statistiques d'usage</strong>&nbsp;: effacées par Umami au bout de <strong>6 mois</strong>.</li>
+				<li><strong>Statistiques d'usage</strong>&nbsp;: gardées <strong>24 mois</strong> sur notre serveur, puis effacées&nbsp;; ses sauvegardes, 14 jours. Celles que reçoit encore Umami Cloud, depuis les versions pas encore à jour, y sont effacées au bout de 6 mois.</li>
 				<li><strong>Compte</strong>&nbsp;: jusqu'à ce que tu le supprimes.</li>
 			</ul>
 		</section>

@@ -23,7 +23,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			This policy covers <strong>the Dragon Gems Swipe mobile app</strong>
 			(<code>com.ludivenstudio.dragonsgems</code>) and its leaderboards, shared with the game on the website
 			(<a href="/jeux/eclats/">ludiven-studio.fr/jeux/eclats</a>). The rest of the website has its
-			<a href="/confidentialite/">own policy</a> (in French). Last updated: October 31, 2026.
+			<a href="/confidentialite/">own policy</a> (in French). Last updated: November 2, 2026.
 		</p>
 		<p class="updated">
 			This is a courtesy translation. In case of discrepancy, the
@@ -36,7 +36,8 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li>The game is played <strong>without an account</strong>. Your progress is kept on your phone.</li>
 				<li>An optional <strong>Google or Apple account</strong> saves your progress online, to find it on all your devices.</li>
 				<li>The daily challenge, endless mode and summit challenge leaderboards show <strong>your name and your score</strong> to everyone. Nothing else.</li>
-				<li><strong>Optional video ads</strong> (Unity) give hearts and coins. They are tailored to your interests only if you agree. No usage analytics. The app asks for neither your location, nor your contacts, nor your photos.</li>
+				<li><strong>Optional video ads</strong> (Unity) give hearts and coins. They are tailored to your interests only if you agree. The app asks for neither your location, nor your contacts, nor your photos.</li>
+				<li><strong>Usage statistics</strong> with no identifier (levels played, videos, purchases…) go to our own server, in Germany.</li>
 				<li>Optional <strong>in-app purchases</strong> (coins, unlimited hearts), paid through Google Play or the App Store.</li>
 				<li>You can <strong>delete your account</strong> at any time from the app's Settings.</li>
 			</ul>
@@ -155,7 +156,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 							<td>Your choice about ads</td>
 							<td>Remember it and pass it on to Unity</td>
 							<td>Legal obligation</td>
-							<td>Your phone; Unity</td>
+							<td>Your phone; Unity; Umami counts the yeses and noes, with no identifier (see §8)</td>
 						</tr>
 						<tr>
 							<td>Product bought, store receipt, transaction number</td>
@@ -164,10 +165,16 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 							<td>Google Play or App Store; Unity (purchase module)</td>
 						</tr>
 						<tr>
+							<td>Usage statistics, with no account or identifier (see §8)</td>
+							<td>Know which features are used and improve the game</td>
+							<td>Legitimate interest</td>
+							<td>Umami, on our own server (Hetzner, Germany)</td>
+						</tr>
+						<tr>
 							<td>IP address</td>
 							<td>Carry the exchanges</td>
 							<td>Legitimate interest</td>
-							<td>Supabase; Unity; Google or Apple during a sign-in</td>
+							<td>Supabase; Unity; Google or Apple during a sign-in; our statistics server</td>
 						</tr>
 					</tbody>
 				</table>
@@ -218,15 +225,47 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 		</section>
 
 		<section class="stack gap-2">
-			<h2>8. What the app does not do</h2>
+			<h2>8. Usage statistics</h2>
+			<p>
+				The app sends <strong>Umami</strong>, a cookie-free statistics tool installed on our own server, the
+				name of certain actions, with a few details:
+			</p>
 			<ul>
-				<li><strong>No usage analytics</strong> and no crash reports of our own.</li>
+				<li><code>app_open</code> — the app starts (with your choice about ads: yes, no or not asked yet);</li>
+				<li><code>level_start</code> / <code>level_end</code> — a level starts or ends (game mode, level number, won or lost, moves played, stars);</li>
+				<li><code>run_end</code> — a daily challenge, endless mode or summit challenge game ends (mode, result, score, moves played);</li>
+				<li><code>tutorial_end</code> — a tutorial ends (which one, skipped or not, step reached);</li>
+				<li><code>ad_rewarded</code> — an offered video (for a heart, to continue a level, to double the gift or for shop coins) is watched, skipped or unavailable;</li>
+				<li><code>continue_buy</code>, <code>breath_buy</code> — coins are spent to continue a level or on a breath (mode, level);</li>
+				<li><code>iap_buy</code> — a purchase with money (product bought);</li>
+				<li><code>daily_gift</code> — the daily gift is received (day of the streak);</li>
+				<li><code>reminders</code>, <code>ad_consent</code> — your answer about reminders and about ads (yes or no);</li>
+				<li><code>sign_in</code>, <code>sign_out</code>, <code>account_delete</code> — a sign-in (Google or Apple; succeeded, cancelled or failed), a sign-out, an account deletion (succeeded or not).</li>
+			</ul>
+			<p>
+				Each send also carries the platform, the kind of build (test or public), the app and system versions,
+				the phone model, the phone's language and the screen size. <strong>No</strong> player identifier, name,
+				account, email address or advertising identifier is included: these statistics are linked neither to
+				your account nor to your identity.
+			</p>
+			<p>
+				Like any web service, our server sees your phone's IP address. It does not keep it, but infers the
+				country, the region and the city from it. To count visitors, it groups the actions made from the same
+				connection and the same phone model, for one calendar month at most. This server is rented from
+				<strong>Hetzner Online GmbH</strong>, which hosts it in Germany; no one else receives these statistics.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>9. What the app does not do</h2>
+			<ul>
+				<li><strong>No crash reports</strong> of our own.</li>
 				<li>No precise location, contacts, photos or files: the app asks for none of these permissions.</li>
 			</ul>
 		</section>
 
 		<section class="stack gap-2">
-			<h2>9. What is stored on your phone</h2>
+			<h2>10. What is stored on your phone</h2>
 			<ul>
 				<li>your progress: levels, stars, treasure, hearts, daily challenge played, daily gift;</li>
 				<li>your sign-in session and your email address, if you are signed in;</li>
@@ -245,7 +284,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 		</section>
 
 		<section class="stack gap-2">
-			<h2>10. Recipients, transfers and retention</h2>
+			<h2>11. Recipients, transfers and retention</h2>
 			<p>
 				We do not sell your data. It is processed only by:
 			</p>
@@ -253,6 +292,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Supabase</strong> — database, accounts and saves. Data hosted in the European Union (Ireland).</li>
 				<li><strong>Unity Technologies</strong> (and its subsidiary ironSource) — video ads (LevelPlay, Unity Ads) and purchase module. For ads, Unity also acts on its own behalf and shares data with advertisers (see <a href="#publicite">Ads</a>).</li>
 				<li><strong>Google</strong> and <strong>Apple</strong> — signing in to your account, distributing the app and paying for purchases.</li>
+				<li><strong>Hetzner Online GmbH</strong> — hosting of our usage statistics server, in Germany (see §8).</li>
 			</ul>
 			<p>
 				Supabase and Unity are American companies. This transfer is covered by the mechanisms of chapter V of
@@ -261,14 +301,15 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<p>Retention:</p>
 			<ul>
 				<li><strong>Account and save</strong>: until you delete your account.</li>
-				<li><strong>Leaderboard scores</strong> and their submission numbers: as long as the leaderboard is online. On request, we remove your name and your scores (see §12).</li>
+				<li><strong>Leaderboard scores</strong> and their submission numbers: as long as the leaderboard is online. On request, we remove your name and your scores (see §13).</li>
 				<li><strong>IP address</strong>: only in Supabase's technical logs, which it erases within a few days.</li>
+				<li><strong>Usage statistics</strong>: kept <strong>24 months</strong> on our server, then erased; its backups, 14 days.</li>
 				<li><strong>Advertising data</strong>: at Unity, under its policy.</li>
 			</ul>
 		</section>
 
 		<section class="stack gap-2" id="suppression">
-			<h2>11. Delete your account</h2>
+			<h2>12. Delete your account</h2>
 			<p>
 				In the app: <strong>Settings → "Delete my account"</strong> (the button shows once you are signed in).
 				It is immediate and final:
@@ -297,7 +338,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 		</section>
 
 		<section class="stack gap-2">
-			<h2>12. Your rights</h2>
+			<h2>13. Your rights</h2>
 			<p>
 				Under the GDPR, you have the right of access, rectification, erasure, restriction, objection and
 				portability. To use them, or to have a name removed from a leaderboard, write to
@@ -311,7 +352,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 		</section>
 
 		<section class="stack gap-2">
-			<h2>13. Children</h2>
+			<h2>14. Children</h2>
 			<p>
 				The game is not meant for children under 13 and is played without an account. If you are under 15,
 				ask your parents before answering "Yes, tailored" to videos, before a purchase and before signing in
@@ -321,7 +362,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 		</section>
 
 		<section class="stack gap-2">
-			<h2>14. Security</h2>
+			<h2>15. Security</h2>
 			<p>
 				All exchanges are encrypted (HTTPS). Saves can only be reached through our server: no direct access
 				to the database is open. The leaderboards' technical id is never published. Your session is kept in
@@ -330,7 +371,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 		</section>
 
 		<section class="stack gap-2">
-			<h2>15. Changes</h2>
+			<h2>16. Changes</h2>
 			<p>
 				We will update this page with every change of the app that touches your data, with its date at the
 				top.
