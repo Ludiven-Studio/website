@@ -3,13 +3,29 @@
 // app_saves goes with the user (on delete cascade).
 
 import type { SupabaseClient } from 'jsr:@supabase/supabase-js@2.117.0';
+import { revokeApple } from './apple.ts';
 import { dropPosters } from './posters.ts';
 
 /** Apple requires it in the apps. Open games are cancelled, not deleted, so signed-up
  *  players still learn they are off. A ban outlives the account: meetup_bans keeps only
  *  the id, which is no personal data on its own. The first steps are best effort, as they were in meetups;
- *  it throws when the follows, the claims or the user itself cannot be deleted. */
-export async function deleteAccount(db: SupabaseClient, uid: string): Promise<void> {
+ *  it throws when the follows, the claims or the user itself cannot be deleted.
+ *  An account that signed in with Apple brings a fresh code from the phone (apple.ts): Apple's grant
+ *  is revoked first, best effort too, so a failure there never keeps an account the player deleted.
+ *  Returns whether Apple's grant was revoked (null: nothing to revoke). */
+export async function deleteAccount(
+	db: SupabaseClient, uid: string, apple: { code: string; clientId: string } | null = null,
+): Promise<boolean | null> {
+	let revoked: boolean | null = null;
+	if (apple) {
+		try {
+			await revokeApple(apple.code, apple.clientId);
+			revoked = true;
+		} catch (e) {
+			console.error('apple revoke', apple.clientId, e instanceof Error ? e.message : e);
+			revoked = false;
+		}
+	}
 	const nowIso = new Date().toISOString();
 	await db.from('meetup_events').update({ status: 'cancelled', hidden: true, updated_at: nowIso })
 		.eq('organizer_id', uid).eq('status', 'open');
@@ -28,4 +44,5 @@ export async function deleteAccount(db: SupabaseClient, uid: string): Promise<vo
 	if (cErr) throw cErr;
 	const { error } = await db.auth.admin.deleteUser(uid);
 	if (error) throw error;
+	return revoked;
 }

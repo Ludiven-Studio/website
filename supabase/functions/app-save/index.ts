@@ -9,12 +9,15 @@
 //                                  from (0 = none yet); 409 { data, version } when the cloud
 //                                  moved since: the app merges and puts again. Dragon's Gems'
 //                                  copy is bounded first (boundDragonsGems).
-//   delete_account              -> { ok }  the whole studio account (_shared/account.ts)
+//   delete_account { apple_code?, apple_client? }
+//                               -> { ok, apple }  the whole studio account (_shared/account.ts); an account
+//                                  that signed in with Apple sends a fresh code to revoke Apple's grant
 //
 // Deploy:  supabase functions deploy app-save
 
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2.117.0';
 import { deleteAccount } from '../_shared/account.ts';
+import { appleOf } from '../_shared/apple.ts';
 
 const CORS = {
 	'Access-Control-Allow-Origin': '*',
@@ -123,8 +126,7 @@ Deno.serve(async (req) => {
 			}
 
 			case 'delete_account':
-				await deleteAccount(db, uid);
-				return json({ ok: true });
+				return json({ ok: true, apple: await deleteAccount(db, uid, appleOf(body)) });
 
 			default:
 				return bad(`unknown action '${action}'`);

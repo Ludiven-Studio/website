@@ -19,11 +19,13 @@
 // Deploy:  supabase functions deploy meetups
 // Secrets: MEETUPS_ADMIN_KEY (seed, guard cleanup, moderation links), MEETUPS_IP_PEPPER
 //          (quota and ban hashing), RESEND_API_KEY + MEETUPS_MOD_EMAIL (report mails;
-//          sender MEETUPS_FROM_EMAIL, else COURSES_FROM_EMAIL)
+//          sender MEETUPS_FROM_EMAIL, else COURSES_FROM_EMAIL), APPLE_KEY_ID + APPLE_PRIVATE_KEY
+//          (revoking Sign in with Apple at delete_account, _shared/apple.ts)
 
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2.117.0';
 import { ipKey, ipQuotaEnabled } from '../_shared/ipKey.ts';
 import { deleteAccount } from '../_shared/account.ts';
+import { appleOf } from '../_shared/apple.ts';
 import { dropPosters, thumbOf } from '../_shared/posters.ts';
 
 const CORS = {
@@ -1030,12 +1032,12 @@ Deno.serve(async (req) => {
 				return json({ ok: true });
 			}
 
-			// The account is the studio's: its apps' data goes too (_shared/account.ts).
+			// The account is the studio's: its apps' data goes too (_shared/account.ts). From an iPhone it
+			// brings a fresh Apple code, to revoke Apple's grant (_shared/apple.ts).
 			case 'delete_account': {
 				const uid = await whoAmI();
 				if (!uid) return bad(LOGIN, 401);
-				await deleteAccount(db, uid);
-				return json({ ok: true });
+				return json({ ok: true, apple: await deleteAccount(db, uid, appleOf(body)) });
 			}
 
 			// The page behind the report mail's link. The token is per game.

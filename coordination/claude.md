@@ -1411,3 +1411,17 @@
   build : un fichier de public/ copié tel quel
 - 12:13 : commité et poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé.
   Réservations libérées.
+
+## 2026-11-02 — Applis : révocation Sign in with Apple à la suppression du compte (session PetanqueGame)
+- Statut : en cours (2026-11-02T12:17+01:00). Demande de l'utilisateur : il y a aussi la suppression d'un compte Apple
+  qui doit être corrigée de partout
+- Réservations actives : `supabase/functions/_shared/apple.ts` (nouveau), `supabase/functions/_shared/account.ts`,
+  `supabase/functions/app-save/index.ts`, `supabase/functions/meetups/index.ts` (action delete_account seulement),
+  `supabase/functions/apple-revoke/` (nouveau).
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 12:18 : _shared/apple.ts (secret client ES256, échange du code, révocation), delete_account d'app-save et de meetups
+  révoque d'abord si l'appli envoie apple_code/apple_client (au mieux : un échec n'empêche jamais la suppression),
+  nouvelle fonction apple-revoke pour Pétanque Game ; deno check OK sur les 4 fichiers ; signature vérifiée avec une
+  clé de test
+- 12:18 : commité, poussé et fonctions déployées à la demande de l'utilisateur : mes 5 fichiers et cette section
+  seulement. Statut : terminé. Réservations libérées.
