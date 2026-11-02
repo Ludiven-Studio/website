@@ -5,6 +5,7 @@ img: /assets/dragons-gems/feature-fr.webp
 img_alt: Dragon Gems Swipe — Bijou, le bébé dragon, sur son tas d'or, devant un plateau de gemmes
 role: Développeur
 org: Ludiven Studio
+playStore: https://play.google.com/store/apps/details?id=com.ludivenstudio.dragonsgems&hl=fr
 appPage: /dragons-gems/
 appPageLabel: Découvrir l'appli
 webApp: /jeux/eclats/

@@ -12,7 +12,7 @@ export const ANDROID_ID = 'com.ludivenstudio.petanquegame';
  * Google Play: `https://play.google.com/store/apps/details?id=${ANDROID_ID}`.
  * App Store: `https://apps.apple.com/app/id<number>`, with no country code (Apple picks the visitor's store).
  */
-export const STORES: { play?: string; apple?: string } = {};
+export const STORES: { play?: string; apple?: string } = { play: `https://play.google.com/store/apps/details?id=${ANDROID_ID}` };
 
 const play = (lang: LandingLang): string | undefined => STORES.play && `${STORES.play}&hl=${lang}`;
 
@@ -115,12 +115,12 @@ const copy: Record<LandingLang, AppCopy> = {
 	fr: typoFr<AppCopy>({
 		title: 'Pétanque Game — le jeu de boules en 3D sur ton téléphone',
 		description:
-			"Pétanque en 3D sur Android et iPhone : contre l'ordinateur, à deux sur un téléphone ou en ligne, en tête-à-tête, doublette ou triplette. Ligues, défis du jour, 14 boules, quatre décors. Bientôt sur Google Play et l'App Store.",
+			"Pétanque en 3D sur Android et iPhone : contre l'ordinateur, à deux sur un téléphone ou en ligne, en tête-à-tête, doublette ou triplette. Ligues, défis du jour, 14 boules, quatre décors. Sur Google Play, et bientôt sur l'App Store.",
 		tagline:
 			"Une partie sur la place du village, à l'ombre des platanes. Les boules roulent, rebondissent et se choquent comme pour de vrai, le terrain a ses pentes et ses cailloux, et la partie se joue en 13 points, selon les règles de la pétanque. Le jeu est fait pour ceux qui jouent pour de vrai : on pointe, on tire, on lit le terrain avant de lancer.",
 		heroAlt: "Deux boules et un bouchon sur le gravier d'une place de village au soleil couchant, sous le titre Pétanque Game",
 		badges: { play: play('fr'), playAlt: 'Disponible sur Google Play', apple: STORES.apple, appleAlt: "Télécharger dans l'App Store" },
-		soon: "Bientôt sur Google Play et l'App Store",
+		soon: "Bientôt sur l'App Store",
 		soonShort: 'Bientôt',
 		stepsTitle: 'Comment on lance',
 		steps: [
@@ -208,8 +208,8 @@ const copy: Record<LandingLang, AppCopy> = {
 		faqTitle: 'Questions fréquentes',
 		faq: [
 			{
-				q: 'Quand sort le jeu ?',
-				a: "Bientôt, sur Google Play et l'App Store. En attendant, la pétanque se joue déjà dans ton navigateur, sur ce site.",
+				q: 'Où télécharger le jeu ?',
+				a: "Sur Google Play pour Android, dès maintenant ; sur l'App Store pour iPhone et iPad, bientôt. La pétanque se joue aussi dans ton navigateur, sur ce site.",
 			},
 			{
 				q: 'Faut-il internet ?',
@@ -241,17 +241,17 @@ const copy: Record<LandingLang, AppCopy> = {
 		support: 'Une question, une idée ? Écris-nous :',
 		privacy: { label: 'politique de confidentialité', href: '/petanque-game/confidentialite/' },
 		terms: { label: "conditions d'utilisation", href: '/petanque-game/cgu/' },
-		closing: 'Bientôt sur Android et iPhone',
+		closing: 'Sur Android, et bientôt sur iPhone',
 	}),
 	en: {
 		title: 'Pétanque Game — French boules in 3D on your phone',
 		description:
-			'Pétanque in 3D for Android and iPhone: against the computer, two on one phone or online, in singles, doubles or triples. Leagues, daily challenges, 14 boules, four settings. Coming soon to Google Play and the App Store.',
+			'Pétanque in 3D for Android and iPhone: against the computer, two on one phone or online, in singles, doubles or triples. Leagues, daily challenges, 14 boules, four settings. Out now on Google Play, coming soon to the App Store.',
 		tagline:
 			'A match on the village square, in the shade of the plane trees. The boules roll, bounce and knock each other away as they do for real, the ground has its slopes and its stones, and the match is played to 13 points, by the rules of pétanque. The game is made for people who play for real: you point, you shoot, you read the ground before you throw.',
 		heroAlt: 'Two boules and a jack on the gravel of a village square at sunset, under the title Pétanque Game',
 		badges: { play: play('en'), playAlt: 'Get it on Google Play', apple: STORES.apple, appleAlt: 'Download on the App Store' },
-		soon: 'Coming soon to Google Play and the App Store',
+		soon: 'Coming soon to the App Store',
 		soonShort: 'Coming soon',
 		stepsTitle: 'How you throw',
 		steps: [
@@ -339,8 +339,8 @@ const copy: Record<LandingLang, AppCopy> = {
 		faqTitle: 'Questions',
 		faq: [
 			{
-				q: 'When does the game come out?',
-				a: 'Soon, on Google Play and the App Store. Until then, pétanque already plays in your browser, on this website.',
+				q: 'Where do I get the game?',
+				a: 'On Google Play for Android, right now; on the App Store for iPhone and iPad, soon. Pétanque also plays in your browser, on this website.',
 			},
 			{
 				q: 'Do I need internet?',
@@ -372,17 +372,17 @@ const copy: Record<LandingLang, AppCopy> = {
 		support: 'A question, an idea? Write to us:',
 		privacy: { label: 'privacy policy', href: '/en/petanque-game/confidentialite/' },
 		terms: { label: 'terms of use', href: '/en/petanque-game/cgu/' },
-		closing: 'Coming soon to Android and iPhone',
+		closing: 'Out now on Android, coming soon to iPhone',
 	},
 	es: {
 		title: 'Pétanque Game — la petanca en 3D en tu móvil',
 		description:
-			'Petanca en 3D para Android y iPhone: contra la máquina, entre dos en un teléfono o en línea, individual, dupletas o tripletas. Ligas, desafíos diarios, 14 bolas, cuatro escenarios. Próximamente en Google Play y el App Store.',
+			'Petanca en 3D para Android y iPhone: contra la máquina, entre dos en un teléfono o en línea, individual, dupletas o tripletas. Ligas, desafíos diarios, 14 bolas, cuatro escenarios. Ya en Google Play, y muy pronto en el App Store.',
 		tagline:
 			'Una partida en la plaza del pueblo, a la sombra de los plátanos. Las bolas ruedan, rebotan y se golpean como de verdad, el terreno tiene sus pendientes y sus piedras, y la partida se juega a 13 puntos, con las reglas de la petanca. El juego está hecho para quienes juegan de verdad: se arrima, se tira, se lee el terreno antes de lanzar.',
 		heroAlt: 'Dos bolas y un boliche sobre la grava de una plaza de pueblo al atardecer, bajo el título Pétanque Game',
 		badges: { play: play('es'), playAlt: 'Disponible en Google Play', apple: STORES.apple, appleAlt: 'Consíguelo en el App Store' },
-		soon: 'Próximamente en Google Play y el App Store',
+		soon: 'Próximamente en el App Store',
 		soonShort: 'Próximamente',
 		stepsTitle: 'Cómo se lanza',
 		steps: [
@@ -470,8 +470,8 @@ const copy: Record<LandingLang, AppCopy> = {
 		faqTitle: 'Preguntas frecuentes',
 		faq: [
 			{
-				q: '¿Cuándo sale el juego?',
-				a: 'Muy pronto, en Google Play y el App Store. Mientras tanto, la petanca ya se juega en tu navegador, en esta web.',
+				q: '¿Dónde descargo el juego?',
+				a: 'En Google Play para Android, ya disponible; en el App Store para iPhone y iPad, muy pronto. La petanca también se juega en tu navegador, en esta web.',
 			},
 			{
 				q: '¿Hace falta internet?',
@@ -503,17 +503,17 @@ const copy: Record<LandingLang, AppCopy> = {
 		support: '¿Una pregunta, una idea? Escríbenos:',
 		privacy: { label: 'política de privacidad', href: '/es/petanque-game/confidentialite/' },
 		terms: { label: 'condiciones de uso', href: '/es/petanque-game/cgu/' },
-		closing: 'Próximamente en Android y iPhone',
+		closing: 'Ya en Android, y muy pronto en iPhone',
 	},
 	de: {
 		title: 'Pétanque Game — Boule in 3D auf deinem Handy',
 		description:
-			'Boule in 3D für Android und iPhone: gegen den Computer, zu zweit auf einem Handy oder online, im Tête-à-tête, in der Doublette oder Triplette. Ligen, tägliche Aufgaben, 14 Kugeln, vier Spielorte. Demnächst bei Google Play und im App Store.',
+			'Boule in 3D für Android und iPhone: gegen den Computer, zu zweit auf einem Handy oder online, im Tête-à-tête, in der Doublette oder Triplette. Ligen, tägliche Aufgaben, 14 Kugeln, vier Spielorte. Jetzt bei Google Play, bald im App Store.',
 		tagline:
 			'Eine Partie auf dem Dorfplatz, im Schatten der Platanen. Die Kugeln rollen, springen und treffen sich wie in echt, der Platz hat seine Neigungen und Steine, und gespielt wird bis 13 Punkte, nach den Regeln der Pétanque. Das Spiel ist für alle gemacht, die selbst spielen: Du legst, du schießt, du liest den Boden, bevor du wirfst.',
 		heroAlt: 'Zwei Kugeln und eine Zielkugel auf dem Kies eines Dorfplatzes bei Sonnenuntergang, unter dem Titel Pétanque Game',
 		badges: { play: play('de'), playAlt: 'Jetzt bei Google Play', apple: STORES.apple, appleAlt: 'Download on the App Store' },
-		soon: 'Demnächst bei Google Play und im App Store',
+		soon: 'Demnächst im App Store',
 		soonShort: 'Demnächst',
 		stepsTitle: 'So wirfst du',
 		steps: [
@@ -601,8 +601,8 @@ const copy: Record<LandingLang, AppCopy> = {
 		faqTitle: 'Häufige Fragen',
 		faq: [
 			{
-				q: 'Wann erscheint das Spiel?',
-				a: 'Bald, bei Google Play und im App Store. Bis dahin lässt sich Pétanque schon im Browser spielen, auf dieser Website.',
+				q: 'Wo bekomme ich das Spiel?',
+				a: 'Bei Google Play für Android, ab sofort; im App Store für iPhone und iPad, bald. Pétanque lässt sich auch im Browser spielen, auf dieser Website.',
 			},
 			{
 				q: 'Brauche ich Internet?',
@@ -634,17 +634,17 @@ const copy: Record<LandingLang, AppCopy> = {
 		support: 'Eine Frage, eine Idee? Schreib uns:',
 		privacy: { label: 'Datenschutzerklärung', href: '/de/petanque-game/confidentialite/' },
 		terms: { label: 'Nutzungsbedingungen', href: '/de/petanque-game/cgu/' },
-		closing: 'Demnächst für Android und iPhone',
+		closing: 'Jetzt für Android, bald für iPhone',
 	},
 	it: {
 		title: 'Pétanque Game — le bocce in 3D sul tuo telefono',
 		description:
-			"Pétanque in 3D per Android e iPhone: contro il computer, in due su un telefono o online, individuale, coppie o terne. Leghe, sfide del giorno, 14 bocce, quattro ambientazioni. Presto su Google Play e sull'App Store.",
+			"Pétanque in 3D per Android e iPhone: contro il computer, in due su un telefono o online, individuale, coppie o terne. Leghe, sfide del giorno, 14 bocce, quattro ambientazioni. Ora su Google Play, presto sull'App Store.",
 		tagline:
 			"Una partita nella piazza del paese, all'ombra dei platani. Le bocce rotolano, rimbalzano e si colpiscono come dal vero, il campo ha le sue pendenze e i suoi sassi, e la partita si gioca a 13 punti, con le regole della pétanque. Il gioco è fatto per chi gioca davvero: si accosta, si boccia, si legge il terreno prima di lanciare.",
 		heroAlt: 'Due bocce e un pallino sulla ghiaia di una piazza di paese al tramonto, sotto il titolo Pétanque Game',
 		badges: { play: play('it'), playAlt: 'Disponibile su Google Play', apple: STORES.apple, appleAlt: 'Download on the App Store' },
-		soon: "Presto su Google Play e sull'App Store",
+		soon: "Presto sull'App Store",
 		soonShort: 'Presto',
 		stepsTitle: 'Come si lancia',
 		steps: [
@@ -732,8 +732,8 @@ const copy: Record<LandingLang, AppCopy> = {
 		faqTitle: 'Domande frequenti',
 		faq: [
 			{
-				q: 'Quando esce il gioco?',
-				a: "Presto, su Google Play e sull'App Store. Nel frattempo, la pétanque si gioca già nel browser, su questo sito.",
+				q: 'Dove si scarica il gioco?',
+				a: "Su Google Play per Android, da subito; sull'App Store per iPhone e iPad, presto. La pétanque si gioca anche nel browser, su questo sito.",
 			},
 			{
 				q: 'Serve internet?',
@@ -765,7 +765,7 @@ const copy: Record<LandingLang, AppCopy> = {
 		support: "Una domanda, un'idea? Scrivici:",
 		privacy: { label: 'informativa sulla privacy', href: '/it/petanque-game/confidentialite/' },
 		terms: { label: "condizioni d'uso", href: '/it/petanque-game/cgu/' },
-		closing: 'Presto su Android e iPhone',
+		closing: 'Ora su Android, presto su iPhone',
 	},
 };
 

@@ -5,6 +5,7 @@ img: /assets/petanque-game/feature-en.webp
 img_alt: Pétanque Game — two boules and a jack on the gravel of a village square at sunset
 role: Developer
 org: Ludiven Studio
+playStore: https://play.google.com/store/apps/details?id=com.ludivenstudio.petanquegame&hl=en
 appPage: /en/petanque-game/
 appPageLabel: Discover the game
 webApp: /jeux/petanque/

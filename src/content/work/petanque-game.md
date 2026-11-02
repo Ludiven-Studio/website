@@ -5,6 +5,7 @@ img: /assets/petanque-game/feature-fr.webp
 img_alt: Pétanque Game — deux boules et un bouchon sur le gravier d'une place de village au soleil couchant
 role: Développeur
 org: Ludiven Studio
+playStore: https://play.google.com/store/apps/details?id=com.ludivenstudio.petanquegame&hl=fr
 appPage: /petanque-game/
 appPageLabel: Découvrir le jeu
 webApp: /jeux/petanque/

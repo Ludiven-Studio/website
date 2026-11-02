@@ -8,7 +8,7 @@ export const APP_NAME = "Dragon Gems Swipe";
 export const ANDROID_ID = 'com.ludivenstudio.dragonsgems';
 
 /** The store listings, once the game is on them: the badges link there instead of « coming soon ». */
-export const STORES: { play?: string; apple?: string } = {};
+export const STORES: { play?: string; apple?: string } = { play: `https://play.google.com/store/apps/details?id=${ANDROID_ID}` };
 
 export const LANDING_PATHS: Record<Lang, string> = {
 	fr: '/dragons-gems/',
@@ -67,6 +67,7 @@ export interface Copy {
 	faq: { q: string; a: string }[];
 	soon: string;
 	soonShort: string;
+	closing: string;
 	playWeb: string;
 	playWebNote: string;
 	testApk: string;
@@ -84,7 +85,7 @@ export interface Copy {
 export const copy: Record<Lang, Copy> = {
 	fr: {
 		title: "Dragon Gems Swipe — le puzzle de gemmes du bébé dragon",
-		description: "Glisse le plateau, fais exploser les gemmes et remplis le trésor de Bijou, le bébé dragon : 500 niveaux, un défi du jour, un mode infini. Bientôt sur iPhone, iPad et Android.",
+		description: "Glisse le plateau, fais exploser les gemmes et remplis le trésor de Bijou, le bébé dragon : 500 niveaux, un défi du jour, un mode infini. Sur Android, et bientôt sur iPhone et iPad.",
 		kicker: 'Jeu mobile · iPhone, iPad et Android',
 		tagline: 'Puzzle de gemmes à glisser',
 		intro: 'Aide Bijou, un bébé dragon né sans trésor, à traverser cinq mondes : 250 niveaux à glisser, un défi du jour pour tout le monde et un mode infini.',
@@ -115,14 +116,15 @@ export const copy: Record<Lang, Copy> = {
 		],
 		faqTitle: 'Questions',
 		faq: [
-			{ q: 'Quand sort le jeu ?', a: "Bientôt sur l'App Store et Google Play. En attendant, la version web se joue tout de suite dans le navigateur, et les testeurs Android ont une version de test." },
+			{ q: 'Où télécharger le jeu ?', a: "Sur Google Play pour Android, dès maintenant. Sur l'App Store pour iPhone et iPad, bientôt. Et la version web se joue tout de suite dans le navigateur." },
 			{ q: 'Faut-il une connexion ?', a: 'Non pour les niveaux, qui se jouent hors ligne. Le défi du jour et les classements en demandent une.' },
 			{ q: 'Comment garder ma progression ?', a: 'Elle est gardée sur ton téléphone. Connecte-toi avec Google ou Apple, si tu veux, pour la retrouver sur tous tes appareils ; tu peux supprimer ton compte quand tu veux depuis les Réglages.' },
 			{ q: 'Sur quels appareils, dans quelles langues ?', a: 'iPhone, iPad (en plein écran) et Android, en français, anglais, espagnol, allemand et italien.' },
 			{ q: 'Et sur ordinateur ?', a: 'Le jeu existe aussi sur ludiven-studio.fr : 100 niveaux, le mode libre et le même défi du jour, avec le même classement que l’appli.' },
 		],
-		soon: "Bientôt sur l'App Store et Google Play",
+		soon: "Bientôt sur l'App Store",
 		soonShort: 'Bientôt',
+		closing: 'Disponible sur Google Play',
 		playWeb: 'Jouer dans le navigateur',
 		playWebNote: 'La version web, tout de suite : 100 niveaux et le défi du jour.',
 		testApk: 'Version de test Android',
@@ -136,16 +138,16 @@ export const copy: Record<Lang, Copy> = {
 		privacy: 'Politique de confidentialité',
 		dl: {
 			title: "Télécharger Dragon Gems Swipe",
-			kicker: 'Bientôt sur les stores',
+			kicker: 'Disponible sur Google Play',
 			lead: 'Glisse le plateau, fais exploser les gemmes et remplis le trésor du bébé dragon.',
-			waiting: "Le jeu arrive bientôt sur l'App Store et Google Play. En attendant :",
+			waiting: 'Autres façons de jouer :',
 			screensTitle: "L'appli en images",
 			back: "Tout sur l'appli",
 		},
 	},
 	en: {
 		title: "Dragon Gems Swipe — the baby dragon's gem puzzle",
-		description: "Slide the board, blast the gems and fill the treasure of Bijou, the baby dragon: 500 levels, a daily challenge, an endless mode. Coming soon to iPhone, iPad and Android.",
+		description: "Slide the board, blast the gems and fill the treasure of Bijou, the baby dragon: 500 levels, a daily challenge, an endless mode. Out now on Android, coming soon to iPhone and iPad.",
 		kicker: 'Mobile game · iPhone, iPad and Android',
 		tagline: 'Gem puzzle: slide and blast',
 		intro: 'Help Bijou, a baby dragon born without a treasure, cross five lands: 250 levels to slide, a daily challenge shared by everyone and an endless mode.',
@@ -176,14 +178,15 @@ export const copy: Record<Lang, Copy> = {
 		],
 		faqTitle: 'Questions',
 		faq: [
-			{ q: 'When does it come out?', a: 'Soon on the App Store and Google Play. Until then, the web version plays right away in your browser, and Android testers have a test build.' },
+			{ q: 'Where do I get it?', a: 'On Google Play for Android, right now. On the App Store for iPhone and iPad, soon. And the web version plays right away in your browser.' },
 			{ q: 'Do I need a connection?', a: 'Not for the levels, which play offline. The daily challenge and the leaderboards need one.' },
 			{ q: 'How do I keep my progress?', a: 'It is kept on your phone. Sign in with Google or Apple, if you like, to find it on all your devices; you can delete your account whenever you want from Settings.' },
 			{ q: 'Which devices, which languages?', a: 'iPhone, iPad (full screen) and Android, in English, French, Spanish, German and Italian.' },
 			{ q: 'And on a computer?', a: 'The game also plays on ludiven-studio.fr: 100 levels, free play and the same daily challenge, with the same leaderboard as the app.' },
 		],
-		soon: 'Coming soon to the App Store and Google Play',
+		soon: 'Coming soon to the App Store',
 		soonShort: 'Coming soon',
+		closing: 'Out now on Google Play',
 		playWeb: 'Play in your browser',
 		playWebNote: 'The web version, right now: 100 levels and the daily challenge.',
 		testApk: 'Android test build',
@@ -197,16 +200,16 @@ export const copy: Record<Lang, Copy> = {
 		privacy: 'Privacy policy',
 		dl: {
 			title: "Download Dragon Gems Swipe",
-			kicker: 'Coming soon to the stores',
+			kicker: 'Out now on Google Play',
 			lead: "Slide the board, blast the gems and fill the baby dragon's treasure.",
-			waiting: 'The game is coming soon to the App Store and Google Play. Until then:',
+			waiting: 'Other ways to play:',
 			screensTitle: 'The app in pictures',
 			back: 'All about the app',
 		},
 	},
 	es: {
 		title: "Dragon Gems Swipe — el puzle de gemas del dragón bebé",
-		description: 'Desliza el tablero, haz explotar las gemas y llena el tesoro de Bijou, el dragón bebé: 500 niveles, un reto del día y un modo infinito. Muy pronto en iPhone, iPad y Android.',
+		description: 'Desliza el tablero, haz explotar las gemas y llena el tesoro de Bijou, el dragón bebé: 500 niveles, un reto del día y un modo infinito. Ya en Android, y muy pronto en iPhone y iPad.',
 		kicker: 'Juego para móvil · iPhone, iPad y Android',
 		tagline: 'Puzle de gemas para deslizar',
 		intro: 'Ayuda a Bijou, un dragón bebé nacido sin tesoro, a cruzar cinco mundos: 250 niveles para deslizar, un reto del día para todos y un modo infinito.',
@@ -237,14 +240,15 @@ export const copy: Record<Lang, Copy> = {
 		],
 		faqTitle: 'Preguntas',
 		faq: [
-			{ q: '¿Cuándo sale el juego?', a: 'Muy pronto en el App Store y Google Play. Mientras tanto, la versión web se juega ya en el navegador, y los testers de Android tienen una versión de prueba.' },
+			{ q: '¿Dónde descargo el juego?', a: 'En Google Play para Android, ya disponible. En el App Store para iPhone y iPad, muy pronto. Y la versión web se juega ya en el navegador.' },
 			{ q: '¿Hace falta conexión?', a: 'No para los niveles, que se juegan sin conexión. El reto del día y las clasificaciones la necesitan.' },
 			{ q: '¿Cómo guardo mi progreso?', a: 'Se guarda en tu teléfono. Inicia sesión con Google o Apple, si quieres, para recuperarlo en todos tus dispositivos; puedes eliminar tu cuenta cuando quieras desde Ajustes.' },
 			{ q: '¿En qué dispositivos y en qué idiomas?', a: 'iPhone, iPad (a pantalla completa) y Android, en español, francés, inglés, alemán e italiano.' },
 			{ q: '¿Y en el ordenador?', a: 'El juego también está en ludiven-studio.fr: 100 niveles, el modo libre y el mismo reto del día, con la misma clasificación que la app.' },
 		],
-		soon: 'Muy pronto en el App Store y Google Play',
+		soon: 'Muy pronto en el App Store',
 		soonShort: 'Próximamente',
+		closing: 'Ya disponible en Google Play',
 		playWeb: 'Jugar en el navegador',
 		playWebNote: 'La versión web, ahora mismo: 100 niveles y el reto del día.',
 		testApk: 'Versión de prueba para Android',
@@ -258,16 +262,16 @@ export const copy: Record<Lang, Copy> = {
 		privacy: 'Política de privacidad (en inglés)',
 		dl: {
 			title: "Descargar Dragon Gems Swipe",
-			kicker: 'Muy pronto en las tiendas',
+			kicker: 'Ya disponible en Google Play',
 			lead: 'Desliza el tablero, haz explotar las gemas y llena el tesoro del dragón bebé.',
-			waiting: 'El juego llega muy pronto al App Store y a Google Play. Mientras tanto:',
+			waiting: 'Otras formas de jugar:',
 			screensTitle: 'La app en imágenes',
 			back: 'Todo sobre la app',
 		},
 	},
 	de: {
 		title: "Dragon Gems Swipe — das Edelstein-Puzzle des Babydrachen",
-		description: 'Wisch das Spielfeld, spreng die Edelsteine und füll den Schatz von Bijou, dem Babydrachen: 500 Level, eine Tagesaufgabe und ein Endlosmodus. Bald für iPhone, iPad und Android.',
+		description: 'Wisch das Spielfeld, spreng die Edelsteine und füll den Schatz von Bijou, dem Babydrachen: 500 Level, eine Tagesaufgabe und ein Endlosmodus. Jetzt für Android, bald für iPhone und iPad.',
 		kicker: 'Handyspiel · iPhone, iPad und Android',
 		tagline: 'Puzzle: Edelsteine wischen',
 		intro: 'Hilf Bijou, einem Babydrachen, der ohne Schatz geschlüpft ist, fünf Welten zu durchqueren: 250 Level zum Wischen, eine Tagesaufgabe für alle und ein Endlosmodus.',
@@ -298,14 +302,15 @@ export const copy: Record<Lang, Copy> = {
 		],
 		faqTitle: 'Fragen',
 		faq: [
-			{ q: 'Wann erscheint das Spiel?', a: 'Bald im App Store und bei Google Play. Bis dahin läuft die Webversion sofort im Browser, und Android-Tester haben eine Testversion.' },
+			{ q: 'Wo bekomme ich das Spiel?', a: 'Bei Google Play für Android, ab sofort. Im App Store für iPhone und iPad, bald. Und die Webversion läuft sofort im Browser.' },
 			{ q: 'Brauche ich eine Internetverbindung?', a: 'Nicht für die Level, die offline laufen. Die Tagesaufgabe und die Ranglisten brauchen eine.' },
 			{ q: 'Wie behalte ich meinen Fortschritt?', a: 'Er wird auf deinem Handy gespeichert. Melde dich mit Google oder Apple an, wenn du willst, um ihn auf all deinen Geräten wiederzufinden; dein Konto kannst du jederzeit in den Einstellungen löschen.' },
 			{ q: 'Welche Geräte, welche Sprachen?', a: 'iPhone, iPad (im Vollbild) und Android, auf Deutsch, Französisch, Englisch, Spanisch und Italienisch.' },
 			{ q: 'Und am Computer?', a: 'Das Spiel gibt es auch auf ludiven-studio.fr: 100 Level, freies Spiel und dieselbe Tagesaufgabe, mit derselben Rangliste wie die App.' },
 		],
-		soon: 'Bald im App Store und bei Google Play',
+		soon: 'Bald im App Store',
 		soonShort: 'Demnächst',
+		closing: 'Jetzt bei Google Play',
 		playWeb: 'Im Browser spielen',
 		playWebNote: 'Die Webversion, sofort: 100 Level und die Tagesaufgabe.',
 		testApk: 'Android-Testversion',
@@ -319,16 +324,16 @@ export const copy: Record<Lang, Copy> = {
 		privacy: 'Datenschutzerklärung (auf Englisch)',
 		dl: {
 			title: "Dragon Gems Swipe herunterladen",
-			kicker: 'Bald in den Stores',
+			kicker: 'Jetzt bei Google Play',
 			lead: 'Wisch das Spielfeld, spreng die Edelsteine und füll den Schatz des Babydrachen.',
-			waiting: 'Das Spiel kommt bald in den App Store und zu Google Play. Bis dahin:',
+			waiting: 'Weitere Möglichkeiten zu spielen:',
 			screensTitle: 'Die App in Bildern',
 			back: 'Alles über die App',
 		},
 	},
 	it: {
 		title: "Dragon Gems Swipe — il puzzle di gemme del cucciolo di drago",
-		description: 'Fai scorrere il tabellone, fai esplodere le gemme e riempi il tesoro di Bijou, il cucciolo di drago: 500 livelli, una sfida del giorno e una modalità infinita. Presto su iPhone, iPad e Android.',
+		description: 'Fai scorrere il tabellone, fai esplodere le gemme e riempi il tesoro di Bijou, il cucciolo di drago: 500 livelli, una sfida del giorno e una modalità infinita. Ora su Android, presto su iPhone e iPad.',
 		kicker: 'Gioco per cellulare · iPhone, iPad e Android',
 		tagline: 'Puzzle di gemme da scorrere',
 		intro: 'Aiuta Bijou, un cucciolo di drago nato senza tesoro, ad attraversare cinque mondi: 250 livelli da scorrere, una sfida del giorno per tutti e una modalità infinita.',
@@ -359,14 +364,15 @@ export const copy: Record<Lang, Copy> = {
 		],
 		faqTitle: 'Domande',
 		faq: [
-			{ q: 'Quando esce il gioco?', a: 'Presto su App Store e Google Play. Nel frattempo, la versione web si gioca subito nel browser, e i tester Android hanno una versione di prova.' },
+			{ q: 'Dove si scarica il gioco?', a: 'Su Google Play per Android, da subito. Su App Store per iPhone e iPad, presto. E la versione web si gioca subito nel browser.' },
 			{ q: 'Serve una connessione?', a: 'Non per i livelli, che si giocano offline. La sfida del giorno e le classifiche ne richiedono una.' },
 			{ q: 'Come conservo i miei progressi?', a: 'Sono salvati sul tuo telefono. Accedi con Google o Apple, se vuoi, per ritrovarli su tutti i tuoi dispositivi; puoi eliminare il tuo account quando vuoi dalle Impostazioni.' },
 			{ q: 'Su quali dispositivi, in quali lingue?', a: 'iPhone, iPad (a schermo intero) e Android, in italiano, francese, inglese, spagnolo e tedesco.' },
 			{ q: 'E sul computer?', a: 'Il gioco è anche su ludiven-studio.fr: 100 livelli, la modalità libera e la stessa sfida del giorno, con la stessa classifica dell’app.' },
 		],
-		soon: 'Presto su App Store e Google Play',
+		soon: 'Presto su App Store',
 		soonShort: 'Prossimamente',
+		closing: 'Disponibile su Google Play',
 		playWeb: 'Gioca nel browser',
 		playWebNote: 'La versione web, subito: 100 livelli e la sfida del giorno.',
 		testApk: 'Versione di prova per Android',
@@ -380,9 +386,9 @@ export const copy: Record<Lang, Copy> = {
 		privacy: 'Informativa sulla privacy (in inglese)',
 		dl: {
 			title: "Scarica Dragon Gems Swipe",
-			kicker: 'Presto negli store',
+			kicker: 'Disponibile su Google Play',
 			lead: 'Fai scorrere il tabellone, fai esplodere le gemme e riempi il tesoro del cucciolo di drago.',
-			waiting: 'Il gioco arriva presto su App Store e Google Play. Nel frattempo:',
+			waiting: 'Altri modi per giocare:',
 			screensTitle: "L'app in immagini",
 			back: "Tutto sull'app",
 		},
