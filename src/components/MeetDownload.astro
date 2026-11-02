@@ -4,6 +4,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import Icon from './Icon.astro';
 import LangSwitch from './LangSwitch.astro';
 import StoreBadges from './StoreBadges.astro';
+import ShareButton from './ShareButton.astro';
 import { MEET_DOWNLOAD, MEET_STORES } from '../data/petanqueMeet';
 
 type Lang = keyof typeof MEET_DOWNLOAD;
@@ -37,6 +38,7 @@ const first = t.screens[0];
 					<p class="lead">{t.lead}</p>
 					<StoreBadges playStore={stores.play} appStore={stores.apple} lang={lang} />
 					<p class="free">{t.free}</p>
+					<ShareButton id="meet" title="Pétanque Meet" kind="app" lang={lang} />
 				</div>
 
 				<figure class="showcase" data-showcase>
@@ -347,6 +349,20 @@ const first = t.screens[0];
 		font-size: var(--text-sm);
 		font-weight: 700;
 		color: var(--clay-dark);
+	}
+
+	/* The hero is light in both themes, so the button takes its colours, not the site's. */
+	.hero-copy :global(.share-btn) {
+		margin-top: 1rem;
+		color: #4a4f63;
+		border-color: rgb(30 34 51 / 0.3);
+	}
+
+	.hero-copy :global(.share-btn:hover),
+	.hero-copy :global(.share-btn:focus-visible),
+	.hero-copy :global(.share-btn.done) {
+		color: var(--clay-dark);
+		border-color: var(--clay-dark);
 	}
 
 	.showcase {

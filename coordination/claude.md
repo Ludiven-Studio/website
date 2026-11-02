@@ -1467,3 +1467,29 @@
 - 20:10 : commité et poussé à la demande de l'utilisateur (« ok pousse ») : mes 24 fichiers (pour les 7 pages de
   confidentialité partagées avec la section Umami, le renommage seulement), les 15 images et cette section seulement.
   Statut : terminé. Réservations libérées.
+
+## 2026-11-02 — Jeux : bouton « Partager le jeu » (session website)
+- Statut : en cours (2026-11-02T11:46+01:00). Demande de l'utilisateur : dans les pages des jeux ce serait bien d'avoir
+  un bouton pour "partager le jeu" qui copie la page en cours
+- Réservations actives : `src/layouts/GamePage.astro`, `src/components/GameShare.astro` (nouveau),
+  `src/components/GameFullscreen.astro`.
+- Ressources : serveur de dev sur le port 4503 ; eslint, `astro check`. Build annoncé ici avant.
+- 11:51 : bouton « Partager le jeu » à côté de « Plein écran » sur toutes les pages de jeu (GameShare.astro) : lien
+  canonique copié sur ordinateur, feuille de partage sur téléphone ; essai Playwright OK (presse-papier, feuille,
+  annulation, langue, plein écran) ; eslint OK, astro check 0 erreur, captures clair, sombre et téléphone vues
+- 11:51 : Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 11:53 : build complet OK : astro check 0 erreur, 192 pages, précache 362 entrées, liens OK ; essai rejoué sur le
+  build (preview) OK. Rien de commité : en attente de l'accord de l'utilisateur pour pousser.
+- 12:01 : l'utilisateur précise : « je parlais surtout pour les vrais jeux mobiles et applications mobiles ». Réservé
+  aussi : `src/components/ShareButton.astro` (GameShare.astro renommé, pas encore commité),
+  `src/components/DragonsGemsLanding.astro`, `src/components/DragonsGemsDownload.astro`,
+  `src/components/PetanqueLanding.astro`, `src/components/ScannerDownload.astro`, `src/components/MeetDownload.astro`.
+- 12:06 : bouton commun ShareButton.astro (5 langues, « jeu » ou « appli ») ajouté aux pages des applis : Dragon Gems
+  Swipe (présentation et téléchargement), Pétanque Game et Pétanque Scanner (présentation et téléchargement), Pétanque
+  Meet (téléchargement) ; couleurs du panneau sur les pages de téléchargement dont le héros garde son thème ; essai
+  Playwright OK sur 9 pages d'applis et une page de jeu ; eslint OK
+- 12:06 : Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 12:08 : build complet OK : astro check 0 erreur, 192 pages, précache 362 entrées, liens OK ; essai rejoué sur le
+  build (preview). Rien de commité : en attente de l'accord de l'utilisateur pour pousser.
+- 20:10 : commité et poussé à la demande de l'utilisateur (« ok pousse ») : mes 8 fichiers et cette section seulement.
+  Statut : terminé. Réservations libérées.

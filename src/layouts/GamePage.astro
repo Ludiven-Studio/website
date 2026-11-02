@@ -2,6 +2,7 @@
 import BaseLayout from './BaseLayout.astro';
 import Icon from '../components/Icon.astro';
 import GameTutorial from '../components/GameTutorial.astro';
+import ShareButton from '../components/ShareButton.astro';
 import CocoinBar from '../components/CocoinBar';
 import CocoinToast from '../components/CocoinToast';
 import DefiChallenge from '../components/DefiChallenge';
@@ -99,6 +100,10 @@ const hasDaily = gameId in DAILY_LB;
 			</a>
 			<h1>{heading}</h1>
 			{hasDaily && <DefiChallenge client:load gameId={gameId} />}
+			{/* GameFullscreen puts its button first in this row. */}
+			<div class="game-actions">
+				<ShareButton id={gameId} title={heading} />
+			</div>
 		</header>
 
 		<slot />
@@ -184,10 +189,20 @@ const hasDaily = gameId in DAILY_LB;
 		width: 100%;
 		text-align: center;
 	}
-	/* The challenge banner and the injected fullscreen button take their own line. */
+	/* The challenge banner and the buttons (fullscreen, share) take their own line. */
 	.game-head :global(.dc-banner),
-	.game-head :global(.gf-btn) {
+	.game-actions {
 		flex-basis: 100%;
+	}
+	.game-actions {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 0.5rem;
+	}
+	/* The fullscreen button has the same. */
+	.game-actions :global(.share-btn) {
+		margin-top: 0.25rem;
 	}
 	/* Hidden until the watchdog says otherwise. Centred on its own because fullscreen hides the
 	   head and the footer, so this ends up alone on the screen. */

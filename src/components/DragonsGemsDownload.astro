@@ -5,6 +5,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import Icon from './Icon.astro';
 import LangSwitch from './LangSwitch.astro';
 import DragonsGemsBadges from './DragonsGemsBadges.astro';
+import ShareButton from './ShareButton.astro';
 import { APP_NAME, DOWNLOAD_PATHS, ICON, LANDING_PATHS, TEST_APK, WEB_GAME, copy, ogImage, screens, typo, type Lang } from '../data/dragonsGems';
 
 interface Props {
@@ -50,7 +51,10 @@ const options = [
 							</a>
 						))}
 					</div>
-					<a class="back" href={LANDING_PATHS[lang]}>{t.dl.back} <Icon icon="arrow-right" size="1em" /></a>
+					<div class="links">
+						<a class="back" href={LANDING_PATHS[lang]}>{t.dl.back} <Icon icon="arrow-right" size="1em" /></a>
+						<ShareButton id="dragons-gems" title={APP_NAME} lang={lang} />
+					</div>
 				</div>
 				<img class="phone" src={shots[0]} alt={ty(t.shotsAlt[0] ?? '')} width="540" height="1170" />
 			</section>
@@ -156,6 +160,13 @@ const options = [
 	.option small {
 		color: var(--gray-400);
 		font-size: var(--text-sm);
+	}
+
+	.links {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 1rem 1.75rem;
 	}
 
 	.back {

@@ -6,6 +6,7 @@ import Hero from './Hero.astro';
 import Icon from './Icon.astro';
 import ContactCTA from './ContactCTA.astro';
 import LangSwitch from './LangSwitch.astro';
+import ShareButton from './ShareButton.astro';
 import { SCANNER, type LandingLang, type PetanqueApp } from '../data/petanqueApps';
 
 interface Props {
@@ -72,6 +73,7 @@ const jsonLd = [
 				)))}
 			</div>
 			{soon && t.soon && <p class="soon-note">{t.soon}</p>}
+			<div class="share"><ShareButton id={app.id} title={app.name} kind={app.id === 'game' ? 'game' : 'app'} lang={lang} /></div>
 			<img class="cover" src={app.heroes[lang]} alt={t.heroAlt} />
 		</div>
 
@@ -373,6 +375,11 @@ const jsonLd = [
 		color: var(--gray-300);
 		font-weight: 600;
 		text-align: center;
+	}
+
+	.share {
+		display: flex;
+		justify-content: center;
 	}
 
 	@media (min-width: 50em) {

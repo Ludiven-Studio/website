@@ -4,6 +4,7 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Icon from './Icon.astro';
 import LangSwitch from './LangSwitch.astro';
+import ShareButton from './ShareButton.astro';
 import { SCANNER, type LandingLang, type PetanqueApp } from '../data/petanqueApps';
 
 interface Props {
@@ -67,6 +68,7 @@ const video = app.video?.(lang);
 					</div>
 					{soon && c.soon && <p class="soon-note">{typo(c.soon)}</p>}
 					<p class="free">{typo(free)}</p>
+					<ShareButton id={app.id} title={app.name} kind={app.id === 'game' ? 'game' : 'app'} lang={lang} />
 				</div>
 
 				<figure class="showcase" data-showcase aria-label={c.galleryTitle}>
@@ -378,6 +380,20 @@ const video = app.video?.(lang);
 		font-size: var(--text-sm);
 		font-weight: 700;
 		color: var(--cyan);
+	}
+
+	/* The hero is dark in both themes, so the button takes its colours, not the site's. */
+	.hero-copy :global(.share-btn) {
+		margin-top: 1rem;
+		color: var(--mist);
+		border-color: rgb(255 255 255 / 0.3);
+	}
+
+	.hero-copy :global(.share-btn:hover),
+	.hero-copy :global(.share-btn:focus-visible),
+	.hero-copy :global(.share-btn.done) {
+		color: var(--cyan);
+		border-color: var(--cyan);
 	}
 
 	/* A store not open yet: the badge faded, its tag on top at full strength. */

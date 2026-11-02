@@ -106,6 +106,8 @@
 
 		const d = document as FsDocument;
 		const html = document.documentElement;
+		// GamePage's button row, beside "Partager le jeu"; straight in the head on a page without it.
+		const row = document.querySelector('.game-actions');
 		const host = document.querySelector('.game-head');
 		const target = document.querySelector<FsElement>('.game-page');
 		if (!host || !target) return;
@@ -206,7 +208,8 @@
 		btn.className = 'gf-btn';
 		btn.textContent = labels.enter;
 		btn.addEventListener('click', toggle);
-		host.appendChild(btn);
+		if (row) row.prepend(btn);
+		else host.appendChild(btn);
 
 		// Exit button anchored inside the game area (shown only in fullscreen).
 		const exitBtn = document.createElement('button');

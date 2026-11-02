@@ -7,6 +7,7 @@ import CallToAction from './CallToAction.astro';
 import ContactCTA from './ContactCTA.astro';
 import LangSwitch from './LangSwitch.astro';
 import DragonsGemsBadges from './DragonsGemsBadges.astro';
+import ShareButton from './ShareButton.astro';
 import {
 	APP_NAME,
 	CONTACT,
@@ -77,6 +78,7 @@ const jsonLd = [
 					<Icon icon="arrow-right" size="1.1em" />
 				</CallToAction>
 				<a class="dg-alt" href={WEB_GAME}>{t.playWeb} <Icon icon="arrow-right" size="1em" /></a>
+				<ShareButton id="dragons-gems" title={APP_NAME} lang={lang} />
 			</div>
 			<img class="cover" src={feature(lang)} alt={`${APP_NAME} — ${t.tagline}`} width="1024" height="500" />
 		</div>

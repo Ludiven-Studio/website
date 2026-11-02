@@ -1,0 +1,119 @@
+---
+// "Partager le jeu" / "Partager l'appli": the share sheet on a phone, the link copied everywhere else.
+// Always the page's canonical address: a level, seed or challenge query stays out.
+type Lang = 'fr' | 'en' | 'es' | 'de' | 'it';
+
+interface Props {
+	/** Shown by the share sheet. */
+	title: string;
+	/** The game or app, for the analytics. */
+	id: string;
+	kind?: 'game' | 'app';
+	lang?: Lang;
+}
+
+const { title, id, kind = 'game', lang = 'fr' } = Astro.props;
+const NBSP = String.fromCharCode(160);
+const LABELS: Record<Lang, { game: string; app: string; copied: string; manual: string }> = {
+	fr: { game: 'Partager le jeu', app: "Partager l'appli", copied: `Lien copié${NBSP}!`, manual: `Copie ce lien${NBSP}:` },
+	en: { game: 'Share the game', app: 'Share the app', copied: 'Link copied!', manual: 'Copy this link:' },
+	es: { game: 'Compartir el juego', app: 'Compartir la app', copied: '¡Enlace copiado!', manual: 'Copia este enlace:' },
+	de: { game: 'Spiel teilen', app: 'App teilen', copied: 'Link kopiert!', manual: 'Diesen Link kopieren:' },
+	it: { game: 'Condividi il gioco', app: "Condividi l'app", copied: 'Link copiato!', manual: 'Copia questo link:' },
+};
+// Every language, for a game page whose game switches language on the fly (lib/gameLang).
+const labels = Object.fromEntries(
+	Object.entries(LABELS).map(([l, v]) => [l, { share: v[kind], copied: v.copied, manual: v.manual }]),
+);
+---
+
+<button type="button" class="share-btn" data-id={id} data-title={title} data-lang={lang} data-labels={JSON.stringify(labels)}>
+	<svg viewBox="0 0 256 256" width="1em" height="1em" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="18" stroke-linecap="round">
+		<circle cx="64" cy="128" r="30" /><circle cx="180" cy="56" r="30" /><circle cx="180" cy="200" r="30" />
+		<path d="M90 112l64-40M90 144l64 40" />
+	</svg>
+	<span aria-live="polite">{LABELS[lang][kind]}</span>
+</button>
+
+<style>
+	/* Same pill as the games' fullscreen button. */
+	.share-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4em;
+		border: 1.5px solid var(--gray-700);
+		background: transparent;
+		color: var(--gray-300);
+		font-family: var(--font-brand);
+		font-weight: 500;
+		font-size: var(--text-sm);
+		border-radius: 999px;
+		padding: 5px 14px;
+		cursor: pointer;
+		transition:
+			color var(--theme-transition),
+			border-color var(--theme-transition);
+	}
+	.share-btn:hover,
+	.share-btn:focus-visible,
+	.share-btn.done {
+		color: var(--accent-regular);
+		border-color: var(--accent-regular);
+	}
+</style>
+
+<script>
+	import { trackEvent } from '../lib/analytics';
+	import { LANG_EVENT } from '../lib/gameLang';
+
+	type Labels = Record<string, { share: string; copied: string; manual: string }>;
+
+	for (const btn of document.querySelectorAll<HTMLButtonElement>('.share-btn')) {
+		const label = btn.querySelector('span')!;
+		const all = JSON.parse(btn.dataset.labels!) as Labels;
+		const fallback = all[btn.dataset.lang!];
+		// A game may have announced its language before this ran; it also sets <html lang>.
+		let labels = all[document.documentElement.lang] ?? fallback;
+		label.textContent = labels.share;
+		let timer = 0;
+		const url = document.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.href ?? location.origin + location.pathname;
+		const id = btn.dataset.id;
+
+		const copied = (): void => {
+			label.textContent = labels.copied;
+			btn.classList.add('done');
+			clearTimeout(timer);
+			timer = window.setTimeout(() => {
+				label.textContent = labels.share;
+				btn.classList.remove('done');
+			}, 2000);
+		};
+
+		btn.addEventListener('click', async () => {
+			// A phone's share sheet reaches the messaging apps and has its own "copy". On a desktop
+			// that sheet is a system dialog for little gain, so the link goes straight to the clipboard.
+			if (navigator.share && matchMedia('(pointer: coarse)').matches) {
+				try {
+					await navigator.share({ title: btn.dataset.title, url });
+					trackEvent('page:share', { id, via: 'sheet' });
+					return;
+				} catch (e) {
+					if ((e as DOMException).name === 'AbortError') return; // sheet dismissed
+				}
+			}
+			try {
+				await navigator.clipboard.writeText(url);
+				copied();
+			} catch {
+				// No clipboard access (some in-app browsers): show the link, selected, to copy by hand.
+				window.prompt(labels.manual, url);
+			}
+			trackEvent('page:share', { id, via: 'copy' });
+		});
+
+		document.addEventListener(LANG_EVENT, (e) => {
+			labels = all[(e as CustomEvent<string>).detail] ?? fallback;
+			label.textContent = btn.classList.contains('done') ? labels.copied : labels.share;
+		});
+	}
+</script>
