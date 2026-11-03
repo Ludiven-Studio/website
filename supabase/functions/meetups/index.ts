@@ -210,6 +210,18 @@ async function ban(db: SupabaseClient, playerId: string, ip: string | null, even
 
 const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
+/** « samedi 7 novembre 2026 à 14:00 », Paris time: the stored value is UTC. */
+const parisWhen = (iso: unknown): string => {
+	const d = new Date(String(iso ?? ''));
+	return isNaN(d.getTime()) ? '' : new Intl.DateTimeFormat('fr-FR', {
+		timeZone: 'Europe/Paris', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
+	}).format(d);
+};
+
+/** One mail line from the parts that are set, escaped. */
+const mailLine = (...parts: unknown[]): string =>
+	[...new Set(parts.map((p) => String(p ?? '').trim()).filter(Boolean))].map(esc).join(' · ');
+
 /** Never throws: a mail that fails must not lose what is already saved. */
 async function sendMail(to: string, subject: string, lines: string[], link?: { href: string; text: string }): Promise<void> {
 	if (!RESEND_API_KEY || !FROM_EMAIL || !to) return;
@@ -235,9 +247,9 @@ async function mailMod(subject: string, lines: string[], link: string): Promise<
 
 async function mailReport(eventId: string, ev: Record<string, unknown>, reason: string, count: number, hidden: boolean): Promise<void> {
 	if (!ADMIN_KEY) return;
-	await mailMod(`Rencontres : signalement (${REASON_LABEL[reason] ?? reason})`, [
+	await mailMod(`Pétanque Meet : signalement (${REASON_LABEL[reason] ?? reason})`, [
 		`<b>${esc(REASON_LABEL[reason] ?? reason)}</b> — ${count} signalement(s)${hidden ? ', <b>partie masquée</b>' : ''}.`,
-		`${esc(String(ev.organizer_name ?? ''))} · ${esc(String(ev.label ?? ''))} · ${esc(String(ev.starts_at ?? ''))}`,
+		mailLine(ev.organizer_name, ev.label, parisWhen(ev.starts_at)),
 	], `${MOD_URL}?e=${eventId}&k=${await modToken(eventId)}`);
 }
 
@@ -517,7 +529,7 @@ async function mailTournament(t: Record<string, unknown>, headline: string, subj
 	const id = String(t.id);
 	await mailMod(subject, [
 		headline,
-		`${esc(String(t.title ?? ''))} · ${esc(String(t.club_name ?? ''))} · ${esc(String(t.commune ?? ''))} · ${esc(String(t.starts_at ?? ''))}`,
+		mailLine(t.title, t.club_name, t.label, t.commune, parisWhen(t.starts_at)),
 	], `${MOD_URL}?t=${id}&k=${await tToken(id)}`);
 }
 
@@ -1267,7 +1279,7 @@ Deno.serve(async (req) => {
 				await db.from('meetup_tournaments')
 					.update({ poster_status: 'pending', poster_path: path, poster_has_thumb: hasThumb, updated_at: nowIso }).eq('id', own.id);
 				await mailTournament(shapeTournament(own as Record<string, unknown>),
-					'<b>Nouvelle affiche à valider.</b>', 'Rencontres : affiche à valider');
+					'<b>Nouvelle affiche à valider.</b>', 'Pétanque Meet : affiche à valider');
 				// Each new poster pays for the old ones: no scheduler needed.
 				await prunePosters(db, nowMs).catch((e) => console.error(e));
 				return json({ ok: true, posterStatus: 'pending' });
@@ -1327,7 +1339,7 @@ Deno.serve(async (req) => {
 				await mailTournament(shaped,
 					`<b>${esc(label)}</b> — ${all.length} signalement(s)${hidden ? ', <b>concours masqué</b>' : ''}.`
 						+ (note ? `<br>« ${esc(note)} »` : ''),
-					`Rencontres : signalement concours (${label})`);
+					`Pétanque Meet : signalement concours (${label})`);
 				return json({ ok: true });
 			}
 
@@ -1365,8 +1377,8 @@ Deno.serve(async (req) => {
 					return json({ ok: true, status: 'approved', moved });
 				}
 				const shaped = shapeTournament(t as Record<string, unknown>);
-				await mailMod(`Rencontres : ${clubName} réclame ses concours`, [
-					`<b>${esc(clubName)}</b> · ${esc(String(shaped.commune ?? ''))} · ${esc(String(shaped.title ?? ''))}`,
+				await mailMod(`Pétanque Meet : ${clubName} réclame ses concours`, [
+					[`<b>${esc(clubName)}</b>`, mailLine(shaped.label, shaped.commune, shaped.title)].filter(Boolean).join(' · '),
 					`« ${esc(message)} »`,
 					`Compte : ${esc(await emailOf(db, uid) ?? '?')}`,
 					`Numéro du club au calendrier : ${esc(String(shaped.contact_phone ?? 'aucun'))}`,
@@ -1468,7 +1480,7 @@ Deno.serve(async (req) => {
 				const { data: sent } = await db.rpc('meetup_bump_quota',
 					{ p_kind: 'ip', p_subject: 'mod-link', p_day: parisDay(), p_creates: 1, p_joins: 0 });
 				if (typeof sent === 'number' && sent > QUEUE_LINKS_PER_DAY) return bad('Trop de liens demandés aujourd’hui. Réessaie demain.', 429);
-				await mailMod('Rencontres : accès à la modération', [
+				await mailMod('Pétanque Meet : accès à la modération', [
 					'Voici ton lien vers la file de modération. Il reste valable 7 jours.',
 					'Si tu n’as rien demandé, ignore ce message.',
 				], `${MOD_URL}?q=${await queueToken(nowMs + QUEUE_LINK_MS)}`);

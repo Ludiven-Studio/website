@@ -1529,3 +1529,14 @@
   l'utilisateur
 - 10:14 : commité et poussé à la demande de l'utilisateur : app-ads.txt et cette section seulement. Statut : terminé.
   Réservations libérées.
+
+## 2026-11-03 — Pétanque Meet : mails de modération lisibles (session petanque-meet)
+- Statut : en cours (2026-11-03T15:08+01:00). Demande de l'utilisateur : ok oui on peut améliorer (mail « affiche à
+  valider » : sujet « Rencontres », date ISO en UTC, lieu vide)
+- Réservations actives : `supabase/functions/meetups/index.ts` (mails de modération seulement).
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 15:09 : sujets « Pétanque Meet : … » au lieu de « Rencontres : … » ; date en heure de Paris (« samedi 7 novembre 2026
+  à 14:00 ») au lieu de l'ISO UTC ; lieu = nom du terrain et commune, parties vides retirées. deno check OK. Rien de
+  commité ni déployé : sur l'accord de l'utilisateur
+- 19:09 : commité et poussé à la demande de l'utilisateur : index.ts de meetups et cette section seulement. Déploiement
+  de la fonction en attente de son accord.. Statut : terminé. Réservations libérées.
