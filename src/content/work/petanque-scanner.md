@@ -32,7 +32,7 @@ gallery:
   - src: /assets/petanque-ar/screen-05-fr.webp
     alt: "Mode photo — une seule photo prise d'en haut, la boule la plus proche cerclée de vert"
   - src: /assets/petanque-ar/screen-06-fr.webp
-    alt: "Écran Premium — trois scans gratuits par jour, ou Premium à vie sans abonnement"
+    alt: "Écran Premium — il reste trois scans gratuits aujourd'hui, ou Premium à vie sans abonnement"
   - src: /assets/petanque-ar/premium.webp
     alt: "Visuel Premium à vie — mesures illimitées, sans publicité"
 ---

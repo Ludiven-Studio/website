@@ -160,7 +160,7 @@ export const copy: Record<LandingLang, LandingCopy> = {
 		],
 		priceTitle: 'Combien ça coûte',
 		priceBody:
-			'L\'application est gratuite, avec 3 scans par jour. Vous pouvez regarder une publicité facultative pour en recharger, ou passer une seule fois en Premium à vie : mesures illimitées et plus aucune publicité. Il n\'y a pas d\'abonnement, et aucun achat n\'est nécessaire pour se servir de l\'application.',
+			'L\'application est gratuite, avec 10 scans par jour. Vous pouvez regarder une publicité facultative pour en recharger, ou passer une seule fois en Premium à vie : mesures illimitées et plus aucune publicité. Il n\'y a pas d\'abonnement, et aucun achat n\'est nécessaire pour se servir de l\'application.',
 		galleryTitle: 'L\'application en images',
 		faqTitle: 'Questions fréquentes',
 		faq: [
@@ -277,7 +277,7 @@ export const copy: Record<LandingLang, LandingCopy> = {
 		],
 		priceTitle: 'What it costs',
 		priceBody:
-			'The app is free, with 3 scans a day. You can watch an optional ad to refill them, or buy lifetime Premium once: unlimited measurements and no more ads. There is no subscription, and no purchase is needed to use the app.',
+			'The app is free, with 10 scans a day. You can watch an optional ad to refill them, or buy lifetime Premium once: unlimited measurements and no more ads. There is no subscription, and no purchase is needed to use the app.',
 		galleryTitle: 'The app in pictures',
 		faqTitle: 'Frequently asked questions',
 		faq: [
@@ -394,7 +394,7 @@ export const copy: Record<LandingLang, LandingCopy> = {
 		],
 		priceTitle: 'Cuánto cuesta',
 		priceBody:
-			'La aplicación es gratuita, con 3 escaneos al día. Puedes ver un anuncio opcional para recargarlos, o pasar una sola vez a Premium de por vida: medidas ilimitadas y ningún anuncio más. No hay suscripción, y no hace falta ninguna compra para usar la aplicación.',
+			'La aplicación es gratuita, con 10 escaneos al día. Puedes ver un anuncio opcional para recargarlos, o pasar una sola vez a Premium de por vida: medidas ilimitadas y ningún anuncio más. No hay suscripción, y no hace falta ninguna compra para usar la aplicación.',
 		galleryTitle: 'La aplicación en imágenes',
 		faqTitle: 'Preguntas frecuentes',
 		faq: [
@@ -515,7 +515,7 @@ export const copy: Record<LandingLang, LandingCopy> = {
 		],
 		priceTitle: 'Was es kostet',
 		priceBody:
-			'Die App ist kostenlos, mit 3 Scans pro Tag. Du kannst dir freiwillig eine Werbung ansehen, um sie aufzuladen, oder einmalig Premium auf Lebenszeit kaufen: unbegrenzte Messungen und keine Werbung mehr. Es gibt kein Abo, und für die Nutzung der App ist kein Kauf nötig.',
+			'Die App ist kostenlos, mit 10 Scans pro Tag. Du kannst dir freiwillig eine Werbung ansehen, um sie aufzuladen, oder einmalig Premium auf Lebenszeit kaufen: unbegrenzte Messungen und keine Werbung mehr. Es gibt kein Abo, und für die Nutzung der App ist kein Kauf nötig.',
 		galleryTitle: 'Die App in Bildern',
 		faqTitle: 'Häufige Fragen',
 		faq: [
@@ -632,7 +632,7 @@ export const copy: Record<LandingLang, LandingCopy> = {
 		],
 		priceTitle: 'Quanto costa',
 		priceBody:
-			'L\'app è gratuita, con 3 scansioni al giorno. Puoi guardare una pubblicità facoltativa per ricaricarle, oppure passare una volta per tutte a Premium a vita: misure illimitate e nessuna pubblicità. Non c\'è abbonamento, e non serve alcun acquisto per usare l\'app.',
+			'L\'app è gratuita, con 10 scansioni al giorno. Puoi guardare una pubblicità facoltativa per ricaricarle, oppure passare una volta per tutte a Premium a vita: misure illimitate e nessuna pubblicità. Non c\'è abbonamento, e non serve alcun acquisto per usare l\'app.',
 		galleryTitle: 'L\'app in immagini',
 		faqTitle: 'Domande frequenti',
 		faq: [
@@ -705,7 +705,7 @@ export const download: Record<LandingLang, DownloadCopy> = {
 			'Passe au-dessus. Chaque boule se verrouille toute seule.',
 			'Le verdict d’en haut. Boules classées, écarts affichés.',
 			'Pas d’AR ? Une photo suffit. Le mode photo marche sur tous les téléphones.',
-			'3 scans gratuits par jour. Premium à vie : illimité, sans pub, sans abonnement.',
+			'10 scans gratuits par jour. Premium à vie : illimité, sans pub, sans abonnement.',
 		],
 		pause: 'Mettre l’animation en pause',
 		videoTitle: 'En vidéo',
@@ -720,7 +720,7 @@ export const download: Record<LandingLang, DownloadCopy> = {
 			'Hold it above. Each boule locks by itself.',
 			'The verdict from above. Boules ranked, gaps shown.',
 			'No AR? One photo will do. Photo mode works on every phone.',
-			'3 free scans a day. Lifetime Premium: unlimited, no ads, no subscription.',
+			'10 free scans a day. Lifetime Premium: unlimited, no ads, no subscription.',
 		],
 		pause: 'Pause the animation',
 		videoTitle: 'On video',
@@ -735,7 +735,7 @@ export const download: Record<LandingLang, DownloadCopy> = {
 			'Colócate encima. Cada bola se bloquea sola.',
 			'El veredicto desde arriba. Bolas clasificadas, distancias a la vista.',
 			'¿Sin AR? Basta una foto. El modo foto funciona en todos los móviles.',
-			'3 escaneos gratis al día. Premium de por vida: ilimitado, sin anuncios ni suscripción.',
+			'10 escaneos gratis al día. Premium de por vida: ilimitado, sin anuncios ni suscripción.',
 		],
 		pause: 'Pausar la animación',
 		videoTitle: 'En vídeo',
@@ -750,7 +750,7 @@ export const download: Record<LandingLang, DownloadCopy> = {
 			'Halte es darüber. Jede Kugel rastet von selbst ein.',
 			'Das Urteil von oben. Kugeln gewertet, Abstände sichtbar.',
 			'Kein AR? Ein Foto reicht. Der Fotomodus läuft auf jedem Handy.',
-			'3 Gratis-Scans pro Tag. Premium auf Lebenszeit: unbegrenzt, ohne Werbung, ohne Abo.',
+			'10 Gratis-Scans pro Tag. Premium auf Lebenszeit: unbegrenzt, ohne Werbung, ohne Abo.',
 		],
 		pause: 'Animation anhalten',
 		videoTitle: 'Im Video',
@@ -765,7 +765,7 @@ export const download: Record<LandingLang, DownloadCopy> = {
 			'Tienilo sopra. Ogni boccia si blocca da sola.',
 			'Il verdetto dall’alto. Bocce in classifica, distanze in vista.',
 			'Niente AR? Basta una foto. La modalità foto funziona su ogni telefono.',
-			'3 scansioni gratis al giorno. Premium a vita: illimitato, senza pubblicità né abbonamento.',
+			'10 scansioni gratis al giorno. Premium a vita: illimitato, senza pubblicità né abbonamento.',
 		],
 		pause: 'Metti in pausa l’animazione',
 		videoTitle: 'In video',

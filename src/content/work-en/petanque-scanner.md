@@ -32,7 +32,7 @@ gallery:
   - src: /assets/petanque-ar/screen-05-en.webp
     alt: "Photo mode — a single shot taken from above, the closest boule circled in green"
   - src: /assets/petanque-ar/screen-06-en.webp
-    alt: "Premium screen — three free scans a day, or lifetime Premium with no subscription"
+    alt: "Premium screen — three free scans left today, or lifetime Premium with no subscription"
 ---
 <p>
   This page covers the <strong>engineering behind</strong> Pétanque Scan. If you're after the app

@@ -18,7 +18,7 @@ import Hero from '../../../components/Hero.astro';
 		<p class="updated">
 			Questa informativa riguarda <strong>l'app mobile Pétanque Scan</strong>
 			(in precedenza Pétanque Scanner, <code>com.raphbenpro.petanquear</code>), e non il sito ludiven-studio.fr, che dispone di una
-			<a href="/confidentialite/">propria informativa</a>. Ultimo aggiornamento: 2 novembre 2026.
+			<a href="/confidentialite/">propria informativa</a>. Ultimo aggiornamento: 3 novembre 2026 (versione 1.2.13: la pubblicità passa da Google AdMob a Unity LevelPlay, con la nostra finestra di consenso; Google Firebase viene rimosso; 10 scansioni gratuite al giorno invece di 3).
 		</p>
 		<p class="updated">
 			Questa è una traduzione di cortesia. In caso di discordanza, prevale la
@@ -29,8 +29,8 @@ import Hero from '../../../components/Hero.astro';
 			<p><strong>L'essenziale:</strong></p>
 			<ul>
 				<li><strong>Le immagini della tua fotocamera non lasciano mai il tuo dispositivo.</strong> Il rilevamento delle bocce viene calcolato localmente sul telefono. Nessuna foto, nessun video, nessuna immagine viene inviata a un server né salvata in modo permanente — nemmeno nella modalità foto, dove l'immagine dello scatto resta nella memoria RAM.</li>
-				<li>Non abbiamo <strong>alcun server</strong> né <strong>alcun account utente</strong>. Non conosciamo il tuo nome, la tua e-mail né la tua posizione.</li>
-				<li>La pubblicità e la misurazione dell'audience vengono attivate <strong>solo con il tuo consenso</strong>, richiesto al primo avvio. Puoi revocarlo in qualsiasi momento.</li>
+				<li>Non c'è <strong>nessun account utente</strong>. Non conosciamo né il tuo nome, né la tua e-mail, né la tua posizione. Il nostro unico server è quello delle statistiche d'uso (vedi §5).</li>
+				<li>La pubblicità parte <strong>solo con il tuo consenso</strong>, richiesto al primo avvio. Senza, l'app funziona lo stesso, senza gli annunci dei nostri partner. Puoi cambiare idea in qualsiasi momento. Le statistiche d'uso, senza cookie né identificativo, non dipendono da questa scelta (vedi §5).</li>
 				<li>L'acquisto <strong>Premium rimuove la pubblicità</strong> e, in tal caso, l'SDK pubblicitario non viene nemmeno avviato.</li>
 			</ul>
 		</div>
@@ -91,34 +91,22 @@ import Hero from '../../../components/Hero.astro';
 					</thead>
 					<tbody>
 						<tr>
-							<td>Identificativo pubblicitario del dispositivo (GAID su Android, IDFA su iOS)</td>
-							<td>Visualizzazione di pubblicità, personalizzate solo se acconsenti</td>
-							<td>Consenso (art. 6.1.a GDPR)</td>
-							<td>Google (AdMob)</td>
+							<td>Identificativo pubblicitario del dispositivo (GAID su Android, IDFA su iOS se autorizzi il tracciamento), altri identificativi del dispositivo, indirizzo IP, interazioni con gli annunci, informazioni tecniche (vedi §4)</td>
+							<td>Mostrare annunci scelti in base ai tuoi interessi, misurarli, combattere le frodi</td>
+							<td>Consenso (art. 6.1.a GDPR): senza, non parte nulla</td>
+							<td>Unity Technologies e la sua controllata ironSource (Unity LevelPlay, ironSource Ads, Unity Ads); tramite le loro aste, altri acquirenti di pubblicità (vedi §4)</td>
 						</tr>
 						<tr>
-							<td>Eventi d'uso dell'applicazione (vedi §5) e dati tecnici associati: modello del dispositivo, versione del sistema, versione dell'applicazione, paese</td>
+							<td>Eventi d'uso dell'applicazione (vedi §5), accompagnati da: piattaforma (Android o iOS), versione dell'applicazione e del sistema, modello del dispositivo, lingua del telefono, risoluzione dello schermo</td>
 							<td>Misurazione dell'audience: capire quali funzioni vengono usate e migliorare l'applicazione</td>
-							<td>Consenso</td>
-							<td>Google (Firebase Analytics)</td>
-						</tr>
-						<tr>
-							<td>Gli stessi eventi d'uso (vedi §5), accompagnati da: piattaforma (Android o iOS), versione dell'applicazione, lingua del telefono, risoluzione dello schermo, sistema operativo</td>
-							<td>Misurazione dell'audience, a complemento della precedente: ottenere una dashboard semplice e senza cookie</td>
-							<td>Consenso</td>
+							<td>Legittimo interesse (senza cookie né identificativo, vedi §5)</td>
 							<td>Umami, sul nostro server (Hetzner Online GmbH, Germania)</td>
 						</tr>
 						<tr>
-							<td>Token per le notifiche push</td>
-							<td>Inviarti notifiche (novità, promemoria)</td>
-							<td>Consenso</td>
-							<td>Google (Firebase Cloud Messaging)</td>
-						</tr>
-						<tr>
-							<td>La tua scelta di consenso</td>
-							<td>Memorizzare la tua decisione e non richiedertela a ogni avvio</td>
-							<td>Obbligo legale / legittimo interesse</td>
-							<td>Memorizzata sul dispositivo; gestita da Google (UMP)</td>
+							<td>La tua risposta alla finestra «Pubblicità» (accettare o rifiutare), la sua data e la versione del testo</td>
+							<td>Memorizzare la tua decisione, richiedertela dopo 6 mesi, poter dimostrare la tua scelta</td>
+							<td>Obbligo legale</td>
+							<td>Conservata solo sul tuo dispositivo; Umami conta i sì e i no, senza identificativo (vedi §5)</td>
 						</tr>
 						<tr>
 							<td>Prova d'acquisto («ricevuta») del Premium</td>
@@ -127,10 +115,22 @@ import Hero from '../../../components/Hero.astro';
 							<td>Apple o Google (store di applicazioni)</td>
 						</tr>
 						<tr>
+							<td>Piattaforma, prezzo e versione dell'applicazione all'acquisto del Premium, senza alcun identificativo</td>
+							<td>Avvisare l'editore di una vendita</td>
+							<td>Legittimo interesse</td>
+							<td>ntfy.sh (servizio di notifiche), su un canale privato</td>
+						</tr>
+						<tr>
 							<td>Numero di scansioni effettuate oggi e data del giorno</td>
-							<td>Far funzionare il limite di 3 scansioni gratuite al giorno</td>
+							<td>Far funzionare il limite di 10 scansioni gratuite al giorno</td>
 							<td>Esecuzione del contratto</td>
 							<td>Nessuno: resta sul dispositivo</td>
+						</tr>
+						<tr>
+							<td>Indirizzo IP, come per qualsiasi pagina web</td>
+							<td>Leggere sul nostro sito il numero dell'ultima versione e, quando sostituisce una pubblicità, il video di Pétanque Meet (vedi §8)</td>
+							<td>Legittimo interesse</td>
+							<td>GitHub (hosting del nostro sito)</td>
 						</tr>
 						<tr>
 							<td>Immagini della fotocamera</td>
@@ -151,99 +151,115 @@ import Hero from '../../../components/Hero.astro';
 		<section class="stack gap-2">
 			<h2>4. Pubblicità e consenso</h2>
 			<p>
-				L'applicazione è gratuita ed è finanziata da un banner pubblicitario, oltre che da una pubblicità
-				facoltativa che puoi scegliere di guardare per ricaricare le tue scansioni gratuite. La concessionaria
-				utilizzata è <strong>Google AdMob</strong>.
+				L'app è gratuita e finanziata da un banner pubblicitario, oltre che da un video facoltativo che puoi
+				scegliere di guardare per ricaricare le tue scansioni gratuite. Dalla versione 1.2.13 la pubblicità
+				è servita da <strong>Unity LevelPlay</strong> con le concessionarie <strong>ironSource Ads</strong>
+				e <strong>Unity Ads</strong> (Unity Technologies e la sua controllata ironSource). Google non
+				interviene più né nella pubblicità né nel tuo consenso. Le versioni precedenti, finché non vengono
+				aggiornate, usano ancora Google AdMob e la sua finestra di consenso (Google UMP).
 			</p>
 			<p>
-				Al primo avvio, ti viene presentata una schermata di consenso gestita dalla piattaforma <strong>Google
-				UMP</strong> (User Messaging Platform) quando la normativa lo richiede (in particolare nello Spazio
-				economico europeo, nel Regno Unito e in Svizzera). In concreto:
+				<strong>Il tuo consenso.</strong> Al primo avvio, qualunque sia il tuo paese, una finestra
+				«Pubblicità» ti chiede se accetti che i nostri partner pubblicitari (Unity Ads e ironSource) usino
+				un identificativo del tuo telefono per scegliere gli annunci e misurarne l'efficacia. «Accetta» e
+				«Rifiuta» hanno lo stesso peso.
 			</p>
 			<ul>
-				<li><strong>Se accetti</strong>: le pubblicità possono essere personalizzate in base all'identificativo pubblicitario del tuo dispositivo, e la misurazione dell'audience viene attivata.</li>
-				<li><strong>Se rifiuti</strong>: la misurazione dell'audience non viene avviata affatto, così come le notifiche, e le pubblicità mostrate sono <strong>non personalizzate</strong> (restano necessarie per finanziare l'applicazione gratuita, ma non si basano su un profilo pubblicitario).</li>
-				<li>Su iOS, una seconda richiesta, imposta da Apple (<em>App Tracking Transparency</em>), ti chiede se autorizzi il tracciamento. Un rifiuto viene rispettato indipendentemente dalla tua risposta precedente.</li>
-				<li>La misurazione dell'audience è configurata per <strong>non raccogliere l'identificativo pubblicitario</strong>: questo viene usato solo dalla parte pubblicitaria, e soltanto con il tuo consenso.</li>
-				<li><strong>Se acquisti il Premium</strong>: la pubblicità scompare e l'SDK pubblicitario non viene più inizializzato.</li>
+				<li><strong>Se accetti</strong>: Unity LevelPlay parte e mostra il banner e i video.</li>
+				<li><strong>Se rifiuti</strong>: non parte nessun modulo pubblicitario. L'app funziona lo stesso, senza gli annunci dei nostri partner: al loro posto, una striscia presenta le nostre altre app, Pétanque Meet o, su Android, Pétanque Game, e un breve video di Pétanque Meet ricarica anche le tue scansioni. Questa presentazione non trasmette nulla che ti riguardi (vedi §8).</li>
+				<li><strong>La tua risposta</strong>, la sua data e la versione del testo restano sul tuo telefono. L'app te la richiede dopo 6 mesi, che tu abbia accettato o rifiutato, o prima se i nostri partner pubblicitari cambiano.</li>
+				<li><strong>Su iOS</strong> l'autorizzazione al tracciamento di Apple (<em>App Tracking Transparency</em>) ti viene chiesta solo dopo un «Accetta» e serve solo alla pubblicità; senza, l'identificativo pubblicitario dell'iPhone non viene usato.</li>
+				<li><strong>Le statistiche d'uso</strong> (vedi §5) non dipendono dalla tua risposta: non contengono né identificativo pubblicitario, né cookie, né identificativo del dispositivo.</li>
+				<li><strong>Se acquisti il Premium</strong>: la pubblicità scompare e il modulo pubblicitario non viene più avviato.</li>
 			</ul>
 			<p>
-				Per saperne di più sull'uso dei dati da parte di Google in questo contesto:
-				<a href="https://business.safety.google/privacy/" target="_blank" rel="noopener">Google — Privacy e termini</a>.
+				<strong>Se hai accettato</strong>, per mostrare gli annunci, sceglierli, misurarli e combattere le
+				frodi, i moduli di ironSource e di Unity Ads ricevono l'<strong>identificativo
+				pubblicitario</strong> del tuo telefono e altri identificativi del dispositivo, il tuo
+				<strong>indirizzo IP</strong> (che dà una posizione approssimativa, a livello di città), le tue
+				interazioni con gli annunci, il tuo tempo di utilizzo, informazioni tecniche (prestazioni, arresti
+				anomali) e, secondo Unity Ads, gli acquisti fatti nell'app. Le loro aste possono trasmettere la
+				richiesta di annuncio ad altri acquirenti di pubblicità.
+			</p>
+			<p>
+				Per saperne di più, anche sui partner di ironSource e di Unity Ads: <a
+				href="https://unity.com/legal/game-player-and-app-user-privacy-policy" target="_blank"
+				rel="noopener">l'informativa sulla privacy di Unity</a>, che copre Unity Ads, LevelPlay e
+				ironSource.
 			</p>
 		</section>
 
 		<section class="stack gap-2">
 			<h2>5. Misurazione dell'audience: gli eventi esatti</h2>
 			<p>
-				Per trasparenza, ecco l'elenco completo degli eventi inviati
-				<em>quando hai dato il consenso</em>. Nessuno contiene dati che tu abbia inserito, né un identificativo
-				creato da noi, né il risultato delle tue partite.
+				Per trasparenza, ecco l'elenco completo degli eventi inviati a <strong>Umami</strong>, uno strumento
+				di statistiche senza cookie installato sul nostro server. Vengono inviati sia che tu accetti sia che
+				tu rifiuti la pubblicità: nessuno contiene dati che hai inserito, identificativi o il risultato
+				delle tue misurazioni.
 			</p>
 			<p>
-				Da settembre 2026, questi eventi vengono inviati a <strong>due</strong> strumenti di misurazione, che
-				ricevono esattamente lo stesso elenco: <strong>Firebase Analytics</strong> (Google) e
-				<strong>Umami</strong>, installato sul nostro server. Il secondo è uno strumento di statistiche senza cookie, utilizzato perché
-				offre una visione semplice e leggibile dell'uso; è descritto in dettaglio più sotto.
+				Dalla versione 1.2.13 Firebase Analytics (Google) non riceve più nulla. Le versioni precedenti,
+				finché non vengono aggiornate, gli inviano ancora questi eventi se avevi accettato.
 			</p>
 			<ul>
-				<li><code>scan_started</code> — inizia una scansione</li>
-				<li><code>scan_completed</code> — una scansione va a buon fine, con il numero di scansioni effettuate nella giornata</li>
+				<li><code>scan_started</code> — una scansione inizia</li>
+				<li><code>scan_completed</code> — una scansione va a buon fine, con il numero di scansioni fatte nella giornata</li>
+				<li><code>scan_cancelled</code> — una scansione viene abbandonata, con l'indicazione se è stata contata o no nella giornata</li>
 				<li><code>scan_blocked_quota</code> — una scansione viene rifiutata perché il limite giornaliero è stato raggiunto</li>
-				<li><code>floor_confirmed</code> — hai confermato il rilevamento del terreno</li>
+				<li><code>welcome_choice</code> — la modalità scelta nella schermata di benvenuto (realtà aumentata o foto)</li>
+				<li><code>floor_confirmed</code> / <code>floor_rejected</code> — confermi o rifiuti il rilevamento del suolo, con l'indicazione se la scansione riparte da zero</li>
 				<li><code>cochonet_redo</code> — chiedi di cercare di nuovo il pallino</li>
-				<li><code>ar_incompatible_shown</code> — il tuo telefono non supporta la realtà aumentata; ti viene mostrata questa informazione</li>
+				<li><code>ar_incompatible_shown</code> — il tuo telefono non supporta la realtà aumentata; questa informazione ti viene mostrata</li>
+				<li><code>camera_permission_denied</code> / <code>camera_settings_opened</code> / <code>camera_permission_recovered</code> — l'accesso alla fotocamera è negato, apri le impostazioni del telefono, poi l'accesso viene concesso</li>
 				<li><code>photo_offer_shown</code> / <code>photo_offer_declined</code> — ti viene proposta la modalità foto, oppure la rifiuti</li>
 				<li><code>photo_mode_entered</code> — la modalità foto si avvia, con il motivo (passaggio automatico, proposta accettata o scelta nelle impostazioni)</li>
 				<li><code>photo_mode_exited</code> — si esce dalla modalità foto</li>
-				<li><code>photo_shutter</code> — scatti una foto, con l'indicazione della riuscita o del fallimento del calcolo</li>
+				<li><code>photo_shutter</code> — scatti una foto, con l'indicazione se il calcolo è riuscito o fallito</li>
+				<li><code>photo_failed_…</code> — il calcolo di una foto fallisce; il motivo è nel nome dell'evento</li>
 				<li><code>photo_retake</code> — rifai una foto</li>
 				<li><code>photo_camera_unavailable</code> — non è stato possibile aprire la fotocamera</li>
-				<li><code>settings_opened</code> — viene aperta la schermata delle impostazioni</li>
-				<li><code>settings_action</code> — vi viene avviata un'azione: consenso, informativa sulla privacy, condizioni d'uso o ripristino dell'acquisto</li>
+				<li><code>settings_opened</code> — si apre la schermata delle impostazioni</li>
+				<li><code>settings_action</code> — vi viene eseguita un'azione: consenso, informativa sulla privacy, condizioni d'uso, lingua o ripristino dell'acquisto</li>
 				<li><code>paywall_shown</code> / <code>paywall_dismissed</code> — la schermata dell'offerta Premium viene mostrata o chiusa, con il motivo della visualizzazione</li>
-				<li><code>paywall_watch_ad</code> — scegli di guardare una pubblicità per ricaricare le tue scansioni</li>
-				<li><code>ad_reward_earned</code> — la pubblicità è stata guardata fino alla fine e le scansioni sono state ricaricate</li>
-				<li><code>ad_unavailable</code> — non era disponibile alcuna pubblicità da mostrare</li>
-				<li><code>premium_purchase_started</code> / <code>premium_purchase_success</code> / <code>premium_purchase_failed</code> — fasi di un acquisto, con il motivo del fallimento se presente</li>
+				<li><code>paywall_watch_ad</code> — scegli di guardare un video per ricaricare le tue scansioni</li>
+				<li><code>ad_reward_earned</code> — la pubblicità è stata guardata fino in fondo e le scansioni vengono ricaricate</li>
+				<li><code>ad_unavailable</code> — non c'era nessuna pubblicità disponibile</li>
+				<li><code>meet_promo_shown</code> / <code>meet_promo_refill</code> / <code>meet_promo_closed</code> — il video di Pétanque Meet viene mostrato, ricarica le tue scansioni o viene chiuso</li>
+				<li><code>meet_store_opened</code> — apri la scheda di Pétanque Meet nello store, dalla striscia o dal video</li>
+				<li><code>game_store_opened</code> — apri la scheda di Pétanque Game nello store, dalla striscia</li>
+				<li><code>premium_purchase_started</code> / <code>premium_purchase_success</code> / <code>premium_purchase_failed</code> — fasi di un acquisto, con l'eventuale motivo del fallimento</li>
 				<li><code>premium_restore_success</code> — un acquisto precedente è stato ripristinato</li>
+				<li><code>premium_revoked</code> — lo store non riconosce più un Premium (dopo un rimborso, per esempio)</li>
 				<li><code>iap_receipt_invalid</code> — non è stato possibile convalidare una prova d'acquisto</li>
+				<li><code>update_prompt</code> / <code>update_tapped</code> — ti viene proposto un aggiornamento (consigliato o obbligatorio), oppure tocchi il pulsante di aggiornamento</li>
 				<li><code>consent_accepted</code> / <code>consent_declined</code> — la tua scelta di consenso</li>
-				<li><code>notification_token_registered</code> — il dispositivo viene registrato per le notifiche</li>
 			</ul>
 			<p>
-				A questi eventi, Firebase aggiunge automaticamente informazioni tecniche standard (modello del dispositivo,
-				versione del sistema operativo, versione dell'applicazione, paese dedotto dall'indirizzo IP, prima
-				apertura, durata della sessione).
+				<strong>Cosa riceve Umami, esattamente.</strong> Ogni evento viene inviato a
+				<code>stats.ludiven-studio.fr</code>, il nostro server, con questo e nient'altro: il nome
+				dell'evento e il suo eventuale dettaglio (per esempio il numero di scansioni del giorno), un
+				identificativo di sito che ci appartiene, la piattaforma (<code>android</code> o <code>ios</code>),
+				la versione dell'applicazione, la versione del sistema, il modello del telefono, la lingua del
+				telefono e la risoluzione dello schermo. <strong>Nessun identificativo pubblicitario, nessun numero
+				di dispositivo, nessun cookie e nessun identificativo persistente</strong> vi compare. Come per ogni
+				richiesta su Internet, il server vede necessariamente il tuo indirizzo IP; il nostro server non lo
+				conserva: serve solo a dedurre il paese, la regione e la città, e a calcolare un'impronta anonima
+				rinnovata ogni mese, che non permette né di seguirti da un mese all'altro né di riconoscerti in
+				un'altra app.
 			</p>
 			<p>
-				<strong>Cosa riceve Umami, esattamente.</strong> Ogni evento viene inviato a <code>stats.ludiven-studio.fr</code>, il nostro server,
-				con, e nient'altro: il nome dell'evento, un identificativo di sito che ci appartiene, la piattaforma
-				(<code>android</code> o <code>ios</code>), la versione dell'applicazione, la lingua del tuo telefono, la
-				risoluzione del tuo schermo e il nome del tuo sistema operativo. <strong>Nessun identificativo
-				pubblicitario, nessun numero di dispositivo, nessun cookie, nessun identificativo persistente</strong> vi
-				compare. Come per qualsiasi richiesta su Internet, il server vede necessariamente il tuo indirizzo IP;
-				il nostro server non lo conserva: serve unicamente a dedurre il paese, la regione e la città e a
-				calcolare un'impronta anonima rinnovata ogni mese, che non permette né di seguirti da un mese
-				all'altro, né di riconoscerti in un'altra applicazione.
-			</p>
-			<p>
-				<strong>Un'eccezione, in totale trasparenza:</strong> se <em>rifiuti</em> il consenso, un unico evento
-				<code>consent_declined</code> viene inviato a Umami, affinché sappiamo quale percentuale di utenti
-				rifiuta. Non contiene alcun identificativo e non è seguito da alcun altro invio: la misurazione
-				dell'audience resta completamente disattivata. Se preferisci che non parta assolutamente nulla, rifiuta il
-				consenso <em>e</em> usa l'applicazione offline, oppure acquista il Premium.
+				Queste statistiche non sono collegate a nessuno: non possiamo ritrovare quelle che provengono dal
+				tuo telefono. Se preferisci che non parta assolutamente nulla, usa l'app offline: la scansione
+				funziona senza rete.
 			</p>
 		</section>
 
 		<section class="stack gap-2">
-			<h2>6. Notifiche push</h2>
+			<h2>6. Notifiche</h2>
 			<p>
-				Se hai dato il consenso e accettato la richiesta di notifiche del sistema, il dispositivo viene
-				registrato presso Firebase Cloud Messaging per poter ricevere messaggi. Le notifiche vengono inviate
-				manualmente dalla console Firebase; non esiste un server di invio automatizzato. Puoi disattivare le
-				notifiche in qualsiasi momento nelle impostazioni del tuo telefono, senza conseguenze sul funzionamento
-				dell'applicazione.
+				Dalla versione 1.2.13 l'app non riceve più notifiche e non chiede più di autorizzarle. Le versioni
+				precedenti, finché non vengono aggiornate, possono ancora riceverle tramite Firebase Cloud Messaging
+				(Google) se le avevi accettate; puoi disattivarle nelle impostazioni del telefono.
 			</p>
 		</section>
 
@@ -255,16 +271,21 @@ import Hero from '../../../components/Hero.astro';
 				di fatturazione, né la tua identità. L'applicazione riceve soltanto una prova d'acquisto, verificata
 				localmente, che serve a sbloccare la funzionalità.
 			</p>
+			<p>
+				A ogni acquisto, l'app avvisa anche l'editore con un avviso di vendita, inviato al servizio
+				<strong>ntfy.sh</strong> su un canale privato: la piattaforma (Android o iOS), il prezzo e la
+				versione dell'applicazione, senza alcun identificativo.
+			</p>
 		</section>
 
 		<section class="stack gap-2">
-			<h2>8. Una lettura dell'ora di riferimento</h2>
+			<h2>8. Cosa legge l'app online</h2>
 			<p>
-				Affinché il limite di 3 scansioni gratuite si azzeri a un'ora affidabile (e non possa essere aggirato
-				cambiando l'orologio del telefono), l'applicazione legge l'ora di riferimento presso un servizio Google
-				Firebase ospitato nell'Unione europea (Belgio, regione <code>europe-west1</code>). Questa richiesta è
-				<strong>in sola lettura</strong>: non trasmette alcun dato che ti riguardi. Se non riesce, viene usato
-				l'orologio locale.
+				<strong>Il nostro sito.</strong> All'avvio, l'app legge sul nostro sito, ludiven-studio.fr, un
+				piccolo file che indica il numero dell'ultima versione, per proporti un aggiornamento. Quando il
+				video di Pétanque Meet sostituisce una pubblicità, anche questo viene letto dal nostro sito. Non
+				viene inviato nulla; come per qualsiasi pagina web, l'hosting del sito (GitHub) vede l'indirizzo IP
+				del tuo telefono.
 			</p>
 		</section>
 
@@ -281,6 +302,12 @@ import Hero from '../../../components/Hero.astro';
 				<li>la tua scelta di consenso.</li>
 			</ul>
 			<p>
+				La tua risposta alla finestra «Pubblicità», con la sua data e la versione del testo, è
+				conservata anche nelle preferenze dell'app, per sapere quando richiedertela. Se hai accettato la
+				pubblicità, anche i moduli di LevelPlay, ironSource e Unity Ads conservano i propri dati sul
+				telefono.
+			</p>
+			<p>
 				Questi dati non vengono sincronizzati con un server e non vengono salvati nel cloud dall'applicazione.
 				Disinstallare l'applicazione li cancella — con un'eccezione: su iOS, l'indicatore del Premium può essere
 				conservato dal Portachiavi, ed è proprio questo che permette di ritrovare il tuo acquisto dopo una
@@ -295,8 +322,12 @@ import Hero from '../../../components/Hero.astro';
 				condividiamo nulla con intermediari di dati.
 			</p>
 			<ul>
-				<li><strong>Google Ireland Limited / Google LLC</strong> — pubblicità (AdMob), misurazione dell'audience (Firebase Analytics), notifiche (Firebase Cloud Messaging), gestione del consenso (UMP), ora di riferimento (Firebase Realtime Database).</li>
+				<li><strong>Unity Technologies</strong> — pubblicità (Unity LevelPlay, Unity Ads), se l'hai accettata.</li>
+				<li><strong>ironSource</strong>, controllata di Unity Technologies — pubblicità (ironSource Ads), se l'hai accettata. Le aste di ironSource e di Unity Ads possono trasmettere la richiesta di annuncio ad altri acquirenti di pubblicità (vedi §4).</li>
+				<li><strong>Google Ireland Limited / Google LLC</strong> — solo per le versioni precedenti alla 1.2.13, finché non vengono aggiornate: pubblicità (AdMob), gestione del consenso (UMP), misurazione dell'audience (Firebase Analytics), notifiche (Firebase Cloud Messaging) e ora di riferimento (Firebase Realtime Database), se le avevi accettate.</li>
 				<li><strong>Hetzner Online GmbH</strong> (Germania) — hosting del nostro server Umami per la misurazione dell'audience. Le versioni dell'app non ancora aggiornate continuano a inviare queste misurazioni a <strong>Umami Software, Inc.</strong> (società di diritto statunitense), tramite il servizio Umami Cloud.</li>
+				<li><strong>GitHub, Inc.</strong> — hosting del nostro sito, letto per la proposta di aggiornamento e il video di Pétanque Meet (vedi §8).</li>
+				<li><strong>ntfy.sh</strong> — servizio di notifiche che ci trasmette l'avviso di vendita (vedi §7).</li>
 				<li><strong>Apple Inc.</strong> e <strong>Google LLC</strong> — distribuzione dell'applicazione e gestione degli acquisti in-app.</li>
 			</ul>
 			<p>
@@ -310,10 +341,12 @@ import Hero from '../../../components/Hero.astro';
 			<h2>11. Periodi di conservazione</h2>
 			<ul>
 				<li><strong>Immagini della fotocamera</strong>: il tempo del calcolo, solo nella memoria RAM (pochi millisecondi).</li>
-				<li><strong>Dati di misurazione dell'audience — Firebase</strong>: conservati da Firebase Analytics per <strong>14 mesi al massimo</strong>, secondo la durata impostata nella console Firebase. I report aggregati (non riconducibili a un dispositivo) possono essere conservati più a lungo.</li>
+				<li><strong>Dati di misurazione dell'audience — Firebase (versioni precedenti alla 1.2.13)</strong>: conservati da Firebase Analytics per <strong>14 mesi al massimo</strong>, secondo la durata impostata nella console Firebase. I report aggregati (non riconducibili a un dispositivo) possono essere conservati più a lungo.</li>
 				<li><strong>Dati di misurazione dell'audience — Umami</strong>: conservati sotto forma di statistiche sugli eventi per <strong>24 mesi</strong> sul nostro server, poi cancellati; i suoi backup sono conservati 14 giorni. Quelli che Umami Cloud riceve ancora dalle versioni non aggiornate vi sono cancellati dopo 6 mesi. Questi dati non sono collegati ad alcun identificativo di dispositivo e non permettono di ricostruire il percorso di una persona.</li>
 				<li><strong>Contatore delle scansioni</strong>: azzerato ogni giorno.</li>
-				<li><strong>Indicatore del Premium e scelta di consenso</strong>: conservati sul dispositivo fino alla disinstallazione o fino alla revoca del tuo consenso.</li>
+				<li><strong>Dati pubblicitari</strong>: secondo le regole di Unity e di ironSource.</li>
+				<li><strong>La tua risposta sulla pubblicità</strong>: 6 mesi sul telefono, poi l'app te la richiede.</li>
+				<li><strong>Indicatore del Premium</strong>: conservato sul dispositivo fino alla disinstallazione (su iOS, il Portachiavi può conservarlo, vedi §9).</li>
 			</ul>
 		</section>
 
@@ -325,7 +358,7 @@ import Hero from '../../../components/Hero.astro';
 			</p>
 			<p><strong>In pratica:</strong></p>
 			<ul>
-				<li><strong>Revocare o modificare il tuo consenso</strong>: tocca «Gestisci il consenso pubblicitario» nelle impostazioni dell'app. La misurazione dell'audience e le notifiche vengono allora disattivate, e le pubblicità tornano in modalità non personalizzata.</li>
+				<li><strong>Revocare o modificare il tuo consenso</strong>: tocca «Gestisci il consenso pubblicitario» nelle impostazioni dell'app: la finestra «Pubblicità» ricompare. Se rifiuti, la pubblicità dei nostri partner si ferma subito. Il tracciamento su iOS si disattiva anche in Impostazioni › Privacy e sicurezza › Tracciamento.</li>
 				<li><strong>Cancellare i dati locali</strong>: disinstalla l'applicazione, oppure cancellane i dati dalle impostazioni del telefono.</li>
 				<li><strong>Reimpostare il tuo identificativo pubblicitario</strong>: Android → Impostazioni › Google › Annunci; iOS → Impostazioni › Privacy e sicurezza › Tracciamento.</li>
 				<li><strong>Esercitare i tuoi diritti nei nostri confronti</strong>: scrivi a <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>. Rispondiamo entro un mese. Tieni presente che, in assenza di un account utente e di un identificativo che ci permetta di riconoscerti, ci è materialmente impossibile ritrovare dati che ti riguardino nelle nostre statistiche: queste sono aggregate e non riconducibili a una persona identificabile da parte nostra.</li>
@@ -351,7 +384,7 @@ import Hero from '../../../components/Hero.astro';
 			<h2>14. Sicurezza</h2>
 			<p>
 				I dati memorizzati localmente lo sono tramite i meccanismi di archiviazione sicura forniti dal sistema
-				operativo. Gli scambi di rete con i servizi Google sono cifrati (HTTPS/TLS). Poiché non esiste alcun
+				operativo. Tutti gli scambi di rete sono cifrati (HTTPS/TLS). Poiché non esiste alcun
 				server applicativo proprio di Pétanque Scan, la superficie di esposizione è limitata ai fornitori
 				elencati al §10.
 			</p>

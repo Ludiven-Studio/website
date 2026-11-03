@@ -1540,3 +1540,37 @@
   commité ni déployé : sur l'accord de l'utilisateur
 - 19:09 : commité et poussé à la demande de l'utilisateur : index.ts de meetups et cette section seulement. Déploiement
   de la fonction en attente de son accord.. Statut : terminé. Réservations libérées.
+
+## 2026-11-03 — Pétanque Scan : pages légales pour la 1.2.13 (LevelPlay, 10 scans) (session website)
+- Statut : en cours (2026-11-03T08:00+01:00). Demande de l'utilisateur : (transmis par la session Pétanque Scan)
+  préparer la politique de confidentialité (5 langues) pour le passage d'AdMob à Unity LevelPlay de la 1.2.13 ; 3 scans
+  gratuits par jour deviennent 10 ; vérifier app-ads.txt ; pousser sur l'accord de l'utilisateur, à la sortie de la
+  1.2.13
+- Réservations actives : `src/pages{,/en,/es,/de,/it}/petanque-scanner/{confidentialite,cgu}.astro`,
+  `src/data/petanqueScanner.ts` (nombre de scans gratuits).
+- Ressources : serveur de dev sur le port 4508 ; eslint, `astro check`. Build annoncé ici avant.
+- 08:11 : politique de confidentialité (5 langues) réécrite d'après le code de la 1.2.13 (dépôt Scan, non commité) :
+  LevelPlay (ironSource Ads, Unity Ads) au lieu d'AdMob, fenêtre « Pubs et statistiques » (refus = aucun module pub ni
+  Firebase, bandeau et vidéo Pétanque Meet), redemandée après 6 mois, ATT après un oui ; liste des événements à jour
+  (31 groupes), champs Umami (version du système, modèle), alerte de vente ntfy.sh, lectures sur notre site
+  (version.json, vidéo Meet) et GitHub ; CGU (5 langues) : 10 scans, LevelPlay ; petanqueScanner.ts : 3 → 10 scans
+  (FAQ, page de téléchargement). eslint OK, astro check 0 erreur, captures sans erreur console
+- 08:11 : Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 08:13 : build complet OK : astro check 0 erreur, 192 pages, précache 362 entrées, liens OK. Rien de commité : à
+  pousser sur l'accord de l'utilisateur, à la sortie de la 1.2.13
+- 08:14 : réservé aussi : `src/content/work{,-en}/petanque-scanner.md` (texte alternatif de la capture Premium, qui
+  donnait 3 scans par jour comme quota). Réponses de la session Scan : SDK Google Mobile Ads inerte (fournisseur d'init
+  retiré, mesure retardée), Firebase sans identifiant publicitaire sur Android et iOS, notifications laissées en place
+  par un refus ultérieur : la politique le dit déjà
+- 08:15 : texte alternatif reformulé (FR « il reste trois scans gratuits aujourd'hui », EN « three free scans left
+  today ») : la capture montre le compteur du jour, pas le quota ; astro check 0 erreur. Rien de commité : à pousser
+  sur l'accord de l'utilisateur, à la sortie de la 1.2.13
+- 18:11 : Firebase retiré de Scan 1.2.13 (décision de l'utilisateur, relayée par petanque-ar-3c, vérifiée dans le code
+  Scan non commité) : confidentialité 5 langues mise à jour — fenêtre « Publicité » (pub seule), Umami sans
+  consentement (intérêt légitime), plus de FCM ni d'heure Firebase, Firebase cité seulement pour les versions < 1.2.13,
+  bandeau Meet ou Game (Android), événement game_store_opened. eslint OK, astro check 0 erreur, captures FR/IT OK.
+  Toujours non commité.
+- 19:09 : Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 19:11 : Build OK : 192 pages, precache 362, liens OK.
+- 19:11 : commité et poussé à la demande de l'utilisateur : mes 13 fichiers et cette section seulement. Statut :
+  terminé. Réservations libérées.
