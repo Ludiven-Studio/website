@@ -1584,3 +1584,14 @@
   APPLE_CLIENTS. Rien de commité ni déployé : sur l'accord de l'utilisateur
 - 21:52 : commité et poussé à la demande de l'utilisateur : mes 2 fichiers et cette section seulement ; app-save pas
   encore déployé. Statut : terminé. Réservations libérées.
+
+## 2026-11-03 — Nino Rush : page de téléchargement à jour (session ninorush)
+- Statut : en cours (2026-11-03T23:04+01:00). Demande de l'utilisateur : la page de téléchargement n'a pas l'air à
+  jour, avec encore le tatou
+- Réservations actives : `src/pages/nino-rush/telecharger.astro`, `src/data/ninoRush.ts`, `public/nino-rush/`.
+- Ressources : serveur de dev sur le port 4493 ; eslint, `astro check`. Build annoncé ici avant.
+- 23:06 : fait, non commité : lien vers la release GitHub nino-rush-dev (l'ancien lien GitLab servait la 1.0.0),
+  version 1.0.7, panda roux au lieu du tatou, compte facultatif, boutique et vidéos gratuites en test ; 7 images
+  refaites depuis le jeu. eslint OK, astro check 0 erreur, captures bureau et téléphone OK
+- 23:07 : commité et poussé à la demande de l'utilisateur : mes 9 fichiers et cette section seulement. Statut :
+  terminé. Réservations libérées.
