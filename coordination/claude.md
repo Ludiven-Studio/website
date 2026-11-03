@@ -1518,3 +1518,14 @@
   l'accord de l'utilisateur pour pousser
 - 20:11 : commité et poussé à la demande de l'utilisateur (« ok pousse ») : mes 16 fichiers et cette section seulement.
   Statut : terminé. Réservations libérées.
+
+## 2026-11-03 — Pétanque Meet : app-ads.txt, casse des identifiants Unity (session petanque-meet)
+- Statut : en cours (2026-11-03T10:09+01:00). Demande de l'utilisateur : Unity Ads signale 3 lignes manquantes dans
+  app-ads.txt (identifiants écrits en minuscules)
+- Réservations actives : `public/app-ads.txt`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 10:10 : 4 identifiants remis dans la casse donnée par Unity Ads (media.net 8CU5L226O, 8CU9B72O6, 8CUH46N56 ;
+  sharethrough SniqCOMC) : les 162 lignes Unity y sont, à l'identique. Rien de commité : à pousser sur l'accord de
+  l'utilisateur
+- 10:14 : commité et poussé à la demande de l'utilisateur : app-ads.txt et cette section seulement. Statut : terminé.
+  Réservations libérées.

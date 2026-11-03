@@ -8,7 +8,7 @@ sharethrough.com, ibazay96, RESELLER, d53b998a7bd4ecd2
 sharethrough.com, bc6d1whs, RESELLER, d53b998a7bd4ecd2
 sharethrough.com, ftvct81v, RESELLER
 sharethrough.com, 3713, RESELLER, d53b998a7bd4ecd2
-sharethrough.com, sniqcomc, RESELLER, d53b998a7bd4ecd2
+sharethrough.com, SniqCOMC, RESELLER, d53b998a7bd4ecd2
 sharethrough.com, r9b1mg7e, RESELLER, d53b998a7bd4ecd2
 sharethrough.com, 5828, RESELLER, 060d053dcf45cbf3
 sharethrough.com, bxzzb1br, RESELLER, d53b998a7bd4ecd2
@@ -58,7 +58,7 @@ contextweb.com, 558622, RESELLER, 89ff185a4c4e857c
 thebrave.io, 1234634, RESELLER, c25b2154543746ac
 ogury.com, 065d4ff5-a269-44be-9634-9d4d7af2dfc3, RESELLER
 undertone.com, 4108, RESELLER
-Media.net, 8CUH46N56, RESELLER
+media.net, 8CUH46N56, RESELLER
 lacunads.com, lcb555b3bc8667a09a, RESELLER
 smartadserver.com, 5294, RESELLER, 060d053dcf45cbf3
 smartadserver.com, 4456, RESELLER
@@ -74,10 +74,10 @@ video.unrulymedia.com, 657436911, RESELLER
 video.unrulymedia.com, 144138083, RESELLER
 kidoz.net, 15467, RESELLER, a109366414b7335e
 kidoz.net, 14260, RESELLER, a109366414b7335e
-media.net, 8cu5l226o, RESELLER
+media.net, 8CU5L226O, RESELLER
 media.net, 8cu12aq1y, RESELLER
 media.net, 8cu355vs4, RESELLER
-media.net, 8cu9b72o6, RESELLER
+media.net, 8CU9B72O6, RESELLER
 prado.co, 14260, RESELLER
 rubiconproject.com, 15268, RESELLER, 0bfd66d529a55807
 rubiconproject.com, 20014, RESELLER, 0bfd66d529a55807
