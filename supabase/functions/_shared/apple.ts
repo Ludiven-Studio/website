@@ -17,6 +17,7 @@ export const APPLE_CLIENTS = new Set([
 	'com.ludivenstudio.petanquegame', 'com.ludivenstudio.petanquegame.dev',
 	'com.ludivenstudio.dragonsgems', 'com.ludivenstudio.dragonsgems.dev',
 	'com.ludivenstudio.petanquemeet', 'com.ludivenstudio.petanquemeetdev',
+	'com.ludivenstudio.ninorush', 'com.ludivenstudio.ninorush.dev',
 ]);
 
 /** An authorization code as Apple writes them: short, URL-safe. */

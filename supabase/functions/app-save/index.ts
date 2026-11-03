@@ -29,7 +29,8 @@ const json = (body: unknown, status = 200): Response =>
 	new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
 const bad = (reason: string, status = 400): Response => json({ error: reason }, status);
 
-const APPS = new Set(['dragonsgems']);
+// Nino Rush keeps no score anyone else sees: its copy is stored as sent.
+const APPS = new Set(['dragonsgems', 'ninorush']);
 const MAX_BYTES = 64 * 1024;
 
 const parisDay = (offset: number): string =>

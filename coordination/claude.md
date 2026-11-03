@@ -1574,3 +1574,13 @@
 - 19:11 : Build OK : 192 pages, precache 362, liens OK.
 - 19:11 : commité et poussé à la demande de l'utilisateur : mes 13 fichiers et cette section seulement. Statut :
   terminé. Réservations libérées.
+
+## 2026-11-03 — Nino Rush : sauvegarde du compte studio (session ninorush)
+- Statut : en cours (2026-11-03T19:13+01:00). Demande de l'utilisateur : authentification, pubs et achats comme pour
+  les autres jeux
+- Réservations actives : `supabase/functions/app-save/index.ts`, `supabase/functions/_shared/apple.ts`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 19:13 : app-save accepte l'app ninorush (copie gardée telle quelle, 64 Ko max) ; bundles Nino Rush dans
+  APPLE_CLIENTS. Rien de commité ni déployé : sur l'accord de l'utilisateur
+- 21:52 : commité et poussé à la demande de l'utilisateur : mes 2 fichiers et cette section seulement ; app-save pas
+  encore déployé. Statut : terminé. Réservations libérées.
