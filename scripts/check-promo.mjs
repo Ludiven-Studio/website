@@ -14,6 +14,12 @@ const PLATFORMS = ['android', 'ios'];
 const SPOTS = ['banner', 'video'];
 // Texture2D.LoadImage reads PNG and JPEG only.
 const IMAGE = /\.(png|jpe?g)$/i;
+// The glyphs every app's static Inter atlas holds (Meet, Scan, PG, Dragon Gems, Nino Rush, 2026-11-04):
+// any other character shows as a box. Not in it: œ Œ, the soft hyphen and the narrow no-break space (U+202F).
+const GLYPHS = new Set(
+	[[0x20, 0x7e], [0xa0, 0xac], [0xae, 0xff], [0x2010, 0x2027], [0x2030, 0x2055], [0x2057, 0x2057], [0x20ac, 0x20ac], [0x2122, 0x2122], [0x25a1, 0x25a1]]
+		.flatMap(([a, b]) => Array.from({ length: b - a + 1 }, (_, i) => a + i)),
+);
 
 /** The public/ file a catalogue URL points to, or null when it is elsewhere. */
 function localFile(url, base) {
@@ -21,7 +27,7 @@ function localFile(url, base) {
 	return u.origin === SITE ? join(PUBLIC, decodeURIComponent(u.pathname)) : null;
 }
 
-function texts(value, what, errors, { required = false } = {}) {
+function texts(value, what, errors, { required = false, shown = true } = {}) {
 	if (value === undefined && !required) return {};
 	if (!value || typeof value !== 'object' || Array.isArray(value)) {
 		errors.push(`${what} is not an object of languages`);
@@ -30,6 +36,11 @@ function texts(value, what, errors, { required = false } = {}) {
 	for (const [k, v] of Object.entries(value)) {
 		if (!LANG.test(k)) errors.push(`${what}: "${k}" is not a two-letter language`);
 		if (typeof v !== 'string' || !v.trim()) errors.push(`${what}.${k} is empty`);
+		else if (shown) {
+			const missing = [...new Set([...v].filter((c) => !GLYPHS.has(c.codePointAt(0))))];
+			if (missing.length)
+				errors.push(`${what}.${k}: ${missing.map((c) => `"${c}" (U+${c.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')})`).join(', ')} not in the apps' fonts`);
+		}
 	}
 	return value;
 }
@@ -63,7 +74,7 @@ function checkEntry(e, base, defaultLanguage) {
 	if (!title[defaultLanguage]) errors.push(`no title in the default language (${defaultLanguage})`);
 	texts(e.text, 'text', errors);
 	url(e.image, 'image', base, errors, { image: true });
-	const clips = texts(e.clips, 'clips', errors);
+	const clips = texts(e.clips, 'clips', errors, { shown: false });
 	for (const [k, v] of Object.entries(clips)) url(v, `clips.${k}`, base, errors);
 	const link = e.link;
 	if (!link || typeof link !== 'object') errors.push('no link');
