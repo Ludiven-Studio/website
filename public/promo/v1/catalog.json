@@ -1,0 +1,167 @@
+{
+  "schema": 1,
+  "updated": "2026-11-04T20:00:00Z",
+  "rotationSeconds": 30,
+  "defaultLanguage": "fr",
+  "entries": [
+    {
+      "id": "petanque-meet",
+      "title": {
+        "fr": "Pétanque Meet",
+        "en": "Pétanque Meet",
+        "es": "Pétanque Meet",
+        "de": "Pétanque Meet",
+        "it": "Pétanque Meet"
+      },
+      "text": {
+        "fr": "Trouve une partie de pétanque près de chez toi",
+        "en": "Find a pétanque game near you",
+        "es": "Encuentra una partida de petanca cerca de ti",
+        "de": "Finde ein Boule-Spiel in deiner Nähe",
+        "it": "Trova una partita di pétanque vicino a te"
+      },
+      "image": "img/petanque-meet.png",
+      "clips": {
+        "fr": "/petanque-scanner/promo/meet_fr.mp4",
+        "en": "/petanque-scanner/promo/meet_en.mp4",
+        "es": "/petanque-scanner/promo/meet_es.mp4",
+        "de": "/petanque-scanner/promo/meet_de.mp4",
+        "it": "/petanque-scanner/promo/meet_it.mp4"
+      },
+      "link": {
+        "android": "com.ludivenstudio.petanquemeet",
+        "ios": "6823583416"
+      },
+      "hideIn": [
+        "com.ludivenstudio.petanquemeet"
+      ]
+    },
+    {
+      "id": "petanque-game",
+      "title": {
+        "fr": "Pétanque Game",
+        "en": "Pétanque Game",
+        "es": "Pétanque Game",
+        "de": "Pétanque Game",
+        "it": "Pétanque Game"
+      },
+      "text": {
+        "fr": "La pétanque en 3D, en ligne ou à deux",
+        "en": "Pétanque in 3D, online or with a friend",
+        "es": "La petanca en 3D, en línea o entre dos",
+        "de": "Boule in 3D, online oder zu zweit",
+        "it": "La pétanque in 3D, online o in due"
+      },
+      "image": "img/petanque-game.png",
+      "clips": {
+        "fr": "clips/petanque-game_fr.mp4",
+        "en": "clips/petanque-game_en.mp4",
+        "es": "clips/petanque-game_es.mp4",
+        "de": "clips/petanque-game_de.mp4",
+        "it": "clips/petanque-game_it.mp4"
+      },
+      "link": {
+        "android": "com.ludivenstudio.petanquegame"
+      },
+      "hideIn": [
+        "com.ludivenstudio.petanquegame"
+      ],
+      "platforms": [
+        "android"
+      ]
+    },
+    {
+      "id": "petanque-scan",
+      "title": {
+        "fr": "Pétanque Scan",
+        "en": "Pétanque Scan",
+        "es": "Pétanque Scan",
+        "de": "Pétanque Scan",
+        "it": "Pétanque Scan"
+      },
+      "text": {
+        "fr": "Qui a le point ? Ton téléphone mesure",
+        "en": "Who has the point? Your phone measures",
+        "es": "¿Quién tiene el punto? Tu móvil mide",
+        "de": "Wer liegt vorn? Dein Handy misst",
+        "it": "Chi ha il punto? Lo misura il telefono"
+      },
+      "image": "img/petanque-scan.png",
+      "clips": {
+        "fr": "clips/petanque-scan.mp4"
+      },
+      "link": {
+        "android": "com.raphbenpro.petanquear",
+        "ios": "6670211733"
+      },
+      "hideIn": [
+        "com.raphbenpro.petanquear"
+      ]
+    },
+    {
+      "id": "dragon-gems",
+      "title": {
+        "fr": "Dragon Gems Swipe",
+        "en": "Dragon Gems Swipe",
+        "es": "Dragon Gems Swipe",
+        "de": "Dragon Gems Swipe",
+        "it": "Dragon Gems Swipe"
+      },
+      "text": {
+        "fr": "Puzzle de gemmes à glisser",
+        "en": "Gem puzzle: slide and blast",
+        "es": "Puzle de gemas para deslizar",
+        "de": "Puzzle: Edelsteine wischen",
+        "it": "Puzzle di gemme da scorrere"
+      },
+      "image": "img/dragon-gems.png",
+      "clips": {
+        "fr": "clips/dragon-gems_fr.mp4",
+        "en": "clips/dragon-gems_en.mp4",
+        "es": "clips/dragon-gems_es.mp4",
+        "de": "clips/dragon-gems_de.mp4",
+        "it": "clips/dragon-gems_it.mp4"
+      },
+      "link": {
+        "android": "com.ludivenstudio.dragonsgems"
+      },
+      "hideIn": [
+        "com.ludivenstudio.dragonsgems"
+      ],
+      "platforms": [
+        "android"
+      ]
+    },
+    {
+      "id": "nino-rush",
+      "title": {
+        "fr": "Nino Rush",
+        "en": "Nino Rush",
+        "es": "Nino Rush",
+        "de": "Nino Rush",
+        "it": "Nino Rush"
+      },
+      "text": {
+        "fr": "Nino le panda roux file vers son terrier",
+        "en": "Nino the red panda races home",
+        "es": "Nino, el panda rojo, corre a su madriguera",
+        "de": "Nino, der Rote Panda, rast nach Hause",
+        "it": "Nino il panda rosso corre verso la tana"
+      },
+      "image": "img/nino-rush.png",
+      "clips": {
+        "fr": "clips/nino-rush.mp4"
+      },
+      "link": {
+        "web": "/nino-rush/telecharger/"
+      },
+      "hideIn": [
+        "com.ludivenstudio.ninorush"
+      ],
+      "platforms": [
+        "android"
+      ],
+      "weight": 0
+    }
+  ]
+}
