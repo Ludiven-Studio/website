@@ -1595,3 +1595,14 @@
   refaites depuis le jeu. eslint OK, astro check 0 erreur, captures bureau et téléphone OK
 - 23:07 : commité et poussé à la demande de l'utilisateur : mes 9 fichiers et cette section seulement. Statut :
   terminé. Réservations libérées.
+
+## 2026-11-04 — Nino Rush : page de téléchargement en 1.0.8 (session ninorush)
+- Statut : en cours (2026-11-04T07:12+01:00). Demande de l'utilisateur : il faut l'uploader sur GitHub, publie (la
+  1.0.8)
+- Réservations actives : `src/data/ninoRush.ts`.
+- Ressources : serveur de dev sur le port 4494 ; eslint, `astro check`. Build annoncé ici avant.
+- 07:14 : fait, non commité : version 1.0.8 et 85,0 Mo, comme l'APK publié sur nino-rush-dev (le lien sert le même
+  fichier, sha256 vérifié). eslint OK, astro check 0 erreur, captures bureau et téléphone OK (serveur 4494 arrêté). Pas
+  de build complet : seules deux constantes changent. À pousser sur l'accord de l'utilisateur
+- 07:18 : commité et poussé à la demande de l'utilisateur : src/data/ninoRush.ts et cette section seulement. Statut :
+  terminé. Réservations libérées.
