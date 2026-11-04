@@ -1646,3 +1646,23 @@
   l'utilisateur, push à son accord
 - 11:23 : commité et poussé à la demande de l'utilisateur : mes 2 fichiers et cette section seulement. Statut :
   terminé. Réservations libérées.
+
+## 2026-11-04 — LudivenTools : catalogue des pubs maison (session ludiventools)
+- Statut : en cours (2026-11-04T19:59+01:00). Demande de l'utilisateur : (transmis par le Producer, voulu par Raphaël)
+  catalogue en ligne des pubs maison des apps : promo/v1/catalog.json, images, clips, contrôle au build ; préparé sans
+  push
+- Réservations actives : `public/promo/`, `scripts/check-promo.mjs`, `package.json` (script build).
+- Ressources : serveur de dev sur le port 4533 ; eslint, `astro check`. Build annoncé ici avant.
+- 21:36 : Module poussé dans LudivenTools (cdff52d8, 14/14 tests, compile Android OK). Lancement du build complet dans
+  mon worktree website-worktrees/house-ads (branche house-ads), pas dans le dossier partagé.
+- 21:38 : Build complet OK dans le worktree house-ads : check-promo (5 entrées), astro check, 192 pages, précache et
+  liens. Branche house-ads (cbd5198) prête, pas poussée : le push sur main attend l'accord de Raphaël.
+- 22:08 : check-promo refuse aussi un titre ou un texte avec un caractère absent des polices Inter statiques des 5 apps
+  (ni œ ni U+202F). Commit 6be sur house-ads, pas poussé.
+- 22:08 : Correction : le commit de la vérification des glyphes est 4548215 (pas « 6be »).
+- 22:13 : Ciblage de Raphaël (hideIn) : les applis de pétanque entre elles, les jeux entre eux, Pétanque Game partout
+  sauf chez lui. Commit cbe0390 sur house-ads, pas poussé.
+- 22:47 : Clips de Pétanque Scan en 5 langues (fournis par sa session), ancien clip unique retiré. Commit e61871e sur
+  house-ads, check-promo OK, pas poussé.
+- 23:27 : commité et poussé à la demande de l'utilisateur : mes 4 commits (cbd5198, 4548215, cbe0390, e61871e) et cette
+  section seulement. Statut : terminé. Réservations libérées.
