@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated": "2026-11-04T21:10:00Z",
+  "updated": "2026-11-04T21:50:00Z",
   "rotationSeconds": 30,
   "defaultLanguage": "fr",
   "entries": [
@@ -90,7 +90,11 @@
       },
       "image": "img/petanque-scan.png",
       "clips": {
-        "fr": "clips/petanque-scan.mp4"
+        "fr": "clips/petanque-scan_fr.mp4",
+        "en": "clips/petanque-scan_en.mp4",
+        "es": "clips/petanque-scan_es.mp4",
+        "de": "clips/petanque-scan_de.mp4",
+        "it": "clips/petanque-scan_it.mp4"
       },
       "link": {
         "android": "com.raphbenpro.petanquear",
