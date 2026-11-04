@@ -1,0 +1,131 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import Hero from '../../../components/Hero.astro';
+import LangSwitch from '../../../components/LangSwitch.astro';
+---
+
+<BaseLayout
+	title="Privacy policy of the Nino Rush app | Ludiven Studio"
+	description="Privacy policy of the Nino Rush mobile game: no account needed, optional video ads after your consent, our own videos, optional account and online copy, in-app purchases, account deletion, GDPR rights."
+	lang="en"
+	alternates={{ fr: '/nino-rush/confidentialite/', en: '/en/nino-rush/confidentialite/' }}
+>
+	<div class="wrapper stack gap-12 legal">
+		<div class="stack gap-8">
+			<LangSwitch lang="en" href="/nino-rush/confidentialite/" />
+			<Hero
+				title="Privacy — Nino Rush"
+				tagline="Your progress stays on your phone. Video ads only when you choose them."
+			/>
+		</div>
+
+		<p class="updated">
+			This policy covers <strong>the Nino Rush mobile game</strong> (<code>com.ludivenstudio.ninorush</code>). The rest of the website has its <a href="/confidentialite/">own policy</a> (in French). Last updated: November 4, 2026.
+		</p>
+		<p class="updated">
+			This is a courtesy translation. In case of discrepancy, the <a href="/nino-rush/confidentialite/" hreflang="fr">original French version</a> prevails.
+		</p>
+
+		<div class="summary">
+			<p><strong>In short:</strong></p>
+			<p>The game plays with no account and no network: your progress stays on your phone. Video ads are optional, and our ad partners only start with your consent. An account, optional too, keeps your progress online. The game runs no usage analytics and no crash reports, and we do not sell your data. The game is for ages 13 and up.</p>
+		</div>
+
+		<section class="stack gap-2">
+			<h2>1. Who is responsible</h2>
+			<p>Publisher of the app and data controller:</p>
+			<ul>
+				<li>Company: <strong>Ludiven Studio</strong></li>
+				<li>Legal form: EURL (French single-member limited company) with a capital of €1,000</li>
+				<li>Registration: 999&nbsp;253&nbsp;586 R.C.S. Vienne — SIRET 999&nbsp;253&nbsp;586&nbsp;00013</li>
+				<li>Registered office: 1166 route de la Ranche, 38440 Châtonnay, France</li>
+				<li>Contact: <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a></li>
+			</ul>
+			<p>See also the <a href="/mentions-legales/">legal notice</a> (in French).</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>2. On your phone</h2>
+			<p>Your progress (levels, stars, coins, outfits, stickers, settings, path of your best run) is stored on your phone, in the app's folder, with your choice about ads and, if you are signed in, your session. It may also be copied to your phone's backup if that is on. It goes away if you uninstall the game, unless that backup restores it.</p>
+			<p>Levels you make in the workshop stay on your phone too. If you tap "Share", the game copies a code to the clipboard and you choose where to paste it: the game sends nothing. The code holds the level, its random name and your best time, nothing about you. The game only reads the clipboard when you tap "Paste a code".</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>3. Video ads</h2>
+			<p>The game is free. At the end of a level, a video can double your coins, five times a day at most, and only when you ask for it. These videos come from <strong>Unity</strong>: the <strong>Unity LevelPlay</strong> mediation, with the <strong>Unity Ads</strong> and <strong>ironSource Ads</strong> networks.</p>
+			<p><strong>Your consent.</strong> At first launch, the game asks whether our ad partners may pick these videos based on your device: "Accept" or "Refuse", two identical buttons. Unity's module only starts after "Accept". If you refuse, you only see videos of our other games (see below). The game asks again after six months, or if this text or our partners change. You can change your mind at any time: Settings › "Ad choices".</p>
+			<p>After a refusal, when you ask for a reward, the game offers once per session to "Turn ads on": that yes shows our partners' question again, with this link, and only "Accept" starts them. "Watch a video of our games" gives you the reward with no partner at all.</p>
+			<p>Once you have agreed, Unity's module receives, at every launch: your phone's advertising ID (on iPhone, only if you allow tracking), other device and app identifiers, your IP address (which gives an approximate location), your interactions with the videos, how long you use the app, your purchase history, technical information (model, language, screen size, connection type, performance) and, on Android, which app stores are installed (Google Play, Samsung, Huawei…). Unity uses it to show the videos, measure them, fight fraud and pick them by your interests, and shares it with advertisers. We give it neither your account, nor your email address, nor your progress. Legal basis: your consent.</p>
+			<p>On iPhone, after you agree, Apple asks for your permission to track. Without it, the iPhone's advertising ID is not used.</p>
+			<p>If you withdraw your consent, the game passes it on to Unity at once, which also takes it as an opt-out of the "sale" of your data under US state laws. Unity's module stays on until the game closes, then no longer starts. You can also reset or delete the advertising ID in your phone's settings. To learn more: Unity's privacy policy, <a href="https://unity.com/legal/game-player-and-app-user-privacy-policy">https://unity.com/legal/game-player-and-app-user-privacy-policy</a>.</p>
+			<p>The "No ads" purchase doubles your coins with no video at all, and Unity's module no longer starts, whatever your choice.</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>4. Our own videos</h2>
+			<p>Our videos ("house ads") show our other games. Their list, pictures and videos come from our website, ludiven-studio.fr, hosted by GitHub Pages. The game downloads their list at every launch, before any answer, then the pictures and videos when it shows them; it keeps the list and the pictures to work offline. Nothing about you is sent: as with any web page, the host only sees your phone's IP address.</p>
+			<p>After 10 seconds, the reward is yours, whether you tap "Discover" or not. "Discover" opens the game's page on Google Play, the App Store or our website. On Google Play, the link only says that it comes from a Nino Rush video, nothing about you. Legal basis: our legitimate interest in making our games known.</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>5. Your account (optional)</h2>
+			<p>In Settings › "Account", you can sign in with Google, or with Apple on iPhone. This is the <strong>Ludiven Studio account</strong>: the same one works for our other games, the Pétanque Meet app and the website. Playing, buying and watching videos never need it.</p>
+			<p>We then receive an account ID and your email address; with Apple, it may be the relay address that hides yours, or none. We never receive your password. With Google, the sign-in service also keeps the name and photo of your Google profile: we neither show nor use them. For security, it records the IP address and the software of each sign-in session.</p>
+			<p>Once you are signed in, a copy of your progress goes online: your levels (stars, crowns, best times), coins, outfits, stickers, puzzles and records, play counters (jumps, falls…), the day's video count and your purchases (the big wardrobe, "No ads", coins bought and their transaction numbers). Your settings (sound, controls, language, graphics), your ghosts and your workshop levels stay on the phone. Only you see your email address, in the game.</p>
+			<p>This data is hosted by Supabase, in the European Union (Ireland). Legal basis: the service you ask for when you sign in.</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>6. In-app purchases</h2>
+			<p>The shop, behind a question for grown-ups, sells the big wardrobe, "No ads" and coin packs. Payment goes entirely through Google Play or the App Store: we never see your name or your payment method. Unity's purchase module runs on your phone and goes through the store; according to Unity, it only handles technical information, for the time of the exchange. The game keeps your purchases, and the transaction numbers of coin packs, in your progress. "Restore purchases", in the shop, gives back the wardrobe and "No ads" after a reinstall, on the same Google Play or Apple account. Legal basis: carrying out your purchase.</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>7. What the game does not do</h2>
+			<p>No usage analytics and no crash reports: Unity's measurement tools are off in the game. No precise location, contacts, photos, files, microphone or camera: the game asks for none of these permissions.</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>8. Who receives your data, and for how long</h2>
+			<p>We do not sell your data. Only these companies process it:</p>
+			<ul>
+				<li><strong>Supabase</strong>: accounts and saves, hosted in Ireland;</li>
+				<li><strong>GitHub</strong>: hosting of our website and our videos;</li>
+				<li><strong>Unity Technologies</strong> and its subsidiary ironSource: the video ads, after your consent, and the purchase module. For ads, Unity also acts on its own behalf;</li>
+				<li><strong>Google</strong> and <strong>Apple</strong>: signing in to your account, distributing the game and paying for purchases.</li>
+			</ul>
+			<p>Supabase, GitHub and Unity are US companies: these transfers follow chapter V of the GDPR (standard contractual clauses, or the EU–US Data Privacy Framework).</p>
+			<p>Your account and its save are kept until you delete the account. The IP address stays a few days in Supabase's technical logs, as long as GitHub sets in its own, and with your session while it lasts. Ad data is kept by Unity, under its policy. Your choice about ads stays on your phone, and the game asks again after six months.</p>
+		</section>
+
+		<section class="stack gap-2" id="suppression">
+			<h2>9. Delete your account</h2>
+			<p>In the game: Settings › "Account" › "Delete account", then "Delete". It is immediate and final:</p>
+			<ul>
+				<li>your Ludiven Studio account and your email address are erased;</li>
+				<li>your online save of Nino Rush, and those of our other games, are erased;</li>
+				<li>what this account holds in Pétanque Meet is erased or anonymized;</li>
+				<li>with Apple, the game asks Apple for a code to cut the link between your Apple ID and us.</li>
+			</ul>
+			<p>The progress on your phone stays; uninstalling the game erases it. Your purchases stay tied to your Google Play or Apple account: "Restore purchases" gives back the wardrobe and "No ads".</p>
+			<p>Without the game: write to <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a> from your account's address. We delete it within a month. Ad data is held by Unity: ask Unity to erase it, or write to us and we will pass it on.</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>10. Your rights</h2>
+			<p>You have the right to access, correct, erase, restrict, object and port your data. To use them, write to <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>: we answer within a month. You can also complain to the CNIL (www.cnil.fr), the French data protection authority.</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>11. Age</h2>
+			<p>The game is for ages 13 and up. If you are under 15, ask your parents before tapping "Accept", before a purchase and before signing in. A parent can write to us to have an account deleted: we will delete it.</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>12. Changes</h2>
+			<p>We update this page whenever a change in the game touches your data, with its date at the top.</p>
+			<p>The "Privacy" link in the game opens this page in your browser. From there your browser and the website apply, under their own policy.</p>
+			<p>Questions: <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a></p>
+		</section>
+	</div>
+</BaseLayout>
