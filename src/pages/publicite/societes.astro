@@ -1,0 +1,79 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Hero from '../../components/Hero.astro';
+---
+
+<BaseLayout
+	title="Les sociétés de la publicité dans nos applis | Ludiven Studio"
+	description="Qui reçoit quoi quand vous acceptez la publicité personnalisée dans Pétanque Scan, Pétanque Meet, Pétanque Game et Dragon Gems."
+	lang="fr"
+	alternates={{ fr: '/publicite/societes/', en: '/en/publicite/societes/', es: '/es/publicite/societes/', de: '/de/publicite/societes/', it: '/it/publicite/societes/' }}
+>
+	<div class="wrapper stack gap-12 legal">
+		<Hero
+			title="Les sociétés de la publicité"
+			tagline="Qui reçoit quoi quand vous acceptez la publicité personnalisée dans nos applis."
+		/>
+
+		<p class="updated">
+			Cette page est celle du lien « Voir les sociétés » de la fenêtre de consentement de nos applis :
+			Pétanque Scan, Pétanque Meet, Pétanque Game et Dragon Gems. Dernière mise à jour&nbsp;: 4 novembre 2026.
+		</p>
+
+		<section class="stack gap-2">
+			<h2>1. Ce que vous acceptez</h2>
+			<p>
+				Une seule chose, la <strong>publicité personnalisée</strong>&nbsp;: choisir les publicités selon votre
+				profil, limiter leur répétition, mesurer leur efficacité et lutter contre la fraude.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>2. Qui la sert</h2>
+			<ul>
+				<li><strong>Unity Ads</strong> et <strong>ironSource Ads</strong>, par <strong>Unity LevelPlay</strong>&nbsp;: Unity Technologies et sa filiale ironSource.</li>
+				<li>
+					Par leurs enchères, la demande d'annonce peut partir, avec des données personnelles comme
+					l'identifiant publicitaire de votre téléphone, vers <strong>d'autres sociétés publicitaires</strong>.
+					Unity en publie la liste, environ 95 sociétés, à la section 13 de sa
+					<a href="https://unity.com/legal/game-player-and-app-user-privacy-policy" target="_blank" rel="noopener">politique de confidentialité</a>.
+				</li>
+			</ul>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>3. Si vous refusez</h2>
+			<p>
+				Le module publicitaire ne démarre pas&nbsp;: rien n'est envoyé à ces sociétés. L'appli montre seulement
+				nos propres annonces, pour nos autres applis, dont la liste est lue sur ce site.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>4. Sur iPhone</h2>
+			<p>
+				Si vous refusez le suivi demandé par Apple, les publicités ne sont pas personnalisées et nos partenaires
+				ne reçoivent pas l'identifiant publicitaire de votre iPhone, même si vous avez accepté la publicité.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>5. Changer d'avis</h2>
+			<p>
+				À tout moment, dans les réglages de l'appli. Un retrait arrête la publicité personnalisée et est transmis
+				au module publicitaire. L'appli vous redemande votre choix au bout de 6 mois.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>6. Pour chaque appli</h2>
+			<p>Le détail des données et de vos droits est dans la politique de confidentialité de chaque appli&nbsp;:</p>
+			<ul>
+				<li><a href="/petanque-scanner/confidentialite/">Pétanque Scan</a></li>
+				<li><a href="/petanque-meet/confidentialite/">Pétanque Meet</a></li>
+				<li><a href="/petanque-game/confidentialite/">Pétanque Game</a></li>
+				<li><a href="/dragons-gems/confidentialite/">Dragon Gems</a></li>
+			</ul>
+		</section>
+	</div>
+</BaseLayout>

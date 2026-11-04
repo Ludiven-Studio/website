@@ -1,0 +1,63 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import Hero from '../../../components/Hero.astro';
+---
+
+<BaseLayout
+	title="Die Werbeunternehmen in unseren Apps | Ludiven Studio"
+	description="Wer was erhält, wenn du personalisierter Werbung in Pétanque Scan, Pétanque Meet, Pétanque Game und Dragon Gems zustimmst."
+	lang="de"
+	alternates={{ fr: '/publicite/societes/', en: '/en/publicite/societes/', es: '/es/publicite/societes/', de: '/de/publicite/societes/', it: '/it/publicite/societes/' }}
+>
+	<div class="wrapper stack gap-12 legal">
+		<Hero
+			title="Die Werbe­unternehmen"
+			tagline="Wer was erhält, wenn du personalisierter Werbung in unseren Apps zustimmst."
+		/>
+
+		<p class="updated">Dies ist die Seite hinter dem Link „Unternehmen ansehen“ im Einwilligungsfenster unserer Apps: Pétanque Scan, Pétanque Meet, Pétanque Game und Dragon Gems. Zuletzt aktualisiert: 4. November 2026.</p>
+		<p class="updated">Dies ist eine unverbindliche Übersetzung. Bei Abweichungen gilt die <a href="/publicite/societes/" hreflang="fr">französische Originalfassung</a>.</p>
+
+		<section class="stack gap-2">
+			<h2>1. Wozu du zustimmst</h2>
+			<p>Zu einer einzigen Sache, der <strong>personalisierten Werbung</strong>: Anzeigen nach deinem Profil auswählen, ihre Wiederholung begrenzen, ihre Wirkung messen und Betrug bekämpfen.</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>2. Wer sie ausliefert</h2>
+			<ul>
+				<li><strong>Unity Ads</strong> und <strong>ironSource Ads</strong>, über <strong>Unity LevelPlay</strong>: Unity Technologies und ihre Tochter ironSource.</li>
+				<li>
+					Über ihre Auktionen kann die Anzeigenanfrage mit personenbezogenen Daten wie der Werbe-ID deines Telefons an <strong>andere Werbeunternehmen</strong> gehen. Unity veröffentlicht deren Liste, etwa 95 Unternehmen, in Abschnitt 13 seiner
+					<a href="https://unity.com/legal/game-player-and-app-user-privacy-policy" target="_blank" rel="noopener">Datenschutzerklärung</a>.
+				</li>
+			</ul>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>3. Wenn du ablehnst</h2>
+			<p>Das Werbemodul startet nicht: Nichts wird an diese Unternehmen gesendet. Die App zeigt nur unsere eigenen Anzeigen für unsere anderen Apps, deren Liste von dieser Website gelesen wird.</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>4. Auf dem iPhone</h2>
+			<p>Wenn du das von Apple abgefragte Tracking ablehnst, wird die Werbung nicht personalisiert und unsere Partner erhalten die Werbe-ID deines iPhones nicht, auch wenn du der Werbung zugestimmt hast.</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>5. Meinung ändern</h2>
+			<p>Jederzeit, in den Einstellungen der App. Ein Widerruf beendet die personalisierte Werbung und wird an das Werbemodul weitergegeben. Die App fragt nach 6 Monaten erneut nach deiner Wahl.</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>6. Für jede App</h2>
+			<p>Die Einzelheiten zu den Daten und zu deinen Rechten stehen in der Datenschutzerklärung jeder App:</p>
+			<ul>
+				<li><a href="/de/petanque-scanner/confidentialite/">Pétanque Scan</a></li>
+				<li><a href="/petanque-meet/confidentialite/" hreflang="fr">Pétanque Meet</a> (auf Französisch)</li>
+				<li><a href="/de/petanque-game/confidentialite/">Pétanque Game</a></li>
+				<li><a href="/dragons-gems/confidentialite/" hreflang="fr">Dragon Gems</a> (auf Französisch)</li>
+			</ul>
+		</section>
+	</div>
+</BaseLayout>
