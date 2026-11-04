@@ -18,7 +18,7 @@ import Hero from '../../../components/Hero.astro';
 		<p class="updated">
 			Esta política se refiere a <strong>la aplicación móvil Pétanque Scan</strong>
 			(antes llamada Pétanque Scanner, <code>com.raphbenpro.petanquear</code>), y no al sitio web ludiven-studio.fr, que tiene su
-			<a href="/confidentialite/">propia política</a>. Última actualización: 3 de noviembre de 2026 (versión 1.2.13: la publicidad pasa de Google AdMob a Unity LevelPlay, con nuestra propia ventana de consentimiento; se retira Google Firebase; 10 escaneos gratis al día en lugar de 3).
+			<a href="/confidentialite/">propia política</a>. Última actualización: 4 de noviembre de 2026 (versión 1.2.13: la publicidad pasa de Google AdMob a Unity LevelPlay, con nuestra propia ventana de consentimiento; se retira Google Firebase; 10 escaneos gratis al día en lugar de 3).
 		</p>
 		<p class="updated">
 			Esta es una traducción de cortesía. En caso de discrepancia, prevalece la
@@ -72,6 +72,13 @@ import Hero from '../../../components/Hero.astro';
 			<p>
 				En consecuencia, el uso de la cámara no da lugar a <strong>ninguna recogida de datos personales</strong>
 				por parte del editor.
+			</p>
+			<p>
+				En Android, la realidad aumentada funciona con los Servicios de Google Play para RA (ARCore),
+				proporcionados por Google y regidos por la <a href="https://policies.google.com/privacy?hl=es"
+				target="_blank" rel="noopener">Política de Privacidad de Google</a>. Para sus propias estadísticas,
+				Google recoge identificadores del dispositivo (o de tu cuenta de Google), datos de rendimiento y el uso
+				de las funciones de realidad aumentada; ninguna imagen se envía a Google.
 			</p>
 		</section>
 
@@ -127,7 +134,7 @@ import Hero from '../../../components/Hero.astro';
 						</tr>
 						<tr>
 							<td>Dirección IP, como para cualquier página web</td>
-							<td>Leer en nuestro sitio el número de la última versión y, cuando sustituye a un anuncio, el vídeo de Pétanque Meet (ver §8)</td>
+							<td>Leer en nuestro sitio el número de la última versión, la lista de vídeos de Pétanque Meet y el vídeo que se muestra (ver §8)</td>
 							<td>Interés legítimo</td>
 							<td>GitHub (alojamiento de nuestro sitio)</td>
 						</tr>
@@ -165,7 +172,7 @@ import Hero from '../../../components/Hero.astro';
 			</p>
 			<ul>
 				<li><strong>Si aceptas</strong>: Unity LevelPlay se pone en marcha y muestra el banner y los vídeos.</li>
-				<li><strong>Si rechazas</strong>: no se pone en marcha ningún módulo publicitario. La aplicación funciona igual, sin los anuncios de nuestros socios: en su lugar, una franja presenta nuestras otras aplicaciones, Pétanque Meet o, en Android, Pétanque Game, y un vídeo corto de Pétanque Meet también recarga tus escaneos. Esta presentación no transmite nada sobre ti (ver §8).</li>
+				<li><strong>Si rechazas</strong>: no se pone en marcha ningún módulo publicitario. La aplicación funciona igual, sin los anuncios de nuestros socios: en su lugar, una franja presenta nuestras otras aplicaciones, Pétanque Meet o, en Android, Pétanque Game, y un vídeo corto de Pétanque Meet también recarga tus escaneos. Esta presentación solo envía los eventos de uso del §5 y, para el vídeo, la petición a nuestro sitio (ver §8).</li>
 				<li><strong>Tu respuesta</strong>, su fecha y la versión del texto se quedan en tu teléfono. La aplicación te vuelve a preguntar a los 6 meses, tanto si aceptaste como si rechazaste, o antes si cambian nuestros socios publicitarios.</li>
 				<li><strong>En iOS</strong>, la autorización de seguimiento de Apple (<em>App Tracking Transparency</em>) solo se te pide después de un «Aceptar» y solo sirve para la publicidad; sin ella, no se usa el identificador publicitario del iPhone.</li>
 				<li><strong>Las estadísticas de uso</strong> (ver §5) no dependen de tu respuesta: no contienen ni identificador publicitario, ni cookies, ni identificador del dispositivo.</li>
@@ -280,7 +287,8 @@ import Hero from '../../../components/Hero.astro';
 			<p>
 				<strong>Nuestro sitio.</strong> Al iniciarse, la aplicación lee en nuestro sitio, ludiven-studio.fr,
 				un pequeño archivo que indica el número de la última versión, para proponerte una actualización.
-				Cuando el vídeo de Pétanque Meet sustituye a un anuncio, también se lee en nuestro sitio. No se
+				Cuando el vídeo de Pétanque Meet sustituye a un anuncio, también se lee en nuestro sitio. Al
+				abrir la pantalla Premium, la aplicación también lee allí la lista de vídeos de Pétanque Meet. No se
 				envía nada; como en cualquier página web, el alojamiento del sitio (GitHub) ve la dirección IP de tu
 				teléfono.
 			</p>
@@ -320,9 +328,10 @@ import Hero from '../../../components/Hero.astro';
 			<ul>
 				<li><strong>Unity Technologies</strong> — publicidad (Unity LevelPlay, Unity Ads), si la has aceptado.</li>
 				<li><strong>ironSource</strong>, filial de Unity Technologies — publicidad (ironSource Ads), si la has aceptado. Las subastas de ironSource y de Unity Ads pueden transmitir la solicitud de anuncio a otros compradores de publicidad (ver §4).</li>
+				<li><strong>Google LLC</strong> — Servicios de Google Play para RA (ARCore), en Android, en todas las versiones (ver §2).</li>
 				<li><strong>Google Ireland Limited / Google LLC</strong> — solo para las versiones anteriores a la 1.2.13, mientras no se actualicen: publicidad (AdMob), gestión del consentimiento (UMP), medición de audiencia (Firebase Analytics), notificaciones (Firebase Cloud Messaging) y hora de referencia (Firebase Realtime Database), si las habías aceptado.</li>
 				<li><strong>Hetzner Online GmbH</strong> (Alemania) — alojamiento de nuestro servidor de medición de audiencia Umami. Las versiones de la aplicación aún no actualizadas siguen enviando estas mediciones a <strong>Umami Software, Inc.</strong> (sociedad estadounidense), a través del servicio Umami Cloud.</li>
-				<li><strong>GitHub, Inc.</strong> — alojamiento de nuestro sitio, que se lee para la propuesta de actualización y el vídeo de Pétanque Meet (ver §8).</li>
+				<li><strong>GitHub, Inc.</strong> — alojamiento de nuestro sitio, que se lee para la propuesta de actualización, la lista de vídeos de Pétanque Meet y el vídeo que se muestra (ver §8).</li>
 				<li><strong>ntfy.sh</strong> — servicio de notificaciones que nos transmite la alerta de venta (ver §7).</li>
 				<li><strong>Apple Inc.</strong> y <strong>Google LLC</strong> — distribución de la aplicación y tramitación de las compras integradas.</li>
 			</ul>
@@ -357,6 +366,7 @@ import Hero from '../../../components/Hero.astro';
 				<li><strong>Retirar o modificar tu consentimiento</strong>: pulsa «Gestionar mi consentimiento publicitario» en los ajustes de la aplicación: vuelve la ventana «Publicidad». Si rechazas, la publicidad de nuestros socios se detiene enseguida. El seguimiento en iOS también se desactiva en Ajustes › Privacidad y seguridad › Rastreo.</li>
 				<li><strong>Borrar los datos locales</strong>: desinstala la aplicación o borra sus datos desde los ajustes del móvil.</li>
 				<li><strong>Restablecer tu identificador publicitario</strong>: Android → Ajustes › Google › Anuncios; iOS → Ajustes › Privacidad y seguridad › Rastreo.</li>
+				<li><strong>Borrar los datos publicitarios</strong>: los tiene Unity (ironSource, Unity Ads); pídele que los borre por los medios indicados en su política de privacidad (enlace en el §4).</li>
 				<li><strong>Ejercer tus derechos ante nosotros</strong>: escribe a <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>. Respondemos en el plazo de un mes. Ten en cuenta que, al no existir cuenta de usuario ni identificador que nos permita reconocerte, nos resulta materialmente imposible encontrar datos que te conciernan en nuestras estadísticas: están agregadas y no vinculadas a una persona identificable por nuestra parte.</li>
 			</ul>
 			<p>

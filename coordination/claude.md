@@ -1630,6 +1630,7 @@
   l'accord de l'utilisateur
 - 10:59 : commité et poussé à la demande de l'utilisateur (« ok ca me va tu peux push ») : mes 5 fichiers et cette
   section seulement. Statut : terminé. Réservations libérées.
+- 11:05 : en ligne (69b22e4, déploiement 4 min 38 s) : le jeu servi sur /jeux/petanque/ contient la pub Pétanque Game
 
 ## 2026-11-04 — Pétanque Meet : politique et CGU pour la 0.1.7 (LevelPlay, consentement maison) (session petanque-meet)
 - Statut : en cours (2026-11-04T11:13+01:00). Demande de l'utilisateur : (transmis par la session Producer) OK pour
@@ -1666,3 +1667,28 @@
   house-ads, check-promo OK, pas poussé.
 - 23:27 : commité et poussé à la demande de l'utilisateur : mes 4 commits (cbd5198, 4548215, cbe0390, e61871e) et cette
   section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-04 — Pétanque Scan : politique de confidentialité, ARCore et vidéos de Meet (session website)
+- Statut : en cours (2026-11-04T18:26+01:00). Demande de l'utilisateur : (transmis par la session sessions claude et
+  playtest, pour Pétanque Scan) ajouts à la politique de Pétanque Scan : ARCore de Google sur Android, liste des vidéos
+  de Meet, effacement des données publicitaires ; traduits dans les 4 autres langues
+- Réservations actives : `src/pages/petanque-scanner/confidentialite.astro`,
+  `src/pages/{en,es,de,it}/petanque-scanner/confidentialite.astro`.
+- Ressources : serveur de dev sur le port 4521 ; eslint, `astro check`. Build annoncé ici avant.
+- 18:34 : fait, en 5 langues : §2 ARCore de Google sur Android (lien vers ses règles de confidentialité), §4 phrase de
+  la présentation remplacée, §8 liste des vidéos de Meet à l'écran Premium, §10 Google LLC pour ARCore, §12 effacement
+  des données publicitaires chez Unity, date au 4 novembre ; eslint OK, astro check 0 erreur ; les 5 pages en dev,
+  bureau et téléphone : textes présents, ancienne phrase absente, aucun débordement, aucune erreur console (hors le 404
+  du sw.js propre au serveur de dev)
+- 18:34 : Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 18:37 : build complet OK (192 pages, précache 362 entrées, liens OK, astro check 0 erreur). Rien de commité : le push
+  met le site en ligne, donc à l'accord de Raphaël
+- 18:42 : écarts validés par la session Pétanque Scan ; ajout demandé par elle : la liste des vidéos de Meet au §3
+  (ligne GitHub) et au §10, en 5 langues. eslint OK, les 5 pages en dev (bureau et téléphone) toutes vertes. Pas de
+  nouveau build complet : du texte change dans des cellules et des points existants. Push à l'accord de Raphaël
+- 20:12 : Pause pour le redémarrage du PC : rien ne tourne (port 4521 libre). Les 5 pages restent réservées et non
+  commitées jusqu'au mot de Raphaël pour le push.
+- 20:13 : Contre-ordre, pas de redémarrage : je reprends. Rien ne change pour les 5 pages, qui attendent le mot de
+  Raphaël pour le push.
+- 23:28 : commité et poussé à la demande de l'utilisateur : mes 5 pages, cette section et la ligne « en ligne » de ma
+  section du mini-jeu. Statut : terminé. Réservations libérées.
