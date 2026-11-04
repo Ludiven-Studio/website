@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated": "2026-11-04T20:00:00Z",
+  "updated": "2026-11-04T21:10:00Z",
   "rotationSeconds": 30,
   "defaultLanguage": "fr",
   "entries": [
@@ -33,7 +33,9 @@
         "ios": "6823583416"
       },
       "hideIn": [
-        "com.ludivenstudio.petanquemeet"
+        "com.ludivenstudio.petanquemeet",
+        "com.ludivenstudio.dragonsgems",
+        "com.ludivenstudio.ninorush"
       ]
     },
     {
@@ -95,7 +97,9 @@
         "ios": "6670211733"
       },
       "hideIn": [
-        "com.raphbenpro.petanquear"
+        "com.raphbenpro.petanquear",
+        "com.ludivenstudio.dragonsgems",
+        "com.ludivenstudio.ninorush"
       ]
     },
     {
@@ -126,7 +130,9 @@
         "android": "com.ludivenstudio.dragonsgems"
       },
       "hideIn": [
-        "com.ludivenstudio.dragonsgems"
+        "com.ludivenstudio.dragonsgems",
+        "com.ludivenstudio.petanquemeet",
+        "com.raphbenpro.petanquear"
       ],
       "platforms": [
         "android"
@@ -156,7 +162,9 @@
         "web": "/nino-rush/telecharger/"
       },
       "hideIn": [
-        "com.ludivenstudio.ninorush"
+        "com.ludivenstudio.ninorush",
+        "com.ludivenstudio.petanquemeet",
+        "com.raphbenpro.petanquear"
       ],
       "platforms": [
         "android"
