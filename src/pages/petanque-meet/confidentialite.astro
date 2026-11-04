@@ -18,7 +18,7 @@ import Hero from '../../components/Hero.astro';
 			Cette politique concerne <strong>l'application mobile Pétanque Meet</strong>
 			(<code>com.ludivenstudio.petanquemeet</code>) et la carte des rencontres qu'elle partage avec le site
 			(<a href="/petanque-meet/">ludiven-studio.fr/petanque-meet</a>). Le reste du site a sa
-			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 2 novembre 2026.
+			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 4 novembre 2026.
 		</p>
 
 		<div class="summary">
@@ -27,7 +27,7 @@ import Hero from '../../components/Hero.astro';
 				<li>Regarder la carte ne demande <strong>aucun compte</strong>. Pour publier, rejoindre ou signaler une partie, tu te connectes avec <strong>Google ou Apple</strong>.</li>
 				<li>Ce que tu publies est <strong>visible de tous</strong>&nbsp;: le prénom que tu saisis, le terrain, l'horaire, et pour un concours les informations du club. Ton adresse mail, elle, n'est jamais montrée.</li>
 				<li>Ta position GPS sert à centrer la carte et à calculer les distances, sur ton téléphone. <strong>Elle ne nous est jamais envoyée.</strong></li>
-				<li>Une <strong>bannière publicitaire</strong> de Google finance l'application. Elle n'est personnalisée qu'<strong>avec ton accord</strong>. Aucune revente de données.</li>
+				<li>Une <strong>bannière publicitaire</strong>, servie par Unity LevelPlay (ironSource Ads et Unity Ads), finance l'application. Les régies ne reçoivent rien <strong>sans ton accord</strong>, demandé au premier lancement. Aucune revente de données.</li>
 				<li>Tu peux <strong>supprimer ton compte</strong> à tout moment depuis l'application.</li>
 			</ul>
 		</div>
@@ -159,10 +159,10 @@ import Hero from '../../components/Hero.astro';
 							<td>Umami, sur notre serveur (Hetzner, Allemagne)</td>
 						</tr>
 						<tr>
-							<td>Identifiant publicitaire, adresse IP, interactions avec les annonces, informations techniques (voir §9)</td>
-							<td>Afficher et mesurer la bannière publicitaire, lutter contre la fraude</td>
-							<td>Ton consentement (art. 6.1.a) pour les annonces personnalisées&nbsp;; intérêt légitime sinon</td>
-							<td>Google (AdMob) et, avec ton accord, ses partenaires publicitaires</td>
+							<td>Identifiant publicitaire et autres identifiants de l'appareil, adresse IP, interactions avec les annonces, durée d'utilisation, informations techniques, achats (déclarés par Unity Ads&nbsp;; l'application n'en propose pas) (voir §9)</td>
+							<td>Afficher, choisir et mesurer la bannière publicitaire, lutter contre la fraude</td>
+							<td>Ton consentement (art. 6.1.a). Jusqu'à la version 0.1.6&nbsp;: ton consentement pour les annonces personnalisées, intérêt légitime sinon</td>
+							<td>Unity Technologies et sa filiale ironSource (Unity LevelPlay, ironSource Ads, Unity Ads)&nbsp;; par leurs enchères, d'autres acheteurs de publicité. Jusqu'à la version 0.1.6&nbsp;: Google (AdMob) et ses partenaires publicitaires</td>
 						</tr>
 					</tbody>
 				</table>
@@ -171,7 +171,8 @@ import Hero from '../../components/Hero.astro';
 				L'application ne collecte <strong>pas</strong> tes contacts, ni tes photos (hors l'affiche que tu
 				choisis d'envoyer). Ta position GPS ne nous est jamais envoyée (voir §5). Ton nom de famille n'est
 				demandé que pour une demande «&nbsp;C'est mon club&nbsp;», et seul l'éditeur le voit. L'identifiant publicitaire de ton téléphone
-				n'est lu que par le module publicitaire de Google (voir §9)&nbsp;: nous ne le recevons pas.
+				n'est lu que par les modules publicitaires d'ironSource et de Unity Ads, et seulement avec ton accord (voir §9)&nbsp;: nous
+				ne le recevons pas.
 			</p>
 		</section>
 
@@ -259,33 +260,45 @@ import Hero from '../../components/Hero.astro';
 		<section class="stack gap-2">
 			<h2>9. Publicité</h2>
 			<p>
-				L'application affiche une <strong>bannière publicitaire</strong> en haut de l'écran. Elle est fournie
-				par <strong>Google AdMob</strong> et finance le service, qui reste gratuit. Quand Google ne fournit
-				aucune annonce, la bannière présente à la place Pétanque Scan, notre autre application&nbsp;: la
-				toucher ouvre sa fiche sur le store. Rien d'autre n'est envoyé, sinon le fait que la bannière a été
-				touchée (voir §8).
+				L'application affiche une <strong>bannière publicitaire</strong> en haut de l'écran. Elle finance le
+				service, qui reste gratuit, et elle est servie par <strong>Unity LevelPlay</strong> avec les régies
+				<strong>ironSource Ads</strong> et <strong>Unity Ads</strong> (Unity Technologies et sa filiale
+				ironSource). Quand aucune annonce n'est disponible, ou si tu refuses la publicité, la bannière présente
+				à la place Pétanque Scan, notre autre application&nbsp;: la toucher ouvre sa fiche sur le store. Rien
+				d'autre n'est envoyé, sinon le fait que la bannière a été touchée (voir §8).
 			</p>
 			<p>
-				Pour afficher les annonces, les mesurer et lutter contre la fraude, le module de Google reçoit
-				l'<strong>identifiant publicitaire</strong> de ton téléphone et d'autres identifiants propres à
-				l'application (sur Android, l'«&nbsp;app set ID&nbsp;»), ton <strong>adresse IP</strong> (qui donne une
-				position approximative, à l'échelle de la ville), tes interactions avec l'application et les annonces
-				(ouverture, annonces vues, touchers) et des informations techniques (performances, plantages). Nous ne lui
-				transmettons ni ton compte, ni ton adresse mail, ni ton prénom, ni tes parties.
+				<strong>Ton accord.</strong> Au premier lancement, l'application te demande si tu acceptes la publicité
+				de ces partenaires, avec deux boutons identiques, «&nbsp;Accepter&nbsp;» et «&nbsp;Refuser&nbsp;». Ton
+				choix reste sur ton téléphone et t'est redemandé au bout de 6 mois. <strong>Si tu refuses, aucun module
+				publicitaire n'est démarré</strong> et rien ne leur est envoyé&nbsp;: seule notre bannière pour Pétanque
+				Scan s'affiche. Tu peux changer d'avis à tout moment&nbsp;: «&nbsp;Compte et aide&nbsp;» →
+				«&nbsp;Choix publicitaires&nbsp;». Sur iPhone, après un «&nbsp;Accepter&nbsp;», l'application te demande
+				aussi l'autorisation de suivi d'Apple&nbsp;; sans elle, l'identifiant publicitaire de l'iPhone n'est pas
+				utilisé.
 			</p>
 			<p>
-				<strong>Ton accord.</strong> Au premier lancement, un formulaire de Google te demande si tu acceptes
-				les annonces personnalisées. Sans ton accord, les annonces ne sont pas personnalisées. Tu peux changer
-				d'avis à tout moment&nbsp;: «&nbsp;Compte et aide&nbsp;» → «&nbsp;Choix publicitaires&nbsp;» (ce bouton
-				apparaît là où ce choix est demandé, dont l'Union européenne). Sur
-				iPhone, l'application te demande aussi l'autorisation de suivi d'Apple&nbsp;; sans elle, l'identifiant
-				publicitaire n'est pas utilisé.
+				Avec ton accord, pour afficher les annonces, les choisir selon tes centres d'intérêt, les mesurer et
+				lutter contre la fraude, les modules d'ironSource et de Unity Ads enregistrent et lisent des
+				informations sur ton téléphone. Ils reçoivent son <strong>identifiant publicitaire</strong> et d'autres
+				identifiants de l'appareil, ton <strong>adresse IP</strong> (qui donne une position approximative, à
+				l'échelle de la ville), tes interactions avec les annonces, ta durée d'utilisation, des informations
+				techniques (modèle, langue, type de connexion, performances) et, selon Unity Ads, tes achats
+				(l'application n'en propose aucun). Leurs enchères peuvent transmettre la demande d'annonce à d'autres
+				acheteurs de publicité. Nous ne leur transmettons ni ton compte, ni ton adresse mail, ni ton prénom, ni
+				tes parties.
+			</p>
+			<p>
+				Les versions de l'application jusqu'à la 0.1.6 demandent encore leurs annonces à <strong>Google
+				AdMob</strong>. Elles consultent à chaque lancement le formulaire de consentement de Google, qui voit
+				alors l'adresse IP de ton téléphone&nbsp;; sans ton accord, leurs annonces ne sont pas personnalisées.
 			</p>
 			<p>
 				Tu peux aussi réinitialiser ou supprimer l'identifiant publicitaire dans les réglages de ton téléphone.
-				Pour en savoir plus&nbsp;:
-				<a href="https://policies.google.com/technologies/partner-sites" target="_blank" rel="noopener">comment
-				Google utilise les données des applications partenaires</a> et les
+				Pour en savoir plus, et pour les partenaires d'ironSource et de Unity Ads&nbsp;: la
+				<a href="https://unity.com/legal/game-player-and-app-user-privacy-policy" target="_blank" rel="noopener">politique
+				de confidentialité de Unity</a>, qui couvre Unity Ads, LevelPlay et ironSource. Pour les versions
+				jusqu'à la 0.1.6&nbsp;: les
 				<a href="https://policies.google.com/privacy" target="_blank" rel="noopener">règles de confidentialité
 				de Google</a>.
 			</p>
@@ -297,7 +310,7 @@ import Hero from '../../components/Hero.astro';
 				<li>ta session de connexion et ton adresse mail&nbsp;;</li>
 				<li>le prénom que tu as saisi, les parties rejointes, les lieux que tu as enregistrés, le dernier endroit affiché sur la carte&nbsp;;</li>
 				<li>tes préférences&nbsp;: langue, thème, organisateurs masqués, messages déjà vus&nbsp;;</li>
-				<li>ton choix sur la publicité et les données du module publicitaire de Google (voir §9)&nbsp;;</li>
+				<li>ton choix sur la publicité et, si tu l'as acceptée, les données des modules publicitaires d'ironSource et de Unity Ads (voir §9)&nbsp;;</li>
 				<li>un cache des fonds de carte et des affiches, pour un affichage plus rapide.</li>
 			</ul>
 			<p>
@@ -317,7 +330,8 @@ import Hero from '../../components/Hero.astro';
 			<ul>
 				<li><strong>Supabase</strong> — base de données, comptes et stockage des affiches. Données hébergées dans l'Union européenne (Irlande).</li>
 				<li><strong>Google</strong> et <strong>Apple</strong> — connexion à ton compte et distribution de l'application.</li>
-				<li><strong>Google (AdMob)</strong> — affichage et mesure de la bannière publicitaire (voir §9).</li>
+				<li><strong>Unity Technologies</strong> et sa filiale <strong>ironSource</strong> — la bannière publicitaire, avec ton accord (Unity LevelPlay, ironSource Ads, Unity Ads)&nbsp;; leurs enchères peuvent transmettre la demande d'annonce à d'autres acheteurs de publicité (voir §9).</li>
+				<li><strong>Google (AdMob)</strong> — la bannière publicitaire et son formulaire de consentement, dans les versions de l'application jusqu'à la 0.1.6.</li>
 				<li><strong>BKG</strong> (Office fédéral allemand de cartographie et de géodésie) — fonds de carte (TopPlusOpen). Comme pour tout site web, ses serveurs voient l'adresse IP de ton téléphone.</li>
 				<li><strong>IGN</strong> (Institut national de l'information géographique et forestière, France) — recherche d'adresses&nbsp;: chaque recherche lui est envoyée. Fonds de carte des premières versions de l'application. Ses serveurs voient aussi l'adresse IP de ton téléphone.</li>
 				<li><strong>komoot</strong> (service Photon, Allemagne) — recherche de lieux dans le monde&nbsp;: chaque recherche lui est envoyée, avec le centre de la carte affichée arrondi à une dizaine de kilomètres et la langue de l'application.</li>
@@ -348,6 +362,8 @@ import Hero from '../../components/Hero.astro';
 				<li><strong>Compteurs anti-abus</strong>&nbsp;: effacés au bout de 30 jours.</li>
 				<li><strong>Suspension d'un compte</strong>&nbsp;: l'identifiant technique est conservé tant que la suspension dure.</li>
 				<li><strong>Statistiques d'usage</strong>&nbsp;: gardées <strong>24 mois</strong> sur notre serveur, puis effacées&nbsp;; ses sauvegardes, 14 jours. Celles que reçoit encore Umami Cloud, depuis les versions pas encore à jour, y sont effacées au bout de 6 mois.</li>
+				<li><strong>Ton choix sur la publicité</strong>&nbsp;: 6 mois sur ton téléphone, puis il t'est redemandé.</li>
+				<li><strong>Données publicitaires</strong>&nbsp;: selon les règles de Unity et d'ironSource (voir §9).</li>
 				<li><strong>Compte</strong>&nbsp;: jusqu'à ce que tu le supprimes.</li>
 			</ul>
 		</section>
@@ -361,8 +377,13 @@ import Hero from '../../components/Hero.astro';
 			<ul>
 				<li>ton compte et ton adresse mail sont effacés&nbsp;;</li>
 				<li>tes parties à venir sont annulées (les inscrits le voient) et ton prénom est remplacé par «&nbsp;Compte supprimé&nbsp;» sur toutes tes parties&nbsp;;</li>
-				<li>tes inscriptions, tes concours, leurs affiches, les concours que tu suis, tes signalements et tes demandes «&nbsp;C'est mon club&nbsp;» sont effacés.</li>
+				<li>tes inscriptions, tes concours, leurs affiches, les concours que tu suis, tes signalements et tes demandes «&nbsp;C'est mon club&nbsp;» sont effacés&nbsp;;</li>
+				<li>sur iPhone, l'application te redemande la connexion Apple, pour retirer à Pétanque Meet l'accès à ton identifiant Apple.</li>
 			</ul>
+			<p>
+				Ton compte est celui de Ludiven Studio&nbsp;: le même sert dans nos autres applications. Le supprimer
+				efface aussi ce qu'elles ont enregistré pour lui (sauvegardes).
+			</p>
 			<p>
 				Tes anciennes parties restent un temps dans la base, sans prénom, rattachées à un identifiant technique
 				qui ne renvoie plus à aucun compte. Elles suivent ensuite les durées du §12.

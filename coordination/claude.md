@@ -1630,3 +1630,19 @@
   l'accord de l'utilisateur
 - 10:59 : commité et poussé à la demande de l'utilisateur (« ok ca me va tu peux push ») : mes 5 fichiers et cette
   section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-04 — Pétanque Meet : politique et CGU pour la 0.1.7 (LevelPlay, consentement maison) (session petanque-meet)
+- Statut : en cours (2026-11-04T11:13+01:00). Demande de l'utilisateur : (transmis par la session Producer) OK pour
+  réécrire la politique de confidentialité et les CGU du site (AdMob → LevelPlay)
+- Réservations actives : `src/pages/petanque-meet/confidentialite.astro`, `src/pages/petanque-meet/cgu.astro`.
+- Ressources : serveur de dev sur le port 4517 ; eslint, `astro check`. Build annoncé ici avant.
+- 11:17 : fait : politique (date, l'essentiel, tableau §4 ligne pub, §4 identifiant pub, §9 réécrit : LevelPlay
+  ironSource/Unity Ads, consentement maison Accepter/Refuser, rien sans accord, AdMob jusqu'à 0.1.6 ; §10, §11
+  Unity/ironSource + Google jusqu'à 0.1.6 ; §12 choix pub 6 mois ; §13 révocation Apple et compte studio) et CGU (date,
+  bannière LevelPlay, annonces fournies par ironSource Ads/Unity Ads) ; eslint OK, astro check 0 erreur ; captures
+  bureau et téléphone sans erreur console
+- 11:19 : Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 11:22 : build complet OK (192 pages, précache 362 entrées, liens OK). Rien de commité : captures montrées à
+  l'utilisateur, push à son accord
+- 11:23 : commité et poussé à la demande de l'utilisateur : mes 2 fichiers et cette section seulement. Statut :
+  terminé. Réservations libérées.
