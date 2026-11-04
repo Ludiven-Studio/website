@@ -1,7 +1,7 @@
 ---
 import GamePage from '../../layouts/GamePage.astro';
 import PetanqueGame from '../../games/petanque/PetanqueGame.tsx';
-import { ICON, LANDING_PATHS } from '../../data/petanqueGame';
+import { ICON, LANDING_PATHS, DOWNLOAD_PATHS, STORES } from '../../data/petanqueGame';
 ---
 
 <GamePage
@@ -13,7 +13,7 @@ import { ICON, LANDING_PATHS } from '../../data/petanqueGame';
 	fullscreen="auto"
 	app={{ href: LANDING_PATHS.fr, label: 'Aussi sur téléphone : Pétanque Game', note: 'Sur Android, bientôt sur iPhone · en ligne, en équipe, ligues', icon: ICON }}
 >
-	<PetanqueGame client:only="react" gameId="petanque" />
+	<PetanqueGame client:only="react" gameId="petanque" gameAd={{ ...STORES, download: DOWNLOAD_PATHS, icon: ICON }} />
 	<p class="pe-scanner">
 		<span data-pe-lang="scanner-pre">Vous jouez pour de vrai ?</span> <a href="/petanque-scanner/">Pétanque Scan</a>
 		<span data-pe-lang="scanner-post">mesure vos points au téléphone.</span>

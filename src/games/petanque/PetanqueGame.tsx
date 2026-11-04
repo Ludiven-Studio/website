@@ -33,6 +33,7 @@ import {
 import * as sfx from './sfx';
 import { preloadTown, type DecorId } from './decors';
 import { loadEquipped, modelOf, kitOf, otherLook, decorOf, jackColorOf, type Equipped, type BouleLook, type ShopItem } from './shop';
+import { platformOf, gameStore, gameHref, type GameAd, type Platform, type PromoSpot } from './promo';
 import { usePointerDrag } from '../usePointerDrag';
 import { isTypingTarget } from '../../lib/keyboard';
 import { trackGame, trackEvent } from '../../lib/analytics';
@@ -145,7 +146,7 @@ const PAD_EDGE = 12; // px, same margin the pad's width clamp leaves
 const PAD_GAP = 8; // px kept clear of a side gauge
 const PAD_HEAD = 40; // px above the pad: power bar then state line
 const PAD_GRIP_W = 22;
-// The Pétanque Scan card in the free side of the band. Closed for the session with its ×.
+// The app ad in the free side of the band (Pétanque Game, or Pétanque Scan). Closed for the session with its ×.
 const PROMO_KEY = 'petanque-promo-shut';
 const TUTO_KEY = 'petanque-tuto-throw'; // set once the player has thrown a boule by themselves
 const EFFET_KEY = 'petanque-effet'; // expert mode: where the finger lands across the board gives spin
@@ -157,6 +158,13 @@ const spinAcross = (box: { left: number; right: number }, x: number): number => 
 	return Math.round(Math.sign(f) * a * 100) / 100; // two decimals: the wire and both boards agree
 };
 const PROMO_MIN = 104; // px — narrower and the name no longer fits on one line
+const PROMO_NARROW = 190; // px — below, the picture goes on top of the words
+/** Whether Pétanque Game's ad keeps its line at this card size. Measured over fr/en/es, with 10 px to
+ *  spare: the line fits from 200 px wide on a 140 px band, 210 on 120, 240 on 110. */
+const promoLineFits = (w: number, h: number): boolean => w >= 250 || (w >= 220 && h >= 120) || (w >= 210 && h >= 140);
+const NBSP = String.fromCharCode(160);
+/** « Gratuit sur Google Play › », breaking only before the store's name. */
+const storeCall = (t: Strings, store: string): string => `${t.gameFree} ${store.replace(/ /g, NBSP)}${NBSP}›`;
 const PROMO_MAX = 280;
 
 function loadPadX(): PadX {
@@ -434,8 +442,14 @@ function BouleTable({ rows, mySide, t }: { rows: readonly BouleRow[]; mySide: Si
 	);
 }
 
-/** Under a finished match: the tip jar and the real-world app, in a new tab so the result stays. */
-function TipCard({ t, gameId, from = 'end', scanner = true }: { t: Strings; gameId: string; from?: string; scanner?: boolean }) {
+/** Pétanque Game's ad for one spot: where it leads, the store's name, the app icon. */
+type GameLink = { href: string; store: string; icon: string };
+
+/** Under a finished match: the tip jar and one of our apps (Pétanque Game when `game` is given), in a
+ *  new tab so the result stays. */
+function TipCard({ t, gameId, from = 'end', app = true, game = null }: {
+	t: Strings; gameId: string; from?: string; app?: boolean; game?: GameLink | null;
+}) {
 	return (
 		<div className="pe-tip">
 			{(COFFEE_URL || TIP_URL) && (
@@ -450,12 +464,22 @@ function TipCard({ t, gameId, from = 'end', scanner = true }: { t: Strings; game
 					<span className="pe-tip-wink">{t.tipWink}</span>
 				</>
 			)}
-			{scanner && (
-				<a className="pe-tip-scanner" href={t.scannerHref} target="_blank" rel="noopener"
+			{app && (game ? (
+				<a className="pe-tip-game" href={game.href} target="_blank" rel="noopener"
+					onClick={() => trackEvent('promo_click', { from: gameId, to: 'petanque-game', where: from })}>
+					<img src={game.icon} alt="" width={40} height={40} />
+					<span>
+						<small>{t.gameTitle}</small>
+						<b>Pétanque Game</b>
+						<em>{storeCall(t, game.store)}</em>
+					</span>
+				</a>
+			) : (
+				<a className="pe-tip-app" href={t.scannerHref} target="_blank" rel="noopener"
 					onClick={() => trackEvent('promo_click', { from: gameId, to: 'petanque-scanner' })}>
 					<span>{t.scannerTitle}</span> {t.scannerBtn} ›
 				</a>
-			)}
+			))}
 		</div>
 	);
 }
@@ -490,7 +514,7 @@ export interface PetanqueEvent {
 	lang: GameLang;
 }
 
-export default function PetanqueGame({ gameId, event }: { gameId: string; event?: PetanqueEvent }) {
+export default function PetanqueGame({ gameId, event, gameAd }: { gameId: string; event?: PetanqueEvent; gameAd?: GameAd }) {
 	const wrapRef = useRef<HTMLDivElement | null>(null);
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
 	const armElRef = useRef<HTMLDivElement | null>(null); // the launch pad, read back for the hit test
@@ -646,7 +670,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 	// Laid out in px by layoutPad; null until the first measure, where the CSS centre stands in.
 	// `label` is the state line's fraction of the width; `grip` the grip's left edge in px; `promo`
 	// the free side of the band, or null when it is too narrow.
-	const [padPos, setPadPos] = useState<{ left: number; label: number; grip: number; promo: { left: number; width: number } | null; mid: number } | null>(null);
+	const [padPos, setPadPos] = useState<{ left: number; label: number; grip: number; promo: { left: number; width: number; height: number } | null; mid: number } | null>(null);
 	// The first-throw tutorial: a ghost finger doing the gesture on the pad, until the first real throw.
 	const [tutoDone, setTutoDone] = useState(() => {
 		try { return localStorage.getItem(TUTO_KEY) === '1'; } catch { return false; }
@@ -657,6 +681,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 	const [promoShut, setPromoShut] = useState(() => {
 		try { return sessionStorage.getItem(PROMO_KEY) === '1'; } catch { return false; }
 	});
+	const [platform] = useState<Platform>(() => platformOf(navigator.userAgent, navigator.maxTouchPoints || 0));
 	const [padGrip, setPadGrip] = useState<'call' | 'idle' | 'held'>(() => {
 		try { return localStorage.getItem(PAD_GRIP_KEY) ? 'idle' : 'call'; } catch { return 'idle'; }
 	});
@@ -687,6 +712,14 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 	const langKey = event ? `${LANG_KEY}-${event.id}` : LANG_KEY;
 	const [lang, setLang] = useState<GameLang>(() => (event ? storedGameLang(langKey) ?? event.lang : detectGameLang(langKey)));
 	const t = STRINGS[lang];
+	// Pétanque Game's ad, where its store is out for this platform; null leaves the spot to Pétanque Scan.
+	const store = gameStore(platform, gameAd);
+	const adFor = (spot: PromoSpot): GameLink | null => {
+		const href = gameHref(platform, lang, spot, gameAd);
+		return href && store && gameAd ? { href, store, icon: gameAd.icon } : null;
+	};
+	const gameBand = adFor('band');
+	const gameEnd = adFor('end');
 	const tRef = useRef<Strings>(t);
 	tRef.current = t;
 	useEffect(() => announceGameLang(lang), [lang]);
@@ -2441,10 +2474,12 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		const inR = W - all.r0 - (Math.max(left + w, gripLeft + PAD_GRIP_W) + PAD_GAP);
 		const room = Math.max(inL, inR);
 		const pw = Math.min(PROMO_MAX, room);
+		const ph = el.offsetHeight; // the card shares the pad's band height
 		const promo = room < PROMO_MIN ? null
-			: inL >= inR ? { left: Math.round(all.l0), width: Math.round(pw) } : { left: Math.round(W - all.r0 - pw), width: Math.round(pw) };
+			: { left: Math.round(inL >= inR ? all.l0 : W - all.r0 - pw), width: Math.round(pw), height: ph };
 		setPadPos((p) => (p && p.left === left && p.label === label && p.grip === gripLeft && p.mid === Math.round(mid)
-			&& p.promo?.left === promo?.left && p.promo?.width === promo?.width ? p : { left, label, grip: gripLeft, promo, mid: Math.round(mid) }));
+			&& p.promo?.left === promo?.left && p.promo?.width === promo?.width && p.promo?.height === promo?.height
+			? p : { left, label, grip: gripLeft, promo, mid: Math.round(mid) }));
 	}, []);
 
 	const savePadX = useCallback((f: number) => {
@@ -3763,26 +3798,47 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 					>⋮⋮</div>
 				)}
 
-				{/* The real-world companion app, in the free side of the band. Fullscreen only (CSS): the
-				    windowed page already says it in a line under the game. A new tab keeps the match. */}
+				{/* Our app ad, in the free side of the band: Pétanque Game where its store is out, the
+				    real-world companion app elsewhere. Fullscreen only (CSS): the windowed page already says
+				    both under the game. A new tab keeps the match. */}
 				{padPos?.promo && armLive && !card && !promoShut && (
-					<div className={`pe-promo${padPos.promo.width < 190 ? ' narrow' : ''}`} style={{ left: `${padPos.promo.left}px`, width: `${padPos.promo.width}px` }}>
-						<a
-							href={t.scannerHref}
-							target="_blank"
-							rel="noopener"
-							onClick={() => trackEvent('promo_click', { from: gameId, to: 'petanque-scanner' })}
-						>
-							<span className="pe-promo-pic" aria-hidden="true" style={{ backgroundImage: `url(/assets/petanque-ar/screen-01-${lang}.webp)` }} />
-							<span className="pe-promo-txt">
-								<strong>Pétanque Scan</strong>
-								<span>{t.promoLine}</span>
-								<em>{t.promoFree}</em>
-							</span>
-						</a>
+					<div
+						className={`pe-promo${gameBand ? ' game' : ''}${padPos.promo.width < PROMO_NARROW ? ' narrow'
+							: gameBand && !promoLineFits(padPos.promo.width, padPos.promo.height) ? ' mid' : ''}`}
+						style={{ left: `${padPos.promo.left}px`, width: `${padPos.promo.width}px` }}
+					>
+						{gameBand ? (
+							<a
+								href={gameBand.href}
+								target="_blank"
+								rel="noopener"
+								onClick={() => trackEvent('promo_click', { from: gameId, to: 'petanque-game', where: 'band' })}
+							>
+								<img className="pe-promo-icon" src={gameBand.icon} alt="" width={60} height={60} />
+								<span className="pe-promo-txt">
+									<strong>Pétanque Game</strong>
+									<span>{t.gameLine}</span>
+									<em>{storeCall(t, gameBand.store)}</em>
+								</span>
+							</a>
+						) : (
+							<a
+								href={t.scannerHref}
+								target="_blank"
+								rel="noopener"
+								onClick={() => trackEvent('promo_click', { from: gameId, to: 'petanque-scanner' })}
+							>
+								<span className="pe-promo-pic" aria-hidden="true" style={{ backgroundImage: `url(/assets/petanque-ar/screen-01-${lang}.webp)` }} />
+								<span className="pe-promo-txt">
+									<strong>Pétanque Scan</strong>
+									<span>{t.promoLine}</span>
+									<em>{t.promoFree}</em>
+								</span>
+							</a>
+						)}
 						<button
 							className="pe-promo-x"
-							aria-label={t.promoClose}
+							aria-label={gameBand ? t.gameClose : t.promoClose}
 							onClick={() => {
 								setPromoShut(true);
 								try { sessionStorage.setItem(PROMO_KEY, '1'); } catch { /* private mode */ }
@@ -3801,7 +3857,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 						<div className="pe-card pe-bar-card" onClick={(e) => e.stopPropagation()}>
 							<button className="pe-bar-x" onClick={() => setBarOpen(false)} aria-label={t.close}>×</button>
 							<div className="pe-mp-title">{t.barTitle}</div>
-							<TipCard t={t} gameId={gameId} from="bar" scanner={false} />
+							<TipCard t={t} gameId={gameId} from="bar" app={false} />
 						</div>
 					</div>
 				)}
@@ -3841,7 +3897,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 							{/* The event's board opens under this card: the bar already offers the drinks. */}
 							{dailyRef.current?.event
 								? <button className="pe-replay" onClick={startEventChallenge}>{t.retry}</button>
-								: <TipCard t={t} gameId={gameId} />}
+								: <TipCard t={t} gameId={gameId} game={gameEnd} />}
 						</div>
 					</div>
 				)}
@@ -3857,7 +3913,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 							{online
 								? <button className="pe-replay" onClick={leaveOnline}>{t.quit}</button>
 								: <button className="pe-replay" onClick={() => newGame(diff)}>{t.newGame}</button>}
-							<TipCard t={t} gameId={gameId} />
+							<TipCard t={t} gameId={gameId} game={gameEnd} />
 						</div>
 					</div>
 				)}
@@ -4222,8 +4278,9 @@ const CSS = `
 /* Finger down, nothing pulled yet: letting go here throws nothing. Said in words AND in colour,
    because the board looks identical whether it is armed or merely touched. */
 .pe-arm-label.warn { background: rgba(120,34,28,0.72); color: #ffd7d2; font-weight: 700; }
-/* The Pétanque Scan card: same band as the pad, laid out by layoutPad. The screenshot is cropped
-   on the measured distances, which say what the app does faster than any sentence. */
+/* The app card: same band as the pad, laid out by layoutPad. Pétanque Scan's screenshot is cropped
+   on the measured distances, which say what the app does faster than any sentence; Pétanque Game
+   shows its icon, the one people then find in the store. */
 .pe-promo { display: none; position: absolute; bottom: var(--pe-arm-b); height: var(--pe-arm-h); z-index: 3; }
 .game-page.gf-full .pe-promo { display: block; }
 .pe-promo a { display: flex; gap: 10px; height: 100%; box-sizing: border-box; padding: 8px; border-radius: 14px; border: 1.5px solid rgba(255,255,255,0.28); background: rgba(28,20,12,0.72); color: #f4ece2; text-decoration: none; backdrop-filter: blur(4px); overflow: hidden; }
@@ -4235,6 +4292,8 @@ const CSS = `
 .pe-promo-txt strong { font-size: 14px; font-weight: 800; line-height: 1.15; color: #fff; }
 .pe-promo-txt span { font-size: 11.5px; line-height: 1.3; opacity: 0.88; }
 .pe-promo-txt em { font-style: normal; font-size: 12px; font-weight: 800; color: #ffd166; }
+.pe-promo-icon { flex: 0 0 auto; align-self: center; width: 60px; height: 60px; border-radius: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.45); }
+.pe-promo.mid .pe-promo-txt span { display: none; }
 /* A phone column leaves ~120 px: picture on top, name and call below, the sentence dropped. */
 .pe-promo.narrow a { flex-direction: column; gap: 5px; padding: 6px; }
 .pe-promo.narrow .pe-promo-pic { flex: 1 1 auto; width: 100%; height: auto; min-height: 0; background-size: 260% auto; }
@@ -4242,6 +4301,8 @@ const CSS = `
 .pe-promo.narrow .pe-promo-txt strong { font-size: 12px; }
 .pe-promo.narrow .pe-promo-txt span { display: none; }
 .pe-promo.narrow .pe-promo-txt em { font-size: 11px; }
+.pe-promo.game.narrow a { justify-content: center; }
+.pe-promo.game.narrow .pe-promo-icon { width: 52px; height: 52px; }
 .pe-promo-x { position: absolute; top: 3px; right: 3px; width: 24px; height: 24px; border-radius: 999px; border: none; background: rgba(0,0,0,0.55); color: #f4ece2; font: inherit; font-size: 15px; line-height: 1; cursor: pointer; display: grid; place-items: center; }
 .pe-promo-x:hover { background: rgba(0,0,0,0.8); }
 /* The first-throw tutorial. Anchored on the pad's centre, 35 % up it (a demi-portée press); the
@@ -4476,9 +4537,18 @@ const CSS = `
 .pe-tip-btn { display: inline-block; padding: 7px 14px; border-radius: 999px; background: #ffd166; color: #2a1e00; font-weight: 700; text-decoration: none; }
 .pe-tip-btn:hover { background: #ffdd88; }
 .pe-tip-wink { font-size: 11px; opacity: 0.6; font-style: italic; }
-.pe-tip-scanner { color: inherit; opacity: 0.85; text-decoration: none; margin-top: 2px; }
-.pe-tip-scanner:hover { opacity: 1; text-decoration: underline; }
-.pe-tip-scanner span { opacity: 0.7; }
+.pe-tip-app { color: inherit; opacity: 0.85; text-decoration: none; margin-top: 2px; }
+.pe-tip-app:hover { opacity: 1; text-decoration: underline; }
+.pe-tip-app span { opacity: 0.7; }
+/* Pétanque Game at the end of a match: its store icon, so it reads as the app it leads to. */
+.pe-tip-game { display: flex; align-items: center; gap: 10px; margin-top: 4px; padding: 6px 14px 6px 6px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--gray-0) 18%, transparent); background: color-mix(in srgb, var(--gray-0) 5%, transparent); color: inherit; text-decoration: none; text-align: left; }
+.pe-tip-game:hover { border-color: var(--link-color); }
+.pe-tip-game img { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 9px; }
+.pe-tip-game span { display: flex; flex-direction: column; line-height: 1.25; }
+.pe-tip-game small { font-size: 11px; opacity: 0.7; }
+.pe-tip-game b { font-size: 13.5px; font-weight: 800; }
+/* The site's link colour, which lightens in the dark theme; --pe-accent stays dark purple on black. */
+.pe-tip-game em { font-style: normal; font-size: 12px; font-weight: 700; color: var(--link-color); }
 .pe-lang { font-weight: 800; font-size: 12px; letter-spacing: 0.04em; }
 .pe-help { max-width: 480px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.55; margin-top: 1rem; }
 `;

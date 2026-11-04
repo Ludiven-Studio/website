@@ -115,6 +115,9 @@ const fr = {
 	promoLine: 'Qui a le point ? Mesurez en vrai, au téléphone.',
 	promoFree: 'Appli gratuite ›',
 	promoClose: 'Fermer la publicité Pétanque Scan',
+	gameLine: 'Le jeu complet : équipes, ligues et coupes.',
+	gameFree: 'Gratuit sur',
+	gameClose: 'Fermer la publicité Pétanque Game',
 	placeHere: '✓ Poser ici',
 	throwJackHere: '🎯 Lancer le bouchon ici',
 	continue: 'Continuer ›',
@@ -230,6 +233,7 @@ const fr = {
 	scannerTitle: 'Tu joues pour de vrai ?',
 	scannerBtn: '📱 Pétanque Scan mesure tes points',
 	scannerHref: '/petanque-scanner/',
+	gameTitle: 'Aussi sur téléphone',
 
 	help: (daily: boolean, stations: number, target: number): ReactNode => (
 		<>
@@ -347,6 +351,9 @@ const en: Strings = {
 	promoLine: 'Who has the point? Measure it for real, with your phone.',
 	promoFree: 'Free app ›',
 	promoClose: 'Close the Pétanque Scan ad',
+	gameLine: 'The full game: teams, leagues and cups.',
+	gameFree: 'Free on',
+	gameClose: 'Close the Pétanque Game ad',
 	placeHere: '✓ Place here',
 	throwJackHere: '🎯 Throw the jack here',
 	continue: 'Continue ›',
@@ -462,6 +469,7 @@ const en: Strings = {
 	scannerTitle: 'Playing for real?',
 	scannerBtn: '📱 Pétanque Scan measures your points',
 	scannerHref: '/en/petanque-scanner/',
+	gameTitle: 'Also on your phone',
 
 	help: (daily, stations, target) => (
 		<>
@@ -577,6 +585,9 @@ const es: Strings = {
 	promoLine: '¿Quién tiene el punto? Mídelo de verdad, con el móvil.',
 	promoFree: 'App gratuita ›',
 	promoClose: 'Cerrar el anuncio de Pétanque Scan',
+	gameLine: 'El juego completo: equipos, ligas y copas.',
+	gameFree: 'Gratis en',
+	gameClose: 'Cerrar el anuncio de Pétanque Game',
 	placeHere: '✓ Colocar aquí',
 	throwJackHere: '🎯 Lanzar el boliche aquí',
 	continue: 'Continuar ›',
@@ -692,6 +703,7 @@ const es: Strings = {
 	scannerTitle: '¿Juegas de verdad?',
 	scannerBtn: '📱 Pétanque Scan mide tus puntos',
 	scannerHref: '/es/petanque-scanner/',
+	gameTitle: 'También en tu móvil',
 
 	help: (daily, stations, target) => (
 		<>

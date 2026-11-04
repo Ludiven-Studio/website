@@ -1606,3 +1606,27 @@
   de build complet : seules deux constantes changent. À pousser sur l'accord de l'utilisateur
 - 07:18 : commité et poussé à la demande de l'utilisateur : src/data/ninoRush.ts et cette section seulement. Statut :
   terminé. Réservations libérées.
+
+## 2026-11-04 — Pétanque (mini-jeu) : pub pour l'appli Pétanque Game (session website)
+- Statut : en cours (2026-11-04T09:48+01:00). Demande de l'utilisateur : Dans le mini jeu de pétanque, il faudrait
+  faire de la pub pour l'application de pétanque game (android pour l'instant)
+- Réservations actives : `src/games/petanque/PetanqueGame.tsx` (pub du bandeau et carte de fin),
+  `src/games/petanque/i18n.tsx` (textes de la pub), `src/games/petanque/promo.ts` et `promo.test.ts` (nouveaux).
+- Ressources : serveur de dev sur le port 4509 ; eslint, `astro check`. Build annoncé ici avant.
+- 10:05 : fait : la pub du bandeau (plein écran, pendant la visée) et la ligne de fin de partie montrent Pétanque Game
+  là où son store existe (Android : lien Google Play avec un referrer de campagne ; ordinateur : page de
+  téléchargement), Pétanque Scan reste sur iPhone ; promo.ts testé (7 tests), vitest pétanque 124/124, eslint OK, astro
+  check 0 erreur ; captures Android portrait et paysage, iPhone, ordinateur fr/en/es, clair et sombre ; audit téléphone
+  (snap-petanque-phone, dev) sans chevauchement de la pub
+- 10:05 : Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 10:09 : build complet OK (192 pages, précache 362 entrées, liens OK), mais le jeu embarquait les textes français de
+  la page Pétanque Game en important ses liens (+12 Ko) ; réservé aussi : `src/pages/jeux/petanque.astro` (la page
+  passe les liens au jeu)
+- 10:13 : les liens passent par la page (prop gameAd) ; vitest pétanque 125/125, eslint OK, astro check 0 erreur,
+  captures identiques. Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 10:18 : build complet OK (192 pages, précache 362 entrées, liens OK), le jeu sans les textes de la page (+3,5 Ko en
+  tout) ; audit téléphone sur le build sans aucun chevauchement (l'étape 8 a manqué de temps une fois, passée au second
+  essai) ; page du tournoi (coruna) sans pub Game, sans erreur ; captures envoyées. Rien de commité : en attente de
+  l'accord de l'utilisateur
+- 10:59 : commité et poussé à la demande de l'utilisateur (« ok ca me va tu peux push ») : mes 5 fichiers et cette
+  section seulement. Statut : terminé. Réservations libérées.
