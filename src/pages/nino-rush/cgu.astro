@@ -7,11 +7,19 @@ import LangSwitch from '../../components/LangSwitch.astro';
 <BaseLayout
 	title="Conditions d'utilisation de l'application Nino Rush | Ludiven Studio"
 	description="Conditions générales d'utilisation et de vente du jeu mobile Nino Rush : jeu sans compte, compte facultatif, pièces et looks, achats, vidéos publicitaires, atelier de niveaux, responsabilité, droit applicable."
-	alternates={{ fr: '/nino-rush/cgu/', en: '/en/nino-rush/cgu/' }}
+	alternates={{ fr: '/nino-rush/cgu/', en: '/en/nino-rush/cgu/', es: '/es/nino-rush/cgu/', de: '/de/nino-rush/cgu/', it: '/it/nino-rush/cgu/' }}
 >
 	<div class="wrapper stack gap-12 legal">
 		<div class="stack gap-8">
-			<LangSwitch lang="fr" href="/en/nino-rush/cgu/" />
+			<LangSwitch
+				lang="fr"
+				links={[
+					{ lang: 'en', href: '/en/nino-rush/cgu/' },
+					{ lang: 'es', href: '/es/nino-rush/cgu/' },
+					{ lang: 'de', href: '/de/nino-rush/cgu/' },
+					{ lang: 'it', href: '/it/nino-rush/cgu/' },
+				]}
+			/>
 			<Hero
 				title="Conditions d'utilisation — Nino Rush"
 				tagline="Des looks pour Nino, et tous les niveaux sans rien acheter."

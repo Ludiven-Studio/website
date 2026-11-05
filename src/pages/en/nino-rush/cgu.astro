@@ -8,11 +8,19 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 	title="Terms of use of the Nino Rush app | Ludiven Studio"
 	description="Terms of use and sale of the Nino Rush mobile game: no account needed, optional account, coins and looks, purchases, video ads, level workshop, liability, governing law."
 	lang="en"
-	alternates={{ fr: '/nino-rush/cgu/', en: '/en/nino-rush/cgu/' }}
+	alternates={{ fr: '/nino-rush/cgu/', en: '/en/nino-rush/cgu/', es: '/es/nino-rush/cgu/', de: '/de/nino-rush/cgu/', it: '/it/nino-rush/cgu/' }}
 >
 	<div class="wrapper stack gap-12 legal">
 		<div class="stack gap-8">
-			<LangSwitch lang="en" href="/nino-rush/cgu/" />
+			<LangSwitch
+				lang="en"
+				links={[
+					{ lang: 'fr', href: '/nino-rush/cgu/' },
+					{ lang: 'es', href: '/es/nino-rush/cgu/' },
+					{ lang: 'de', href: '/de/nino-rush/cgu/' },
+					{ lang: 'it', href: '/it/nino-rush/cgu/' },
+				]}
+			/>
 			<Hero
 				title="Terms of use — Nino Rush"
 				tagline="Looks for Nino, and every level without buying a thing."
