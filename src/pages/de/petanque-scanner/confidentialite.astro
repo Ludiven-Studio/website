@@ -18,7 +18,7 @@ import Hero from '../../../components/Hero.astro';
 		<p class="updated">
 			Diese Erklärung betrifft <strong>die mobile App Pétanque Scan</strong>
 			(früher Pétanque Scanner, <code>com.raphbenpro.petanquear</code>) und nicht die Website ludiven-studio.fr, die über eine
-			<a href="/confidentialite/">eigene Datenschutzerklärung</a> verfügt. Letzte Aktualisierung: 5. November 2026 (Version 1.2.13: Die Werbung wechselt von Google AdMob zu Unity LevelPlay, mit unserem eigenen Einwilligungsfenster; auf dem iPhone ist die Werbung ohne Apples Tracking-Erlaubnis nicht personalisiert; ein Widerruf deiner Einwilligung wird an die Werbenetzwerke weitergegeben; Google Firebase entfällt; 10 kostenlose Scans pro Tag statt 3).
+			<a href="/confidentialite/">eigene Datenschutzerklärung</a> verfügt. Letzte Aktualisierung: 5. November 2026 (Version 1.2.14: Unsere eigenen Anzeigen, von unserer Website geladen, ersetzen das Banner und das Video von Pétanque Meet; nach einer Ablehnung wird „Werbung aktivieren?“ einmal pro Sitzung angeboten, wenn du ein Video anforderst. Version 1.2.13: Die Werbung wechselt von Google AdMob zu Unity LevelPlay, mit unserem eigenen Einwilligungsfenster; auf dem iPhone ist die Werbung ohne Apples Tracking-Erlaubnis nicht personalisiert; ein Widerruf deiner Einwilligung wird an die Werbenetzwerke weitergegeben; Google Firebase entfällt; 10 kostenlose Scans pro Tag statt 3).
 		</p>
 		<p class="updated">
 			Dies ist eine Höflichkeitsübersetzung. Bei Abweichungen gilt die
@@ -135,7 +135,7 @@ import Hero from '../../../components/Hero.astro';
 						</tr>
 						<tr>
 							<td>IP-Adresse, wie bei jeder Webseite</td>
-							<td>Auf unserer Website die Nummer der neuesten Version, die Liste der Videos von Pétanque Meet und das gezeigte Video lesen (siehe §8)</td>
+							<td>Auf unserer Website die Nummer der neuesten Version, den Katalog unserer eigenen Anzeigen, ihre Bilder und Videos lesen (siehe §8)</td>
 							<td>Berechtigtes Interesse</td>
 							<td>GitHub (Hoster unserer Website)</td>
 						</tr>
@@ -173,8 +173,9 @@ import Hero from '../../../components/Hero.astro';
 				haben das gleiche Gewicht.
 			</p>
 			<ul>
-				<li><strong>Wenn du akzeptierst</strong>: Unity LevelPlay startet und zeigt das Banner und die Videos.</li>
-				<li><strong>Wenn du ablehnst</strong>: Es startet kein Werbemodul. Die App funktioniert genauso, ohne die Werbung unserer Partner: An ihrer Stelle stellt ein Banner unsere anderen Apps vor, Pétanque Meet oder, unter Android, Pétanque Game, und ein kurzes Video von Pétanque Meet lädt deine Scans ebenfalls auf. Diese Vorstellung sendet nur die Nutzungsereignisse aus §5 und, für das Video, die Anfrage an unsere Website (siehe §8).</li>
+				<li><strong>Wenn du akzeptierst</strong>: Unity LevelPlay startet und zeigt das Banner und die Videos. Wenn es keine Anzeige zu zeigen hat, treten unsere eigenen Anzeigen an seine Stelle, beim Banner wie beim Video.</li>
+				<li><strong>Wenn du ablehnst</strong>: Es startet kein Werbemodul. Die App funktioniert genauso, ohne die Werbung unserer Partner: An ihrer Stelle zeigt ein Banner abwechselnd unsere eigenen Anzeigen für unsere anderen Apps (derzeit Pétanque Meet und, unter Android, Pétanque Game), und ein kurzes Video einer dieser Apps lädt deine Scans ebenfalls auf. Unsere eigenen Anzeigen laufen über kein Werbenetzwerk und verfolgen dich nicht (siehe §5 und §8).</li>
+				<li><strong>Nach einer Ablehnung</strong> bietet dir die App einmal pro Sitzung an, die Werbung zu aktivieren, wenn du ein Video anforderst, um deine Scans aufzuladen: „Werbung aktivieren“ gilt als „Akzeptieren“ (auf dem iPhone wird dann die Tracking-Erlaubnis von Apple abgefragt, falls das noch nicht geschehen ist), „Video unserer Apps ansehen“ behält deine Ablehnung bei und zeigt eines unserer Videos.</li>
 				<li><strong>Deine Antwort</strong>, ihr Datum und die Version des Textes bleiben auf deinem Handy. Die App fragt dich nach 6 Monaten erneut, egal ob du akzeptiert oder abgelehnt hast, oder früher, wenn sich unsere Werbepartner ändern.</li>
 				<li><strong>Wenn du deine Einwilligung widerrufst</strong> (in den Einstellungen der App, siehe §12): Die Werbung unserer Partner endet sofort, und die App meldet den Widerruf an Unity LevelPlay, das ihn an die Werbenetzwerke weitergibt.</li>
 				<li><strong>Unter iOS</strong> wird die Tracking-Erlaubnis von Apple (<em>App Tracking Transparency</em>) erst nach einem „Akzeptieren“ abgefragt und dient nur der Werbung. Wenn du sie ablehnst oder später in den Einstellungen des iPhones ausschaltest (die App berücksichtigt das beim nächsten Start), wird weiterhin Werbung angezeigt, aber sie ist <strong>nicht personalisiert</strong>: Die App teilt Unity LevelPlay mit, dass du personalisierte Werbung ablehnst, LevelPlay gibt das an die Werbenetzwerke weiter, und die Werbe-ID des iPhones wird ihnen nicht übermittelt.</li>
@@ -232,9 +233,11 @@ import Hero from '../../../components/Hero.astro';
 				<li><code>paywall_watch_ad</code> — du entscheidest dich, ein Video anzusehen, um deine Scans aufzuladen</li>
 				<li><code>ad_reward_earned</code> — die Werbung wurde bis zum Ende angesehen und die Scans werden aufgeladen</li>
 				<li><code>ad_unavailable</code> — es war keine Werbung zum Anzeigen verfügbar</li>
-				<li><code>meet_promo_shown</code> / <code>meet_promo_refill</code> / <code>meet_promo_closed</code> — das Video von Pétanque Meet wird gezeigt, lädt deine Scans auf oder wird geschlossen</li>
-				<li><code>meet_store_opened</code> — du öffnest die Seite von Pétanque Meet im Store, über das Banner oder das Video</li>
-				<li><code>game_store_opened</code> — du öffnest die Seite von Pétanque Game im Store, über das Banner</li>
+				<li><code>house_ad_shown</code> — eine unserer eigenen Anzeigen wird gezeigt, mit ihrem Namen und ihrem Platz (Banner oder Video), nur einmal pro Anzeige und Platz in einer Sitzung (seit 1.2.14)</li>
+				<li><code>house_ad_opened</code> — du tippst auf eine unserer eigenen Anzeigen, mit ihrem Namen und ihrem Platz (seit 1.2.14)</li>
+				<li><code>meet_promo_shown</code> / <code>meet_promo_refill</code> / <code>meet_promo_closed</code> — das Video von Pétanque Meet wird gezeigt, lädt deine Scans auf oder wird geschlossen (bis 1.2.13)</li>
+				<li><code>meet_store_opened</code> — du öffnest die Seite von Pétanque Meet im Store, über das Banner oder das Video (bis 1.2.13)</li>
+				<li><code>game_store_opened</code> — du öffnest die Seite von Pétanque Game im Store, über das Banner (bis 1.2.13)</li>
 				<li><code>premium_purchase_started</code> / <code>premium_purchase_success</code> / <code>premium_purchase_failed</code> — Schritte eines Kaufs, gegebenenfalls mit dem Grund des Scheiterns</li>
 				<li><code>premium_restore_success</code> — ein früherer Kauf wurde wiederhergestellt</li>
 				<li><code>premium_revoked</code> — der Store erkennt ein Premium nicht mehr an (zum Beispiel nach einer Erstattung)</li>
@@ -291,11 +294,17 @@ import Hero from '../../../components/Hero.astro';
 			<h2>8. Was die App online abruft</h2>
 			<p>
 				<strong>Unsere Website.</strong> Beim Start liest die App auf unserer Website, ludiven-studio.fr,
-				eine kleine Datei mit der Nummer der neuesten Version, um dir ein Update anzubieten. Wenn das Video
-				von Pétanque Meet eine Werbung ersetzt, wird es ebenfalls von unserer Website geladen. Beim
-				Öffnen des Premium-Bildschirms liest die App dort außerdem die Liste der Videos von Pétanque Meet. Es wird
-				nichts gesendet; wie bei jeder Webseite sieht der Hoster der Website (GitHub) die IP-Adresse deines
-				Handys.
+				eine kleine Datei mit der Nummer der neuesten Version, um dir ein Update anzubieten, sowie den Katalog
+				unserer eigenen Anzeigen und ihre Bilder; das Video einer Anzeige wird dort geladen, wenn es dir gezeigt
+				wird. Diese Abrufe erfolgen unabhängig von deiner Wahl zur Werbung. Es wird nichts gesendet; wie bei
+				jeder Webseite sieht der Hoster der Website (GitHub) die IP-Adresse deines Handys.
+			</p>
+			<p>
+				<strong>Unsere eigenen Anzeigen.</strong> Ein Tipp auf eine davon öffnet die Seite der vorgestellten
+				App im Store. Bei Google Play gibt der Link an, dass er von Pétanque Scan kommt, von welcher Anzeige und
+				von welchem Platz (Banner oder Video), ohne jede Kennung; der Link zum App Store gibt nichts an. Bis
+				Version 1.2.13 lud die App von unserer Website nur das Video von Pétanque Meet und, beim Öffnen des
+				Premium-Bildschirms, die Liste seiner Videos.
 			</p>
 		</section>
 
@@ -315,7 +324,8 @@ import Hero from '../../../components/Hero.astro';
 				Deine Antwort im Fenster „Werbung“ wird mit ihrem Datum und der Version des Textes
 				außerdem in den Einstellungen der App gespeichert, um zu wissen, wann du erneut gefragt wirst. Wenn
 				du der Werbung zugestimmt hast, speichern die Module von LevelPlay, ironSource und Unity Ads auch
-				eigene Daten auf dem Handy.
+				eigene Daten auf dem Handy. Schließlich behält die App eine Kopie des Katalogs unserer eigenen Anzeigen
+				und ihrer Bilder, um sie ohne Warten auf das Netz zu zeigen; sie enthält nichts über dich.
 			</p>
 			<p>
 				Diese Daten werden nicht mit einem Server synchronisiert und von der App nicht in der Cloud gesichert.
@@ -337,7 +347,7 @@ import Hero from '../../../components/Hero.astro';
 				<li><strong>Google LLC</strong> — Google Play-Dienste für AR (ARCore), unter Android, in allen Versionen (siehe §2).</li>
 				<li><strong>Google Ireland Limited / Google LLC</strong> — nur für Versionen vor 1.2.13, solange sie nicht aktualisiert sind: Werbung (AdMob), Einwilligungsverwaltung (UMP), Reichweitenmessung (Firebase Analytics), Benachrichtigungen (Firebase Cloud Messaging) und Referenzzeit (Firebase Realtime Database), wenn du zugestimmt hattest.</li>
 				<li><strong>Hetzner Online GmbH</strong> (Deutschland) — Hosting unseres Umami-Servers für die Reichweitenmessung. Noch nicht aktualisierte Versionen der App senden diese Messdaten weiterhin an <strong>Umami Software, Inc.</strong> (Gesellschaft nach US-amerikanischem Recht) über den Dienst Umami Cloud.</li>
-				<li><strong>GitHub, Inc.</strong> — Hosting unserer Website, gelesen für das Update-Angebot, die Liste der Videos von Pétanque Meet und das gezeigte Video (siehe §8).</li>
+				<li><strong>GitHub, Inc.</strong> — Hosting unserer Website, gelesen für das Update-Angebot, den Katalog unserer eigenen Anzeigen, ihre Bilder und Videos (siehe §8).</li>
 				<li><strong>ntfy.sh</strong> — Benachrichtigungsdienst, der uns die Verkaufsmeldung übermittelt (siehe §7).</li>
 				<li><strong>Apple Inc.</strong> und <strong>Google LLC</strong> — Vertrieb der App und Abwicklung der In-App-Käufe.</li>
 			</ul>

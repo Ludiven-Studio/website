@@ -18,7 +18,7 @@ import Hero from '../../../components/Hero.astro';
 		<p class="updated">
 			This policy covers <strong>the Pétanque Scan mobile app</strong>
 			(formerly Pétanque Scanner, <code>com.raphbenpro.petanquear</code>), not the ludiven-studio.fr website, which has its
-			<a href="/confidentialite/">own policy</a>. Last updated: 5 November 2026 (version 1.2.13: advertising moves from Google AdMob to Unity LevelPlay, with our own consent window; on iPhone, without Apple's tracking permission, ads are not personalised; withdrawing your consent is passed on to the ad networks; Google Firebase is removed; 10 free scans a day instead of 3).
+			<a href="/confidentialite/">own policy</a>. Last updated: 5 November 2026 (version 1.2.14: our house ads, read from our website, replace the Pétanque Meet strip and video; after a refusal, "Turn ads on?" is offered once per session when you ask for a video. Version 1.2.13: advertising moves from Google AdMob to Unity LevelPlay, with our own consent window; on iPhone, without Apple's tracking permission, ads are not personalised; withdrawing your consent is passed on to the ad networks; Google Firebase is removed; 10 free scans a day instead of 3).
 		</p>
 		<p class="updated">
 			This is a courtesy translation. In case of discrepancy, the
@@ -133,7 +133,7 @@ import Hero from '../../../components/Hero.astro';
 						</tr>
 						<tr>
 							<td>IP address, as for any web page</td>
-							<td>Reading on our website the number of the latest version, the list of Pétanque Meet videos and the video shown (see §8)</td>
+							<td>Reading on our website the number of the latest version, the catalogue of our house ads, their images and videos (see §8)</td>
 							<td>Legitimate interest</td>
 							<td>GitHub (our website's host)</td>
 						</tr>
@@ -169,8 +169,9 @@ import Hero from '../../../components/Hero.astro';
 				the ads and measure how they perform. "Accept" and "Refuse" carry the same weight.
 			</p>
 			<ul>
-				<li><strong>If you accept</strong>: Unity LevelPlay starts and shows the banner and the videos.</li>
-				<li><strong>If you refuse</strong>: no advertising module starts. The app works just the same, without our partners' ads: in their place, a strip presents our other apps, Pétanque Meet or, on Android, Pétanque Game, and a short Pétanque Meet video also recharges your scans. This presentation only sends the usage events of §5 and, for the video, the request to our website (see §8).</li>
+				<li><strong>If you accept</strong>: Unity LevelPlay starts and shows the banner and the videos. When it has no ad to show, our house ads take its place, for the banner as for the video.</li>
+				<li><strong>If you refuse</strong>: no advertising module starts. The app works just the same, without our partners' ads: in their place, a strip shows our house ads in turn, for our other apps (today Pétanque Meet and, on Android, Pétanque Game), and a short video of one of them also recharges your scans. Our house ads go through no ad network and do not track you (see §5 and §8).</li>
+				<li><strong>After a refusal</strong>, when you ask for a video to recharge your scans, the app offers once per session to turn advertising on: "Turn ads on" counts as an "Accept" (on iPhone, Apple's tracking permission is then requested if it has not been yet), "Watch a video of our apps" keeps your refusal and shows one of our videos.</li>
 				<li><strong>Your answer</strong>, its date and the version of the text stay on your phone. The app asks you again after 6 months, whether you accepted or refused, or sooner if our ad partners change.</li>
 				<li><strong>If you withdraw your consent</strong> in the app's settings (see §12): our partners' advertising stops at once, and the app reports the withdrawal to Unity LevelPlay, which passes it on to the ad networks.</li>
 				<li><strong>On iOS</strong>, Apple's tracking permission (<em>App Tracking Transparency</em>) is only requested after an "Accept", and only serves advertising. If you refuse it, or turn it off later in the iPhone's settings (the app takes this into account the next time it starts), ads still show, but they are <strong>not personalised</strong>: the app tells Unity LevelPlay that you refuse personalised advertising, LevelPlay passes this on to the ad networks, and the iPhone's advertising identifier is not shared with them.</li>
@@ -228,9 +229,11 @@ import Hero from '../../../components/Hero.astro';
 				<li><code>paywall_watch_ad</code> — you choose to watch a video to recharge your scans</li>
 				<li><code>ad_reward_earned</code> — the ad was watched to the end and the scans are recharged</li>
 				<li><code>ad_unavailable</code> — no ad was available to show</li>
-				<li><code>meet_promo_shown</code> / <code>meet_promo_refill</code> / <code>meet_promo_closed</code> — the Pétanque Meet video is shown, recharges your scans, or is closed</li>
-				<li><code>meet_store_opened</code> — you open Pétanque Meet's page in the store, from the strip or the video</li>
-				<li><code>game_store_opened</code> — you open Pétanque Game's page in the store, from the strip</li>
+				<li><code>house_ad_shown</code> — one of our house ads is shown, with its name and its spot (strip or video), only once per ad and spot in a session (since 1.2.14)</li>
+				<li><code>house_ad_opened</code> — you tap one of our house ads, with its name and its spot (since 1.2.14)</li>
+				<li><code>meet_promo_shown</code> / <code>meet_promo_refill</code> / <code>meet_promo_closed</code> — the Pétanque Meet video is shown, recharges your scans, or is closed (up to 1.2.13)</li>
+				<li><code>meet_store_opened</code> — you open Pétanque Meet's page in the store, from the strip or the video (up to 1.2.13)</li>
+				<li><code>game_store_opened</code> — you open Pétanque Game's page in the store, from the strip (up to 1.2.13)</li>
 				<li><code>premium_purchase_started</code> / <code>premium_purchase_success</code> / <code>premium_purchase_failed</code> — steps of a purchase, with the reason for failure where applicable</li>
 				<li><code>premium_restore_success</code> — a previous purchase was restored</li>
 				<li><code>premium_revoked</code> — the store no longer recognises a Premium (after a refund, for example)</li>
@@ -283,10 +286,16 @@ import Hero from '../../../components/Hero.astro';
 			<h2>8. What the app reads online</h2>
 			<p>
 				<strong>Our website.</strong> At launch, the app reads a small file on our website,
-				ludiven-studio.fr, that gives the number of the latest version, to offer you an update. When the
-				Pétanque Meet video stands in for an ad, it is read from our website too. When the
-				Premium screen opens, the app also reads the list of Pétanque Meet videos there. Nothing is sent; as for
-				any web page, the website's host (GitHub) sees your phone's IP address.
+				ludiven-studio.fr, that gives the number of the latest version, to offer you an update, as well as the
+				catalogue of our house ads and their images; an ad's video is read there when it is shown to you.
+				These reads happen whatever your choice about advertising. Nothing is sent; as for any web page, the
+				website's host (GitHub) sees your phone's IP address.
+			</p>
+			<p>
+				<strong>Our house ads.</strong> Tapping one opens the page of the app it presents in the store. On
+				Google Play, the link says that it comes from Pétanque Scan, from which ad and which spot (strip or
+				video), with no identifier; the App Store link says nothing. Up to version 1.2.13, the app only read
+				the Pétanque Meet video from our website and, when the Premium screen opened, the list of its videos.
 			</p>
 		</section>
 
@@ -305,7 +314,9 @@ import Hero from '../../../components/Hero.astro';
 			<p>
 				Your answer to the "Ads" window, with its date and the version of the text, is also
 				kept in the app's preferences, to know when to ask you again. If you have accepted advertising, the
-				LevelPlay, ironSource and Unity Ads modules also keep their own data on the phone.
+				LevelPlay, ironSource and Unity Ads modules also keep their own data on the phone. Finally, the app keeps
+				a copy of the catalogue of our house ads and of their images, to show them without waiting for the
+				network; it holds nothing about you.
 			</p>
 			<p>
 				This data is not synchronised to a server and is not backed up to the cloud by the app. Uninstalling the
@@ -326,7 +337,7 @@ import Hero from '../../../components/Hero.astro';
 				<li><strong>Google LLC</strong> — Google Play Services for AR (ARCore), on Android, in all versions (see §2).</li>
 				<li><strong>Google Ireland Limited / Google LLC</strong> — only for versions earlier than 1.2.13, until they are updated: advertising (AdMob), consent management (UMP), analytics (Firebase Analytics), notifications (Firebase Cloud Messaging) and reference time (Firebase Realtime Database), if you had accepted them.</li>
 				<li><strong>Hetzner Online GmbH</strong> (Germany) — hosting of our Umami analytics server. Versions of the app not yet updated still send this analytics data to <strong>Umami Software, Inc.</strong> (a US company), via the Umami Cloud service.</li>
-				<li><strong>GitHub, Inc.</strong> — hosting of our website, read for the update offer, the list of Pétanque Meet videos and the video shown (see §8).</li>
+				<li><strong>GitHub, Inc.</strong> — hosting of our website, read for the update offer, the catalogue of our house ads, their images and videos (see §8).</li>
 				<li><strong>ntfy.sh</strong> — notification service that passes the sale alert on to us (see §7).</li>
 				<li><strong>Apple Inc.</strong> and <strong>Google LLC</strong> — distribution of the app and processing of in-app purchases.</li>
 			</ul>
