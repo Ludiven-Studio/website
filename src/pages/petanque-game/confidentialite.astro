@@ -30,15 +30,14 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			Cette politique concerne <strong>l'application mobile Pétanque Game</strong>
 			(<code>com.ludivenstudio.petanquegame</code>). Le jeu de pétanque du site
 			(<a href="/jeux/petanque/">ludiven-studio.fr/jeux/petanque</a>) et le reste du site ont leur
-			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 2 novembre 2026 (les
-			statistiques d'usage passent d'Umami Cloud à notre propre serveur Umami, en Allemagne).
+			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 6 novembre 2026 (connexion avec Google sur iPhone&nbsp;; retrait de l'accès «&nbsp;Se connecter avec Apple&nbsp;» à la suppression du compte&nbsp;; statistiques d'usage envoyées à partir de la version 1.0.7).
 		</p>
 
 		<div class="summary">
 			<p><strong>L'essentiel&nbsp;:</strong></p>
 			<ul>
 				<li>Contre l'ordinateur ou à deux sur un téléphone, tu joues <strong>sans compte</strong>, même hors ligne. Quand le téléphone a internet, seules partent la publicité si tu l'as acceptée, des statistiques d'usage anonymes et quelques vérifications techniques (voir §2).</li>
-				<li>Les pièces, le magasin, les ligues et le jeu en ligne demandent un <strong>compte Google</strong> (Android) <strong>ou Apple</strong> (iPhone). Ta progression est alors sauvegardée chez <strong>Unity</strong>, notre prestataire, pour la retrouver sur tous tes téléphones.</li>
+				<li>Les pièces, le magasin, les ligues et le jeu en ligne demandent un <strong>compte Google</strong> (Android ou iPhone) <strong>ou Apple</strong> (iPhone). Ta progression est alors sauvegardée chez <strong>Unity</strong>, notre prestataire, pour la retrouver sur tous tes téléphones.</li>
 				<li><strong>Ton pseudo est public</strong>&nbsp;: dans la liste des parties publiques, chez ton adversaire et au classement, avec ta note. Il n'y a pas de chat.</li>
 				<li>La publicité ne s'affiche <strong>qu'avec ton accord</strong>, demandé au premier lancement. Sans lui, tu joues normalement, sans publicité. Aucune revente de données.</li>
 				<li>Tu peux <strong>supprimer ton compte</strong> à tout moment&nbsp;: Options › «&nbsp;Supprimer mon compte&nbsp;» (<a href="#suppression">voir §11</a>).</li>
@@ -81,8 +80,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			<h2>3. Ton compte</h2>
 			<p>
 				Les pièces, le magasin, les ligues, le jeu en ligne et les achats demandent un compte. Le jeu te le
-				propose au moment où tu en as besoin&nbsp;: tu te connectes avec <strong>Google</strong> sur Android,
-				avec <strong>Apple</strong> («&nbsp;Se connecter avec Apple&nbsp;») sur iPhone. Nous ne recevons
+				propose au moment où tu en as besoin&nbsp;: tu te connectes avec <strong>Google</strong> sur Android&nbsp;; sur iPhone, au choix avec <strong>Apple</strong> («&nbsp;Se connecter avec Apple&nbsp;») ou avec <strong>Google</strong>. Nous ne recevons
 				jamais ton mot de passe.
 			</p>
 			<p>
@@ -265,13 +263,14 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			<ul>
 				<li><code>app_open</code> — le jeu démarre (avec le fait que la publicité peut s'afficher ou non)&nbsp;;</li>
 				<li><code>match_start</code> / <code>match_end</code> — une partie commence ou finit (mode, niveau, résultat, score)&nbsp;;</li>
-				<li><code>cup_enter</code> / <code>cup_end</code> — une coupe de ligue commence ou finit (ligue, tour atteint, gain)&nbsp;;</li>
+				<li><code>cup_enter</code> / <code>cup_end</code> — une coupe de ligue commence ou finit (ligue, format, tour atteint, gain)&nbsp;;</li>
 				<li><code>rated_end</code> — une partie classée finit (résultat, palier de la note)&nbsp;;</li>
 				<li><code>daily_bonus</code>, <code>challenge_claim</code> — un bonus du jour (série) ou un défi (pièces) est reçu&nbsp;;</li>
 				<li><code>shop_buy</code>, <code>iap_buy</code> — un objet est acheté avec des pièces (objet, prix), ou avec de l'argent (produit)&nbsp;;</li>
 				<li><code>ad_consent</code> — ta réponse à la fenêtre «&nbsp;Publicité et vie privée&nbsp;» (oui ou non)&nbsp;;</li>
 				<li><code>ad_offer</code>, <code>ad_rewarded</code>, <code>ad_interstitial</code> — une vidéo est proposée ou regardée, une publicité s'affiche (emplacement, résultat)&nbsp;;</li>
 				<li><code>account_gate</code>, <code>sign_in</code>, <code>sign_out</code>, <code>account_delete</code> — le compte est demandé, une connexion, une déconnexion ou une suppression a lieu (Google ou Apple, réussite)&nbsp;;</li>
+				<li><code>ambience</code> — l'«&nbsp;Ambiance&nbsp;» choisie dans Options (lieu, réglage du mode sombre)&nbsp;;</li>
 				<li><code>reminders</code>, <code>review_ask</code>, <code>howto</code>, <code>update_prompt</code>, <code>update_tapped</code> — ta réponse sur les rappels, la demande d'avis du store, une page de «&nbsp;Comment jouer&nbsp;», la proposition de mise à jour.</li>
 			</ul>
 			<p>
@@ -287,8 +286,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			</p>
 			<p>
 				Ce serveur est loué à <strong>Hetzner Online GmbH</strong>, qui l'héberge en Allemagne. Personne d'autre
-				ne reçoit ces statistiques. Les versions du jeu qui n'ont pas encore été mises à jour les envoient encore
-				à Umami Cloud (Umami Software, Inc., États-Unis).
+				ne reçoit ces statistiques. Le jeu les envoie depuis la version 1.0.7&nbsp;; les versions précédentes n'en envoyaient aucune.
 			</p>
 		</section>
 
@@ -356,7 +354,8 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			<ul>
 				<li>ta progression est effacée de Unity Cloud Save&nbsp;;</li>
 				<li>ton compte Unity est effacé, avec son lien vers ton compte Google ou Apple&nbsp;;</li>
-				<li>la copie de ta progression sur le téléphone est effacée.</li>
+				<li>la copie de ta progression sur le téléphone est effacée&nbsp;;</li>
+				<li>si tu t'étais connecté avec Apple, une fenêtre d'Apple te redemande ton identifiant&nbsp;; le code qu'elle donne part, avec l'identifiant de l'application, vers notre fonction serveur, qui le remet à Apple pour retirer au jeu son accès «&nbsp;Se connecter avec Apple&nbsp;». Rien n'est gardé. Si tu fermes cette fenêtre, le compte est supprimé quand même&nbsp;: retire alors l'accès toi-même (voir plus bas).</li>
 			</ul>
 			<p>
 				Tes pièces, tes boules, tes objets et tes trophées sont perdus, sur tous tes téléphones.
@@ -388,15 +387,16 @@ import LangSwitch from '../../components/LangSwitch.astro';
 		<section class="stack gap-2">
 			<h2>12. Destinataires et transferts hors Union européenne</h2>
 			<p>
-				Notre seul serveur est celui des statistiques d'usage (voir §7). Tes données ne sont ni vendues ni cédées. Elles ne sont traitées
+				Nos seuls serveurs sont celui des statistiques d'usage (voir §7) et une fonction qui retire l'accès «&nbsp;Se connecter avec Apple&nbsp;» quand tu supprimes ton compte (voir §11). Tes données ne sont ni vendues ni cédées. Elles ne sont traitées
 				que par ces prestataires&nbsp;:
 			</p>
 			<ul>
 				<li><strong>Unity Technologies</strong> — comptes (Authentication), sauvegarde (Cloud Save), parties en ligne (Multiplayer et Relay), classement (Leaderboards), module d'achat (In-App Purchasing), statistiques du moteur et, si tu l'as acceptée, publicité (Unity LevelPlay, Unity Ads).</li>
 				<li><strong>ironSource</strong>, filiale de Unity Technologies — publicité (ironSource Ads), si tu l'as acceptée. Les enchères d'ironSource et de Unity Ads peuvent transmettre la demande d'annonce à d'autres acheteurs de publicité (voir §6).</li>
-				<li><strong>Google</strong> (Google Ireland Limited, Google LLC) — connexion sur Android, Google Play (distribution, paiement, fiche de notation).</li>
+				<li><strong>Google</strong> (Google Ireland Limited, Google LLC) — connexion sur Android et sur iPhone, Google Play (distribution, paiement, fiche de notation).</li>
 				<li><strong>Apple Inc.</strong> — «&nbsp;Se connecter avec Apple&nbsp;», autorisation de suivi, App Store (distribution, paiement, fiche de notation).</li>
-				<li><strong>Hetzner Online GmbH</strong> (Allemagne) — hébergement de notre serveur de statistiques d'usage (voir §7). Les versions du jeu pas encore mises à jour envoient encore ces statistiques à <strong>Umami Software, Inc.</strong> (Umami Cloud).</li>
+				<li><strong>Hetzner Online GmbH</strong> (Allemagne) — hébergement de notre serveur de statistiques d'usage (voir §7).</li>
+				<li><strong>Supabase, Inc.</strong> — hébergement de notre fonction qui retire l'accès «&nbsp;Se connecter avec Apple&nbsp;» (voir §11)&nbsp;: elle reçoit le code d'Apple, l'identifiant de l'application et l'adresse IP du téléphone, et ne garde rien.</li>
 				<li><strong>GitHub, Inc.</strong> — hébergement de notre site, lu pour la vérification de mise à jour (voir §9).</li>
 			</ul>
 			<p>
@@ -412,7 +412,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li><strong>Compte et progression</strong> (Unity Authentication et Cloud Save)&nbsp;: jusqu'à ce que tu supprimes ton compte.</li>
 				<li><strong>Classement</strong>&nbsp;: ta note et ton pseudo, jusqu'à ce que tu les fasses retirer (voir §11).</li>
 				<li><strong>Parties en ligne</strong>&nbsp;: une partie publique quitte la liste dès qu'elle commence ou que tu la fermes&nbsp;; les lancers ne sont pas gardés après la partie.</li>
-				<li><strong>Statistiques d'usage</strong>&nbsp;: gardées <strong>24 mois</strong> sur notre serveur, puis effacées&nbsp;; ses sauvegardes, 14 jours. Celles que reçoit encore Umami Cloud, depuis les versions pas encore à jour, y sont effacées au bout de 6 mois.</li>
+				<li><strong>Statistiques d'usage</strong>&nbsp;: gardées <strong>24 mois</strong> sur notre serveur, puis effacées&nbsp;; ses sauvegardes, 14 jours.</li>
 				<li><strong>Données publicitaires</strong>&nbsp;: selon les règles de Unity et d'ironSource.</li>
 				<li><strong>Ta réponse sur la publicité</strong>&nbsp;: 6 mois sur ton téléphone, puis le jeu te la redemande.</li>
 				<li><strong>Achats</strong>&nbsp;: les numéros de transaction restent dans ta progression, jusqu'à la suppression du compte&nbsp;; Google et Apple gardent leurs propres justificatifs.</li>

@@ -31,8 +31,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			Diese Erklärung betrifft <strong>die mobile App Pétanque Game</strong>
 			(<code>com.ludivenstudio.petanquegame</code>). Das Pétanque-Spiel der Website
 			(<a href="/jeux/petanque/">ludiven-studio.fr/jeux/petanque</a>) und die übrige Website haben eine
-			<a href="/confidentialite/">eigene Datenschutzerklärung</a>. Letzte Aktualisierung: 2. November 2026 (die Nutzungsstatistiken laufen nicht mehr über Umami Cloud,
-			sondern über unseren eigenen Umami-Server in Deutschland).
+			<a href="/confidentialite/">eigene Datenschutzerklärung</a>. Letzte Aktualisierung: 6. November 2026 (Anmeldung mit Google auf dem iPhone; Entzug des Zugriffs über „Mit Apple anmelden“ beim Löschen des Kontos; Nutzungsstatistiken ab Version 1.0.7 gesendet).
 		</p>
 		<p class="updated">
 			Dies ist eine Höflichkeitsübersetzung. Bei Abweichungen gilt die
@@ -43,7 +42,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<p><strong>Das Wichtigste:</strong></p>
 			<ul>
 				<li>Gegen den Computer oder zu zweit an einem Handy spielst du <strong>ohne Konto</strong>, auch offline. Wenn das Handy Internet hat, verlassen es nur die Werbung, wenn du sie akzeptiert hast, anonyme Nutzungsstatistiken und ein paar technische Abfragen (siehe §2).</li>
-				<li>Für Münzen, Shop, Ligen und Online-Spiel brauchst du ein <strong>Google-Konto</strong> (Android) <strong>oder Apple-Konto</strong> (iPhone). Dein Spielstand wird dann bei <strong>Unity</strong> gespeichert, unserem Dienstleister, damit du ihn auf all deinen Handys wiederfindest.</li>
+				<li>Für Münzen, Shop, Ligen und Online-Spiel brauchst du ein <strong>Google-Konto</strong> (Android oder iPhone) <strong>oder Apple-Konto</strong> (iPhone). Dein Spielstand wird dann bei <strong>Unity</strong> gespeichert, unserem Dienstleister, damit du ihn auf all deinen Handys wiederfindest.</li>
 				<li><strong>Dein Spitzname ist öffentlich</strong>: in der Liste der öffentlichen Partien, bei deinem Gegner und in der Rangliste, zusammen mit deiner Wertung. Es gibt keinen Chat.</li>
 				<li>Werbung erscheint <strong>nur mit deiner Einwilligung</strong>, nach der das Spiel beim ersten Start fragt. Ohne sie spielst du ganz normal, ohne Werbung. Kein Weiterverkauf von Daten.</li>
 				<li>Du kannst jederzeit <strong>dein Konto löschen</strong>: Optionen › „Mein Konto löschen“ (<a href="#suppression">siehe §11</a>).</li>
@@ -86,8 +85,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<h2>3. Dein Konto</h2>
 			<p>
 				Für Münzen, Shop, Ligen, Online-Spiel und Käufe brauchst du ein Konto. Das Spiel bietet es dir an, wenn
-				du es brauchst: Du meldest dich unter Android mit <strong>Google</strong> an, auf dem iPhone mit
-				<strong>Apple</strong> („Mit Apple anmelden“). Wir erhalten nie dein Passwort.
+				du es brauchst: Du meldest dich unter Android mit <strong>Google</strong> an, auf dem iPhone nach Wahl mit <strong>Apple</strong> („Mit Apple anmelden“) oder mit <strong>Google</strong>. Wir erhalten nie dein Passwort.
 			</p>
 			<p>
 				Das Handy übergibt ein Anmelde-Token an <strong>Unity Authentication</strong>. Unity erstellt damit deine
@@ -269,13 +267,14 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<ul>
 				<li><code>app_open</code> — das Spiel startet (mit der Angabe, ob Werbung angezeigt werden kann oder nicht);</li>
 				<li><code>match_start</code> / <code>match_end</code> — eine Partie beginnt oder endet (Modus, Stufe, Ergebnis, Punktestand);</li>
-				<li><code>cup_enter</code> / <code>cup_end</code> — ein Ligapokal beginnt oder endet (Liga, erreichte Runde, Gewinn);</li>
+				<li><code>cup_enter</code> / <code>cup_end</code> — ein Ligapokal beginnt oder endet (Liga, Format, erreichte Runde, Gewinn);</li>
 				<li><code>rated_end</code> — eine gewertete Partie endet (Ergebnis, Stufe der Wertung);</li>
 				<li><code>daily_bonus</code>, <code>challenge_claim</code> — ein Tagesbonus (Serie) oder eine Herausforderung (Münzen) wird abgeholt;</li>
 				<li><code>shop_buy</code>, <code>iap_buy</code> — ein Gegenstand wird mit Münzen gekauft (Gegenstand, Preis) oder mit Geld (Produkt);</li>
 				<li><code>ad_consent</code> — deine Antwort im Fenster „Werbung und Datenschutz“ (ja oder nein);</li>
 				<li><code>ad_offer</code>, <code>ad_rewarded</code>, <code>ad_interstitial</code> — ein Video wird angeboten oder angesehen, eine Werbung wird angezeigt (Platzierung, Ergebnis);</li>
 				<li><code>account_gate</code>, <code>sign_in</code>, <code>sign_out</code>, <code>account_delete</code> — das Konto wird verlangt, eine Anmeldung, eine Abmeldung oder eine Löschung findet statt (Google oder Apple, Erfolg);</li>
+				<li><code>ambience</code> — die in den Optionen gewählte „Stimmung“ (Ort, Einstellung des Dunkelmodus);</li>
 				<li><code>reminders</code>, <code>review_ask</code>, <code>howto</code>, <code>update_prompt</code>, <code>update_tapped</code> — deine Antwort zu den Erinnerungen, die Bewertungsanfrage des Stores, eine Seite von „So wird gespielt“, das Angebot eines Updates.</li>
 			</ul>
 			<p>
@@ -291,8 +290,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			</p>
 			<p>
 				Diesen Server mieten wir bei der <strong>Hetzner Online GmbH</strong>, die ihn in Deutschland betreibt.
-				Niemand sonst erhält diese Statistiken. Noch nicht aktualisierte Versionen des Spiels senden sie
-				weiterhin an Umami Cloud (Umami Software, Inc., USA).
+				Niemand sonst erhält diese Statistiken. Das Spiel sendet sie ab Version 1.0.7; frühere Versionen haben keine gesendet.
 			</p>
 		</section>
 
@@ -360,7 +358,8 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<ul>
 				<li>dein Spielstand wird aus Unity Cloud Save gelöscht;</li>
 				<li>dein Unity-Konto wird gelöscht, mit seiner Verknüpfung zu deinem Google- oder Apple-Konto;</li>
-				<li>die Kopie deines Spielstands auf dem Handy wird gelöscht.</li>
+				<li>die Kopie deines Spielstands auf dem Handy wird gelöscht;</li>
+				<li>Hast du dich mit Apple angemeldet, fragt ein Fenster von Apple noch einmal nach deiner Apple-ID; der Code, den es liefert, geht mit der Kennung der App an unsere Serverfunktion, die ihn an Apple weitergibt, um dem Spiel den Zugriff über „Mit Apple anmelden“ zu entziehen. Nichts wird gespeichert. Schließt du dieses Fenster, wird das Konto trotzdem gelöscht: Entziehe den Zugriff dann selbst (siehe unten).</li>
 			</ul>
 			<p>
 				Deine Münzen, deine Kugeln, deine Gegenstände und deine Trophäen sind verloren, auf all deinen Handys.
@@ -392,15 +391,16 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 		<section class="stack gap-2">
 			<h2>12. Empfänger und Übermittlungen außerhalb der Europäischen Union</h2>
 			<p>
-				Unser einziger eigener Server ist der für die Nutzungsstatistiken (siehe §7). Deine Daten werden weder verkauft noch weitergegeben. Sie werden nur
+				Unsere einzigen eigenen Server sind der für die Nutzungsstatistiken (siehe §7) und eine Funktion, die beim Löschen deines Kontos den Zugriff über „Mit Apple anmelden“ entzieht (siehe §11). Deine Daten werden weder verkauft noch weitergegeben. Sie werden nur
 				von diesen Dienstleistern verarbeitet:
 			</p>
 			<ul>
 				<li><strong>Unity Technologies</strong> — Konten (Authentication), Speicherung (Cloud Save), Online-Partien (Multiplayer und Relay), Rangliste (Leaderboards), Kaufmodul (In-App Purchasing), Statistiken der Engine und, wenn du sie akzeptiert hast, Werbung (Unity LevelPlay, Unity Ads).</li>
 				<li><strong>ironSource</strong>, Tochter von Unity Technologies — Werbung (ironSource Ads), wenn du sie akzeptiert hast. Die Auktionen von ironSource und Unity Ads können die Anzeigenanfrage an weitere Werbekäufer weitergeben (siehe §6).</li>
-				<li><strong>Google</strong> (Google Ireland Limited, Google LLC) — Anmeldung unter Android, Google Play (Vertrieb, Zahlung, Bewertungsfenster).</li>
+				<li><strong>Google</strong> (Google Ireland Limited, Google LLC) — Anmeldung unter Android und auf dem iPhone, Google Play (Vertrieb, Zahlung, Bewertungsfenster).</li>
 				<li><strong>Apple Inc.</strong> — „Mit Apple anmelden“, Tracking-Erlaubnis, App Store (Vertrieb, Zahlung, Bewertungsfenster).</li>
-				<li><strong>Hetzner Online GmbH</strong> (Deutschland) — Hosting unseres Servers für die Nutzungsstatistiken (siehe §7). Noch nicht aktualisierte Versionen des Spiels senden diese Statistiken weiterhin an <strong>Umami Software, Inc.</strong> (Umami Cloud).</li>
+				<li><strong>Hetzner Online GmbH</strong> (Deutschland) — Hosting unseres Servers für die Nutzungsstatistiken (siehe §7).</li>
+				<li><strong>Supabase, Inc.</strong> — Hosting unserer Funktion, die den Zugriff über „Mit Apple anmelden“ entzieht (siehe §11): Sie erhält den Code von Apple, die Kennung der App und die IP-Adresse des Handys und speichert nichts.</li>
 				<li><strong>GitHub, Inc.</strong> — Hosting unserer Website, die für die Update-Prüfung gelesen wird (siehe §9).</li>
 			</ul>
 			<p>
@@ -417,7 +417,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Konto und Spielstand</strong> (Unity Authentication und Cloud Save): bis du dein Konto löschst.</li>
 				<li><strong>Rangliste</strong>: deine Wertung und dein Spitzname, bis du sie entfernen lässt (siehe §11).</li>
 				<li><strong>Online-Partien</strong>: Eine öffentliche Partie verschwindet aus der Liste, sobald sie beginnt oder du sie schließt; die Würfe werden nach der Partie nicht aufbewahrt.</li>
-				<li><strong>Nutzungsstatistiken</strong>: <strong>24 Monate</strong> auf unserem Server gespeichert, dann gelöscht; seine Sicherungen 14 Tage. Was Umami Cloud noch von nicht aktualisierten Versionen erhält, wird dort nach 6 Monaten gelöscht.</li>
+				<li><strong>Nutzungsstatistiken</strong>: <strong>24 Monate</strong> auf unserem Server gespeichert, dann gelöscht; seine Sicherungen 14 Tage.</li>
 				<li><strong>Werbedaten</strong>: nach den Regeln von Unity und ironSource.</li>
 				<li><strong>Deine Antwort zur Werbung</strong>: 6 Monate auf deinem Handy, dann fragt das Spiel erneut.</li>
 				<li><strong>Käufe</strong>: Die Transaktionsnummern bleiben in deinem Spielstand, bis das Konto gelöscht wird; Google und Apple bewahren ihre eigenen Belege auf.</li>

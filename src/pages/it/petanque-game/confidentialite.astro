@@ -31,8 +31,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			Questa informativa riguarda <strong>l'app mobile Pétanque Game</strong>
 			(<code>com.ludivenstudio.petanquegame</code>). Il gioco di pétanque del sito
 			(<a href="/jeux/petanque/">ludiven-studio.fr/jeux/petanque</a>) e il resto del sito hanno una
-			<a href="/confidentialite/">propria informativa</a>. Ultimo aggiornamento: 2 novembre 2026 (le statistiche d'uso passano da Umami Cloud al nostro server
-			Umami, in Germania).
+			<a href="/confidentialite/">propria informativa</a>. Ultimo aggiornamento: 6 novembre 2026 (accesso con Google su iPhone; revoca dell'accesso «Accedi con Apple» all'eliminazione dell'account; statistiche d'uso inviate dalla versione 1.0.7).
 		</p>
 		<p class="updated">
 			Questa è una traduzione di cortesia. In caso di discordanza, prevale la
@@ -43,7 +42,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<p><strong>L'essenziale:</strong></p>
 			<ul>
 				<li>Contro il computer o in due su un telefono, giochi <strong>senza account</strong>, anche offline. Quando c'è internet, dal telefono partono solo la pubblicità, se l'hai accettata, statistiche d'uso anonime e alcuni controlli tecnici (vedi §2).</li>
-				<li>Le monete, il negozio, le leghe e il gioco online richiedono un <strong>account Google</strong> (Android) <strong>o Apple</strong> (iPhone). I tuoi progressi vengono allora salvati da <strong>Unity</strong>, il nostro fornitore, per ritrovarli su tutti i tuoi telefoni.</li>
+				<li>Le monete, il negozio, le leghe e il gioco online richiedono un <strong>account Google</strong> (Android o iPhone) <strong>o Apple</strong> (iPhone). I tuoi progressi vengono allora salvati da <strong>Unity</strong>, il nostro fornitore, per ritrovarli su tutti i tuoi telefoni.</li>
 				<li><strong>Il tuo nickname è pubblico</strong>: nell'elenco delle partite pubbliche, per il tuo avversario e in classifica, con il tuo punteggio. Non c'è chat.</li>
 				<li>La pubblicità compare <strong>solo con il tuo consenso</strong>, chiesto al primo avvio. Senza, giochi normalmente, senza pubblicità. Nessuna rivendita di dati.</li>
 				<li>Puoi <strong>eliminare il tuo account</strong> in qualsiasi momento: Opzioni › «Elimina il mio account» (<a href="#suppression">vedi §11</a>).</li>
@@ -86,8 +85,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<h2>3. Il tuo account</h2>
 			<p>
 				Le monete, il negozio, le leghe, il gioco online e gli acquisti richiedono un account. Il gioco te lo
-				propone quando ti serve: accedi con <strong>Google</strong> su Android, con <strong>Apple</strong>
-				(«Accedi con Apple») su iPhone. Non riceviamo mai la tua password.
+				propone quando ti serve: accedi con <strong>Google</strong> su Android; su iPhone, a scelta con <strong>Apple</strong> («Accedi con Apple») o con <strong>Google</strong>. Non riceviamo mai la tua password.
 			</p>
 			<p>
 				Il telefono consegna un token di accesso a <strong>Unity Authentication</strong>, che crea il tuo
@@ -269,13 +267,14 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<ul>
 				<li><code>app_open</code> — il gioco si avvia (indicando se la pubblicità può essere mostrata o no);</li>
 				<li><code>match_start</code> / <code>match_end</code> — una partita inizia o finisce (modalità, livello, risultato, punteggio della partita);</li>
-				<li><code>cup_enter</code> / <code>cup_end</code> — una coppa di lega inizia o finisce (lega, turno raggiunto, vincita);</li>
+				<li><code>cup_enter</code> / <code>cup_end</code> — una coppa di lega inizia o finisce (lega, formato, turno raggiunto, vincita);</li>
 				<li><code>rated_end</code> — una partita classificata finisce (risultato, fascia del punteggio);</li>
 				<li><code>daily_bonus</code>, <code>challenge_claim</code> — si riceve un bonus giornaliero (serie) o una sfida (monete);</li>
 				<li><code>shop_buy</code>, <code>iap_buy</code> — un oggetto viene acquistato con monete (oggetto, prezzo), o con denaro (prodotto);</li>
 				<li><code>ad_consent</code> — la tua risposta nella finestra «Pubblicità e privacy» (sì o no);</li>
 				<li><code>ad_offer</code>, <code>ad_rewarded</code>, <code>ad_interstitial</code> — un video viene proposto o guardato, una pubblicità viene mostrata (posizione, risultato);</li>
 				<li><code>account_gate</code>, <code>sign_in</code>, <code>sign_out</code>, <code>account_delete</code> — viene richiesto l'account, avviene un accesso, un'uscita o un'eliminazione (Google o Apple, riuscita);</li>
+				<li><code>ambience</code> — l'«Atmosfera» scelta nelle Opzioni (luogo, impostazione della modalità scura);</li>
 				<li><code>reminders</code>, <code>review_ask</code>, <code>howto</code>, <code>update_prompt</code>, <code>update_tapped</code> — la tua risposta sui promemoria, la richiesta di recensione dello store, una pagina di «Come si gioca», la proposta di aggiornamento.</li>
 			</ul>
 			<p>
@@ -291,8 +290,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			</p>
 			<p>
 				Questo server è noleggiato da <strong>Hetzner Online GmbH</strong>, che lo ospita in Germania. Nessun
-				altro riceve queste statistiche. Le versioni del gioco non ancora aggiornate continuano a inviarle a
-				Umami Cloud (Umami Software, Inc., Stati Uniti).
+				altro riceve queste statistiche. Il gioco le invia dalla versione 1.0.7; le versioni precedenti non ne inviavano.
 			</p>
 		</section>
 
@@ -360,7 +358,8 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<ul>
 				<li>i tuoi progressi vengono cancellati da Unity Cloud Save;</li>
 				<li>il tuo account Unity viene cancellato, insieme al suo collegamento con il tuo account Google o Apple;</li>
-				<li>la copia dei tuoi progressi sul telefono viene cancellata.</li>
+				<li>la copia dei tuoi progressi sul telefono viene cancellata;</li>
+				<li>se avevi fatto l'accesso con Apple, una finestra di Apple ti chiede di nuovo il tuo ID Apple; il codice che fornisce viene inviato, con l'identificativo dell'app, alla nostra funzione server, che lo consegna ad Apple per revocare al gioco l'accesso «Accedi con Apple». Non viene conservato nulla. Se chiudi quella finestra, l'account viene eliminato comunque: revoca allora tu l'accesso (vedi sotto).</li>
 			</ul>
 			<p>
 				Le tue monete, le tue bocce, i tuoi oggetti e i tuoi trofei vanno persi, su tutti i tuoi telefoni.
@@ -391,15 +390,16 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 		<section class="stack gap-2">
 			<h2>12. Destinatari e trasferimenti al di fuori dell'Unione europea</h2>
 			<p>
-				Il nostro unico server è quello delle statistiche d'uso (vedi §7). I tuoi dati non vengono né venduti né ceduti. Sono trattati solo da
+				I nostri unici server sono quello delle statistiche d'uso (vedi §7) e una funzione che revoca l'accesso «Accedi con Apple» quando elimini il tuo account (vedi §11). I tuoi dati non vengono né venduti né ceduti. Sono trattati solo da
 				questi fornitori:
 			</p>
 			<ul>
 				<li><strong>Unity Technologies</strong> — account (Authentication), salvataggio (Cloud Save), partite online (Multiplayer e Relay), classifica (Leaderboards), modulo di acquisto (In-App Purchasing), statistiche del motore e, se l'hai accettata, pubblicità (Unity LevelPlay, Unity Ads).</li>
 				<li><strong>ironSource</strong>, controllata di Unity Technologies — pubblicità (ironSource Ads), se l'hai accettata. Le aste di ironSource e di Unity Ads possono trasmettere la richiesta di annuncio ad altri acquirenti di pubblicità (vedi §6).</li>
-				<li><strong>Google</strong> (Google Ireland Limited, Google LLC) — accesso su Android, Google Play (distribuzione, pagamento, scheda di valutazione).</li>
+				<li><strong>Google</strong> (Google Ireland Limited, Google LLC) — accesso su Android e su iPhone, Google Play (distribuzione, pagamento, scheda di valutazione).</li>
 				<li><strong>Apple Inc.</strong> — «Accedi con Apple», autorizzazione al tracciamento, App Store (distribuzione, pagamento, scheda di valutazione).</li>
-				<li><strong>Hetzner Online GmbH</strong> (Germania) — hosting del nostro server per le statistiche d'uso (vedi §7). Le versioni del gioco non ancora aggiornate continuano a inviare queste statistiche a <strong>Umami Software, Inc.</strong> (Umami Cloud).</li>
+				<li><strong>Hetzner Online GmbH</strong> (Germania) — hosting del nostro server per le statistiche d'uso (vedi §7).</li>
+				<li><strong>Supabase, Inc.</strong> — hosting della nostra funzione che revoca l'accesso «Accedi con Apple» (vedi §11): riceve il codice di Apple, l'identificativo dell'app e l'indirizzo IP del telefono, e non conserva nulla.</li>
 				<li><strong>GitHub, Inc.</strong> — hosting del nostro sito, letto per il controllo degli aggiornamenti (vedi §9).</li>
 			</ul>
 			<p>
@@ -415,7 +415,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Account e progressi</strong> (Unity Authentication e Cloud Save): finché non elimini il tuo account.</li>
 				<li><strong>Classifica</strong>: il tuo punteggio e il tuo nickname, finché non li fai rimuovere (vedi §11).</li>
 				<li><strong>Partite online</strong>: una partita pubblica esce dall'elenco appena inizia o appena la chiudi; i lanci non vengono conservati dopo la partita.</li>
-				<li><strong>Statistiche d'uso</strong>: conservate <strong>24 mesi</strong> sul nostro server, poi cancellate; i suoi backup, 14 giorni. Quelle che Umami Cloud riceve ancora dalle versioni non aggiornate vi sono cancellate dopo 6 mesi.</li>
+				<li><strong>Statistiche d'uso</strong>: conservate <strong>24 mesi</strong> sul nostro server, poi cancellate; i suoi backup, 14 giorni.</li>
 				<li><strong>Dati pubblicitari</strong>: secondo le regole di Unity e di ironSource.</li>
 				<li><strong>La tua risposta sulla pubblicità</strong>: 6 mesi sul tuo telefono, poi il gioco te la richiede.</li>
 				<li><strong>Acquisti</strong>: i numeri di transazione restano nei tuoi progressi, fino all'eliminazione dell'account; Google e Apple conservano le proprie ricevute.</li>
