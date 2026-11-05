@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated": "2026-11-04T21:50:00Z",
+  "updated": "2026-11-05T08:00:00Z",
   "rotationSeconds": 30,
   "defaultLanguage": "fr",
   "entries": [
@@ -14,11 +14,11 @@
         "it": "Pétanque Meet"
       },
       "text": {
-        "fr": "Trouve une partie de pétanque près de chez toi",
+        "fr": "Trouve une partie près de chez toi",
         "en": "Find a pétanque game near you",
-        "es": "Encuentra una partida de petanca cerca de ti",
+        "es": "Encuentra una partida cerca de ti",
         "de": "Finde ein Boule-Spiel in deiner Nähe",
-        "it": "Trova una partita di pétanque vicino a te"
+        "it": "Trova una partita vicino a te"
       },
       "image": "img/petanque-meet.png",
       "clips": {
@@ -154,7 +154,7 @@
       "text": {
         "fr": "Nino le panda roux file vers son terrier",
         "en": "Nino the red panda races home",
-        "es": "Nino, el panda rojo, corre a su madriguera",
+        "es": "Nino, el panda rojo, corre a casa",
         "de": "Nino, der Rote Panda, rast nach Hause",
         "it": "Nino il panda rosso corre verso la tana"
       },
