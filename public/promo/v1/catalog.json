@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated": "2026-11-05T08:00:00Z",
+  "updated": "2026-11-05T13:00:00Z",
   "rotationSeconds": 30,
   "defaultLanguage": "fr",
   "entries": [
@@ -32,6 +32,12 @@
         "android": "com.ludivenstudio.petanquemeet",
         "ios": "6823583416"
       },
+      "app": [
+        "com.ludivenstudio.petanquemeet"
+      ],
+      "groups": [
+        "petanque"
+      ],
       "hideIn": [
         "com.ludivenstudio.petanquemeet",
         "com.ludivenstudio.dragonsgems",
@@ -65,6 +71,13 @@
       "link": {
         "android": "com.ludivenstudio.petanquegame"
       },
+      "app": [
+        "com.ludivenstudio.petanquegame"
+      ],
+      "groups": [
+        "petanque",
+        "games"
+      ],
       "hideIn": [
         "com.ludivenstudio.petanquegame"
       ],
@@ -100,6 +113,12 @@
         "android": "com.raphbenpro.petanquear",
         "ios": "6670211733"
       },
+      "app": [
+        "com.raphbenpro.petanquear"
+      ],
+      "groups": [
+        "petanque"
+      ],
       "hideIn": [
         "com.raphbenpro.petanquear",
         "com.ludivenstudio.dragonsgems",
@@ -133,6 +152,12 @@
       "link": {
         "android": "com.ludivenstudio.dragonsgems"
       },
+      "app": [
+        "com.ludivenstudio.dragonsgems"
+      ],
+      "groups": [
+        "games"
+      ],
       "hideIn": [
         "com.ludivenstudio.dragonsgems",
         "com.ludivenstudio.petanquemeet",
@@ -165,6 +190,12 @@
       "link": {
         "web": "/nino-rush/telecharger/"
       },
+      "app": [
+        "com.ludivenstudio.ninorush"
+      ],
+      "groups": [
+        "games"
+      ],
       "hideIn": [
         "com.ludivenstudio.ninorush",
         "com.ludivenstudio.petanquemeet",
