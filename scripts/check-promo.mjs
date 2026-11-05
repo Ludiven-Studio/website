@@ -20,6 +20,8 @@ const GLYPHS = new Set(
 	[[0x20, 0x7e], [0xa0, 0xac], [0xae, 0xff], [0x2010, 0x2027], [0x2030, 0x2055], [0x2057, 0x2057], [0x20ac, 0x20ac], [0x2122, 0x2122], [0x25a1, 0x25a1]]
 		.flatMap(([a, b]) => Array.from({ length: b - a + 1 }, (_, i) => a + i)),
 );
+// A banner's text line holds about 40 characters at 15 pt (Pétanque Scan, 2026-11-05); a longer one ends in "…".
+const BANNER_TEXT_MAX = 40;
 
 /** The public/ file a catalogue URL points to, or null when it is elsewhere. */
 function localFile(url, base) {
@@ -72,7 +74,11 @@ function checkEntry(e, base, defaultLanguage) {
 	if (typeof e.id !== 'string' || !e.id) errors.push('no id');
 	const title = texts(e.title, 'title', errors, { required: true });
 	if (!title[defaultLanguage]) errors.push(`no title in the default language (${defaultLanguage})`);
-	texts(e.text, 'text', errors);
+	const text = texts(e.text, 'text', errors);
+	if (!Array.isArray(e.spots) || e.spots.includes('banner'))
+		for (const [k, v] of Object.entries(text))
+			if (typeof v === 'string' && [...v].length > BANNER_TEXT_MAX)
+				errors.push(`text.${k} has ${[...v].length} characters: a banner shows ${BANNER_TEXT_MAX} at most`);
 	url(e.image, 'image', base, errors, { image: true });
 	const clips = texts(e.clips, 'clips', errors, { shown: false });
 	for (const [k, v] of Object.entries(clips)) url(v, `clips.${k}`, base, errors);
