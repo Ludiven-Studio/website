@@ -1692,3 +1692,21 @@
   Raphaël pour le push.
 - 23:28 : commité et poussé à la demande de l'utilisateur : mes 5 pages, cette section et la ligne « en ligne » de ma
   section du mini-jeu. Statut : terminé. Réservations libérées.
+
+## 2026-11-05 — LudivenTools : textes de bannière des pubs maison (40 caractères) (session LudivenTools)
+- Statut : en cours (2026-11-05T08:42+01:00). Demande de l'utilisateur : Raccourcir le texte de petanque-meet coupé par
+  « … » dans la bannière, vérifier les autres entrées, limite de longueur dans check-promo ; branche banner-texts, sans
+  push
+- Réservations actives : `public/promo/v1/catalog.json`, `scripts/check-promo.mjs`.
+- Ressources : serveur de dev sur le port 4535 ; eslint, `astro check`. Build annoncé ici avant.
+- 08:43 : Branche banner-texts (2 commits, pas poussé) : petanque-meet raccourci en fr « Trouve une partie près de chez
+  toi », es « Encuentra una partida cerca de ti », it « Trova una partita vicino a te » ; nino-rush es « Nino, el panda
+  rojo, corre a casa » (42 car.) ; updated 2026-11-05T08:00:00Z. check-promo refuse un texte de bannière de plus de 40
+  caractères (vérifié sur l'ancien catalogue : 4 refus) ; check-promo OK sur le nouveau. Push au mot de Raphaël.
+- 12:05 : Sur la même branche banner-texts : 2 commits de plus, « app » et « groups » dans les 5 entrées du catalogue,
+  et leur contrôle dans check-promo (catalogue accepté, cas fautifs refusés). Pas poussé : attend le mot de Raphaël.
+- 12:07 : Lancement du build complet dans le worktree banner-texts (écrit son dist/, .astro/, public/vendor/), avant le
+  push demandé par Raphaël.
+- 12:09 : build complet OK ; commité et poussé à la demande de Raphaël : les 4 commits de banner-texts (textes de
+  bannière, limite de 40 caractères, app et groups) et cette section seulement. Statut : terminé. Réservations
+  libérées.
