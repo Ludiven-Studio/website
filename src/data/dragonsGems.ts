@@ -34,6 +34,7 @@ export const WEB_GAME = '/jeux/eclats/';
 export const TEST_APK = '/jeux/eclats/test/';
 export const MAKING_OF: Record<Lang, string> = { fr: '/work/dragons-gems/', en: '/en/work/dragons-gems/', es: '/en/work/dragons-gems/', de: '/en/work/dragons-gems/', it: '/en/work/dragons-gems/' };
 export const PRIVACY: Record<Lang, string> = { fr: '/dragons-gems/confidentialite/', en: '/en/dragons-gems/confidentialite/', es: '/en/dragons-gems/confidentialite/', de: '/en/dragons-gems/confidentialite/', it: '/en/dragons-gems/confidentialite/' };
+export const TERMS: Record<Lang, string> = { fr: '/dragons-gems/cgu/', en: '/en/dragons-gems/cgu/', es: '/en/dragons-gems/cgu/', de: '/en/dragons-gems/cgu/', it: '/en/dragons-gems/cgu/' };
 export const CONTACT: Record<Lang, string> = { fr: '/contact/', en: '/en/contact/', es: '/en/contact/', de: '/en/contact/', it: '/en/contact/' };
 
 const A = '/assets/dragons-gems';
@@ -82,6 +83,7 @@ export interface Copy {
 	support: string;
 	supportLink: string;
 	privacy: string;
+	terms: string;
 	dl: { title: string; kicker: string; lead: string; waiting: string; screensTitle: string; back: string };
 }
 
@@ -139,6 +141,7 @@ export const copy: Record<Lang, Copy> = {
 		support: 'Une question, un souci ?',
 		supportLink: 'Écris-nous',
 		privacy: 'Politique de confidentialité',
+		terms: "Conditions d'utilisation",
 		dl: {
 			title: "Télécharger Dragon Gems Swipe",
 			kicker: "Disponible sur l'App Store et Google Play",
@@ -201,6 +204,7 @@ export const copy: Record<Lang, Copy> = {
 		support: 'A question, a problem?',
 		supportLink: 'Write to us',
 		privacy: 'Privacy policy',
+		terms: 'Terms of use',
 		dl: {
 			title: "Download Dragon Gems Swipe",
 			kicker: 'Out now on the App Store and Google Play',
@@ -263,6 +267,7 @@ export const copy: Record<Lang, Copy> = {
 		support: '¿Una pregunta, un problema?',
 		supportLink: 'Escríbenos',
 		privacy: 'Política de privacidad (en inglés)',
+		terms: 'Condiciones de uso (en inglés)',
 		dl: {
 			title: "Descargar Dragon Gems Swipe",
 			kicker: 'Ya disponible en el App Store y Google Play',
@@ -325,6 +330,7 @@ export const copy: Record<Lang, Copy> = {
 		support: 'Eine Frage, ein Problem?',
 		supportLink: 'Schreib uns',
 		privacy: 'Datenschutzerklärung (auf Englisch)',
+		terms: 'Nutzungsbedingungen (auf Englisch)',
 		dl: {
 			title: "Dragon Gems Swipe herunterladen",
 			kicker: 'Jetzt im App Store und bei Google Play',
@@ -387,6 +393,7 @@ export const copy: Record<Lang, Copy> = {
 		support: 'Una domanda, un problema?',
 		supportLink: 'Scrivici',
 		privacy: 'Informativa sulla privacy (in inglese)',
+		terms: "Condizioni d'uso (in inglese)",
 		dl: {
 			title: "Scarica Dragon Gems Swipe",
 			kicker: 'Disponibile su App Store e Google Play',
