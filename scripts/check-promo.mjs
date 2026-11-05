@@ -91,6 +91,11 @@ function checkEntry(e, base, defaultLanguage) {
 		if (link.android === undefined && link.ios === undefined && link.web === undefined) errors.push('no link');
 	}
 	strings(e.hideIn, 'hideIn', errors);
+	// The apps built since 2026-11-05 hide an entry only in its own app; the older ones still read hideIn.
+	strings(e.app, 'app', errors, (s) => PACKAGE.test(s));
+	if (Array.isArray(e.app))
+		for (const id of e.app) if (!e.hideIn?.includes?.(id)) errors.push(`app "${id}" is not in hideIn: the apps built before "app" would show it in itself`);
+	strings(e.groups, 'groups', errors);
 	strings(e.platforms, 'platforms', errors, (s) => PLATFORMS.includes(s));
 	strings(e.languages, 'languages', errors, (s) => LANG.test(s));
 	const start = date(e.start, 'start', errors);
@@ -122,12 +127,17 @@ for (const version of versions) {
 	const defaultLanguage = LANG.test(catalog.defaultLanguage ?? '') ? catalog.defaultLanguage : 'en';
 	if (!Array.isArray(catalog.entries)) problems.push('no entries list');
 	const ids = new Set();
+	const apps = new Map();
 	for (const [i, e] of (catalog.entries ?? []).entries()) {
 		const name = typeof e?.id === 'string' && e.id ? e.id : `#${i}`;
 		const errors = checkEntry(e, base, defaultLanguage);
 		if (ids.has(name)) errors.push('duplicate id');
 		ids.add(name);
 		for (const err of errors) problems.push(`${name}: ${err}`);
+		for (const id of Array.isArray(e?.app) ? e.app : []) {
+			if (apps.has(id)) problems.push(`${name}: app "${id}" is already ${apps.get(id)}'s: an app takes the groups of one entry`);
+			else apps.set(id, name);
+		}
 	}
 	if (problems.length) {
 		failed = true;
