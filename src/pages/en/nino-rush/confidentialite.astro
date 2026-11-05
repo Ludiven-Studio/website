@@ -8,11 +8,19 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 	title="Privacy policy of the Nino Rush app | Ludiven Studio"
 	description="Privacy policy of the Nino Rush mobile game: no account needed, optional video ads after your consent, our own videos, optional account and online copy, in-app purchases, account deletion, GDPR rights."
 	lang="en"
-	alternates={{ fr: '/nino-rush/confidentialite/', en: '/en/nino-rush/confidentialite/' }}
+	alternates={{ fr: '/nino-rush/confidentialite/', en: '/en/nino-rush/confidentialite/', es: '/es/nino-rush/confidentialite/', de: '/de/nino-rush/confidentialite/', it: '/it/nino-rush/confidentialite/' }}
 >
 	<div class="wrapper stack gap-12 legal">
 		<div class="stack gap-8">
-			<LangSwitch lang="en" href="/nino-rush/confidentialite/" />
+			<LangSwitch
+				lang="en"
+				links={[
+					{ lang: 'fr', href: '/nino-rush/confidentialite/' },
+					{ lang: 'es', href: '/es/nino-rush/confidentialite/' },
+					{ lang: 'de', href: '/de/nino-rush/confidentialite/' },
+					{ lang: 'it', href: '/it/nino-rush/confidentialite/' },
+				]}
+			/>
 			<Hero
 				title="Privacy — Nino Rush"
 				tagline="Your progress stays on your phone. Video ads only when you choose them."

@@ -7,11 +7,19 @@ import LangSwitch from '../../components/LangSwitch.astro';
 <BaseLayout
 	title="Confidentialité de l'application Nino Rush | Ludiven Studio"
 	description="Politique de confidentialité du jeu mobile Nino Rush : jeu sans compte, vidéos publicitaires facultatives après ton accord, nos propres vidéos, compte facultatif et copie en ligne, achats intégrés, suppression du compte, droits RGPD."
-	alternates={{ fr: '/nino-rush/confidentialite/', en: '/en/nino-rush/confidentialite/' }}
+	alternates={{ fr: '/nino-rush/confidentialite/', en: '/en/nino-rush/confidentialite/', es: '/es/nino-rush/confidentialite/', de: '/de/nino-rush/confidentialite/', it: '/it/nino-rush/confidentialite/' }}
 >
 	<div class="wrapper stack gap-12 legal">
 		<div class="stack gap-8">
-			<LangSwitch lang="fr" href="/en/nino-rush/confidentialite/" />
+			<LangSwitch
+				lang="fr"
+				links={[
+					{ lang: 'en', href: '/en/nino-rush/confidentialite/' },
+					{ lang: 'es', href: '/es/nino-rush/confidentialite/' },
+					{ lang: 'de', href: '/de/nino-rush/confidentialite/' },
+					{ lang: 'it', href: '/it/nino-rush/confidentialite/' },
+				]}
+			/>
 			<Hero
 				title="Confidentialité — Nino Rush"
 				tagline="Ta progression reste sur ton téléphone. Les vidéos publicitaires, c'est toi qui choisis."
