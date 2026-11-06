@@ -1,5 +1,5 @@
 import { MEET_STORES } from '../../data/petanqueMeet';
-import { useLang, useT } from './i18n';
+import { PATHS, useLang, useT } from './i18n';
 
 const ICON = '/assets/petanque-meet/icon.webp';
 
@@ -30,6 +30,7 @@ export default function StoreLinks() {
 
 /** Publishing and joining happen in the app: say so where the map opens, badges in reach. */
 export function AppCard() {
+	const lang = useLang();
 	const tr = useT();
 	return (
 		<aside className="re-appcard" aria-label={tr("L'appli Pétanque Meet", 'The Pétanque Meet app')}>
@@ -42,6 +43,7 @@ export function AppCard() {
 						"Post your game, join other people's, follow the tournaments. Free on Android and iPhone.",
 					)}
 				</span>
+				<a className="re-appcard-link" href={PATHS[lang].app}>{tr("Télécharger l'appli", 'Get the app')} →</a>
 			</p>
 			<StoreLinks />
 		</aside>

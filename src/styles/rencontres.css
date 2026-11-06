@@ -278,6 +278,7 @@
 	font-size: var(--text-base);
 	color: var(--gray-0);
 }
+.re-appcard-link { align-self: flex-start; margin-top: 0.2rem; font-weight: 700; }
 .re-appcard .store-badges { grid-column: 1 / -1; justify-content: flex-start; }
 @media (min-width: 44em) {
 	.re-appcard { grid-template-columns: auto minmax(0, 1fr) auto; }
