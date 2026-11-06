@@ -115,6 +115,46 @@
 		0px 16px 16px rgba(255, 255, 255, 0.1), 0px 4px 9px rgba(255, 255, 255, 0.12);
 }
 
+/* « Scène »: the menu, the phone tab bar, the footer and the homepage. The stage is a night scene in both themes
+   (--sc-night-*); the rest follows the theme. */
+:root {
+	--sc-ground: #f7f5fc;
+	--sc-surface: #ffffff;
+	--sc-surface-2: #efeafb;
+	--sc-line: #ddd5f3;
+	--sc-ink: #1a1533;
+	--sc-ink-2: #3b3363;
+	--sc-muted: #5b5480;
+	--sc-accent: #7c3aed;
+	--sc-accent-ink: #ffffff;
+	--sc-link: #6d28d9;
+	--sc-gold: #ffc94d;
+	--sc-gold-ink: #241600;
+	--sc-flame: #c2410c;
+	--sc-shadow: 0 10px 30px rgb(26 21 51 / 0.1);
+
+	--sc-night: #0e0b1f;
+	--sc-night-surface: #1a1533;
+	--sc-night-surface-2: #241d45;
+	--sc-night-line: #3a3166;
+	--sc-night-ink: #f4f1ff;
+	--sc-night-muted: #e4defa;
+	--sc-night-link: #c4a5ff;
+}
+
+:root.theme-dark {
+	--sc-ground: #0e0b1f;
+	--sc-surface: #1a1533;
+	--sc-surface-2: #241d45;
+	--sc-line: #3a3166;
+	--sc-ink: #f4f1ff;
+	--sc-ink-2: #d8d2f0;
+	--sc-muted: #bdb6da;
+	--sc-link: #c4a5ff;
+	--sc-flame: #ffc94d;
+	--sc-shadow: 0 10px 30px rgb(0 0 0 / 0.35);
+}
+
 html,
 body {
 	min-height: 100%;

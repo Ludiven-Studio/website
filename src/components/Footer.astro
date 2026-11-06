@@ -1,116 +1,121 @@
 ---
+// The site's footer, in the page's language. It stays a <footer> right under .backgrounds: the games' fullscreen
+// hides it by that selector.
 import Icon from './Icon.astro';
-const currentYear = new Date().getFullYear();
+import { MAIL, NAV, SOCIALS, type Lang } from '../data/siteNav';
+
+interface Props {
+	lang?: Lang;
+}
+
+const { lang = 'fr' } = Astro.props;
+const t = NAV[lang];
+const year = new Date().getFullYear();
 ---
 
-<footer>
-	<div class="group">
-		<p>
-			Designed with <a href="https://astro.build/" target="_blank">Astro</a>
-			<Icon icon="rocket-launch" size="1.2em" />
+<footer class="sf">
+	<div class="sf-in">
+		<p class="sf-copy">
+			<span>&copy; {year} Ludiven Studio</span>
+			<a href={`mailto:${MAIL}`}>{MAIL}</a>
 		</p>
-		<p>&copy; {currentYear} Ludiven Studio</p>
+		<ul class="sf-links" aria-label={t.footerLabel}>
+			{
+				t.footer.map((l) => (
+					<li>
+						<a href={l.href} hreflang={!l.href.startsWith('mailto:') && lang !== 'fr' && !l.href.startsWith(`/${lang}/`) ? 'fr' : undefined}>
+							{l.label}
+						</a>
+					</li>
+				))
+			}
+		</ul>
+		<ul class="sf-socials">
+			{
+				SOCIALS.map((s) => (
+					<li>
+						<a href={s.href} target="_blank" rel="noopener" aria-label={t.follow(s.label)}>
+							<Icon icon={s.icon} size="1.25em" />
+							<span>{s.label}</span>
+						</a>
+					</li>
+				))
+			}
+		</ul>
 	</div>
-	<p class="socials">
-		<a
-			href="https://www.linkedin.com/in/raphael-benedetto/"
-			target="_blank"
-			rel="noopener"
-			aria-label="LinkedIn de Raphaël Benedetto"
-		>
-			<Icon icon="linkedin-logo" size="1.3em" /> LinkedIn
-		</a>
-		<a
-			href="https://www.tiktok.com/@raphbenpro"
-			target="_blank"
-			rel="noopener"
-			aria-label="TikTok de Raphaël Benedetto"
-		>
-			<Icon icon="tiktok-logo" size="1.3em" /> TikTok
-		</a>
-		<a
-			href="https://www.instagram.com/raphben/"
-			target="_blank"
-			rel="noopener"
-			aria-label="Instagram de Raphaël Benedetto"
-		>
-			<Icon icon="instagram-logo" size="1.3em" /> Instagram
-		</a>
-		<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>
-	</p>
-	<nav class="legal-links" aria-label="Liens légaux">
-		<a href="/contact/">Contact</a>
-		<a href="/mentions-legales/">Mentions légales</a>
-		<a href="/confidentialite/">Confidentialité</a>
-	</nav>
 </footer>
+
 <style>
-	footer {
-		display: flex;
-		flex-direction: column;
-		gap: 3rem;
+	.sf {
 		margin-top: auto;
-		padding: 3rem 2rem 3rem;
-		text-align: center;
-		color: var(--gray-400);
+		padding: 2.5rem 0 2.75rem;
+		border-top: 1px solid var(--sc-line);
+		color: var(--sc-muted);
 		font-size: var(--text-sm);
 	}
 
-	footer a {
-		color: var(--gray-400);
-		text-decoration: 1px solid underline transparent;
-		text-underline-offset: 0.25em;
-		transition: text-decoration-color var(--theme-transition);
+	.sf-in {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 1.25rem;
+		max-width: 76rem;
+		margin-inline: auto;
+		padding-inline: 1.25rem;
+		text-align: center;
 	}
 
-	footer a:hover,
-	footer a:focus {
+	.sf a {
+		color: var(--sc-ink-2);
+		text-decoration: underline;
+		text-decoration-color: transparent;
+		text-underline-offset: 0.25em;
+		transition: text-decoration-color 0.15s ease;
+	}
+	.sf a:hover,
+	.sf a:focus-visible {
 		text-decoration-color: currentColor;
 	}
 
-	.group {
+	.sf-copy {
 		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-	}
-
-	.socials {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 1rem;
 		flex-wrap: wrap;
+		justify-content: center;
+		gap: 0.4rem 1rem;
 	}
 
-	.socials a {
+	.sf-links,
+	.sf-socials {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 0.5rem 1.25rem;
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+
+	.sf-socials a {
 		display: inline-flex;
 		align-items: center;
 		gap: 0.35em;
 	}
 
-	.legal-links {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 1rem;
-		flex-wrap: wrap;
-	}
-
-	@media (min-width: 50em) {
-		footer {
-			flex-direction: row;
-			justify-content: space-between;
-			padding: 2.5rem 5rem;
+	@media (min-width: 64em) {
+		.sf {
+			padding: 2.25rem 0;
 		}
-
-		.group {
+		.sf-in {
+			padding-inline: 1.5rem;
 			flex-direction: row;
-			gap: 1rem;
 			flex-wrap: wrap;
+			justify-content: space-between;
+			text-align: left;
 		}
-
-		.socials {
-			justify-content: flex-end;
+		.sf-links {
+			order: 3;
+			flex-basis: 100%;
+			justify-content: flex-start;
 		}
 	}
 </style>

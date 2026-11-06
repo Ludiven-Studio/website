@@ -7,6 +7,7 @@ import MainHead from '../components/MainHead.astro';
 import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
 import GameFullscreen from '../components/GameFullscreen.astro';
+import TabBar from '../components/TabBar.astro';
 import { games } from '../data/games';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -22,9 +23,11 @@ interface Props {
 	alternates?: Partial<Record<'fr' | 'en' | 'es' | 'de' | 'it', string>> | undefined;
 	/** A game page outside /jeux/<id>/ (an event page): still gets the fullscreen chrome. */
 	gameChrome?: boolean | undefined;
+	/** The homepage's night stage: a plain ground under it, and the stage right under the menu. */
+	scene?: boolean | undefined;
 }
 
-const { title, description, image, type, noindex, lang = 'fr', altLang, alternates, gameChrome } = Astro.props;
+const { title, description, image, type, noindex, lang = 'fr', altLang, alternates, gameChrome, scene } = Astro.props;
 
 // Route-based structured data (JSON-LD): Organization + WebSite on the home page,
 // VideoGame + BreadcrumbList on a game page — no per-page wiring needed.
@@ -32,6 +35,8 @@ const site = Astro.site!;
 const path = Astro.url.pathname;
 const pageUrl = new URL(path, site).href;
 const isGamePage = /^\/jeux\/[^/]+\/?$/.test(path) && !/^\/jeux\/(defi|boutique)\/?$/.test(path); // a game page, not the index, the daily hub or the shop
+// The phone tab bar: French pages, but not a game (its controls own the foot of the screen) nor the map and list apps.
+const tabBar = lang === 'fr' && !isGamePage && !gameChrome && !/^\/(?:rencontres|courses)(?:\/|$)|^\/petanque-meet\/(?:moderation\/?)?$/.test(path);
 // Matched game (if any) — reused for JSON-LD and the auto OG preview image.
 const m = path.match(/^\/jeux\/([^/]+)\/?$/);
 const g = m ? games.find((x) => x.id === m[1] || x.href === `/jeux/${m[1]}/`) : undefined;
@@ -70,12 +75,14 @@ if (path === '/' || path === '') {
 		<MainHead title={title} description={description} image={ogImage} type={type} noindex={noindex} lang={lang} altLang={altLang} alternates={alternates} />
 		{jsonLd && <script type="application/ld+json" is:inline set:html={JSON.stringify(jsonLd)} />}
 	</head>
-	<body>
-		<div class="stack backgrounds">
-			<Nav />
+	<body class:list={{ 'has-tabbar': tabBar }}>
+		<div class:list={['stack', 'backgrounds', { scene }]}>
+			<Nav lang={lang} alternates={alternates} altLang={altLang} scene={scene} />
 			<slot />
-			<Footer />
+			<Footer lang={lang} />
 		</div>
+
+		{tabBar && <TabBar />}
 
 		{(isGamePage || gameChrome) && <GameFullscreen />}
 
@@ -238,6 +245,12 @@ if (path === '/' || path === '') {
 					/*header2*/ normal,
 					/*base*/ normal;
 			}
+			/* The homepage's stage sits on a plain ground, in both themes. */
+			.backgrounds.scene {
+				background: var(--sc-ground);
+				background-blend-mode: normal;
+			}
+
 			@media (forced-colors: active) {
 				/* Deactivate custom backgrounds for high contrast users. */
 				.backgrounds {

@@ -1,0 +1,161 @@
+---
+// The phone tab bar of French pages: the games, the mini-games, the daily challenge (with the streak) and the
+// studio, one tap away from the thumb. Game pages leave it out: their foot belongs to the game's controls.
+import { TABS } from '../data/siteNav';
+
+const path = Astro.url.pathname.endsWith('/') ? Astro.url.pathname : `${Astro.url.pathname}/`;
+---
+
+<nav class="tb" aria-label="Raccourcis">
+	<ul>
+		{
+			TABS.map((tab) => (
+				<li>
+					<a
+						href={tab.href}
+						class:list={['tb-link', { 'is-lit': tab.match.test(path) }]}
+						aria-current={path === tab.href ? 'page' : undefined}
+						data-daily={tab.id === 'daily' ? '' : undefined}
+					>
+						<span class="tb-icon" aria-hidden="true">
+							{tab.id === 'games' && (
+								<svg viewBox="0 0 24 24" width="24" height="24">
+									<path d="M7 8h10a4 4 0 0 1 4 4v2.5a2.5 2.5 0 0 1-4.6 1.4L15 14H9l-1.4 1.9A2.5 2.5 0 0 1 3 14.5V12a4 4 0 0 1 4-4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+									<path d="M8 11v2M7 12h2M15.5 11.2h.01M17 12.8h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+								</svg>
+							)}
+							{tab.id === 'mini' && (
+								<svg viewBox="0 0 24 24" width="24" height="24">
+									<rect x="4" y="4" width="7" height="7" rx="2" fill="none" stroke="currentColor" stroke-width="1.8" />
+									<rect x="13" y="4" width="7" height="7" rx="2" fill="none" stroke="currentColor" stroke-width="1.8" />
+									<rect x="4" y="13" width="7" height="7" rx="2" fill="none" stroke="currentColor" stroke-width="1.8" />
+									<rect x="13" y="13" width="7" height="7" rx="2" fill="none" stroke="currentColor" stroke-width="1.8" />
+								</svg>
+							)}
+							{tab.id === 'daily' && (
+								<svg viewBox="0 0 24 24" width="24" height="24">
+									<circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8" />
+									<circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="1.8" />
+									<circle cx="12" cy="12" r="1.4" fill="currentColor" />
+								</svg>
+							)}
+							{tab.id === 'studio' && (
+								<svg viewBox="0 0 24 24" width="24" height="24">
+									<path d="M12 4l8 4-8 4-8-4 8-4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+									<path d="M4 12l8 4 8-4M4 16l8 4 8-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+								</svg>
+							)}
+						</span>
+						<span class="tb-label">{tab.label}</span>
+						{tab.id === 'daily' && <span class="tb-count" data-streak-count hidden />}
+					</a>
+				</li>
+			))
+		}
+	</ul>
+</nav>
+
+<style>
+	.tb {
+		position: fixed;
+		z-index: 9000;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		padding-bottom: env(safe-area-inset-bottom);
+		border-top: 1px solid var(--sc-line);
+		background: var(--sc-surface);
+		box-shadow: 0 -8px 24px rgb(14 11 31 / 0.08);
+		font-family: var(--font-brand);
+	}
+	@supports (backdrop-filter: blur(1px)) {
+		.tb {
+			background: color-mix(in srgb, var(--sc-surface) 90%, transparent);
+			backdrop-filter: blur(14px);
+		}
+	}
+
+	.tb ul {
+		display: grid;
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+
+	.tb-link {
+		position: relative;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 0.15rem;
+		min-height: 3.6rem;
+		padding: 0.45rem 0.25rem 0.4rem;
+		color: var(--sc-muted);
+		font-size: 0.75rem;
+		font-weight: 600;
+		line-height: 1.15;
+		text-align: center;
+		text-decoration: none;
+	}
+	.tb-link.is-lit {
+		color: var(--sc-link);
+	}
+	.tb-link.is-lit::before {
+		content: '';
+		position: absolute;
+		top: -1px;
+		left: 28%;
+		right: 28%;
+		height: 3px;
+		border-radius: 0 0 3px 3px;
+		background: var(--sc-accent);
+	}
+	.tb-link:focus-visible {
+		outline: 3px solid var(--sc-accent);
+		outline-offset: -3px;
+		border-radius: 0.6rem;
+	}
+
+	.tb-icon {
+		display: grid;
+		place-items: center;
+		width: 1.6rem;
+		height: 1.6rem;
+	}
+
+	.tb-count {
+		position: absolute;
+		top: 0.3rem;
+		left: calc(50% + 0.5rem);
+		min-width: 1.15rem;
+		height: 1.15rem;
+		padding: 0 0.3rem;
+		border-radius: 999rem;
+		background: var(--sc-gold);
+		color: var(--sc-gold-ink);
+		font-family: var(--font-body);
+		font-size: 0.6875rem;
+		font-weight: 700;
+		line-height: 1.15rem;
+		text-align: center;
+	}
+	.tb-count[hidden] {
+		display: none;
+	}
+
+	/* Room for the bar under the page's last line. */
+	:global(body.has-tabbar) {
+		padding-bottom: calc(3.6rem + env(safe-area-inset-bottom));
+	}
+
+	@media (min-width: 50em) {
+		.tb {
+			display: none;
+		}
+		:global(body.has-tabbar) {
+			padding-bottom: 0;
+		}
+	}
+</style>
