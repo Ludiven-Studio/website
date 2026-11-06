@@ -2189,3 +2189,26 @@
   complet OK (222 pages, astro check 0 erreur, précache 384, liens OK), check-tester-links.mjs 118 contrôles OK
   (Pétanque Game montre maintenant Bêta et Dev). Poussé sur le mot de Raphaël (« pousse les accès bêta et dev discrets
   ») : mes 3 commits, cette section et celle des pages bêta seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-06 — Liens vers les pages de téléchargement des applis (session website)
+- Statut : en cours (2026-11-06T18:47+01:00). Demande de l'utilisateur : (transmis par le Producer, Raphaël : « pour
+  pétanque scan je n'arrive pas à la page de téléchargement ») : un lien bien visible de la page de chaque appli vers
+  sa page de téléchargement, 5 langues ; depuis l'accueil, 1 ou 2 clics ; commit sans push
+- Réservations actives : `src/components/PetanqueLanding.astro`, `src/components/rencontres/StoreLinks.tsx`,
+  `scripts/check-download-reach.mjs` (nouveau), dans le worktree website-worktrees/dg-1.0.1, branche download-links ;
+  rien dans ce dossier.
+- Ressources : serveur de dev sur le port 4532 ; eslint, `astro check`. Build annoncé ici avant.
+- 18:53 : écrit : bouton « Télécharger » (5 langues) en haut et en bas de PetanqueLanding (Scan et Game), lien «
+  Télécharger l'appli » dans la carte de l'appli en haut de la carte Meet (FR, EN ; une ligne de style dans
+  `src/styles/rencontres.css`, ajouté à mes réservations) ; scripts/check-download-reach.mjs en dev : 40 contrôles OK,
+  et 12 échecs attendus sur l'ancien code (contre-épreuve). Lancement du build complet dans mon worktree dg-1.0.1 (son
+  dist/, .astro/, public/vendor/ seulement)…
+- 18:56 : build complet OK dans mon worktree (222 pages, astro check 0 erreur, précache 384, liens OK) ; sur ce build,
+  check-download-reach.mjs 40 contrôles OK (Scan et Game à 2 tapes de l'accueil par leur page, 5 langues ; Meet à 2
+  tapes en FR/EN par la carte, à 1 tape en es/de/it ; Dragon's Gems à 2 tapes ; le lien dans le premier écran d'un
+  téléphone) et check-tester-links.mjs OK ; captures téléphone, bureau et sombre vues. Commits sur la branche
+  download-links (partie d'origin/main 6e24cfe), non poussés : 90fc560 (bouton Télécharger, Scan et Game), 8b63314
+  (lien de la carte Meet), d42b706 (le garde). Push au mot de Raphaël : « pousse les liens de téléchargement »
+- 19:21 : poussé sur le mot de Raphaël (« pousse les liens de téléchargement ») : mes 3 commits (main inchangé depuis
+  6e24cfe, build et gardes déjà faits sur cet arbre) et cette section seulement. Statut : terminé. Réservations
+  libérées.
