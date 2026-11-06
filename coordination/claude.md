@@ -2129,3 +2129,63 @@
 - 15:53 : en ligne : store_ios est dans version.json sur main (7d5cc44), poussé par la session website au mot de
   Raphaël ; ma branche dragons-gems-store-ios (c3c1837, même contenu) est supprimée, rien à commiter de mon côté.
   Ticket 0062 clos (## Suite, ligne dans .collab/LOG.md). Statut : terminé. Réservations libérées.
+
+## 2026-11-06 — Pages bêta des applis : hors sitemap, hors précache, noindex (session website)
+- Statut : en cours (2026-11-06T15:52+01:00). Demande de l'utilisateur : (transmis par le Producer : Raphaël veut une
+  bêta prod de chaque appli, Meet, Pétanque Game, Scan, Dragon's Gems, avec un APK .beta sur une page discrète
+  /<jeu>/beta-<code>/) une fois pour les 4 : exclure ces pages du sitemap et du service worker, noindex ; commit sur
+  une branche partie de main, sans push
+- Réservations actives : `astro.config.mjs` (filtre du sitemap et globIgnores : une règle /beta-…/ chacun ; la
+  réservation de la section Pétanque Meet sur ce fichier lui est signalée, son worktree ne le modifie pas),
+  `src/layouts/BaseLayout.astro` (noindex des pages /beta-…/), dans le worktree website-worktrees/dg-1.0.1, branche
+  beta-pages ; rien dans ce dossier.
+- Ressources : serveur de dev sur le port 4531 ; eslint, `astro check`. Build annoncé ici avant.
+- 15:52 : règles écrites (astro.config.mjs : '/beta-' dans le filtre du sitemap, '**/beta-*/**' dans globIgnores ;
+  BaseLayout : noindex sur tout chemin /beta-), page témoin non commitée src/pages/petanque-game/beta-zz9test.astro
+  sans noindex à elle. Lancement du build complet dans mon worktree dg-1.0.1 (son dist/)…
+- 15:55 : correction : le build de 15:52 a tourné dans ce dossier partagé, pas dans mon worktree (dist/, .astro/,
+  public/vendor/ d'ici réécrits depuis main 7d5cc44 et les fichiers non commités présents, 218 pages, build OK) ;
+  aucune autre section n'annonçait de build ici. Relance du build complet dans mon worktree dg-1.0.1 (son dist/)…
+- 16:03 : build dans mon worktree OK (219 pages avec la page témoin, astro check 0 erreur, liens OK) : la page témoin,
+  sans noindex à elle, sort en « noindex, follow » ; précache 389 entrées comme sans elle (les autres pages cachées,
+  test et nuit, y sont, elles), sitemap 185 adresses sans aucune /beta-. Page témoin supprimée, commit bd6032d sur la
+  branche beta-pages (astro.config.mjs et BaseLayout.astro), non poussé. Push au mot de Raphaël : « pousse les règles
+  des pages bêta »
+- 16:22 : bd6032d poussé tel quel par la session Pétanque Meet avec sa page, sur le mot de Raphaël (« Publie la bêta
+  1.0.1 de Pétanque Meet ») : 7d5cc44..d51f62f. Vérifié en ligne : /petanque-meet/beta-0gn9lbmb/ en « noindex, follow
+  », absente de sw.js (où /petanque-meet/test reste listée) et du sitemap (185 adresses, aucune /beta-) ;
+  /petanque-meet/telecharger/ sans robots. Cette section part avec mon prochain push. Statut : terminé. Réservations
+  libérées.
+
+## 2026-11-06 — Accès discrets aux bêtas et aux Dev des applis (5 tapes sur l'icône) (session website)
+- Statut : en cours (2026-11-06T16:53+01:00). Demande de l'utilisateur : (transmis par le Producer, Raphaël : « comment
+  accéder à la bêta de chaque appli facilement depuis la page "télécharger" mais de manière discrète (la version dev
+  aussi devrait être discrète) », choix « 5 tapes sur l'icône ») ; pages Dev noindex, hors sitemap et sw.js, sans lien
+  public ; commit sans push
+- Réservations actives : `src/components/TesterLinks.astro` et `src/data/testerLinks.ts` (nouveaux),
+  `src/components/MeetDownload.astro`, `src/components/ScannerDownload.astro`,
+  `src/components/DragonsGemsDownload.astro`, `src/data/dragonsGems.ts` (lien de l'APK de test),
+  `src/pages/{petanque-meet,petanque-scanner,jeux/petanque,jeux/eclats,rencontres}/test.astro` (noindex seulement),
+  `astro.config.mjs` (sitemap et globIgnores des pages Dev), `src/layouts/BaseLayout.astro` (noindex),
+  `scripts/check-tester-links.mjs` (nouveau), dans le worktree website-worktrees/dg-1.0.1, branche tester-links ; Nino
+  Rush en attente du choix de Raphaël ; rien dans ce dossier.
+- Ressources : serveur de dev sur le port 4531 ; eslint, `astro check`. Build annoncé ici avant.
+- 16:58 : écrit : TesterLinks.astro + testerLinks.ts (chemins inversés puis base64 dans la page, bouton seulement si la
+  page existe : la bêta de Pétanque Game n'a pas encore le sien), branché sur MeetDownload, ScannerDownload (icône de
+  l'appli ajoutée en tête du héros, Scan et Game) et DragonsGemsDownload (carte « Version de test Android » retirée) ;
+  pages Dev hors sw.js (globIgnores) ; elles étaient déjà noindex et hors sitemap. check-tester-links.mjs en dev : tout
+  passe. Lancement du build complet dans mon worktree dg-1.0.1 (son dist/)…
+- 17:05 : Nino Rush garde ses liens publics (choix de Raphaël, transmis par le Producer). Commits sur la branche
+  tester-links (partie d'origin/main aa9b60b), non poussés : a93ebc9 (carte « Version de test Android » retirée de la
+  page de téléchargement de Dragon Gems), db864ca (TesterLinks, testerLinks.ts, branché sur les 3 pages de
+  téléchargement, icône de l'appli en tête de la page de Scan et de Game, scripts/check-tester-links.mjs), b33dc1e
+  (pages Dev hors de sw.js). Build complet de b33dc1e OK (221 pages, astro check 0 erreur, précache 384 entrées au lieu
+  de 389 : les 5 pages Dev en sont sorties, liens OK) ; check-tester-links.mjs sur le build : 113 contrôles OK (20
+  pages sans chemin en clair, 5 tapes rapides et pas 4 ni 5 lentes, souvenir au rechargement, rien sur un téléphone
+  neuf, stockage bloqué, bêtas et Dev hors sw.js et sitemap et en noindex) ; captures téléphone et bureau vues. La bêta
+  de Pétanque Game aura son bouton toute seule quand sa page sera sur main. Push au mot de Raphaël : « pousse les accès
+  bêta et dev discrets »
+- 17:14 : recalé sur origin/main 620695c (la bêta de Pétanque Game y est arrivée) : e3dfa29, 367d251, 0377cb0 ; build
+  complet OK (222 pages, astro check 0 erreur, précache 384, liens OK), check-tester-links.mjs 118 contrôles OK
+  (Pétanque Game montre maintenant Bêta et Dev). Poussé sur le mot de Raphaël (« pousse les accès bêta et dev discrets
+  ») : mes 3 commits, cette section et celle des pages bêta seulement. Statut : terminé. Réservations libérées.
