@@ -54,11 +54,18 @@ export function findContest(contests: unknown, startsAt: unknown, format: unknow
 	return null;
 }
 
-/** The fields of a new search from the request, or the refusal to show. `phone` comes from the
- *  function's own cleaner, so French numbers stay one rule. */
+/** The number as stored, E.164: a French one may be typed as dialled ("06 12 34 56 78"), any
+ *  other with its country code ("+32 470 12 34 56", "0032…"). null when refused or empty. */
+export function cleanPartnerPhone(raw: unknown): string | null {
+	let s = String(raw ?? '').replace(/[\s.\-()/]/g, '');
+	if (s.startsWith('00')) s = '+' + s.slice(2);
+	else if (/^0[1-9]\d{8}$/.test(s)) s = '+33' + s.slice(1);
+	return /^\+[1-9]\d{7,14}$/.test(s) ? s : null;
+}
+
+/** The fields of a new search from the request, or the refusal to show. */
 export function partnerFields(
-	body: Record<string, unknown>, contests: unknown, nowMs: number,
-	offensive: (s: string) => boolean, cleanPhone: (raw: unknown) => string | null,
+	body: Record<string, unknown>, contests: unknown, nowMs: number, offensive: (s: string) => boolean,
 ): Record<string, unknown> | string {
 	const contest = findContest(contests, body.contestStartsAt, body.format, body.category);
 	if (!contest || teamSize(contest.format) < 2) return 'Choisis une épreuve en équipe de ce concours.';
@@ -70,8 +77,8 @@ export function partnerFields(
 	if (!P_LEVELS.includes(level)) return 'Niveau inconnu.';
 	const note = cleanPartnerNote(body.note, offensive);
 	if (note === null) return 'Mot invalide (120 caractères, sans lien).';
-	const phone = cleanPhone(body.phone);
-	if (!phone) return 'Donne un numéro de téléphone français pour qu’on te joigne.';
+	const phone = cleanPartnerPhone(body.phone);
+	if (!phone) return 'Donne un numéro de téléphone pour qu’on te joigne : français, ou avec son indicatif (+32…).';
 	return {
 		poster, level, note, phone,
 		contest_starts_at: new Date(contest.starts_at).toISOString(),
