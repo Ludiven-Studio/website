@@ -83,9 +83,17 @@ export default defineConfig({
                 // The one exception is this legacy store-listing page: it has no index.html, so
                 // workbox derives the URL "PetanqueARDistances", which 404s — and a single bad
                 // entry aborts the WHOLE install, leaving every visitor on a frozen old worker.
-                // The apps' unlisted beta pages (/<app>/beta-<code>/) stay out too: every visitor
-                // downloads sw.js, so listing them there would publish their paths.
-                globIgnores: ['**/PetanqueARDistances/**', '**/beta-*/**'],
+                // The apps' unlisted beta and dev pages stay out too: every visitor downloads sw.js, so
+                // listing them there would publish their paths (testerLinks.ts).
+                globIgnores: [
+                    '**/PetanqueARDistances/**',
+                    '**/beta-*/**',
+                    'petanque-meet/test/**',
+                    'petanque-scanner/test/**',
+                    'jeux/petanque/test/**',
+                    'jeux/eclats/test/**',
+                    'rencontres/test/**',
+                ],
                 navigateFallback: null,
                 cleanupOutdatedCaches: true,
                 maximumFileSizeToCacheInBytes: 3_500_000,
