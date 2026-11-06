@@ -5,6 +5,8 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import Icon from './Icon.astro';
 import MoreApps from './MoreApps.astro';
 import ShareButton from './ShareButton.astro';
+import TesterLinks from './TesterLinks.astro';
+import { HOME_GAMES } from '../data/homeGames';
 import { SCANNER, type LandingLang, type PetanqueApp } from '../data/petanqueApps';
 
 interface Props {
@@ -32,6 +34,8 @@ const soon = badges.some((b) => !b.href);
 const points = app.points.features.map((n, i) => ({ ...c.features[n], icon: app.points.icons[i] }));
 const shots = app.screens[lang];
 const video = app.video?.(lang);
+const homeId = app.id === 'game' ? 'petanque-game' : 'petanque-scan';
+const appIcon = HOME_GAMES.find((g) => g.id === homeId)!.icon;
 ---
 
 <BaseLayout
@@ -45,6 +49,7 @@ const video = app.video?.(lang);
 		<div class:list={['scan-dl', 'stack', 'gap-12', { 'is-game': app.id === 'game' }]}>
 			<section class="hero">
 				<div class="hero-copy">
+					<img class="app-icon" src={appIcon} alt="" width="64" height="64" />
 					<p class="kicker">{t.kicker}</p>
 					<h1>{app.name}</h1>
 					<p class="tagline">{typo(tagline)}</p>
@@ -64,6 +69,7 @@ const video = app.video?.(lang);
 					{soon && c.soon && <p class="soon-note">{typo(c.soon)}</p>}
 					<p class="free">{typo(free)}</p>
 					<ShareButton id={app.id} title={app.name} kind={app.id === 'game' ? 'game' : 'app'} lang={lang} />
+					<TesterLinks app={homeId} lang={lang} icon=".scan-dl .hero .app-icon" />
 				</div>
 
 				<figure class="showcase" data-showcase aria-label={c.galleryTitle}>
@@ -318,6 +324,14 @@ const video = app.video?.(lang);
 		display: flex;
 		flex-direction: column;
 		align-items: flex-start;
+	}
+
+	.app-icon {
+		width: 4rem;
+		height: 4rem;
+		margin-bottom: 1rem;
+		border-radius: 22%;
+		box-shadow: 0 4px 14px rgb(0 0 0 / 0.35);
 	}
 
 	.kicker {

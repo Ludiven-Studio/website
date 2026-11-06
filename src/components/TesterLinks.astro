@@ -1,0 +1,117 @@
+---
+// The testers' way in, on an app's download page: five quick taps on the app's icon show « Bêta » and « Dev »
+// buttons, and the phone remembers it for every app. Nothing shows before, and the paths are not readable in the
+// page (reversed, then base64), so no crawler follows them.
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { TESTER_LINKS, type TesterApp } from '../data/testerLinks';
+
+interface Props {
+	app: TesterApp;
+	lang: string;
+	/** CSS selector of the app's icon on the page. */
+	icon: string;
+}
+
+const { app, lang, icon } = Astro.props;
+// The build runs at the repo's root; a beta announced before its page is written stays without a button.
+const written = (path: string) => {
+	const base = join(process.cwd(), 'src/pages', path.replace(/\/$/, ''));
+	return existsSync(`${base}.astro`) || existsSync(join(base, 'index.astro'));
+};
+const labels = { beta: lang === 'fr' ? 'Bêta' : 'Beta', dev: 'Dev' };
+const links = (['beta', 'dev'] as const)
+	.map((kind) => [labels[kind], TESTER_LINKS[app][kind]] as const)
+	.filter((l): l is readonly [string, string] => !!l[1] && written(l[1]))
+	.map(([label, path]) => [label, [...path].reverse().join('')]);
+const data = Buffer.from(JSON.stringify(links)).toString('base64');
+---
+
+{links.length > 0 && <div class="tl-row" data-tl={data} data-tl-icon={icon} hidden></div>}
+
+<script>
+	const KEY = 'ludiven-testers';
+	const TAPS = 5;
+	const GAP = 700; // ms between two taps of one run
+
+	const decode = (s: string): [string, string][] =>
+		JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(s), (c) => c.charCodeAt(0))));
+
+	for (const row of document.querySelectorAll<HTMLElement>('[data-tl]')) {
+		const show = () => {
+			if (!row.hidden) return;
+			for (const [label, path] of decode(row.dataset.tl ?? '')) {
+				const a = document.createElement('a');
+				a.className = 'tl-btn';
+				a.href = [...path].reverse().join('');
+				a.textContent = label;
+				row.append(a);
+			}
+			row.hidden = false;
+		};
+
+		let unlocked = false;
+		try {
+			unlocked = localStorage.getItem(KEY) === '1';
+		} catch {
+			/* storage blocked: the taps still work for this visit */
+		}
+		if (unlocked) show();
+
+		const target = document.querySelector<HTMLElement>(row.dataset.tlIcon ?? '');
+		if (!target) continue;
+		// Quick taps must not zoom the page nor select the picture.
+		target.style.touchAction = 'manipulation';
+		target.style.userSelect = 'none';
+		target.style.setProperty('-webkit-user-select', 'none');
+		target.style.setProperty('-webkit-tap-highlight-color', 'transparent');
+		target.draggable = false;
+		let count = 0;
+		let last = -Infinity;
+		target.addEventListener('click', () => {
+			const now = performance.now();
+			count = now - last < GAP ? count + 1 : 1;
+			last = now;
+			if (count < TAPS) return;
+			count = 0;
+			try {
+				localStorage.setItem(KEY, '1');
+			} catch {
+				/* not remembered, shown anyway */
+			}
+			show();
+		});
+	}
+</script>
+
+<style is:global>
+	.tl-row {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		margin-top: 0.75rem;
+	}
+
+	.tl-row[hidden] {
+		display: none;
+	}
+
+	.tl-btn {
+		display: inline-flex;
+		align-items: center;
+		min-height: 2.25rem;
+		padding: 0.3rem 1rem;
+		border: 1.5px solid currentColor;
+		border-radius: 999px;
+		font-size: var(--text-sm);
+		font-weight: 600;
+		color: inherit;
+		text-decoration: none;
+		opacity: 0.85;
+	}
+
+	.tl-btn:hover,
+	.tl-btn:focus-visible {
+		opacity: 1;
+	}
+</style>

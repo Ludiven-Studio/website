@@ -1,6 +1,6 @@
 ---
 // The Dragon Gems Swipe download page, in five languages: the store badges (a store that does not list the game yet
-// says so), then the web game.
+// says so), then the web game. Testers reach the beta and the dev build by tapping the icon (TesterLinks).
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Icon from './Icon.astro';
 import AppStage from './AppStage.astro';
@@ -8,6 +8,7 @@ import MoreApps from './MoreApps.astro';
 import DragonsGemsBadges from './DragonsGemsBadges.astro';
 import { HOME_GAMES } from '../data/homeGames';
 import ShareButton from './ShareButton.astro';
+import TesterLinks from './TesterLinks.astro';
 import { APP_NAME, DOWNLOAD_PATHS, ICON, LANDING_PATHS, WEB_GAME, copy, ogImage, screens, typo, type Lang } from '../data/dragonsGems';
 
 interface Props {
@@ -44,6 +45,7 @@ const options = [
 				<a class="sc-link" href={LANDING_PATHS[lang]}>{t.dl.back} <Icon icon="arrow-right" size="1em" /></a>
 				<ShareButton id="dragons-gems" title={APP_NAME} lang={lang} />
 			</div>
+			<TesterLinks app="dragons-gems" lang={lang} icon=".as-icon" />
 		</AppStage>
 	</div>
 

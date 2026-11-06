@@ -5,6 +5,7 @@ import Icon from './Icon.astro';
 import MoreApps from './MoreApps.astro';
 import StoreBadges from './StoreBadges.astro';
 import ShareButton from './ShareButton.astro';
+import TesterLinks from './TesterLinks.astro';
 import { MEET_DOWNLOAD, MEET_STORES } from '../data/petanqueMeet';
 
 type Lang = keyof typeof MEET_DOWNLOAD;
@@ -36,6 +37,7 @@ const first = t.screens[0];
 					<StoreBadges playStore={stores.play} appStore={stores.apple} lang={lang} />
 					<p class="free">{t.free}</p>
 					<ShareButton id="meet" title="Pétanque Meet" kind="app" lang={lang} />
+					<TesterLinks app="petanque-meet" lang={lang} icon=".meet-dl .hero .app-name img" />
 				</div>
 
 				<figure class="showcase" data-showcase>
