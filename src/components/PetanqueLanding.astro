@@ -27,6 +27,8 @@ const badges = [
 	{ href: t.badges.apple, src: apple, cls: 'badge-appstore', alt: t.badges.appleAlt, store: 'App Store' },
 ];
 const soon = badges.some((b) => !b.href);
+const download = app.downloadPaths[lang];
+const DOWNLOAD: Record<LandingLang, string> = { fr: 'Télécharger', en: 'Download', es: 'Descargar', de: 'Herunterladen', it: 'Scarica' };
 const video = app.video?.(lang);
 
 const jsonLd = [
@@ -70,7 +72,10 @@ const jsonLd = [
 				)))}
 			</div>
 			{soon && t.soon && <p class="soon-note">{t.soon}</p>}
-			<div class="as-actions"><ShareButton id={app.id} title={app.name} kind={app.id === 'game' ? 'game' : 'app'} lang={lang} /></div>
+			<div class="as-actions">
+				<a class="sc-btn" href={download}>{DOWNLOAD[lang]} <Icon icon="arrow-right" size="1.1em" /></a>
+				<ShareButton id={app.id} title={app.name} kind={app.id === 'game' ? 'game' : 'app'} lang={lang} />
+			</div>
 		</AppStage>
 	</div>
 
@@ -194,6 +199,7 @@ const jsonLd = [
 				)))}
 			</div>
 			{soon && t.soon && <p class="soon-note">{t.soon}</p>}
+			<p><a class="sc-btn" href={download}>{DOWNLOAD[lang]} <Icon icon="arrow-right" size="1.1em" /></a></p>
 			<p class="legal" id="support">
 				{t.support} <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>
 			</p>
