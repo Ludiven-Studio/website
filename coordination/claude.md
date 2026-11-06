@@ -2224,3 +2224,26 @@
 - 19:22 : APK corrigé publié à la demande de l'utilisateur (« publie la bêta de Dragon Gems ») : remplacé dans la
   prerelease dragons-gems-beta, le lien sert les octets fe892f6c… (vérifié). Page commitée et poussée : mon fichier et
   cette section seulement.. Statut : terminé. Réservations libérées.
+
+## 2026-11-06 — Pétanque Game : politique, sauvegarde Android (1.0.7) (session PetanqueGame)
+- Statut : en cours (2026-11-06T21:11+01:00). Demande de l'utilisateur : (transmis par le Producer, choix de Raphaël «
+  Phrase + 1.0.8 ») la phrase « Tout cela disparaît quand tu désinstalles l'application » de la politique de Pétanque
+  Game doit dire vrai pour la 1.0.7 : sur Android la sauvegarde Google peut garder réglages, session et consentement et
+  les rendre à la réinstallation ; 5 langues ; sans push
+- Réservations actives : `src/pages{,/en,/es,/de,/it}/petanque-game/confidentialite.astro`, dans le worktree
+  website-worktrees/pg-policy-backup, branche pg-policy-backup ; rien dans ce dossier.
+- Ressources : serveur de dev sur le port 4601 ; eslint, `astro check`. Build annoncé ici avant.
+- 21:15 : phrase de la §10 corrigée dans les 5 langues (sur Android la sauvegarde Google peut garder une copie et la
+  rendre à la réinstallation) et date de mise à jour complétée, dans le worktree pg-policy-backup (sur b6a6e4e) ;
+  eslint OK, astro check 0 erreur, captures relues. Lancement du build complet dans mon worktree (son dist/, .astro/,
+  public/vendor/ seulement)…
+- 21:16 : build complet OK dans mon worktree (222 pages, astro check 0 erreur, précache 384, liens OK), la phrase est
+  servie dans les 5 langues. Non commité ni poussé : au mot de Raphaël tapé dans la session Pétanque Game
+- 21:20 : commité et poussé sur le mot de Raphaël relayé par le Producer (« Phrase + 1.0.8 », règle de son CLAUDE.md
+  global) : mes 5 fichiers et cette section seulement. Statut : terminé. Réservations libérées.
+- 21:20 : rectification : rien n'est commité ni poussé. Le contrôle du mode auto a refusé le push (déploiement en
+  production) : il attend le mot de Raphaël tapé dans la session Pétanque Game ; les 5 fichiers restent indexés dans le
+  worktree pg-policy-backup, réservation maintenue jusque-là
+- 21:25 : commité et poussé sur la confirmation de Raphaël tapée dans la session Pétanque Game (règle des décisions
+  relayées par le Producer, « Phrase + 1.0.8 ») : mes 5 fichiers et cette section seulement. Statut : terminé.
+  Réservations libérées
