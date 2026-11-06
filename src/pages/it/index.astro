@@ -1,0 +1,39 @@
+---
+// The homepage in another language: the games and apps on the night stage, and the studio. The mini-games and
+// their daily challenge are in French, so they stay on the French homepage.
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import HomeStage from '../../components/HomeStage.astro';
+import HomeStudio from '../../components/HomeStudio.astro';
+import { HOME } from '../../data/siteNav';
+---
+
+<BaseLayout
+	scene
+	lang="it"
+	title="Ludiven Studio — Giochi mobile, app di pétanque e sviluppo Unity"
+	description="I giochi e le app di Ludiven Studio: Dragon Gems Swipe, Pétanque Game, Pétanque Meet e Pétanque Scan, e presto Nino Rush. Sviluppatore Unity dal 2010."
+	alternates={HOME}
+>
+	<main class="home">
+		<h1 class="sr-only">Ludiven Studio: giochi mobile, app di pétanque e sviluppo Unity</h1>
+		<div class="home-stage">
+			<HomeStage lang="it" />
+		</div>
+		<HomeStudio lang="it" />
+	</main>
+</BaseLayout>
+
+<style>
+	.home {
+		color: var(--sc-ink);
+	}
+
+	/* Phones: the stage runs to the screen's edges; wider screens give it the page's width. */
+	@media (min-width: 56em) {
+		.home-stage {
+			max-width: 76rem;
+			margin-inline: auto;
+			padding-inline: 1.5rem;
+		}
+	}
+</style>
