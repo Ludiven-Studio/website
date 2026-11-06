@@ -1,0 +1,126 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { SUPABASE_URL } from '../../data/site';
+
+// Unlisted: noindex, out of the sitemap and of the offline precache (astro.config.mjs).
+// The 1.0.1 store build under the .beta id, signed with the test key, uploaded by hand.
+const BETA = {
+	version: '1.0.1',
+	date: '2026-11-06',
+	size: 34477657,
+	android: '7.1',
+	sha256: '3d9e6436861bc01a174165d8c11ee20f875b9f505bb4129965bf8c00aa9631e6',
+	url: `${SUPABASE_URL}/storage/v1/object/public/builds/petanquemeet-beta-0gn9lbmb/petanque-meet-beta-1.0.1.apk`,
+};
+const date = new Date(BETA.date).toLocaleDateString('fr-FR', { dateStyle: 'medium' });
+const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
+---
+
+<BaseLayout
+	title="Pétanque Meet β — version 1.0.1 | Ludiven Studio"
+	description="Version bêta Android de Pétanque Meet 1.0.1, pour les testeurs."
+	noindex
+>
+	<div class="wrapper beta-page stack gap-6">
+		<header class="stack gap-2">
+			<h1>Pétanque Meet&nbsp;β</h1>
+			<p class="lead">
+				La version {BETA.version} telle qu'elle part sur les stores, à tester une dernière fois avant sa sortie. Elle s'appelle
+				« Pétanque Meet β » et s'installe à côté de l'appli du Play Store, sans toucher à ses données.
+			</p>
+		</header>
+
+		<section class="card notice stack gap-3">
+			<h2>À savoir avant d'installer</h2>
+			<ul>
+				<li>
+					<strong>Ce sont les vraies parties.</strong> Une partie, une inscription ou un signalement fait dans la β est public, sur la
+					carte et sur le site. Supprime ce que tu crées pour tester.
+				</li>
+				<li>
+					<strong>Pas de vraies pubs.</strong> La β n'en affiche jamais : la fenêtre des pubs s'ouvre comme dans l'appli du store, mais
+					quelle que soit ta réponse, c'est notre bannière pour Pétanque Scan qui s'affiche.
+				</li>
+				<li>
+					<strong>Connexion Google.</strong> Elle marche, avec ton compte habituel. Si l'appli du Play Store est aussi sur ton
+					téléphone, Android demande quelle appli ouvrir au retour de la connexion : choisis « Pétanque Meet β ». Si la connexion
+					échoue, recommence.
+				</li>
+				<li>
+					<strong>Pas de mise à jour par le Play Store.</strong> Une nouvelle bêta se télécharge sur cette page.
+				</li>
+			</ul>
+			<p class="muted">Le reste marche comme dans l'appli du store : la carte, les rappels de parties, le partage et les affiches.</p>
+		</section>
+
+		<section class="card stack gap-3">
+			<a class="download" href={BETA.url}>Télécharger Pétanque Meet&nbsp;β&nbsp;{BETA.version}</a>
+			<p class="muted">{date} · {size} · Android {BETA.android} ou plus récent</p>
+			<p class="muted sha">SHA-256 : <code>{BETA.sha256}</code></p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>Installer sur Android</h2>
+			<ol>
+				<li>Ouvre cette page sur le téléphone et touche « Télécharger ».</li>
+				<li>
+					Ouvre le fichier téléchargé. Si Android bloque, autorise ton navigateur à installer des applis inconnues, puis réessaie.
+					Play Protect peut aussi prévenir que l'appli lui est inconnue : choisis de l'installer quand même.
+				</li>
+				<li>L'icône « Pétanque Meet β » apparaît à côté de celle de Pétanque Meet.</li>
+			</ol>
+			<p class="muted">Pour l'enlever : appui long sur « Pétanque Meet β », puis Désinstaller. L'appli du store reste telle quelle.</p>
+		</section>
+	</div>
+</BaseLayout>
+
+<style>
+	.beta-page {
+		max-width: 40rem;
+		margin-inline: auto;
+	}
+	.beta-page h1 {
+		font-size: var(--text-3xl);
+	}
+	.beta-page h2 {
+		font-size: var(--text-xl);
+	}
+	.lead,
+	.muted {
+		color: var(--gray-300);
+	}
+	.card {
+		padding: 1.5rem;
+		border: 1px solid var(--gray-800);
+		border-radius: 1rem;
+		background: var(--gray-999_40);
+	}
+	.notice {
+		border-color: var(--accent-regular);
+	}
+	.download {
+		display: inline-block;
+		padding: 0.9rem 1.4rem;
+		border-radius: 999px;
+		background: var(--accent-regular);
+		color: var(--accent-text-over);
+		font-weight: 600;
+		text-decoration: none;
+		text-align: center;
+	}
+	.download:hover,
+	.download:focus-visible {
+		background: var(--accent-dark);
+	}
+	.sha code {
+		overflow-wrap: anywhere;
+		font-size: var(--text-sm);
+	}
+	ol,
+	ul {
+		padding-inline-start: 1.25rem;
+	}
+	li + li {
+		margin-top: 0.4rem;
+	}
+</style>
