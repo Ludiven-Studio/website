@@ -1735,3 +1735,68 @@
   d755b84 présente. Pas poussé : attend l'ok de Raphaël dans la session Dragon Gems.
 - 09:37 : commité et poussé à la demande de l'utilisateur : mon fichier (public/dragons-gems/version.json) et cette
   section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-04 — Nino Rush : page de téléchargement en 1.0.10 (session ninorush)
+- Statut : en cours (2026-11-04T14:57+01:00). Demande de l'utilisateur : commit push publie et corrige oui 12 casse
+  tetes
+- Réservations actives : `src/data/ninoRush.ts`, `src/pages/nino-rush/telecharger.astro`.
+- Ressources : serveur de dev sur le port 4495 ; eslint, `astro check`. Build annoncé ici avant.
+- 14:59 : fait, non commité : version 1.0.10 et 84,7 Mo, comme l'APK publié sur nino-rush-dev (le lien sert le même
+  fichier, sha256 vérifié), et « 12 casse-têtes ». Pas encore vérifié : node_modules est vide depuis 14h12 (même moment
+  que l'effacement de D:/tmp), donc ni eslint ni astro check ni captures. J'attends un npm ci coordonné, après la
+  réunion. Pas de build complet prévu : deux constantes et un mot changent
+- 17:34 : Vérifié après le npm ci de website-a3 : eslint des deux fichiers OK, astro check 0 erreur 0 avertissement,
+  captures bureau et téléphone en clair et sombre relues (1.0.10, 84,7 Mo, 12 casse-têtes), aucune erreur console. Pas
+  de build complet : deux constantes et un mot. Le push attend le mot de Raphaël.
+- 22:21 : Raphaël a dit « Publie » (2026-11-05 au soir) : APK 1.0.11 publié sur nino-rush-dev (91 117 353 octets, le
+  lien sert le même fichier, sha256 vérifié). La page passe en 1.0.11, 86,9 Mo ; elle part avec le reste de cette
+  section (12 casse-têtes).
+- 09:32 : Sorti de l'index du dossier partagé (demande du Producer) et refait dans le worktree
+  website-worktrees/nino-rush-site : branche nino-rush-download, commit cc6ce2a sur origin/main d755b84, pas poussé.
+  eslint OK, astro check 0 erreur. Retiré : la ligne de 22:24 qui disait la page poussée, c'était faux. Au mot de
+  Raphaël : merge --ff-only dans main, cette section close, push. Réservations maintenues.
+- 09:39 : commité et poussé à la demande de l'utilisateur (« Ok pousse tout ») : 0b88314, page en 1.0.11, 86,9 Mo, 12
+  casse-têtes, et cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-04 — Nino Rush : page de confidentialité (session ninorush)
+- Statut : en cours (2026-11-04T23:55+01:00). Demande de l'utilisateur : (transmis par le Producer) la politique de
+  confidentialité de Nino Rush pour les pubs et le compte, à préparer ; mise en ligne au mot de Raphaël
+- Réservations actives : `src/pages/nino-rush/confidentialite.astro`, `src/pages/en/nino-rush/confidentialite.astro`,
+  `src/pages/confidentialite.astro` (la liste des applis).
+- Ressources : serveur de dev sur le port 4495 ; eslint, `astro check`. Build annoncé ici avant.
+- 23:58 : fait dans le worktree website-worktrees/nino-rush-privacy, commit 151f922 sur la branche nino-rush-privacy,
+  pas poussé : /nino-rush/confidentialite/ en fr et en (identité, pubs après accord, pubs maison, compte et copie en
+  ligne, achats, suppression #suppression, droits, 13 ans et plus), ajoutée à la liste de /confidentialite/. eslint OK,
+  astro check 0 erreur, captures bureau et téléphone sombre sans erreur console. La mise en ligne attend le mot de
+  Raphaël, avec la page de téléchargement 1.0.10. Réservation maintenue.
+- 13:12 : Dans le worktree nino-rush-privacy, pages fr et en mises à jour d'après docs/privacy-policy.md de Nino Rush
+  (branche house-ads) : fenêtre de consentement du studio (« Publicité personnalisée », Unity Ads, ironSource et
+  partenaires, liens « Voir les sociétés » et politique, redemandé après six mois seulement), « Activer les pubs » vaut
+  accord sous la ligne « Oui : … », sur iPhone sans suivi pas de pubs selon le profil, pubs maison : nos jeux puis Meet
+  ou Scan, applis installées regardées sur le téléphone seulement, bouton « Voir une vidéo de nos jeux et applis » ;
+  date au 5 novembre. eslint OK, astro check 0 erreur, captures bureau et téléphone sombre sans erreur console. Commit
+  local à suivre, pas poussé. Réservation maintenue.
+- 15:02 : Dans le worktree nino-rush-privacy, 3 commits locaux, pas poussés : fb11850 (style des pages légales, absent
+  en fr et en), f09e46b (politique en es, de, it, les cinq versions liées), 55549a1 (CGU fr et en, /nino-rush/cgu/ et
+  /en/nino-rush/cgu/, liées depuis la politique dans les 5 langues). eslint OK, astro check 0 erreur, captures bureau
+  et téléphone sombre sans erreur console ni débordement à 390 px. Réservation étendue à
+  src/pages/{es,de,it}/nino-rush/confidentialite.astro et src/pages{,/en}/nino-rush/cgu.astro. Mise en ligne au mot de
+  Raphaël.
+- 23:58 : Ajouté dans la branche nino-rush-privacy (worktree website-worktrees/nino-rush-privacy) :
+  public/nino-rush/version.json (4ecbbde), lu par l'invite de mise à jour du jeu, vide jusqu'à sa première sortie en
+  store. Non poussé : part avec les pages de confidentialité sur le mot de Raphaël.
+- 00:30 : Branche nino-rush-privacy, non poussée : 10805d5 (la politique nomme la vérification de version, 5 langues),
+  53bd84b (CGU en espagnol, allemand et italien, liées depuis les 5 pages et chaque politique). eslint et astro check
+  OK.
+- 01:53 : Branche nino-rush-privacy (non poussée) : page produit /nino-rush/ ×5 (e6242b3), politique et CGU ×5 pour la
+  démo gratuite sans régie (ceb3fd2), licences de Nino Rush dans mentions-legales.astro#licences-nino-rush (c65ba97).
+  mentions-legales.astro est aussi touché par la branche pg-1.0.7-policy : mes lignes viennent après la liste de
+  Pétanque Game, à fusionner avec soin.
+- 09:32 : Recalé sur origin/main d755b84 : la branche nino-rush-privacy rejouée (12 commits, contenu identique). La
+  politique de la 1.0.11 s'arrête à 7a6d936 (ex-7061be5), branche nino-rush-policy : eslint OK, astro check 0 erreur,
+  build complet dans mon worktree nino-rush-site (202 pages, précache 372, liens OK). Le reste (3d0d285 page produit,
+  5e340c2 démo sans régie, 007a525 licences) : eslint et astro check OK. Rien de poussé.
+- 09:39 : Poussé à la demande de l'utilisateur (« Ok pousse tout ») : politique et CGU de la 1.0.11 en 5 langues,
+  version.json, contact (9 commits, f29877c..6664718, recalés sur 0539241 ; astro check 0 erreur). Reste dans la
+  branche nino-rush-privacy, non poussé : page produit, politique et CGU de la démo sans régie, licences de Nino Rush
+  (pour une version sans pub ; mentions-legales.astro a bougé avec Pétanque Game, à recaler). Réservation maintenue.
