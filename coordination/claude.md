@@ -2060,6 +2060,28 @@
   en ligne avant le push : builds/petanquemeet-beta-0gn9lbmb/petanque-meet-beta-1.0.1.apk, servi identique (34 477 657
   octets, sha256 3d9e6436…aa9631e6). Statut : terminé. Réservations libérées.
 
+## 2026-11-06 — Pétanque Scan : page bêta discrète de la 1.2.13 (APK .beta) (session PetanqueScan)
+- Statut : en cours (2026-11-06T15:58+01:00). Demande de l'utilisateur : (transmis par le Producer) tester une dernière
+  fois la 1.2.13 avant soumission : un APK .beta à côté de l'appli du store, téléchargeable par un lien discret (page
+  testeurs non listée, noindex, hors menu et sitemap, chemin difficile à deviner) ; publication au mot de Raphaël tapé
+  dans la session Pétanque Scan
+- Réservations actives : `src/pages/petanque-scanner/beta-cd53d8qv.astro` (nouveau), dans le worktree
+  website-worktrees/scan-beta-1213, branche scan-beta-1213 ; rien dans ce dossier. Je pars de la règle /beta-…/ de la
+  session website (sitemap, précache, noindex).
+- Ressources : serveur de dev sur le port 4573 ; eslint, `astro check`. Build annoncé ici avant.
+- 16:03 : page écrite dans le worktree scan-beta-1213 : /petanque-scanner/beta-cd53d8qv/, noindex, liée de nulle part ;
+  l'APK ira dans la prerelease petanque-scanner-beta. eslint OK, astro check 0 erreur, captures bureau et téléphone
+  sombre relues. Taille, Android minimum et SHA-256 à remplir après le build. Rien de commité ni poussé : au mot de
+  Raphaël
+- 16:18 : APK construit (103,0 Mo, Android 7.1+, SHA-256 5adfb296…), chiffres posés sur la page ; branche repartie de
+  bd6032d (règles /beta-). Lancement du build complet dans mon worktree scan-beta-1213 (son dist/)…
+- 16:21 : build complet OK dans mon worktree (219 pages, précache 389 entrées sans la page, liens OK) ; la page a son
+  noindex, n'est ni dans le sitemap ni liée ailleurs. Commit local 9dfbcaf sur scan-beta-1213 (parent bd6032d), non
+  poussé. Publication (APK dans la prerelease petanque-scanner-beta, puis la page sur main) au mot de Raphaël
+- 16:41 : APK envoyé dans la prerelease petanque-scanner-beta (lien vérifié : 102982288 octets, HTTP 200). Page
+  commitée et poussée à la demande de l'utilisateur (« publie la bêta 1.2.13 de Pétanque Scan ») : mon fichier et cette
+  section seulement. Worktree scan-beta-1213 libéré. Statut : terminé. Réservations libérées.
+
 ## 2026-11-06 — Dragon Gems : page bêta discrète de la 1.0.1 (APK .beta) (session DragonsGemsSwipe)
 - Statut : en cours (2026-11-06T15:53+01:00). Demande de l'utilisateur : (transmis par la session « sessions claude et
   playtest ») tester une dernière fois la version prod avant soumission, avec un APK téléchargeable par un lien discret
