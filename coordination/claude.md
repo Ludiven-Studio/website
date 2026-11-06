@@ -1710,3 +1710,28 @@
 - 12:09 : build complet OK ; commité et poussé à la demande de Raphaël : les 4 commits de banner-texts (textes de
   bannière, limite de 40 caractères, app et groups) et cette section seulement. Statut : terminé. Réservations
   libérées.
+
+## 2026-11-06 — Dragon Gems : version.json pour l'invite de mise à jour (1.0.0) (session DragonsGemsSwipe)
+- Statut : en cours (2026-11-06T01:41+01:00). Demande de l'utilisateur : (transmis par la session « sessions claude et
+  playtest ») préparer public/dragons-gems/version.json pour l'invite de mise à jour de la 1.0.0 (variante B), sur une
+  branche de worktree, vérifié, sans push ; un seul push au mot de Raphaël tapé dans la session Dragon Gems
+- Réservations actives : `public/dragons-gems/version.json` (nouveau, dans le worktree
+  website-worktrees/dragons-gems-version, branche dragons-gems-version).
+- Ressources : serveur de dev sur le port 4561 ; eslint, `astro check`. Build annoncé ici avant.
+- 01:42 : public/dragons-gems/version.json écrit dans le worktree dragons-gems-version (latest_android et latest_ios
+  1.0.0, min 1.0.0, store_android vers Google Play ; pas de store_ios tant que la fiche App Store n'a pas de lien) ;
+  JSON valide, astro check 0 erreur. Lancement du build complet dans mon worktree dragons-gems-version (écrit son
+  dist/, .astro/, public/vendor/), pas dans le dossier partagé…
+- 01:44 : build complet OK dans le worktree (astro check 0 erreur, 192 pages, précache 362 entrées, liens OK) ;
+  dist/dragons-gems/version.json servi par startServer sur le port 4561 : 200, application/json, contenu exact, requête
+  ?t= comprise ; serveur arrêté. Commit d01f303 sur la branche dragons-gems-version, pas poussé : un seul push au mot
+  de Raphaël tapé dans la session Dragon Gems, si la variante B (avec l'invite) part. Les deux écarts de la politique
+  (EN « Yes, suited », §11 module Google sur iPhone) sont demandés à la session website dans le ticket 0059, car ses
+  pages sont réservées par elle. Réservation maintenue.
+- 09:24 : Branche recalée sur origin/main d755b84 (politique 1.0.0 en ligne) : a715cfe. Lancement du build complet dans
+  mon worktree website-worktrees/dragons-gems-version (écrit dist/, .astro/, public/vendor/ de ce worktree seulement)…
+- 09:26 : Build complet OK sur a715cfe (astro check 0 erreur 0 avertissement, 192 pages, précache 362, liens OK). Servi
+  en preview sur le port 4561 : /dragons-gems/version.json 200 application/json, contenu attendu ; la politique de
+  d755b84 présente. Pas poussé : attend l'ok de Raphaël dans la session Dragon Gems.
+- 09:37 : commité et poussé à la demande de l'utilisateur : mon fichier (public/dragons-gems/version.json) et cette
+  section seulement. Statut : terminé. Réservations libérées.
