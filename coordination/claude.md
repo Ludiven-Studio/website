@@ -1973,3 +1973,35 @@
   check-game-popups (61 jeux) et check-billard-fullscreen OK. Commité et poussé à la demande de l'utilisateur («
   Attendre la fin », puis tout pousser d'un coup) : les 18 commits de home-scene et cette section seulement. Statut :
   terminé. Réservations libérées.
+
+## 2026-11-06 — Dragon Gems Swipe et Pétanque Game : sortie sur l'App Store (session website)
+- Statut : en cours (2026-11-06T12:58+01:00). Demande de l'utilisateur : pour info Petanque Game et Dragon Gems
+  viennent de sortir sur iOS
+- Réservations actives : `src/data/dragonsGems.ts`, `src/data/petanqueGame.ts` (liens App Store et textes « bientôt »),
+  `src/pages/petanque.astro`, `src/pages/jeux/petanque.astro` (notes de la carte),
+  `src/content/work{,-en}/{dragons-gems,petanque-game}.md` (appStore), `scripts/check-home.mjs`, dans le worktree
+  website-worktrees/ios-release, branche ios-release ; rien dans ce dossier.
+- Ressources : serveur de dev sur le port 4530 ; eslint, `astro check`. Build annoncé ici avant.
+- 13:02 : demande de l'utilisateur ajoutée : « Pour dragon gems, il est indiqué des fois 500, des fois 250 niveaux ...
+  en fait c est meme 750 avec une surprise au 500eme (la petite soeur de Bijou) » : 750 niveaux et la surprise du
+  niveau 500 dans les 5 langues (dragonsGems.ts), la carte du mini-jeu (réservé aussi : src/pages/jeux/eclats.astro) et
+  les fiches projet. Lancement du build complet dans mon worktree ios-release (son dist/)…
+- 13:09 : prêt, non poussé : branche ios-release, dad0657 (liens App Store id6829283627 et id6827514133, « bientôt »
+  retiré en 5 langues, notes des cartes des mini-jeux, fiches projet ; la pub du mini-jeu de pétanque passe à Pétanque
+  Game sur iPhone, par les données) et c826ced (750 niveaux, surprise au niveau 500). eslint OK, astro check 0 erreur,
+  build complet 211 pages, précache 384, liens OK, check-home.mjs 109 contrôles OK sur le build, captures relues. Pas
+  touché : version.json des deux applis (sans store_ios), à leurs sessions. Push au mot de Raphaël
+- 13:09 : pour les sessions Dragon's Gems et Pétanque Game (demande du Producer) : store_ios dans
+  public/dragons-gems/version.json et public/jeux/petanque/version.json part avec ce push. Faites votre commit dans
+  votre propre worktree, sur une branche partie d'origin/main (eb5e923), sans pousser, et notez son hash dans votre
+  section ; je le reprends tel quel sur ios-release (un commit par session) et je relance les contrôles. Ces deux
+  fichiers restent à vous : je ne les touche pas. Push au mot de Raphaël, quand les deux sont là
+- 13:26 : repris tels quels sur ios-release (un commit par session, leur message) : c3c1837 (store_ios de Dragon Gems),
+  88e1145 (store_ios de Pétanque Game), a1a9554 (catalogue des vidéos maison par Tools : iOS pour Pétanque Game et
+  Dragon Gems). Lancement du build complet et des contrôles dans mon worktree ios-release (son dist/)…
+- 13:30 : prêt, non poussé : ios-release = dad0657, c826ced, 7054b64, 3d36419, e7a5b72 sur origin/main eb5e923 ; build
+  complet 211 pages, astro check 0 erreur, précache 384, liens OK ; check-promo OK (5 entrées) ; les deux version.json
+  et le catalogue servis identiques dans dist/ ; check-home.mjs 109 contrôles OK sur le build. Push au mot de Raphaël
+- 13:32 : commité et poussé à la demande de l'utilisateur (« pousse la sortie iOS ») : les 5 commits d'ios-release
+  (dont ceux des sessions Dragon's Gems, Pétanque Game et Tools, repris tels quels) et cette section seulement. Statut
+  : terminé. Réservations libérées.
