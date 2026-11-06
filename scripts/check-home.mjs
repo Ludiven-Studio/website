@@ -321,35 +321,36 @@ try {
 
 	// 6. The menu on other pages: the lit link, the tab bar where it belongs, the fullscreen selectors.
 	const PAGES = [
-		['/jeux/', 'Mini-jeux', true, true],
-		['/jeux/defi/', 'Mini-jeux', true, true],
-		['/jeux/sudoku/', 'Mini-jeux', false, true],
-		['/jeux/eclats/', 'Mini-jeux', false, true],
-		['/prestations/', 'Le studio', true, true],
-		['/dragons-gems/', 'Jeux', true, true],
-		['/petanque-meet/', 'Jeux', false, false],
-		['/work/', 'Projets', true, true],
-		['/mentions-legales/', null, true, false],
-		['/en/dragons-gems/', 'Games', false, true],
-		['/en/services/', 'Studio', false, true],
-		['/es/petanque-scanner/', 'Juegos', false, true],
-		['/nino-rush/confidentialite/', 'Jeux', true, false],
-		['/de/nino-rush/confidentialite/', 'Spiele', false, false],
-		['/nino-rush/', 'Jeux', true, true],
-		['/en/nino-rush/', 'Games', false, true],
-		['/it/petanque-game/scarica/', 'Giochi', false, true],
-		['/petanque-meet/telecharger/', 'Jeux', true, true],
+		['/jeux/', 'Mini-jeux', true],
+		['/jeux/defi/', 'Mini-jeux', true],
+		['/jeux/sudoku/', 'Mini-jeux', false],
+		['/jeux/eclats/', 'Mini-jeux', false],
+		['/prestations/', 'Le studio', true],
+		['/dragons-gems/', 'Jeux', true],
+		['/petanque-meet/', 'Jeux', false],
+		['/work/', 'Projets', true],
+		['/mentions-legales/', null, true],
+		['/es/petanque-game/confidentialite/', 'Juegos', false],
+		['/en/dragons-gems/', 'Games', false],
+		['/en/services/', 'Studio', false],
+		['/es/petanque-scanner/', 'Juegos', false],
+		['/nino-rush/confidentialite/', 'Jeux', true],
+		['/de/nino-rush/confidentialite/', 'Spiele', false],
+		['/nino-rush/', 'Jeux', true],
+		['/en/nino-rush/', 'Games', false],
+		['/it/petanque-game/scarica/', 'Giochi', false],
+		['/petanque-meet/telecharger/', 'Jeux', true],
 	];
-	for (const [path, lit, tabBar, ground] of PAGES) {
+	for (const [path, lit, tabBar] of PAGES) {
 		const { ctx, page, errors } = await open(path, 'phone');
 		const got = await page.evaluate(() => ({
 			lit: document.querySelector('.sn-links a.is-lit')?.textContent.trim() ?? null,
 			tabBar: !!document.querySelector('.tb'),
 			chrome: !!document.querySelector('.backgrounds > nav.sn') && !!document.querySelector('.backgrounds > footer.sf'),
-			ground: document.querySelector('.backgrounds').classList.contains('scene'),
+			ground: getComputedStyle(document.querySelector('.backgrounds')).backgroundImage === 'none',
 		}));
-		line(got.lit === lit && got.tabBar === tabBar && got.chrome && got.ground === ground && !(await overflow(page)) && !errors.length,
-			`${path}: ${lit ?? 'no link'} lit, ${tabBar ? 'with' : 'without'} the tab bar, ${ground ? 'the « Scène » ground' : 'its old ground'}, no overflow, no error`, JSON.stringify({ got, errors }));
+		line(got.lit === lit && got.tabBar === tabBar && got.chrome && got.ground && !(await overflow(page)) && !errors.length,
+			`${path}: ${lit ?? 'no link'} lit, ${tabBar ? 'with' : 'without'} the tab bar, the plain « Scène » ground, no overflow, no error`, JSON.stringify({ got, errors }));
 		await ctx.close();
 	}
 
@@ -371,7 +372,7 @@ try {
 			const got = await page.evaluate(() => ({
 				h1: document.querySelectorAll('h1').length,
 				stage: !!document.querySelector('header.as'),
-				ground: document.querySelector('.backgrounds').classList.contains('scene'),
+				ground: getComputedStyle(document.querySelector('.backgrounds')).backgroundImage === 'none',
 				more: [...document.querySelectorAll('.ma a')].map((a) => a.querySelector('strong').textContent),
 				hrefs: [...document.querySelectorAll('.ma a')].map((a) => a.getAttribute('href')),
 			}));
