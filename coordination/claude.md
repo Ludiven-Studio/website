@@ -2212,3 +2212,15 @@
 - 19:21 : poussé sur le mot de Raphaël (« pousse les liens de téléchargement ») : mes 3 commits (main inchangé depuis
   6e24cfe, build et gardes déjà faits sur cet arbre) et cette section seulement. Statut : terminé. Réservations
   libérées.
+
+## 2026-11-06 — Dragon Gems : bêta 1.0.1 reconstruite (écran noir) (session DragonsGemsSwipe)
+- Statut : en cours (2026-11-06T19:08+01:00). Demande de l'utilisateur : écran noir au lancement de Dragon Gems β : APK
+  reconstruit ; remplacer l'APK et mettre à jour la page
+- Réservations actives : `src/pages/dragons-gems/beta-wnkmrlugi7.astro`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 19:09 : Page mise à jour dans le worktree website-worktrees/dragons-gems-version : taille 119544108, SHA-256
+  fe892f6c… ; eslint OK, astro check 0 erreur. Le nouvel APK a passé les deux contrôles et tourne sur le téléphone de
+  Raphaël. En attente de son mot « publie la bêta de Dragon Gems ».
+- 19:22 : APK corrigé publié à la demande de l'utilisateur (« publie la bêta de Dragon Gems ») : remplacé dans la
+  prerelease dragons-gems-beta, le lien sert les octets fe892f6c… (vérifié). Page commitée et poussée : mon fichier et
+  cette section seulement.. Statut : terminé. Réservations libérées.
