@@ -54,3 +54,4 @@ Une ligne par ticket : date · id · résumé · décision.
 - 2026-10-27 · 0058 · moteur des règles (Codex, revue) · 2 points : plateau vide après un souffle (possible sur le papier, 0 fois sur 3 622 souffles mesurés, proposé pour le moteur et l'app), jauge non remplie par le souffle (voulu)
 
 - 2026-11-06 · 0060 · refonte de l'accueil, direction à l'aveugle (Codex, critique et 3 maquettes) · direction B « Escales ludiques » sur la planche de Raphaël ; retenus pour la recommandation : la barre du bas avec « Défi du jour », les badges des seuls stores réels ; 5 erreurs d'image signalées
+- 2026-11-06 · 0062 · politique de la 1.0.1 de Dragon Gems (session website) · faite sur main (dg-1.0.1, 601870d et 804c5f6, avec les deux précisions de la session Dragon Gems), poussée avec les CGU et /publicite/societes/ (7d5cc44)

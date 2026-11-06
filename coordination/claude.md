@@ -2105,3 +2105,27 @@
 - 16:41 : APK envoyé dans la prerelease dragons-gems-beta (le lien sert les octets du build, sha256 f41a18bb… vérifié)
   ; commité et poussé à la demande de l'utilisateur (« publie la bêta de Dragon Gems ») : ma page et cette section
   seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-06 — Dragon Gems : store_ios dans version.json (sortie App Store) (session DragonsGemsSwipe)
+- Statut : en cours (2026-11-06T13:10+01:00). Demande de l'utilisateur : (transmis par la session « sessions claude et
+  playtest ») Dragon's Gems est sorti sur l'App Store : ajouter store_ios à public/dragons-gems/version.json, dans le
+  même push que la branche ios-release de la session website, au mot de Raphaël
+- Réservations actives : `public/dragons-gems/version.json` (dans le worktree website-worktrees/dragons-gems-version,
+  nouvelle branche dragons-gems-store-ios partie d'origin/main eb5e923).
+- Ressources : serveur de dev sur le port 4561 ; eslint, `astro check`. Build annoncé ici avant.
+- 13:10 : store_ios ajouté (https://apps.apple.com/app/id6829283627, la forme de dragonsGems.ts sur ios-release ; le
+  lien répond 200, « Dragon Gems Swipe: Bijou ») ; JSON valide, le champ store_ios est celui que lit UpdatePrompt.cs de
+  l'appli. Lancement du build complet dans mon worktree website-worktrees/dragons-gems-version (écrit son dist/,
+  .astro/, public/vendor/ seulement)…
+- 13:12 : build complet OK dans mon worktree (astro check 0 erreur 0 avertissement, 211 pages, précache 384, liens OK)
+  ; dist/dragons-gems/version.json identique à la source. Commit c3c1837 sur la branche dragons-gems-store-ios (partie
+  d'origin/main eb5e923), pas poussé : pour la session website, à reprendre tel quel sur ios-release (il ne touche que
+  ce fichier, absent d'ios-release). Push au mot de Raphaël. Réservation maintenue jusqu'au push.
+- 13:19 : à savoir : l'appli iPhone en ligne (1.0.0, en ligne depuis le 2026-11-05 20:42 UTC selon
+  itunes.apple.com/lookup) est un build d'avant l'invite de mise à jour : elle ne lit pas version.json. store_ios
+  servira aux versions iPhone suivantes ; c3c1837 reste valable tel quel.
+- 13:30 : pour la session website : ticket 0062 (politique de la 1.0.1 de Dragon Gems : dragons-gems-consent à recaler
+  sur origin/main, sans push ; ad-partners de la session LudivenTools dans le même push, au mot de Raphaël).
+- 15:53 : en ligne : store_ios est dans version.json sur main (7d5cc44), poussé par la session website au mot de
+  Raphaël ; ma branche dragons-gems-store-ios (c3c1837, même contenu) est supprimée, rien à commiter de mon côté.
+  Ticket 0062 clos (## Suite, ligne dans .collab/LOG.md). Statut : terminé. Réservations libérées.
