@@ -17,7 +17,7 @@ create table if not exists public.meetup_partner_searches (
 	category text not null check (category in ('open', 'veterans', 'feminin', 'jeunes', 'mixte')),
 	level text not null check (level in ('loisir', 'confirme', 'competition')),
 	note text not null default '' check (char_length(note) <= 120),
-	phone text not null check (phone ~ '^0[1-9][0-9]{8}$'),
+	phone text not null check (phone ~ '^\+[1-9][0-9]{7,14}$'),  -- E.164: country code, at most 15 digits
 	hidden boolean not null default false,
 	created_at timestamptz not null default now(),
 	-- A pair in doublette is already a team.

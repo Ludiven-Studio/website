@@ -1686,7 +1686,7 @@ Deno.serve(async (req) => {
 				const { data: t } = await db.from('meetup_tournaments').select('id, contests, status, hidden')
 					.eq('id', body.tournamentId).maybeSingle();
 				if (!t || t.hidden || t.status !== 'open') return bad('Ce concours n’est plus en ligne.', 409);
-				const fields = partnerFields(body, t.contests, nowMs, isOffensive, cleanPhone);
+				const fields = partnerFields(body, t.contests, nowMs, isOffensive);
 				if (typeof fields === 'string') return bad(fields);
 				const ip = await ipKey(req);
 				if (await isBanned(db, uid, ip, true)) return bad(BANNED, 403);
