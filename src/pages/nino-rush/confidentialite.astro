@@ -6,7 +6,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 
 <BaseLayout
 	title="Confidentialité de l'application Nino Rush | Ludiven Studio"
-	description="Politique de confidentialité du jeu mobile Nino Rush : jeu sans compte, vidéos publicitaires facultatives après ton accord, nos propres vidéos, compte facultatif et copie en ligne, achats intégrés, suppression du compte, droits RGPD."
+	description="Politique de confidentialité du jeu mobile Nino Rush : jeu sans compte et sans régie publicitaire, vidéos facultatives de nos jeux, compte facultatif et copie en ligne, achats intégrés, suppression du compte, droits RGPD."
 	alternates={{ fr: '/nino-rush/confidentialite/', en: '/en/nino-rush/confidentialite/', es: '/es/nino-rush/confidentialite/', de: '/de/nino-rush/confidentialite/', it: '/it/nino-rush/confidentialite/' }}
 >
 	<div class="wrapper stack gap-12 legal">
@@ -22,7 +22,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			/>
 			<Hero
 				title="Confidentialité — Nino Rush"
-				tagline="Ta progression reste sur ton téléphone. Les vidéos publicitaires, c'est toi qui choisis."
+				tagline="Ta progression reste sur ton téléphone. Les seules vidéos sont celles de nos jeux, et c'est toi qui choisis."
 			/>
 		</div>
 
@@ -32,7 +32,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 
 		<div class="summary">
 			<p><strong>L'essentiel&nbsp;:</strong></p>
-			<p>Le jeu se joue sans compte et sans réseau&nbsp;: ta progression reste sur ton téléphone. Les vidéos publicitaires sont facultatives, et nos partenaires publicitaires ne démarrent qu'avec ton accord. Un compte, facultatif lui aussi, garde ta progression en ligne. Le jeu ne fait ni statistiques d'usage, ni rapports de plantage, et nous ne vendons pas tes données. Le jeu s'adresse aux 13 ans et plus.</p>
+			<p>Le jeu se joue sans compte et sans réseau&nbsp;: ta progression reste sur ton téléphone. Les seules vidéos sont celles de nos autres jeux et applis, à la fin d'un niveau et seulement si tu le veux. Un compte, facultatif, garde ta progression et tes achats en ligne. Les achats se paient sur Google Play ou l'App Store. Le jeu ne fait ni statistiques d'usage, ni rapports de plantage, et nous ne vendons pas tes données. Le jeu s'adresse aux 13 ans et plus.</p>
 		</div>
 
 		<section class="stack gap-2">
@@ -50,61 +50,51 @@ import LangSwitch from '../../components/LangSwitch.astro';
 
 		<section class="stack gap-2">
 			<h2>2. Sur ton téléphone</h2>
-			<p>Ta progression (niveaux, étoiles, pièces, tenues, autocollants, réglages, trajet de ton meilleur temps) est enregistrée sur ton téléphone, dans le dossier de l'application, avec ton choix sur la publicité et, si tu es connecté, ta session. Elle peut aussi être copiée dans la sauvegarde de ton téléphone si elle est activée. Elle disparaît si tu désinstalles le jeu, sauf si cette sauvegarde la restaure.</p>
+			<p>Ta progression (niveaux, étoiles, pièces, tenues, autocollants, achats, réglages, trajet de ton meilleur temps) est enregistrée sur ton téléphone, dans le dossier de l'application, avec ta session si tu es connecté. Elle peut aussi être copiée dans la sauvegarde de ton téléphone si elle est activée. Elle disparaît si tu désinstalles le jeu, sauf si cette sauvegarde la restaure.</p>
 			<p>Les niveaux que tu crées dans l'atelier restent eux aussi sur ton téléphone. Si tu touches «&nbsp;Partager&nbsp;», le jeu copie un code dans le presse-papiers et c'est toi qui choisis où le coller&nbsp;: le jeu n'envoie rien. Ce code contient le niveau, son nom tiré au sort et ton meilleur temps, rien sur toi. Le jeu ne lit le presse-papiers que lorsque tu touches «&nbsp;Coller un code&nbsp;».</p>
 		</section>
 
 		<section class="stack gap-2">
-			<h2>3. Les vidéos publicitaires</h2>
-			<p>Le jeu est gratuit. À la fin d'un niveau, une vidéo peut doubler tes pièces, cinq fois par jour au plus, et seulement si tu la demandes. Ces vidéos viennent de <strong>Unity</strong>&nbsp;: la médiation <strong>Unity LevelPlay</strong>, avec les réseaux <strong>Unity Ads</strong> et <strong>ironSource Ads</strong>.</p>
-			<p><strong>Ton accord.</strong> Au premier lancement, la fenêtre «&nbsp;Publicité personnalisée&nbsp;» te demande si Unity Ads, ironSource (groupe Unity) et leurs partenaires peuvent choisir les pubs selon ton profil, en limiter la répétition, mesurer leur efficacité et lutter contre la fraude&nbsp;: «&nbsp;Accepter&nbsp;» ou «&nbsp;Refuser&nbsp;», deux boutons pareils. Elle a deux liens&nbsp;: «&nbsp;Voir les sociétés&nbsp;» et cette politique. Le module de Unity ne démarre qu'après «&nbsp;Accepter&nbsp;». Si tu refuses, tu ne verras que nos propres vidéos (voir plus bas). Le jeu te repose la question au bout de six mois. Tu peux changer d'avis à tout moment&nbsp;: Réglages › «&nbsp;Choix publicitaires&nbsp;».</p>
-			<p>Après un refus, quand tu demandes une récompense, le jeu te propose une fois par session d'«&nbsp;Activer les pubs&nbsp;», sous la ligne «&nbsp;Oui&nbsp;: Unity Ads et ironSource choisiront des pubs selon ton profil.&nbsp;» Ce oui vaut accord, comme «&nbsp;Accepter&nbsp;». «&nbsp;Voir une vidéo de nos jeux et applis&nbsp;» te donne la récompense sans aucun partenaire.</p>
-			<p>Une fois ton accord donné, le module de Unity reçoit, à chaque lancement&nbsp;: l'identifiant publicitaire de ton téléphone (sur iPhone, seulement si tu autorises le suivi), d'autres identifiants de l'appareil et de l'application, ton adresse IP (qui donne une position approximative), tes interactions avec les vidéos, ta durée d'utilisation, l'historique de tes achats, des informations techniques (modèle, langue, taille d'écran, type de connexion, performances) et, sur Android, les magasins d'applications installés (Google Play, Samsung, Huawei…). Unity s'en sert pour afficher les vidéos, les mesurer, lutter contre la fraude et les choisir selon tes centres d'intérêt, et les partage avec des annonceurs. Nous ne lui transmettons ni ton compte, ni ton adresse mail, ni ta progression. Base légale&nbsp;: ton consentement.</p>
-			<p>Sur iPhone, après ton accord, Apple te demande l'autorisation de suivi. Sans elle, l'identifiant publicitaire de l'iPhone n'est pas utilisé et les pubs ne sont pas choisies selon ton profil.</p>
-			<p>Si tu retires ton accord, le jeu le transmet aussitôt à Unity, qui le prend aussi comme un refus de la «&nbsp;vente&nbsp;» de tes données au sens des lois des États américains. Le module de Unity reste actif jusqu'à la fermeture du jeu, puis ne démarre plus. Tu peux aussi réinitialiser ou supprimer l'identifiant publicitaire dans les réglages de ton téléphone. Pour en savoir plus&nbsp;: la politique de confidentialité de Unity, <a href="https://unity.com/legal/game-player-and-app-user-privacy-policy">https://unity.com/legal/game-player-and-app-user-privacy-policy</a>.</p>
-			<p>L'achat «&nbsp;Sans pub&nbsp;» double tes pièces sans aucune vidéo, et le module de Unity ne démarre plus, quel que soit ton choix.</p>
-		</section>
-
-		<section class="stack gap-2">
-			<h2>4. Nos propres vidéos</h2>
-			<p>Nos vidéos («&nbsp;pubs maison&nbsp;») montrent nos autres jeux, et nos applis de pétanque (Pétanque Meet, Pétanque Scan) quand il ne reste aucun jeu à montrer. Sur Android, le jeu regarde sur ton téléphone lesquels de nos jeux et applis y sont déjà installés, pour te montrer d'abord les autres&nbsp;: cette information ne quitte jamais ton téléphone. Leur liste, leurs images et leurs vidéos viennent de notre site, ludiven-studio.fr, hébergé par GitHub Pages. Le jeu télécharge leur liste à chaque lancement, avant toute réponse, puis les images et les vidéos quand il les montre&nbsp;; il garde la liste et les images pour fonctionner hors ligne. Rien sur toi n'est envoyé&nbsp;: comme pour toute page web, l'hébergeur voit seulement l'adresse IP de ton téléphone.</p>
+			<h2>3. Nos propres vidéos</h2>
+			<p>À la fin d'un niveau, une courte vidéo peut doubler tes pièces, cinq fois par jour au plus, et seulement si tu la demandes. Ces vidéos sont les nôtres («&nbsp;pubs maison&nbsp;»)&nbsp;: elles montrent nos autres jeux, et nos applis de pétanque (Pétanque Meet, Pétanque Scan) quand il ne reste aucun jeu à montrer. Sur Android, le jeu regarde sur ton téléphone lesquels de nos jeux et applis y sont déjà installés, pour te montrer d'abord les autres&nbsp;: cette information ne quitte jamais ton téléphone.</p>
+			<p>Leur liste, leurs images et leurs vidéos viennent de notre site, ludiven-studio.fr, hébergé par GitHub Pages. Le jeu télécharge la liste à chaque lancement, puis ses images, et la vidéo quand il la montre&nbsp;; il garde la liste et les images pour fonctionner hors ligne. Ces demandes ne portent ni identifiant, ni cookie, ni rien sur toi&nbsp;: comme pour toute page web, l'hébergeur voit seulement l'adresse IP de ton téléphone et le logiciel qui fait la demande.</p>
 			<p>Le jeu lit aussi sur ce site, à chaque lancement, un petit fichier qui donne sa dernière version, pour te proposer la mise à jour quand il en existe une plus récente. Là non plus, rien sur toi n'est envoyé.</p>
-			<p>Après 10 secondes, la récompense est à toi, que tu touches «&nbsp;Découvrir&nbsp;» ou non. «&nbsp;Découvrir&nbsp;» ouvre la page du jeu sur Google Play, l'App Store ou notre site. Sur Google Play, le lien dit seulement qu'il vient d'une vidéo de Nino Rush, rien sur toi. Base légale&nbsp;: notre intérêt légitime à faire connaître nos jeux.</p>
+			<p>Après 10 secondes, la récompense est à toi, que tu touches «&nbsp;Découvrir&nbsp;» ou non. «&nbsp;Découvrir&nbsp;» ouvre la page du jeu ou de l'appli sur Google Play, l'App Store ou notre site. Sur Google Play, le lien dit seulement qu'il vient d'une vidéo de Nino Rush, rien sur toi. Base légale&nbsp;: notre intérêt légitime à faire connaître nos jeux.</p>
 		</section>
 
 		<section class="stack gap-2">
-			<h2>5. Ton compte (facultatif)</h2>
+			<h2>4. Ton compte (facultatif)</h2>
 			<p>Dans Réglages › «&nbsp;Compte&nbsp;», tu peux te connecter avec Google, ou avec Apple sur iPhone. C'est le <strong>compte Ludiven Studio</strong>&nbsp;: le même sert à nos autres jeux, à l'application Pétanque Meet et au site. Jouer, acheter et regarder des vidéos ne le demandent jamais.</p>
 			<p>Nous recevons alors un identifiant de compte et ton adresse mail&nbsp;; avec Apple, ce peut être l'adresse relais qui masque la tienne, ou aucune. Nous ne recevons jamais ton mot de passe. Avec Google, le service de connexion garde aussi le nom et la photo de ton profil Google&nbsp;: nous ne les affichons pas et ne nous en servons pas. Pour la sécurité, il note l'adresse IP et le logiciel de chaque session de connexion.</p>
-			<p>Une fois connecté, une copie de ta progression part en ligne&nbsp;: tes niveaux (étoiles, couronnes, meilleurs temps), tes pièces, tes tenues, tes autocollants, tes casse-têtes et tes records, tes compteurs de jeu (sauts, chutes…), le nombre de vidéos du jour et tes achats (le grand dressing, «&nbsp;Sans pub&nbsp;», les pièces achetées et leurs numéros de transaction). Tes réglages (son, commandes, langue, graphismes), tes fantômes et tes niveaux de l'atelier restent sur le téléphone. Ton adresse mail n'est montrée qu'à toi, dans le jeu.</p>
+			<p>Une fois connecté, une copie de ta progression part en ligne&nbsp;: tes niveaux (étoiles, couronnes, meilleurs temps), tes pièces, tes tenues, tes autocollants, tes casse-têtes et tes records, tes compteurs de jeu (sauts, chutes…), le nombre de vidéos du jour et tes achats (l'aventure complète, le grand dressing). Tes réglages (son, commandes, langue, graphismes), tes fantômes et tes niveaux de l'atelier restent sur le téléphone. Ton adresse mail n'est montrée qu'à toi, dans le jeu.</p>
 			<p>Ces données sont hébergées par Supabase, dans l'Union européenne (Irlande). Base légale&nbsp;: le service que tu demandes en te connectant.</p>
 		</section>
 
 		<section class="stack gap-2">
-			<h2>6. Achats intégrés</h2>
-			<p>La boutique, derrière une question pour les grands, vend le grand dressing, «&nbsp;Sans pub&nbsp;» et des paquets de pièces. Le paiement passe entièrement par Google Play ou l'App Store&nbsp;: nous ne voyons ni ton nom, ni ton moyen de paiement. Le module d'achat de Unity tourne sur ton téléphone et passe par le store&nbsp;; selon Unity, il ne traite que des informations techniques, le temps de l'échange. Le jeu garde tes achats, et les numéros de transaction des paquets de pièces, dans ta progression. «&nbsp;Restaurer mes achats&nbsp;», dans la boutique, rend le dressing et «&nbsp;Sans pub&nbsp;» après une réinstallation, sur le même compte Google Play ou Apple. Base légale&nbsp;: l'exécution de ton achat.</p>
+			<h2>5. Achats intégrés</h2>
+			<p>La boutique, derrière une question pour les grands, vend deux achats uniques&nbsp;: l'aventure complète, qui ouvre tous les autres mondes et tous les casse-têtes, et le grand dressing, qui ouvre toutes les tenues vendues contre des pièces. Le paiement passe entièrement par Google Play ou l'App Store&nbsp;: nous ne voyons ni ton nom, ni ton moyen de paiement. Le module d'achat de Unity tourne sur ton téléphone et ne parle qu'au store (Google Play ou l'App Store)&nbsp;; selon Unity, il ne traite que des informations techniques, le temps de l'échange. Le jeu vérifie le reçu du store sur ton téléphone, puis garde tes achats dans ta progression, et dans sa copie en ligne si tu es connecté. «&nbsp;Restaurer mes achats&nbsp;», dans la boutique, te les rend après une réinstallation, sur le même compte Google Play ou Apple. Base légale&nbsp;: l'exécution de ton achat.</p>
 		</section>
 
 		<section class="stack gap-2">
-			<h2>7. Ce que le jeu ne fait pas</h2>
-			<p>Aucune statistique d'usage et aucun rapport de plantage&nbsp;: les outils de mesure de Unity sont coupés dans le jeu. Ni position précise, ni contacts, ni photos, ni fichiers, ni micro, ni caméra&nbsp;: le jeu ne demande aucune de ces autorisations.</p>
+			<h2>6. Ce que le jeu ne fait pas</h2>
+			<p>Aucune statistique d'usage et aucun rapport de plantage&nbsp;: les outils de mesure de Unity sont coupés dans le jeu. Aucune régie publicitaire, et le jeu n'utilise pas l'identifiant publicitaire de ton téléphone. Ni position précise, ni contacts, ni photos, ni fichiers, ni micro, ni caméra&nbsp;: le jeu ne demande aucune de ces autorisations.</p>
 		</section>
 
 		<section class="stack gap-2">
-			<h2>8. Qui reçoit tes données, et combien de temps</h2>
+			<h2>7. Qui reçoit tes données, et combien de temps</h2>
 			<p>Nous ne vendons pas tes données. Elles ne sont traitées que par&nbsp;:</p>
 			<ul>
 				<li><strong>Supabase</strong>&nbsp;: comptes et sauvegardes, hébergés en Irlande&nbsp;;</li>
-				<li><strong>GitHub</strong>&nbsp;: hébergement de notre site et de nos vidéos&nbsp;;</li>
-				<li><strong>Unity Technologies</strong> et sa filiale ironSource&nbsp;: les vidéos publicitaires, après ton accord, et le module d'achat. Pour la publicité, Unity agit aussi pour son propre compte&nbsp;;</li>
+				<li><strong>GitHub</strong>&nbsp;: hébergement de notre site, du fichier de version et de nos vidéos&nbsp;;</li>
+				<li><strong>Unity Technologies</strong>&nbsp;: le module d'achat&nbsp;;</li>
 				<li><strong>Google</strong> et <strong>Apple</strong>&nbsp;: la connexion à ton compte, la distribution du jeu et le paiement des achats.</li>
 			</ul>
 			<p>Supabase, GitHub et Unity sont des sociétés américaines&nbsp;: ces transferts sont encadrés par le chapitre V du RGPD (clauses contractuelles types, ou cadre de protection des données UE–États-Unis).</p>
-			<p>Ton compte et sa sauvegarde sont gardés jusqu'à ce que tu supprimes le compte. L'adresse IP reste quelques jours dans les journaux techniques de Supabase, le temps que fixe GitHub dans les siens, et avec ta session tant qu'elle dure. Les données publicitaires sont gardées par Unity, selon sa politique. Ton choix sur la publicité reste sur ton téléphone, et le jeu te le redemande au bout de six mois.</p>
+			<p>Ton compte et sa sauvegarde sont gardés jusqu'à ce que tu supprimes le compte. L'adresse IP reste quelques jours dans les journaux techniques de Supabase, le temps que fixe GitHub dans les siens, et avec ta session tant qu'elle dure.</p>
 		</section>
 
 		<section class="stack gap-2" id="suppression">
-			<h2>9. Supprimer ton compte</h2>
+			<h2>8. Supprimer ton compte</h2>
 			<p>Dans le jeu&nbsp;: Réglages › «&nbsp;Compte&nbsp;» › «&nbsp;Supprimer le compte&nbsp;», puis «&nbsp;Supprimer&nbsp;». C'est immédiat et définitif&nbsp;:</p>
 			<ul>
 				<li>ton compte Ludiven Studio et ton adresse mail sont effacés&nbsp;;</li>
@@ -112,22 +102,22 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li>ce que ce compte détient dans Pétanque Meet est effacé ou anonymisé&nbsp;;</li>
 				<li>avec Apple, le jeu demande à Apple un code pour couper le lien entre ton identifiant Apple et nous.</li>
 			</ul>
-			<p>La progression sur ton téléphone reste&nbsp;; désinstaller le jeu l'efface. Tes achats restent liés à ton compte Google Play ou Apple&nbsp;: «&nbsp;Restaurer mes achats&nbsp;» rend le dressing et «&nbsp;Sans pub&nbsp;».</p>
-			<p>Sans le jeu&nbsp;: écris à <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a> depuis l'adresse de ton compte. Nous le supprimons sous un mois. Les données publicitaires sont chez Unity&nbsp;: demande-lui leur effacement, ou écris-nous et nous transmettrons.</p>
+			<p>La progression sur ton téléphone reste&nbsp;; désinstaller le jeu l'efface. Tes achats restent liés à ton compte Google Play ou Apple&nbsp;: «&nbsp;Restaurer mes achats&nbsp;» rend l'aventure complète et le grand dressing.</p>
+			<p>Sans le jeu&nbsp;: écris à <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a> depuis l'adresse de ton compte. Nous le supprimons sous un mois.</p>
 		</section>
 
 		<section class="stack gap-2">
-			<h2>10. Tes droits</h2>
+			<h2>9. Tes droits</h2>
 			<p>Tu as un droit d'accès, de rectification, d'effacement, de limitation, d'opposition et de portabilité. Pour les exercer, écris à <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>&nbsp;: nous répondons sous un mois. Tu peux aussi te plaindre auprès de la CNIL (www.cnil.fr).</p>
 		</section>
 
 		<section class="stack gap-2">
-			<h2>11. Âge</h2>
-			<p>Le jeu s'adresse aux 13 ans et plus. Si tu as moins de 15 ans, demande à tes parents avant de toucher «&nbsp;Accepter&nbsp;», avant un achat et avant de te connecter. Un parent peut nous écrire pour faire supprimer un compte&nbsp;: nous le supprimerons.</p>
+			<h2>10. Âge</h2>
+			<p>Le jeu s'adresse aux 13 ans et plus. Si tu as moins de 15 ans, demande à tes parents avant un achat et avant de te connecter. Un parent peut nous écrire pour faire supprimer un compte&nbsp;: nous le supprimerons.</p>
 		</section>
 
 		<section class="stack gap-2">
-			<h2>12. Changements</h2>
+			<h2>11. Changements</h2>
 			<p>Nous mettons cette page à jour à chaque changement du jeu qui touche à tes données, avec sa date en haut.</p>
 			<p>Le lien «&nbsp;Confidentialité&nbsp;» du jeu ouvre cette page dans ton navigateur&nbsp;: ce n'est plus le jeu qui est alors en cause, mais ton navigateur et le site, qui a sa propre politique.</p>
 			<p>Une question&nbsp;: <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a></p>

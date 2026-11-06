@@ -6,7 +6,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 
 <BaseLayout
 	title="Datenschutzerklärung der App Nino Rush | Ludiven Studio"
-	description="Datenschutzerklärung des Handyspiels Nino Rush: Spielen ohne Konto, freiwillige Werbevideos nach deiner Einwilligung, unsere eigenen Videos, freiwilliges Konto und Online-Kopie, In-App-Käufe, Löschen des Kontos, Rechte nach der DSGVO."
+	description="Datenschutzerklärung des Handyspiels Nino Rush: Spielen ohne Konto und ohne Werbenetzwerk, freiwillige Videos unserer Spiele, freiwilliges Konto und Online-Kopie, In-App-Käufe, Löschen des Kontos, Rechte nach der DSGVO."
 	lang="de"
 	alternates={{ fr: '/nino-rush/confidentialite/', en: '/en/nino-rush/confidentialite/', es: '/es/nino-rush/confidentialite/', de: '/de/nino-rush/confidentialite/', it: '/it/nino-rush/confidentialite/' }}
 >
@@ -23,7 +23,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			/>
 			<Hero
 				title="Datenschutz — Nino Rush"
-				tagline="Dein Spielstand bleibt auf deinem Handy. Ob du Werbevideos siehst, entscheidest du."
+				tagline="Dein Spielstand bleibt auf deinem Handy. Die einzigen Videos zeigen unsere Spiele, und ob du sie siehst, entscheidest du."
 			/>
 		</div>
 
@@ -37,7 +37,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 
 		<div class="summary">
 			<p><strong>Das Wichtigste:</strong></p>
-			<p>Du spielst ohne Konto und ohne Internet: Dein Spielstand bleibt auf deinem Handy. Die Werbevideos sind freiwillig, und unsere Werbepartner starten nur mit deiner Einwilligung. Ein Konto, ebenfalls freiwillig, sichert deinen Spielstand online. Das Spiel erstellt weder Nutzungsstatistiken noch Absturzberichte, und wir verkaufen deine Daten nicht. Das Spiel richtet sich an Personen ab 13 Jahren.</p>
+			<p>Du spielst ohne Konto und ohne Internet: Dein Spielstand bleibt auf deinem Handy. Die einzigen Videos zeigen unsere anderen Spiele und Apps, am Ende eines Levels und nur, wenn du willst. Ein Konto, ebenfalls freiwillig, sichert deinen Spielstand und deine Käufe online. Bezahlt werden Käufe über Google Play oder den App Store. Das Spiel erstellt weder Nutzungsstatistiken noch Absturzberichte, und wir verkaufen deine Daten nicht. Das Spiel richtet sich an Personen ab 13 Jahren.</p>
 		</div>
 
 		<section class="stack gap-2">
@@ -55,61 +55,51 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 
 		<section class="stack gap-2">
 			<h2>2. Auf deinem Handy</h2>
-			<p>Dein Spielstand (Level, Sterne, Münzen, Looks, Sticker, Einstellungen, Weg deiner Bestzeit) wird auf deinem Handy gespeichert, im Ordner der App, zusammen mit deiner Wahl zur Werbung und, wenn du angemeldet bist, deiner Sitzung. Er kann auch in die Datensicherung deines Handys kopiert werden, wenn sie eingeschaltet ist. Er verschwindet, wenn du das Spiel deinstallierst, außer diese Sicherung stellt ihn wieder her.</p>
+			<p>Dein Spielstand (Level, Sterne, Münzen, Looks, Sticker, Käufe, Einstellungen, Weg deiner Bestzeit) wird auf deinem Handy gespeichert, im Ordner der App, zusammen mit deiner Sitzung, wenn du angemeldet bist. Er kann auch in die Datensicherung deines Handys kopiert werden, wenn sie eingeschaltet ist. Er verschwindet, wenn du das Spiel deinstallierst, außer diese Sicherung stellt ihn wieder her.</p>
 			<p>Auch die Level, die du im Atelier baust, bleiben auf deinem Handy. Wenn du auf „Teilen“ tippst, kopiert das Spiel einen Code in die Zwischenablage, und du entscheidest, wo du ihn einfügst: Das Spiel sendet nichts. Dieser Code enthält das Level, seinen zufällig gezogenen Namen und deine Bestzeit, nichts über dich. Das Spiel liest die Zwischenablage nur, wenn du auf „Code einfügen“ tippst.</p>
 		</section>
 
 		<section class="stack gap-2">
-			<h2>3. Die Werbevideos</h2>
-			<p>Das Spiel ist kostenlos. Am Ende eines Levels kann ein Video deine Münzen verdoppeln, höchstens fünfmal am Tag und nur auf deinen Wunsch. Diese Videos kommen von <strong>Unity</strong>: die Mediation <strong>Unity LevelPlay</strong> mit den Netzwerken <strong>Unity Ads</strong> und <strong>ironSource Ads</strong>.</p>
-			<p><strong>Deine Einwilligung.</strong> Beim ersten Start fragt dich das Fenster „Personalisierte Werbung“, ob Unity Ads, ironSource (Unity-Gruppe) und ihre Partner Anzeigen nach deinem Profil auswählen, ihre Wiederholung begrenzen, ihre Wirkung messen und Betrug bekämpfen dürfen: „Akzeptieren“ oder „Ablehnen“, zwei gleich aussehende Schaltflächen. Das Fenster hat zwei Links: „Unternehmen ansehen“ und diese Erklärung. Das Modul von Unity startet erst nach „Akzeptieren“. Wenn du ablehnst, siehst du nur unsere eigenen Videos (siehe unten). Nach sechs Monaten fragt dich das Spiel erneut. Du kannst deine Meinung jederzeit ändern: Einstellungen › „Werbeauswahl“.</p>
-			<p>Nach einer Ablehnung schlägt dir das Spiel, wenn du eine Belohnung möchtest, einmal pro Sitzung „Werbung aktivieren“ vor, unter der Zeile „Ja: Unity Ads und ironSource wählen Anzeigen nach deinem Profil aus.“ Dieses Ja gilt als Einwilligung, wie „Akzeptieren“. „Video unserer Spiele und Apps ansehen“ gibt dir die Belohnung ganz ohne Partner.</p>
-			<p>Sobald du eingewilligt hast, erhält das Modul von Unity bei jedem Start: die Werbe-ID deines Handys (auf dem iPhone nur, wenn du Tracking erlaubst), weitere Kennungen des Geräts und der App, deine IP-Adresse (sie ergibt einen ungefähren Standort), deine Interaktionen mit den Videos, deine Nutzungsdauer, deinen Kaufverlauf, technische Informationen (Modell, Sprache, Bildschirmgröße, Verbindungsart, Leistung) und, unter Android, die installierten App-Stores (Google Play, Samsung, Huawei…). Unity nutzt diese Daten, um die Videos anzuzeigen, sie zu messen, Betrug zu bekämpfen und sie nach deinen Interessen auszuwählen, und gibt sie an Werbetreibende weiter. Wir übermitteln Unity weder dein Konto noch deine E-Mail-Adresse noch deinen Spielstand. Rechtsgrundlage: deine Einwilligung.</p>
-			<p>Auf dem iPhone bittet dich Apple, nachdem du eingewilligt hast, um die Erlaubnis zum Tracking. Ohne sie wird die Werbe-ID des iPhones nicht verwendet, und die Anzeigen werden nicht nach deinem Profil ausgewählt.</p>
-			<p>Wenn du deine Einwilligung widerrufst, gibt das Spiel das sofort an Unity weiter, und Unity versteht es auch als Widerspruch gegen den „Verkauf“ deiner Daten im Sinne der Gesetze von US-Bundesstaaten. Das Modul von Unity bleibt aktiv, bis du das Spiel schließt, und startet danach nicht mehr. Du kannst die Werbe-ID auch in den Einstellungen deines Handys zurücksetzen oder löschen. Mehr dazu: die Datenschutzerklärung von Unity, <a href="https://unity.com/legal/game-player-and-app-user-privacy-policy">https://unity.com/legal/game-player-and-app-user-privacy-policy</a>.</p>
-			<p>Der Kauf „Ohne Werbung“ verdoppelt deine Münzen ganz ohne Video, und das Modul von Unity startet nicht mehr, egal wie du dich entschieden hast.</p>
-		</section>
-
-		<section class="stack gap-2">
-			<h2>4. Unsere eigenen Videos</h2>
-			<p>Unsere Videos („Eigenwerbung“) zeigen unsere anderen Spiele und, wenn kein Spiel mehr zu zeigen bleibt, unsere Pétanque-Apps (Pétanque Meet, Pétanque Scan). Unter Android schaut das Spiel auf deinem Handy nach, welche unserer Spiele und Apps dort schon installiert sind, um dir zuerst die anderen zu zeigen: Diese Information verlässt dein Handy nie. Ihre Liste, ihre Bilder und ihre Videos kommen von unserer Website ludiven-studio.fr, die bei GitHub Pages gehostet wird. Das Spiel lädt die Liste bei jedem Start herunter, noch vor jeder Antwort, und die Bilder und Videos dann, wenn es sie zeigt; die Liste und die Bilder behält es, um offline zu funktionieren. Nichts über dich wird gesendet: Wie bei jeder Webseite sieht der Hoster nur die IP-Adresse deines Handys.</p>
+			<h2>3. Unsere eigenen Videos</h2>
+			<p>Am Ende eines Levels kann ein kurzes Video deine Münzen verdoppeln, höchstens fünfmal am Tag und nur auf deinen Wunsch. Diese Videos sind unsere eigenen („Eigenwerbung“): Sie zeigen unsere anderen Spiele und, wenn kein Spiel mehr zu zeigen bleibt, unsere Pétanque-Apps (Pétanque Meet, Pétanque Scan). Unter Android schaut das Spiel auf deinem Handy nach, welche unserer Spiele und Apps dort schon installiert sind, um dir zuerst die anderen zu zeigen: Diese Information verlässt dein Handy nie.</p>
+			<p>Ihre Liste, ihre Bilder und ihre Videos kommen von unserer Website ludiven-studio.fr, die bei GitHub Pages gehostet wird. Das Spiel lädt die Liste bei jedem Start herunter, dann ihre Bilder und das Video, wenn es eines zeigt; die Liste und die Bilder behält es, um offline zu funktionieren. Diese Anfragen enthalten keine Kennung, kein Cookie und nichts über dich: Wie bei jeder Webseite sieht der Hoster nur die IP-Adresse deines Handys und die Software, die die Anfrage stellt.</p>
 			<p>Bei jedem Start liest das Spiel auf dieser Website außerdem eine kleine Datei mit seiner neuesten Version, um dir das Update vorzuschlagen, wenn es eine neuere gibt. Auch dabei wird nichts über dich gesendet.</p>
-			<p>Nach 10 Sekunden gehört die Belohnung dir, ob du auf „Entdecken“ tippst oder nicht. „Entdecken“ öffnet die Seite des Spiels bei Google Play, im App Store oder auf unserer Website. Bei Google Play sagt der Link nur, dass er aus einem Video von Nino Rush kommt, nichts über dich. Rechtsgrundlage: unser berechtigtes Interesse, unsere Spiele bekannt zu machen.</p>
+			<p>Nach 10 Sekunden gehört die Belohnung dir, ob du auf „Entdecken“ tippst oder nicht. „Entdecken“ öffnet die Seite des Spiels oder der App bei Google Play, im App Store oder auf unserer Website. Bei Google Play sagt der Link nur, dass er aus einem Video von Nino Rush kommt, nichts über dich. Rechtsgrundlage: unser berechtigtes Interesse, unsere Spiele bekannt zu machen.</p>
 		</section>
 
 		<section class="stack gap-2">
-			<h2>5. Dein Konto (freiwillig)</h2>
+			<h2>4. Dein Konto (freiwillig)</h2>
 			<p>Unter Einstellungen › „Konto“ kannst du dich mit Google anmelden, oder auf dem iPhone mit Apple. Das ist das <strong>Ludiven-Studio-Konto</strong>: Dasselbe Konto gilt für unsere anderen Spiele, die App Pétanque Meet und die Website. Zum Spielen, Kaufen und Ansehen von Videos brauchst du es nie.</p>
 			<p>Wir erhalten dann eine Konto-ID und deine E-Mail-Adresse; bei Apple kann es die Weiterleitungsadresse sein, die deine eigene verbirgt, oder gar keine. Dein Passwort erhalten wir nie. Bei Google speichert der Anmeldedienst auch den Namen und das Foto deines Google-Profils: Wir zeigen sie nicht an und nutzen sie nicht. Zur Sicherheit protokolliert er die IP-Adresse und die Software jeder Anmeldesitzung.</p>
-			<p>Sobald du angemeldet bist, geht eine Kopie deines Spielstands online: deine Level (Sterne, Kronen, Bestzeiten), deine Münzen, deine Looks, deine Sticker, deine Rätsel und Rekorde, deine Spielzähler (Sprünge, Stürze…), die Zahl der Videos des Tages und deine Käufe (der große Schrank, „Ohne Werbung“, gekaufte Münzen und ihre Transaktionsnummern). Deine Einstellungen (Ton, Steuerung, Sprache, Grafik), deine Geister und deine Atelier-Level bleiben auf dem Handy. Deine E-Mail-Adresse siehst nur du, im Spiel.</p>
+			<p>Sobald du angemeldet bist, geht eine Kopie deines Spielstands online: deine Level (Sterne, Kronen, Bestzeiten), deine Münzen, deine Looks, deine Sticker, deine Rätsel und Rekorde, deine Spielzähler (Sprünge, Stürze…), die Zahl der Videos des Tages und deine Käufe (das komplette Abenteuer, der große Schrank). Deine Einstellungen (Ton, Steuerung, Sprache, Grafik), deine Geister und deine Atelier-Level bleiben auf dem Handy. Deine E-Mail-Adresse siehst nur du, im Spiel.</p>
 			<p>Diese Daten hostet Supabase in der Europäischen Union (Irland). Rechtsgrundlage: der Dienst, den du mit der Anmeldung anforderst.</p>
 		</section>
 
 		<section class="stack gap-2">
-			<h2>6. In-App-Käufe</h2>
-			<p>Der Shop liegt hinter einer Frage für Erwachsene und verkauft den großen Schrank, „Ohne Werbung“ und Münzpakete. Die Zahlung läuft vollständig über Google Play oder den App Store: Wir sehen weder deinen Namen noch dein Zahlungsmittel. Das Kaufmodul von Unity läuft auf deinem Handy und geht über den Store; laut Unity verarbeitet es nur technische Informationen, für die Dauer des Austauschs. Das Spiel speichert deine Käufe und die Transaktionsnummern der Münzpakete in deinem Spielstand. „Käufe wiederherstellen“ im Shop gibt dir den Schrank und „Ohne Werbung“ nach einer Neuinstallation zurück, mit demselben Google-Play- oder Apple-Konto. Rechtsgrundlage: die Abwicklung deines Kaufs.</p>
+			<h2>5. In-App-Käufe</h2>
+			<p>Der Shop liegt hinter einer Frage für Erwachsene und verkauft zwei einmalige Käufe: das komplette Abenteuer, das alle weiteren Welten und alle Rätsel öffnet, und den großen Schrank, der alle Looks öffnet, die man mit Münzen kauft. Die Zahlung läuft vollständig über Google Play oder den App Store: Wir sehen weder deinen Namen noch dein Zahlungsmittel. Das Kaufmodul von Unity läuft auf deinem Handy und spricht nur mit dem Store (Google Play oder dem App Store); laut Unity verarbeitet es nur technische Informationen, für die Dauer des Austauschs. Das Spiel prüft den Beleg des Stores auf deinem Handy und speichert deine Käufe dann in deinem Spielstand, und in seiner Online-Kopie, wenn du angemeldet bist. „Käufe wiederherstellen“ im Shop gibt sie dir nach einer Neuinstallation zurück, mit demselben Google-Play- oder Apple-Konto. Rechtsgrundlage: die Abwicklung deines Kaufs.</p>
 		</section>
 
 		<section class="stack gap-2">
-			<h2>7. Was das Spiel nicht tut</h2>
-			<p>Keine Nutzungsstatistiken und keine Absturzberichte: Die Messwerkzeuge von Unity sind im Spiel ausgeschaltet. Kein genauer Standort, keine Kontakte, keine Fotos, keine Dateien, kein Mikrofon, keine Kamera: Das Spiel fragt nach keiner dieser Berechtigungen.</p>
+			<h2>6. Was das Spiel nicht tut</h2>
+			<p>Keine Nutzungsstatistiken und keine Absturzberichte: Die Messwerkzeuge von Unity sind im Spiel ausgeschaltet. Kein Werbenetzwerk, und das Spiel verwendet die Werbe-ID deines Handys nicht. Kein genauer Standort, keine Kontakte, keine Fotos, keine Dateien, kein Mikrofon, keine Kamera: Das Spiel fragt nach keiner dieser Berechtigungen.</p>
 		</section>
 
 		<section class="stack gap-2">
-			<h2>8. Wer deine Daten erhält, und wie lange</h2>
+			<h2>7. Wer deine Daten erhält, und wie lange</h2>
 			<p>Wir verkaufen deine Daten nicht. Verarbeitet werden sie nur von:</p>
 			<ul>
 				<li><strong>Supabase</strong>: Konten und Online-Spielstände, gehostet in Irland;</li>
-				<li><strong>GitHub</strong>: Hosting unserer Website und unserer Videos;</li>
-				<li><strong>Unity Technologies</strong> und seiner Tochter ironSource: die Werbevideos, nach deiner Einwilligung, und das Kaufmodul. Bei der Werbung handelt Unity auch in eigener Verantwortung;</li>
+				<li><strong>GitHub</strong>: Hosting unserer Website, der Versionsdatei und unserer Videos;</li>
+				<li><strong>Unity Technologies</strong>: das Kaufmodul;</li>
 				<li><strong>Google</strong> und <strong>Apple</strong>: die Anmeldung bei deinem Konto, der Vertrieb des Spiels und die Zahlung der Käufe.</li>
 			</ul>
 			<p>Supabase, GitHub und Unity sind US-amerikanische Unternehmen: Diese Übermittlungen sind durch Kapitel V der DSGVO abgesichert (Standardvertragsklauseln oder <em>EU-U.S. Data Privacy Framework</em>).</p>
-			<p>Dein Konto und sein Online-Spielstand werden aufbewahrt, bis du das Konto löschst. Die IP-Adresse bleibt einige Tage in den technischen Protokollen von Supabase, in denen von GitHub so lange, wie GitHub es festlegt, und bei deiner Sitzung, solange sie besteht. Die Werbedaten bewahrt Unity nach seiner Datenschutzerklärung auf. Deine Wahl zur Werbung bleibt auf deinem Handy, und das Spiel fragt dich nach sechs Monaten erneut.</p>
+			<p>Dein Konto und sein Online-Spielstand werden aufbewahrt, bis du das Konto löschst. Die IP-Adresse bleibt einige Tage in den technischen Protokollen von Supabase, in denen von GitHub so lange, wie GitHub es festlegt, und bei deiner Sitzung, solange sie besteht.</p>
 		</section>
 
 		<section class="stack gap-2" id="suppression">
-			<h2>9. Dein Konto löschen</h2>
+			<h2>8. Dein Konto löschen</h2>
 			<p>Im Spiel: Einstellungen › „Konto“ › „Konto löschen“, dann „Löschen“. Das geht sofort und ist endgültig:</p>
 			<ul>
 				<li>dein Ludiven-Studio-Konto und deine E-Mail-Adresse werden gelöscht;</li>
@@ -117,22 +107,22 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li>was dieses Konto in Pétanque Meet hat, wird gelöscht oder anonymisiert;</li>
 				<li>bei einer Anmeldung mit Apple fordert das Spiel bei Apple einen Code an, um die Verbindung zwischen deiner Apple-ID und uns zu trennen.</li>
 			</ul>
-			<p>Der Spielstand auf deinem Handy bleibt; wenn du das Spiel deinstallierst, wird er gelöscht. Deine Käufe bleiben an dein Google-Play- oder Apple-Konto gebunden: „Käufe wiederherstellen“ gibt dir den Schrank und „Ohne Werbung“ zurück.</p>
-			<p>Ohne das Spiel: Schreib von der Adresse deines Kontos an <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>. Wir löschen es innerhalb eines Monats. Die Werbedaten liegen bei Unity: Bitte Unity, sie zu löschen, oder schreib uns, dann leiten wir deine Anfrage weiter.</p>
+			<p>Der Spielstand auf deinem Handy bleibt; wenn du das Spiel deinstallierst, wird er gelöscht. Deine Käufe bleiben an dein Google-Play- oder Apple-Konto gebunden: „Käufe wiederherstellen“ gibt dir das komplette Abenteuer und den großen Schrank zurück.</p>
+			<p>Ohne das Spiel: Schreib von der Adresse deines Kontos an <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>. Wir löschen es innerhalb eines Monats.</p>
 		</section>
 
 		<section class="stack gap-2">
-			<h2>10. Deine Rechte</h2>
+			<h2>9. Deine Rechte</h2>
 			<p>Du hast das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung, Widerspruch und Datenübertragbarkeit. Um sie auszuüben, schreib an <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>: Wir antworten innerhalb eines Monats. Du kannst dich auch bei der CNIL (www.cnil.fr) beschweren, der französischen Datenschutzbehörde.</p>
 		</section>
 
 		<section class="stack gap-2">
-			<h2>11. Alter</h2>
-			<p>Das Spiel richtet sich an Personen ab 13 Jahren. Wenn du unter 15 bist, frag deine Eltern, bevor du auf „Akzeptieren“ tippst, bevor du etwas kaufst und bevor du dich anmeldest. Ein Elternteil kann uns schreiben, um ein Konto löschen zu lassen: Wir löschen es.</p>
+			<h2>10. Alter</h2>
+			<p>Das Spiel richtet sich an Personen ab 13 Jahren. Wenn du unter 15 bist, frag deine Eltern, bevor du etwas kaufst und bevor du dich anmeldest. Ein Elternteil kann uns schreiben, um ein Konto löschen zu lassen: Wir löschen es.</p>
 		</section>
 
 		<section class="stack gap-2">
-			<h2>12. Änderungen</h2>
+			<h2>11. Änderungen</h2>
 			<p>Wir aktualisieren diese Seite bei jeder Änderung des Spiels, die deine Daten betrifft, mit ihrem Datum oben.</p>
 			<p>Der Link „Datenschutz“ im Spiel öffnet diese Seite in deinem Browser: Ab dort geht es nicht mehr um das Spiel, sondern um deinen Browser und die Website, die eine eigene Datenschutzerklärung hat.</p>
 			<p>Fragen: <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a></p>
