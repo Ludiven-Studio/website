@@ -323,7 +323,8 @@ try {
 	const PAGES = [
 		['/jeux/', 'Mini-jeux', true, true],
 		['/jeux/defi/', 'Mini-jeux', true, true],
-		['/jeux/sudoku/', 'Mini-jeux', false, false],
+		['/jeux/sudoku/', 'Mini-jeux', false, true],
+		['/jeux/eclats/', 'Mini-jeux', false, true],
 		['/prestations/', 'Le studio', true, false],
 		['/dragons-gems/', 'Jeux', true, true],
 		['/petanque-meet/', 'Jeux', false, false],
