@@ -2247,3 +2247,12 @@
 - 21:25 : commité et poussé sur la confirmation de Raphaël tapée dans la session Pétanque Game (règle des décisions
   relayées par le Producer, « Phrase + 1.0.8 ») : mes 5 fichiers et cette section seulement. Statut : terminé.
   Réservations libérées
+
+## 2026-11-06 — Dragon Gems : bêta 1.0.1 n°4 (règle des logs) (session DragonsGemsSwipe)
+- Statut : en cours (2026-11-06T21:26+01:00). Demande de l'utilisateur : décision de Raphaël relayée par le Producer :
+  « Publier seulement » la bêta 4 (08c25fd), APK et page
+- Réservations actives : `src/pages/dragons-gems/beta-wnkmrlugi7.astro`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 21:26 : APK remplacé dans la prerelease dragons-gems-beta : le lien sert les octets 8b05c956… (vérifié). Page :
+  taille 119544876, SHA-256 8b05c956…, commit 08c25fd ; commitée depuis mon worktree et poussée, mon fichier et cette
+  section seulement.. Statut : terminé. Réservations libérées.
