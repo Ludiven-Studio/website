@@ -6,6 +6,7 @@ img_alt: Pétanque Game — deux boules et un bouchon sur le gravier d'une place
 role: Développeur
 org: Ludiven Studio
 playStore: https://play.google.com/store/apps/details?id=com.ludivenstudio.petanquegame&hl=fr
+appStore: https://apps.apple.com/app/id6827514133
 appPage: /petanque-game/
 appPageLabel: Découvrir le jeu
 webApp: /jeux/petanque/

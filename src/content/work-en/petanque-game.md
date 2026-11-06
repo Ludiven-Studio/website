@@ -6,6 +6,7 @@ img_alt: Pétanque Game — two boules and a jack on the gravel of a village squ
 role: Developer
 org: Ludiven Studio
 playStore: https://play.google.com/store/apps/details?id=com.ludivenstudio.petanquegame&hl=en
+appStore: https://apps.apple.com/app/id6827514133
 appPage: /en/petanque-game/
 appPageLabel: Discover the game
 webApp: /jeux/petanque/

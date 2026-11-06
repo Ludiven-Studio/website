@@ -240,9 +240,9 @@ try {
 			})),
 		);
 		const want = [
-			['Dragon Gems Swipe', 'play.google.com', 1, '/dragons-gems/', 'Découvrir le jeu'],
+			['Dragon Gems Swipe', 'play.google.com apps.apple.com', 0, '/dragons-gems/', 'Découvrir le jeu'],
 			['Nino Rush', '', 2, '/nino-rush/', 'Découvrir le jeu'],
-			['Pétanque Game', 'play.google.com', 1, '/petanque-game/', 'Découvrir le jeu'],
+			['Pétanque Game', 'play.google.com apps.apple.com', 0, '/petanque-game/', 'Découvrir le jeu'],
 			['Pétanque Meet', 'play.google.com apps.apple.com', 0, '/petanque-meet/', "Découvrir l'appli"],
 			['Pétanque Scan', 'play.google.com apps.apple.com', 0, '/petanque-scanner/', "Découvrir l'appli"],
 		];

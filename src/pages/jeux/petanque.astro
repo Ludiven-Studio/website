@@ -11,7 +11,7 @@ import { ICON, LANDING_PATHS, DOWNLOAD_PATHS, STORES } from '../../data/petanque
 	tagline="Pose le doigt à la hauteur de l'angle, glisse pour doser — premier à 13"
 	gameId="petanque"
 	fullscreen="auto"
-	app={{ href: LANDING_PATHS.fr, label: 'Aussi sur téléphone : Pétanque Game', note: 'Sur Android, bientôt sur iPhone · en ligne, en équipe, ligues', icon: ICON }}
+	app={{ href: LANDING_PATHS.fr, label: 'Aussi sur téléphone : Pétanque Game', note: 'Sur iPhone et Android · en ligne, en équipe, ligues', icon: ICON }}
 >
 	<PetanqueGame client:only="react" gameId="petanque" gameAd={{ ...STORES, download: DOWNLOAD_PATHS, icon: ICON }} />
 	<p class="pe-scanner">
@@ -28,7 +28,7 @@ import { ICON, LANDING_PATHS, DOWNLOAD_PATHS, STORES } from '../../data/petanque
 			'scanner-post': 'mesure vos points au téléphone.',
 			tagline: 'Pose le doigt à la hauteur de l’angle, glisse pour doser — premier à 13',
 			'app-label': 'Aussi sur téléphone : Pétanque Game',
-			'app-note': 'Sur Android, bientôt sur iPhone · en ligne, en équipe, ligues',
+			'app-note': 'Sur iPhone et Android · en ligne, en équipe, ligues',
 			'app-href': '/petanque-game/',
 		},
 		en: {
@@ -36,7 +36,7 @@ import { ICON, LANDING_PATHS, DOWNLOAD_PATHS, STORES } from '../../data/petanque
 			'scanner-post': 'measures your points with your phone.',
 			tagline: 'Put your finger at the height of the angle, slide to set the power — first to 13',
 			'app-label': 'Also on your phone: Pétanque Game',
-			'app-note': 'On Android, soon on iPhone · online, teams, leagues',
+			'app-note': 'On iPhone and Android · online, teams, leagues',
 			'app-href': '/en/petanque-game/',
 		},
 		es: {
@@ -44,7 +44,7 @@ import { ICON, LANDING_PATHS, DOWNLOAD_PATHS, STORES } from '../../data/petanque
 			'scanner-post': 'mide tus puntos con el móvil.',
 			tagline: 'Pon el dedo a la altura del ángulo y desliza para dosificar — gana quien llega a 13',
 			'app-label': 'También en tu móvil: Pétanque Game',
-			'app-note': 'En Android, pronto en iPhone · en línea, por equipos, ligas',
+			'app-note': 'En iPhone y Android · en línea, por equipos, ligas',
 			'app-href': '/es/petanque-game/',
 		},
 	};

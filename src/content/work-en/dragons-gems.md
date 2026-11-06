@@ -6,6 +6,7 @@ img_alt: Dragon Gems Swipe — Bijou, the baby dragon, on his pile of gold, in f
 role: Developer
 org: Ludiven Studio
 playStore: https://play.google.com/store/apps/details?id=com.ludivenstudio.dragonsgems&hl=en
+appStore: https://apps.apple.com/app/id6829283627
 appPage: /en/dragons-gems/
 appPageLabel: Discover the app
 webApp: /jeux/eclats/
