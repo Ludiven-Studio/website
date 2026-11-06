@@ -2059,3 +2059,27 @@
   règle /beta-…/ de la session website, reprise telle quelle), 17a89f5 (ma page) et cette section seulement. L'APK est
   en ligne avant le push : builds/petanquemeet-beta-0gn9lbmb/petanque-meet-beta-1.0.1.apk, servi identique (34 477 657
   octets, sha256 3d9e6436…aa9631e6). Statut : terminé. Réservations libérées.
+
+## 2026-11-06 — Dragon Gems : page bêta discrète de la 1.0.1 (APK .beta) (session DragonsGemsSwipe)
+- Statut : en cours (2026-11-06T15:53+01:00). Demande de l'utilisateur : (transmis par la session « sessions claude et
+  playtest ») tester une dernière fois la version prod avant soumission, avec un APK téléchargeable par un lien discret
+  : page testeurs non listée, noindex, hors menu et sitemap, chemin difficile à deviner ; publication au mot de Raphaël
+  tapé dans la session Dragon Gems
+- Réservations actives : `src/pages/jeux/eclats/test/beta-*.astro` (worktree website-worktrees/dragons-gems-version,
+  branche dragons-gems-beta).
+- Ressources : serveur de dev sur le port 4491 ; eslint, `astro check`. Build annoncé ici avant.
+- 15:57 : page écrite dans le worktree (branche dragons-gems-beta) : /jeux/eclats/test/beta-…/, noindex, liée de nulle
+  part, hors sitemap par le filtre /jeux/eclats/test existant (astro.config.mjs inchangé). eslint OK, astro check 0
+  erreur, captures bureau et téléphone sombre relues. Taille et SHA-256 de l'APK à remplir après le build ; l'APK ira
+  dans la prerelease dragons-gems-beta. Rien de commité ni poussé : au mot de Raphaël
+- 16:05 : page déplacée en src/pages/dragons-gems/beta-wnkmrlugi7.astro (/dragons-gems/beta-…/, la forme
+  /<app>/beta-<code>/ des règles de website-a3) ; ma réservation devient `src/pages/dragons-gems/beta-*.astro`. Branche
+  dragons-gems-beta avancée sur bd6032d (beta-pages : noindex, hors sitemap et hors précache pour /beta-). eslint OK
+- 16:30 : APK bêta construit (16:17-16:29) et vérifié : taille et SHA-256 mis sur la page. Lancement du build complet
+  dans mon worktree (écrit dist/, .astro/, public/vendor/ du worktree seulement)…
+- 16:36 : build complet OK dans mon worktree (sur d51f62f) : 220 pages, astro check 0 erreur, précache 389 sans la
+  page, sitemap sans /beta-, noindex servi, aucune page ne la lie ; captures relues. Prêt : envoi de l'APK (prerelease
+  dragons-gems-beta) et push de la page au mot de Raphaël « publie la bêta de Dragon Gems »
+- 16:41 : APK envoyé dans la prerelease dragons-gems-beta (le lien sert les octets du build, sha256 f41a18bb… vérifié)
+  ; commité et poussé à la demande de l'utilisateur (« publie la bêta de Dragon Gems ») : ma page et cette section
+  seulement. Statut : terminé. Réservations libérées.
