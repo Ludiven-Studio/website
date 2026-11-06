@@ -138,7 +138,7 @@ const searchText = [title, pitch, id]
 		border: none;
 		border-radius: 999rem;
 		background: transparent;
-		color: var(--gray-400);
+		color: var(--sc-muted);
 		cursor: pointer;
 		line-height: 0;
 		transition:
@@ -155,12 +155,12 @@ const searchText = [title, pitch, id]
 
 	.fav-toggle:hover,
 	.fav-toggle:focus-visible {
-		color: var(--accent-regular);
+		color: var(--sc-accent);
 		transform: scale(1.12);
 	}
 
 	.fav-toggle.is-fav {
-		color: var(--accent-regular);
+		color: var(--sc-accent);
 	}
 
 	.fav-toggle.is-fav svg {
@@ -172,11 +172,11 @@ const searchText = [title, pitch, id]
 		flex-direction: column;
 		height: 100%;
 		gap: 0.75rem;
-		border: 1px solid var(--gray-800);
+		border: 1px solid var(--sc-line);
 		border-radius: 1.5rem;
 		padding: 1.75rem;
-		background-color: var(--gray-999_40);
-		box-shadow: var(--shadow-sm);
+		background-color: var(--sc-surface);
+		box-shadow: var(--sc-shadow);
 		text-decoration: none;
 		color: inherit;
 		transition:
@@ -188,7 +188,7 @@ const searchText = [title, pitch, id]
 	a.game-card:hover,
 	a.game-card:focus-visible {
 		transform: translateY(-4px);
-		border-color: var(--accent-regular);
+		border-color: var(--sc-accent);
 		box-shadow: var(--shadow-md);
 	}
 
@@ -205,7 +205,7 @@ const searchText = [title, pitch, id]
 		gap: 0;
 		padding: 0;
 		border-radius: 1.1rem;
-		background-color: var(--gray-999);
+		background-color: var(--sc-surface);
 	}
 
 	.game-card.compact .game-card-media,
@@ -287,9 +287,9 @@ const searchText = [title, pitch, id]
 	}
 
 	.pips .daily-chip.done {
-		border-color: var(--accent-regular);
-		background: var(--accent-regular);
-		color: var(--accent-text-over);
+		border-color: var(--sc-accent);
+		background: var(--sc-accent);
+		color: var(--sc-accent-ink);
 	}
 
 	/* The heart rides the scrim instead of reserving a row under the art. */
@@ -329,14 +329,14 @@ const searchText = [title, pitch, id]
 		aspect-ratio: 1;
 		border-radius: 22%;
 		overflow: hidden;
-		border: 1px solid var(--gray-800);
-		box-shadow: var(--shadow-sm);
-		background: var(--gray-999);
+		border: 1px solid var(--sc-line);
+		box-shadow: var(--sc-shadow);
+		background: var(--sc-surface);
 	}
 
 	:global([data-tiles='icon']) a.game-card:is(.art, .compact):hover .game-card-media,
 	:global([data-tiles='icon']) a.game-card:is(.art, .compact):focus-visible .game-card-media {
-		border-color: var(--accent-regular);
+		border-color: var(--sc-accent);
 	}
 
 	/* .game-card-wrap: above the done tile's narrower plaque. */
@@ -354,7 +354,7 @@ const searchText = [title, pitch, id]
 		font-weight: 600;
 		line-height: 1.25;
 		text-align: center;
-		color: var(--gray-100);
+		color: var(--sc-ink);
 		background: none;
 		text-shadow: none;
 	}
@@ -397,7 +397,7 @@ const searchText = [title, pitch, id]
 		position: static;
 		padding: 0;
 		font-size: var(--text-md);
-		color: var(--gray-0);
+		color: var(--sc-ink);
 		background: none;
 		text-shadow: none;
 	}
@@ -427,11 +427,11 @@ const searchText = [title, pitch, id]
 		bottom: auto;
 		right: 0.4rem;
 		transform: translateY(-50%);
-		color: var(--gray-400);
+		color: var(--sc-muted);
 	}
 
 	:global([data-tiles='list']) .game-card-wrap:has(.game-card.art) .fav-toggle.is-fav {
-		color: var(--accent-regular);
+		color: var(--sc-accent);
 	}
 
 	/* A daily tile in a list: the art spans both rows, the name over the day's record. */
@@ -459,7 +459,7 @@ const searchText = [title, pitch, id]
 		padding: 0;
 		border-radius: 0;
 		font-size: var(--text-md);
-		color: var(--gray-0);
+		color: var(--sc-ink);
 		background: none;
 		backdrop-filter: none;
 		text-shadow: none;
@@ -529,7 +529,7 @@ const searchText = [title, pitch, id]
 		overflow: hidden;
 		font-size: 11px;
 		line-height: 1.3;
-		color: var(--gray-400);
+		color: var(--sc-muted);
 	}
 
 	.tile-note[hidden] {
@@ -566,8 +566,8 @@ const searchText = [title, pitch, id]
 		place-items: center;
 		font-weight: 700;
 		font-size: 0.85rem;
-		color: var(--accent-text-over);
-		background: var(--accent-regular);
+		color: var(--sc-accent-ink);
+		background: var(--sc-accent);
 		box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
 	}
 
@@ -575,7 +575,7 @@ const searchText = [title, pitch, id]
 		border-radius: 0.75rem;
 		overflow: hidden;
 		aspect-ratio: 16 / 10;
-		background: var(--gray-800);
+		background: var(--sc-line);
 	}
 
 	.game-card-media img {
@@ -599,15 +599,15 @@ const searchText = [title, pitch, id]
 		line-height: 1;
 		padding: 0.4rem 0.85rem;
 		border-radius: 999rem;
-		color: var(--accent-text-over);
-		background-color: var(--accent-regular);
+		color: var(--sc-accent-ink);
+		background-color: var(--sc-accent);
 		white-space: nowrap;
 	}
 
 	.badge.soon {
-		color: var(--gray-300);
+		color: var(--sc-muted);
 		background-color: transparent;
-		border: 1px solid var(--gray-700);
+		border: 1px solid var(--sc-line);
 	}
 
 	.game-card h3 {
@@ -626,19 +626,19 @@ const searchText = [title, pitch, id]
 		line-height: 1;
 		padding: 0.3rem 0.7rem;
 		border-radius: 999rem;
-		border: 1px solid var(--gray-700);
-		color: var(--gray-300);
+		border: 1px solid var(--sc-line);
+		color: var(--sc-muted);
 	}
 
 	.daily-chip.progress {
-		border-color: var(--accent-regular);
-		color: var(--accent-regular);
+		border-color: var(--sc-accent);
+		color: var(--sc-accent);
 	}
 
 	.daily-chip.done {
-		border-color: var(--accent-regular);
-		background-color: var(--accent-regular);
-		color: var(--accent-text-over);
+		border-color: var(--sc-accent);
+		background-color: var(--sc-accent);
+		color: var(--sc-accent-ink);
 	}
 
 	.streak-badge {
@@ -668,9 +668,9 @@ const searchText = [title, pitch, id]
 		line-height: 1;
 		padding: 3px 9px;
 		border-radius: 999rem;
-		color: var(--accent-regular);
+		color: var(--sc-accent);
 		background: var(--accent-overlay);
-		border: 1px solid var(--accent-regular);
+		border: 1px solid var(--sc-accent);
 	}
 
 	/* [hidden] must win over the display above, else empty badges show as blank pills. */
@@ -681,7 +681,7 @@ const searchText = [title, pitch, id]
 	}
 
 	.game-card p {
-		color: var(--gray-400);
+		color: var(--sc-muted);
 		margin: 0;
 		font-size: var(--text-base);
 	}

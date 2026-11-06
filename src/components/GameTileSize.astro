@@ -49,9 +49,9 @@ const SIZES = [
 		display: inline-flex;
 		gap: 2px;
 		padding: 3px;
-		border: 1px solid var(--gray-800);
+		border: 1px solid var(--sc-line);
 		border-radius: 999px;
-		background: var(--gray-999);
+		background: var(--sc-surface);
 	}
 
 	.ts-btn {
@@ -62,7 +62,7 @@ const SIZES = [
 		border: none;
 		border-radius: 999px;
 		background: transparent;
-		color: var(--gray-200);
+		color: var(--sc-ink-2);
 		font: inherit;
 		font-size: var(--text-sm);
 		font-weight: 600;
@@ -79,13 +79,13 @@ const SIZES = [
 
 	.ts-btn:hover,
 	.ts-btn:focus-visible {
-		color: var(--gray-0);
-		background: var(--gray-900);
+		color: var(--sc-ink);
+		background: var(--sc-surface-2);
 	}
 
 	.ts-btn[aria-pressed='true'] {
-		color: var(--accent-text-over);
-		background: var(--accent-regular);
+		color: var(--sc-accent-ink);
+		background: var(--sc-accent);
 	}
 </style>
 

@@ -97,25 +97,34 @@ const top = (await topPlayed([...byId.keys()], SHORTLIST, POPULAR_DAYS)).map((id
 </BaseLayout>
 
 <style>
+	/* The page's head: a night card, as the homepage's stage. */
 	.defi-hero {
-		text-align: center;
-		max-width: 54ch;
-		margin-inline: auto;
 		align-items: center;
-		color: var(--gray-300);
+		width: 100%;
+		max-width: 73rem;
+		margin-inline: auto;
+		padding: 1.75rem 1.25rem 2rem;
+		border-radius: 1.75rem;
+		background: var(--sc-night-surface);
+		color: var(--sc-night-muted);
 		font-size: var(--text-md);
+		text-align: center;
+	}
+	.defi-hero > p {
+		max-width: 54ch;
 	}
 	.defi-hero h1 {
 		font-size: var(--text-3xl);
+		color: #fff;
 	}
 	.defi-hero strong {
-		color: var(--gray-0);
+		color: var(--sc-night-ink);
 	}
 	.back {
 		display: inline-flex;
 		align-items: center;
 		gap: 0.4rem;
-		color: var(--gray-300);
+		color: var(--sc-night-link);
 		text-decoration: none;
 		font-family: var(--font-brand);
 		font-weight: 500;
@@ -123,7 +132,43 @@ const top = (await topPlayed([...byId.keys()], SHORTLIST, POPULAR_DAYS)).map((id
 	}
 	.back:hover,
 	.back:focus-visible {
-		color: var(--accent-regular);
+		color: var(--sc-night-ink);
+	}
+	.games-promise li {
+		background: var(--sc-night-surface-2);
+		border: 1px solid var(--sc-night-line);
+		border-radius: 999px;
+		padding: 5px 13px;
+		font-size: var(--text-sm);
+		font-weight: 600;
+		color: var(--sc-night-ink);
+	}
+	.defi-count {
+		font-weight: 700;
+		color: var(--sc-gold);
+		font-size: var(--text-md);
+		margin-top: 0.35rem;
+	}
+	.defi-streak {
+		align-self: center;
+		font-weight: 800;
+		font-size: var(--text-md);
+		color: var(--sc-night-ink);
+		background: rgb(255 201 77 / 0.14);
+		border: 1px solid rgb(255 201 77 / 0.5);
+		border-radius: 999px;
+		padding: 6px 16px;
+		margin-top: 0.35rem;
+	}
+	@media (min-width: 50em) {
+		.defi-hero {
+			padding: 2.25rem 2rem 2.5rem;
+		}
+	}
+
+	.back:hover,
+	.back:focus-visible {
+		color: var(--sc-accent);
 	}
 	.games-promise {
 		list-style: none;
@@ -133,21 +178,6 @@ const top = (await topPlayed([...byId.keys()], SHORTLIST, POPULAR_DAYS)).map((id
 		justify-content: center;
 		padding: 0;
 		margin: 0.25rem 0 0;
-	}
-	.games-promise li {
-		background: var(--gray-999);
-		border: 1px solid var(--gray-800);
-		border-radius: 999px;
-		padding: 5px 13px;
-		font-size: var(--text-sm);
-		font-weight: 600;
-		color: var(--gray-100);
-	}
-	.defi-count {
-		font-weight: 700;
-		color: var(--accent-regular);
-		font-size: var(--text-md);
-		margin-top: 0.35rem;
 	}
 	.defi-grid {
 		list-style: none;
@@ -176,20 +206,9 @@ const top = (await topPlayed([...byId.keys()], SHORTLIST, POPULAR_DAYS)).map((id
 		}
 	}
 
-	.defi-streak {
-		align-self: center;
-		font-weight: 800;
-		font-size: var(--text-md);
-		color: var(--gray-0);
-		background: var(--accent-overlay);
-		border: 1px solid var(--accent-regular);
-		border-radius: 999px;
-		padding: 6px 16px;
-		margin-top: 0.35rem;
-	}
 	.defi-streak .defi-streak-note {
 		font-weight: 600;
-		color: var(--gray-200);
+		color: var(--sc-ink-2);
 	}
 </style>
 

@@ -40,14 +40,14 @@ const { placeholder = 'Rechercher un jeu…', total } = Astro.props;
 		align-items: center;
 		gap: 0.55rem;
 		padding: 0.55rem 0.9rem;
-		border: 1px solid var(--gray-800);
+		border: 1px solid var(--sc-line);
 		border-radius: 999px;
-		background: var(--gray-999);
+		background: var(--sc-surface);
 		transition: border-color var(--theme-transition);
 	}
 
 	.gs-field:focus-within {
-		border-color: var(--accent-regular);
+		border-color: var(--sc-accent);
 	}
 
 	.gs-icon {
@@ -60,7 +60,7 @@ const { placeholder = 'Rechercher un jeu…', total } = Astro.props;
 		min-width: 0;
 		border: none;
 		background: transparent;
-		color: var(--gray-0);
+		color: var(--sc-ink);
 		font: inherit;
 		font-size: var(--text-md);
 	}
@@ -76,8 +76,8 @@ const { placeholder = 'Rechercher un jeu…', total } = Astro.props;
 
 	.gs-clear {
 		border: none;
-		background: var(--gray-900);
-		color: var(--gray-200);
+		background: var(--sc-surface-2);
+		color: var(--sc-ink-2);
 		border-radius: 999px;
 		width: 1.6rem;
 		height: 1.6rem;
@@ -90,8 +90,8 @@ const { placeholder = 'Rechercher un jeu…', total } = Astro.props;
 
 	.gs-clear:hover,
 	.gs-clear:focus-visible {
-		background: var(--accent-regular);
-		color: var(--accent-text-over);
+		background: var(--sc-accent);
+		color: var(--sc-accent-ink);
 	}
 
 	.gs-clear[hidden] {
@@ -103,7 +103,7 @@ const { placeholder = 'Rechercher un jeu…', total } = Astro.props;
 		text-align: center;
 		font-size: var(--text-sm);
 		font-weight: 600;
-		color: var(--gray-300);
+		color: var(--sc-muted);
 	}
 
 	.gs-status[hidden] {
@@ -111,7 +111,7 @@ const { placeholder = 'Rechercher un jeu…', total } = Astro.props;
 	}
 
 	.gs-status strong {
-		color: var(--accent-regular);
+		color: var(--sc-accent);
 	}
 </style>
 
