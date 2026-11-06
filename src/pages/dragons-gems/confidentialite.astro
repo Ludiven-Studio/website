@@ -31,7 +31,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li>Le jeu se joue <strong>sans compte</strong>. Ta progression est gardée sur ton téléphone.</li>
 				<li>Un <strong>compte Google ou Apple</strong>, facultatif, sauvegarde ta progression en ligne pour la retrouver sur tous tes appareils.</li>
 				<li>Les classements du défi du jour, du mode infini et du défi du sommet montrent <strong>ton pseudo et ton score</strong>, à tout le monde. Rien d'autre.</li>
-				<li>Des <strong>vidéos publicitaires facultatives</strong> (Unity) offrent des cœurs et des pièces. Elles ne sont adaptées à tes centres d'intérêt qu'avec ton accord. L'application ne demande ni ta position, ni tes contacts, ni tes photos.</li>
+				<li>Des <strong>vidéos facultatives</strong> offrent des cœurs et des pièces&nbsp;: celles de Unity si tu acceptes qu'elles soient adaptées à tes centres d'intérêt, sinon des vidéos de nos autres jeux et applis. L'application ne demande ni ta position, ni tes contacts, ni tes photos.</li>
 				<li>Des <strong>statistiques d'usage</strong> sans identifiant (niveaux joués, vidéos, achats…) partent sur notre propre serveur, en Allemagne.</li>
 				<li>Des <strong>achats intégrés</strong> facultatifs (pièces, cœurs illimités), payés par Google Play ou l'App Store.</li>
 				<li>Tu peux <strong>supprimer ton compte</strong> à tout moment depuis les Réglages de l'application.</li>
@@ -146,8 +146,8 @@ import LangSwitch from '../../components/LangSwitch.astro';
 						</tr>
 						<tr>
 							<td>Identifiant publicitaire (sur iPhone, seulement si tu autorises le suivi), autres identifiants de l'appareil et de l'application, adresse IP (position approximative), interactions avec les annonces, durée d'utilisation, historique d'achats, informations techniques (modèle, langue, écran, connexion, performances) et, sur Android, les magasins d'applications installés</td>
-							<td>Afficher les vidéos que tu demandes, les mesurer, lutter contre la fraude&nbsp;; les adapter à tes centres d'intérêt si tu l'acceptes</td>
-							<td>Ton consentement (art. 6.1.a) pour les annonces adaptées&nbsp;; intérêt légitime (art. 6.1.f) sinon</td>
+							<td>Afficher les vidéos que tu demandes, les mesurer, lutter contre la fraude et les adapter à tes centres d'intérêt</td>
+							<td>Ton consentement (art. 6.1.a)</td>
 							<td>Unity (LevelPlay, Unity Ads, ironSource Ads), qui les partage avec des annonceurs</td>
 						</tr>
 						<tr>
@@ -167,6 +167,12 @@ import LangSwitch from '../../components/LangSwitch.astro';
 							<td>Savoir quelles fonctions servent et améliorer le jeu</td>
 							<td>Intérêt légitime</td>
 							<td>Umami, sur notre serveur (Hetzner, Allemagne)</td>
+						</tr>
+						<tr>
+							<td>Adresse IP, comme pour toute visite du site</td>
+							<td>Vérifier s'il existe une nouvelle version et télécharger les vidéos de nos autres jeux et applis (liste, images, vidéos)</td>
+							<td>Intérêt légitime (art. 6.1.f)&nbsp;: tenir l'application à jour et faire connaître nos jeux</td>
+							<td>GitHub Pages, l'hébergeur de notre site&nbsp;; Umami compte les vidéos montrées et ouvertes, sans identifiant (voir §8)</td>
 						</tr>
 						<tr>
 							<td>Adresse IP</td>
@@ -200,11 +206,13 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			<p>
 				<strong>Ton accord.</strong> Avant la première vidéo, le jeu te demande si les vidéos peuvent être
 				adaptées à tes centres d'intérêt («&nbsp;Oui, adaptées&nbsp;» ou «&nbsp;Non merci&nbsp;»). Le module de
-				Unity ne démarre qu'une fois que tu as répondu&nbsp;; sans ton accord, les vidéos ne sont pas
-				personnalisées. «&nbsp;Non merci&nbsp;» vaut aussi, pour Unity, refus de la vente de tes données au sens
-				des lois des États américains. Tu peux changer d'avis à tout moment&nbsp;: Réglages ›
-				«&nbsp;Choix publicitaires&nbsp;». Sur iPhone, après un oui, Apple te demande l'autorisation de
-				suivi&nbsp;; sans elle, l'identifiant publicitaire de l'iPhone n'est pas utilisé. Tu peux aussi
+				Unity ne démarre qu'après «&nbsp;Oui, adaptées&nbsp;». Après «&nbsp;Non merci&nbsp;», ou tant que tu
+				n'as pas répondu, Unity ne reçoit rien&nbsp;: les récompenses passent par des vidéos de nos autres jeux
+				et applis, téléchargées depuis notre site. Tu peux changer d'avis à tout moment&nbsp;: Réglages ›
+				«&nbsp;Choix publicitaires&nbsp;». Un retour à «&nbsp;Non merci&nbsp;» est transmis tout de suite à
+				Unity, et vaut aussi refus de la vente de tes données au sens des lois des États américains. Sur
+				iPhone, après un oui, Apple te demande l'autorisation de suivi&nbsp;; sans elle, l'identifiant
+				publicitaire de l'iPhone n'est pas utilisé. Tu peux aussi
 				réinitialiser ou supprimer l'identifiant publicitaire dans les réglages de ton téléphone. Pour en
 				savoir plus&nbsp;: la
 				<a href="https://unity.com/legal/game-player-and-app-user-privacy-policy" target="_blank" rel="noopener">politique de confidentialité de Unity</a>.
@@ -239,6 +247,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li><code>run_end</code> — une partie du défi du jour, du mode infini ou du défi du sommet finit (mode, résultat, score, coups joués)&nbsp;;</li>
 				<li><code>tutorial_end</code> — un tutoriel finit (lequel, passé ou non, étape atteinte)&nbsp;;</li>
 				<li><code>ad_rewarded</code> — une vidéo proposée (pour un cœur, continuer un niveau, doubler le cadeau ou des pièces de la boutique) est regardée, passée ou indisponible&nbsp;;</li>
+				<li><code>house_ad_shown</code>, <code>house_ad_opened</code> — une vidéo de nos autres jeux ou applis est montrée ou ouverte (laquelle, où)&nbsp;;</li>
 				<li><code>continue_buy</code>, <code>breath_buy</code> — des pièces sont dépensées pour continuer un niveau ou pour un souffle (mode, niveau)&nbsp;;</li>
 				<li><code>iap_buy</code> — un achat avec de l'argent (produit acheté)&nbsp;;</li>
 				<li><code>daily_gift</code> — le cadeau du jour est reçu (jour de la série)&nbsp;;</li>
@@ -275,7 +284,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li>ta session de connexion et ton adresse mail, si tu es connecté&nbsp;;</li>
 				<li>ton pseudo et l'identifiant technique des classements&nbsp;;</li>
 				<li>tes réglages&nbsp;: langue, thème et rappels&nbsp;;</li>
-				<li>ton choix sur la publicité, le nombre de vidéos regardées dans la journée, les numéros de tes derniers achats et les résultats en attente d'envoi aux classements&nbsp;; les modules de Unity y gardent aussi leurs propres données.</li>
+				<li>ton choix sur la publicité, le nombre de vidéos regardées dans la journée, les numéros de tes derniers achats, les résultats en attente d'envoi aux classements, la liste et les images des vidéos de nos autres jeux&nbsp;; les modules de Unity y gardent aussi leurs propres données.</li>
 			</ul>
 			<p>
 				Tout cela reste sur l'appareil et disparaît quand tu désinstalles l'application.
@@ -297,9 +306,10 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li><strong>Unity Technologies</strong> (et sa filiale ironSource) — vidéos publicitaires (LevelPlay, Unity Ads) et module d'achat. Pour la publicité, Unity agit aussi pour son propre compte et partage des données avec des annonceurs (voir <a href="#publicite">Publicité</a>).</li>
 				<li><strong>Google</strong> et <strong>Apple</strong> — connexion à ton compte, distribution de l'application et paiement des achats. Sur iPhone, le module de connexion de Google recueille aussi, pour Google, ta position approximative, qui sert à faire fonctionner la connexion, ainsi que des identifiants de l'appareil et du compte et des données d'usage, qui servent aux statistiques de Google.</li>
 				<li><strong>Hetzner Online GmbH</strong> — hébergement de notre serveur de statistiques d'usage, en Allemagne (voir §8).</li>
+				<li><strong>GitHub</strong> (GitHub Pages) — hébergement de notre site, d'où l'application vérifie s'il existe une nouvelle version et télécharge les vidéos de nos autres jeux et applis.</li>
 			</ul>
 			<p>
-				Supabase et Unity sont des sociétés américaines. Ce transfert est encadré par les mécanismes du
+				Supabase, Unity et GitHub sont des sociétés américaines. Ce transfert est encadré par les mécanismes du
 				chapitre V du RGPD (clauses contractuelles types).
 			</p>
 			<p>Durées de conservation&nbsp;:</p>

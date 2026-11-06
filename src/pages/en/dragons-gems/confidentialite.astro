@@ -36,7 +36,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li>The game is played <strong>without an account</strong>. Your progress is kept on your phone.</li>
 				<li>An optional <strong>Google or Apple account</strong> saves your progress online, to find it on all your devices.</li>
 				<li>The daily challenge, endless mode and summit challenge leaderboards show <strong>your name and your score</strong> to everyone. Nothing else.</li>
-				<li><strong>Optional video ads</strong> (Unity) give hearts and coins. They are tailored to your interests only if you agree. The app asks for neither your location, nor your contacts, nor your photos.</li>
+				<li><strong>Optional videos</strong> give hearts and coins: Unity's if you agree to have them tailored to your interests, otherwise videos of our other games and apps. The app asks for neither your location, nor your contacts, nor your photos.</li>
 				<li><strong>Usage statistics</strong> with no identifier (levels played, videos, purchases…) go to our own server, in Germany.</li>
 				<li>Optional <strong>in-app purchases</strong> (coins, unlimited hearts), paid through Google Play or the App Store.</li>
 				<li>You can <strong>delete your account</strong> at any time from the app's Settings.</li>
@@ -148,8 +148,8 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 						</tr>
 						<tr>
 							<td>Advertising id (on iPhone, only if you allow tracking), other device and app ids, IP address (approximate location), ad interactions, time of use, purchase history, technical information (model, language, screen, connection, performance) and, on Android, the app stores installed</td>
-							<td>Show the videos you ask for, measure them, fight fraud; tailor them to your interests if you agree</td>
-							<td>Your consent (art. 6.1.a) for tailored ads; legitimate interest (art. 6.1.f) otherwise</td>
+							<td>Show the videos you ask for, measure them, fight fraud and tailor them to your interests</td>
+							<td>Your consent (art. 6.1.a)</td>
 							<td>Unity (LevelPlay, Unity Ads, ironSource Ads), which shares them with advertisers</td>
 						</tr>
 						<tr>
@@ -169,6 +169,12 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 							<td>Know which features are used and improve the game</td>
 							<td>Legitimate interest</td>
 							<td>Umami, on our own server (Hetzner, Germany)</td>
+						</tr>
+						<tr>
+							<td>IP address, as for any visit to the site</td>
+							<td>Check whether there is a new version and download the videos of our other games and apps (list, pictures, videos)</td>
+							<td>Legitimate interest (art. 6.1.f): keep the app up to date and make our games known</td>
+							<td>GitHub Pages, our site's host; Umami counts the videos shown and opened, with no identifier (see §8)</td>
 						</tr>
 						<tr>
 							<td>IP address</td>
@@ -200,11 +206,12 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			</p>
 			<p>
 				<strong>Your consent.</strong> Before the first video, the game asks whether videos may be tailored to
-				your interests ("Yes, suited" or "No thanks"). Unity's module starts only once you have answered;
-				without your consent, the videos are not personalized. For Unity, "No thanks" also opts you out of the
-				sale of your data under US state laws. You can change your mind at any time: Settings › "Ad choices".
-				On iPhone, after a yes, Apple asks for your permission to track; without it, the iPhone's advertising
-				id is not used. You can also reset or delete the advertising id in your phone's settings. To learn
+				your interests ("Yes, suited" or "No thanks"). Unity's module starts only after "Yes, suited". After
+				"No thanks", or as long as you have not answered, Unity receives nothing: rewards come through videos of
+				our other games and apps, downloaded from our site. You can change your mind at any time: Settings ›
+				"Ad choices". Going back to "No thanks" is passed on to Unity at once, and also opts you out of the sale
+				of your data under US state laws. On iPhone, after a yes, Apple asks for your permission to track;
+				without it, the iPhone's advertising id is not used. You can also reset or delete the advertising id in your phone's settings. To learn
 				more: <a href="https://unity.com/legal/game-player-and-app-user-privacy-policy" target="_blank" rel="noopener">Unity's privacy policy</a>.
 			</p>
 		</section>
@@ -236,6 +243,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><code>run_end</code> — a daily challenge, endless mode or summit challenge game ends (mode, result, score, moves played);</li>
 				<li><code>tutorial_end</code> — a tutorial ends (which one, skipped or not, step reached);</li>
 				<li><code>ad_rewarded</code> — an offered video (for a heart, to continue a level, to double the gift or for shop coins) is watched, skipped or unavailable;</li>
+				<li><code>house_ad_shown</code>, <code>house_ad_opened</code> — a video of our other games or apps is shown or opened (which one, where);</li>
 				<li><code>continue_buy</code>, <code>breath_buy</code> — coins are spent to continue a level or on a breath (mode, level);</li>
 				<li><code>iap_buy</code> — a purchase with money (product bought);</li>
 				<li><code>daily_gift</code> — the daily gift is received (day of the streak);</li>
@@ -271,7 +279,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li>your sign-in session and your email address, if you are signed in;</li>
 				<li>your name and the leaderboards' technical id;</li>
 				<li>your settings: language, theme and reminders;</li>
-				<li>your choice about ads, the number of videos watched that day, the numbers of your latest purchases and the results waiting to be sent to the leaderboards; Unity's modules also keep their own data there.</li>
+				<li>your choice about ads, the number of videos watched that day, the numbers of your latest purchases, the results waiting to be sent to the leaderboards, the list and pictures of the videos of our other games; Unity's modules also keep their own data there.</li>
 			</ul>
 			<p>
 				All of this stays on the device and is erased when you uninstall the app.
@@ -293,9 +301,10 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Unity Technologies</strong> (and its subsidiary ironSource) — video ads (LevelPlay, Unity Ads) and purchase module. For ads, Unity also acts on its own behalf and shares data with advertisers (see <a href="#publicite">Ads</a>).</li>
 				<li><strong>Google</strong> and <strong>Apple</strong> — signing in to your account, distributing the app and paying for purchases. On iPhone, Google's sign-in module also collects, for Google, your approximate location, used to run the sign-in, as well as device and account identifiers and usage data, used for Google's statistics.</li>
 				<li><strong>Hetzner Online GmbH</strong> — hosting of our usage statistics server, in Germany (see §8).</li>
+				<li><strong>GitHub</strong> (GitHub Pages) — hosting of our site, from which the app checks whether there is a new version and downloads the videos of our other games and apps.</li>
 			</ul>
 			<p>
-				Supabase and Unity are American companies. This transfer is covered by the mechanisms of chapter V of
+				Supabase, Unity and GitHub are American companies. This transfer is covered by the mechanisms of chapter V of
 				the GDPR (standard contractual clauses).
 			</p>
 			<p>Retention:</p>
