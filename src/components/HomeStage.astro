@@ -234,8 +234,9 @@ const tabId = (id: string): string => `stage-tab-${id}`;
 			() => {
 				window.clearTimeout(settle);
 				settle = window.setTimeout(() => {
+					// Only a track at rest on a slide counts: a busy phone can pause mid-way through a scroll.
 					const i = nearest();
-					if (i !== index) {
+					if (i !== index && Math.abs(track.scrollLeft - i * track.clientWidth) < 2) {
 						index = i;
 						mark();
 					}
