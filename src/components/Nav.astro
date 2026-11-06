@@ -416,12 +416,6 @@ const lit = (l: NavLink): boolean => exact(l) || (!!l.also && l.also.test(path))
 		max-width: 76rem;
 	}
 
-	/* The older pages paint their header: there the menu's pieces stand on their own surface. */
-	.sn:not(.sn-scene) .sn-menu,
-	.sn:not(.sn-scene) .sn-daily {
-		background: var(--sc-surface);
-	}
-
 	.sn a:focus-visible,
 	.sn summary:focus-visible,
 	.sn-menu:focus-visible {
@@ -575,18 +569,6 @@ const lit = (l: NavLink): boolean => exact(l) || (!!l.also && l.also.test(path))
 		.sn-panel[hidden],
 		.sn-noscript {
 			display: none;
-		}
-	}
-
-	@media (min-width: 64em) {
-		.sn:not(.sn-scene) .sn-links {
-			padding: 0.3rem;
-			border-radius: 999rem;
-			background: var(--sc-surface);
-			box-shadow: 0 0 0 1px var(--sc-line);
-		}
-		.sn:not(.sn-scene) .sn-lang summary {
-			background: var(--sc-surface);
 		}
 	}
 
