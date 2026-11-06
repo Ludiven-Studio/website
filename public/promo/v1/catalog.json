@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated": "2026-11-05T13:00:00Z",
+  "updated": "2026-11-06T12:25:00Z",
   "rotationSeconds": 30,
   "defaultLanguage": "fr",
   "entries": [
@@ -69,7 +69,8 @@
         "it": "clips/petanque-game_it.mp4"
       },
       "link": {
-        "android": "com.ludivenstudio.petanquegame"
+        "android": "com.ludivenstudio.petanquegame",
+        "ios": "6827514133"
       },
       "app": [
         "com.ludivenstudio.petanquegame"
@@ -80,9 +81,6 @@
       ],
       "hideIn": [
         "com.ludivenstudio.petanquegame"
-      ],
-      "platforms": [
-        "android"
       ]
     },
     {
@@ -150,7 +148,8 @@
         "it": "clips/dragon-gems_it.mp4"
       },
       "link": {
-        "android": "com.ludivenstudio.dragonsgems"
+        "android": "com.ludivenstudio.dragonsgems",
+        "ios": "6829283627"
       },
       "app": [
         "com.ludivenstudio.dragonsgems"
@@ -162,9 +161,6 @@
         "com.ludivenstudio.dragonsgems",
         "com.ludivenstudio.petanquemeet",
         "com.raphbenpro.petanquear"
-      ],
-      "platforms": [
-        "android"
       ]
     },
     {
