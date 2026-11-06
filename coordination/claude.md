@@ -1800,3 +1800,8 @@
   version.json, contact (9 commits, f29877c..6664718, recalés sur 0539241 ; astro check 0 erreur). Reste dans la
   branche nino-rush-privacy, non poussé : page produit, politique et CGU de la démo sans régie, licences de Nino Rush
   (pour une version sans pub ; mentions-legales.astro a bougé avec Pétanque Game, à recaler). Réservation maintenue.
+- 09:58 : commité et poussé à la demande de l'utilisateur (« Pousser + publier 1.0.12 ») : page produit /nino-rush/ ×5
+  (54c9045), politique et CGU ×5 de la démo sans régie (a93aeb9), licences de Nino Rush dans les mentions légales
+  (df7c8cb), page de téléchargement en 1.0.12, 83,9 Mo (aea2d01), comme l'APK publié sur nino-rush-dev (sha256 vérifié)
+  ; build complet OK dans mon worktree (207 pages, précache 377, liens OK) ; mes fichiers et cette section seulement.
+  Statut : terminé. Réservations libérées.
