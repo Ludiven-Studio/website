@@ -2031,3 +2031,31 @@
   et téléphone sombre). Push au mot de Raphaël : « pousse la 1.0.1 de Dragon Gems et le ménage du site »
 - 15:37 : poussé sur le mot de Raphaël (« Ok pousse », en réponse à la ligne « pousse la 1.0.1 de Dragon Gems et le
   ménage du site ») : les 6 commits de dg-1.0.1 et cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-06 — Pétanque Meet : page bêta de la 1.0.1 (APK .beta, lien discret) (session PetanqueMeet)
+- Statut : en cours (2026-11-06T15:50+01:00). Demande de l'utilisateur : (transmis par le Producer) tester une dernière
+  fois la 1.0.1 avant soumission : un APK .beta, à côté de l'appli du store, téléchargeable par un lien discret (page
+  testeurs non listée, noindex, hors menu et sitemap, chemin difficile à deviner) ; publication au mot de Raphaël
+- Réservations actives : `src/pages/petanque-meet/beta-0gn9lbmb.astro` (nouveau), `astro.config.mjs` (une règle du
+  filtre du sitemap et un motif de globIgnores, pour toute page /beta-…/), dans le worktree
+  website-worktrees/meet-beta-101, branche meet-beta-101 ; rien dans ce dossier.
+- Ressources : serveur de dev sur le port 4587 ; eslint, `astro check`. Build annoncé ici avant.
+- 15:53 : astro.config.mjs retiré de ma réservation : la session website pose la règle /beta-…/ pour les 4 applis
+  (sitemap, globIgnores, noindex), je pars de son commit. Réservation restante :
+  src/pages/petanque-meet/beta-0gn9lbmb.astro (nouveau), dans le worktree website-worktrees/meet-beta-101
+- 16:05 : page prête, non poussée : commit 6c9970b sur la branche meet-beta-101 (partie d'origin/main 7d5cc44),
+  src/pages/petanque-meet/beta-0gn9lbmb.astro seulement ; eslint OK, astro check 0 erreur 0 avertissement, captures
+  bureau, bureau sombre, téléphone et téléphone sombre relues, aucune erreur de console. J'attends le commit de la
+  règle /beta-…/ de la session website pour repartir dessus et lancer le build complet. Publication (APK dans le bucket
+  builds, puis push) au mot de Raphaël
+- 16:06 : page reprise sur bd6032d (règle /beta-…/ de la session website) : 17a89f5. Lancement du build complet dans
+  mon worktree meet-beta-101 (écrit son dist/, .astro/, public/vendor/ seulement)…
+- 16:08 : build complet OK dans mon worktree : astro check 0 erreur 0 avertissement, 219 pages, précache 389 (toutes
+  résolues), liens OK. Dans dist/ : la page est en noindex (robots noindex, follow), absente du sitemap et de sw.js
+  (qui liste bien /petanque-meet/test, témoin), et son bouton vise petanque-meet-beta-1.0.1.apk. Prêt, non poussé :
+  meet-beta-101 = bd6032d (règle de la session website) + 17a89f5 (ma page). Push au mot de Raphaël : « Publie la bêta
+  1.0.1 de Pétanque Meet »
+- 16:12 : commité et poussé à la demande de l'utilisateur (« Publie la bêta 1.0.1 de Pétanque Meet ») : bd6032d (la
+  règle /beta-…/ de la session website, reprise telle quelle), 17a89f5 (ma page) et cette section seulement. L'APK est
+  en ligne avant le push : builds/petanquemeet-beta-0gn9lbmb/petanque-meet-beta-1.0.1.apk, servi identique (34 477 657
+  octets, sha256 3d9e6436…aa9631e6). Statut : terminé. Réservations libérées.
