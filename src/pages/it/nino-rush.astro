@@ -1,0 +1,11 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import NinoRushLanding from '../../components/NinoRushLanding.astro';
+import { copy, LANDING_PATHS, SHARE_IMAGE } from '../../data/ninoRush';
+
+const t = copy.it;
+---
+
+<BaseLayout title={t.title} description={t.description} image={SHARE_IMAGE} lang="it" alternates={LANDING_PATHS}>
+	<NinoRushLanding lang="it" />
+</BaseLayout>

@@ -1,0 +1,362 @@
+---
+// The Nino Rush product page, in five languages. Not on the stores yet: « coming soon » and no badges.
+// The French page also leads to the Android test build (/nino-rush/telecharger/).
+import Hero from './Hero.astro';
+import Icon from './Icon.astro';
+import CallToAction from './CallToAction.astro';
+import ContactCTA from './ContactCTA.astro';
+import LangSwitch from './LangSwitch.astro';
+import ShareButton from './ShareButton.astro';
+import {
+	APP_NAME,
+	CONTACT,
+	ICON,
+	LANDING_PATHS,
+	PRIVACY,
+	TERMS,
+	TEST_PAGE,
+	copy,
+	feature,
+	screens,
+	typo,
+	type Lang,
+} from '../data/ninoRush';
+
+interface Props {
+	lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = copy[lang];
+const ty = (s: string) => typo(lang, s);
+const others = (Object.keys(LANDING_PATHS) as Lang[]).filter((l) => l !== lang).map((l) => ({ lang: l, href: LANDING_PATHS[l] }));
+const shots = screens(lang);
+
+// No offer: the full adventure has no price yet.
+const jsonLd = [
+	{
+		'@context': 'https://schema.org',
+		'@type': ['VideoGame', 'MobileApplication'],
+		name: APP_NAME,
+		description: t.description,
+		url: new URL(Astro.url.pathname, Astro.site).href,
+		image: new URL(ICON, Astro.site).href,
+		applicationCategory: 'GameApplication',
+		genre: 'Platformer',
+		operatingSystem: 'Android, iOS, iPadOS',
+		inLanguage: ['fr', 'en', 'es', 'de', 'it'],
+		author: { '@type': 'Organization', name: 'Ludiven Studio' },
+	},
+	{
+		'@context': 'https://schema.org',
+		'@type': 'FAQPage',
+		mainEntity: t.faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })),
+	},
+];
+---
+
+<div class="stack gap-20">
+	<main class="wrapper stack gap-15">
+		<div class="stack gap-8">
+			<LangSwitch lang={lang} links={others} />
+			<div class="nr-head">
+				<img class="nr-icon" src={ICON} alt="" width="96" height="96" />
+				<div class="stack gap-2">
+					<p class="nr-kicker">{t.kicker}</p>
+					<Hero title={APP_NAME} tagline={ty(t.tagline)} align="start" />
+				</div>
+			</div>
+			<p class="lead">{ty(t.intro)}</p>
+			<div class="stack gap-4">
+				<p class="nr-soon"><Icon icon="rocket-launch" size="1.3em" /> <span>{ty(t.soon)}</span></p>
+				<div class="nr-ctas">
+					{t.test && (
+						<CallToAction href={TEST_PAGE}>
+							{t.test}
+							<Icon icon="arrow-right" size="1.1em" />
+						</CallToAction>
+					)}
+					<ShareButton id="nino-rush" title={APP_NAME} lang={lang} />
+				</div>
+			</div>
+			<img class="cover" src={feature(lang)} alt={ty(t.coverAlt)} width="1024" height="500" />
+		</div>
+
+		<section class="stack gap-4">
+			<p class="story">{ty(t.story)}</p>
+		</section>
+
+		<section class="stack gap-4">
+			<h2 class="section-title">{t.featuresTitle}</h2>
+			<div class="box grid-2">
+				{t.features.map((f) => (
+					<div>
+						<h3>{ty(f.title)}</h3>
+						<p>{ty(f.body)}</p>
+					</div>
+				))}
+			</div>
+		</section>
+
+		<section class="screens stack gap-6">
+			<h2 class="section-title">{t.galleryTitle}</h2>
+			<div class="screens-grid">
+				{shots.map((src, i) => <img src={src} alt={ty(t.shotsAlt[i] ?? '')} width="1170" height="540" loading="lazy" decoding="async" />)}
+			</div>
+		</section>
+
+		<section class="stack gap-4">
+			<h2 class="section-title">{t.workshopTitle}</h2>
+			<div class="box grid-3">
+				{t.workshop.map((w) => (
+					<div>
+						<h3>{ty(w.title)}</h3>
+						<p>{ty(w.body)}</p>
+					</div>
+				))}
+			</div>
+		</section>
+
+		<section class="stack gap-4">
+			<h2 class="section-title">{t.playTitle}</h2>
+			<div class="box grid-3">
+				{t.play.map((p) => (
+					<div>
+						<h3>{ty(p.title)}</h3>
+						<p>{ty(p.body)}</p>
+					</div>
+				))}
+			</div>
+		</section>
+
+		<section class="stack gap-4">
+			<h2 class="section-title">{t.faqTitle}</h2>
+			<div class="box faq">
+				{t.faq.map((f) => (
+					<details>
+						<summary>{ty(f.q)}</summary>
+						<p>{ty(f.a)}</p>
+						{f.link && <p class="faq-link"><a href={f.link.href}>{f.link.label} <Icon icon="arrow-right" size="1em" /></a></p>}
+					</details>
+				))}
+			</div>
+		</section>
+
+		<section class="stack gap-4 closing">
+			<h2 class="section-title">{ty(t.soon)}</h2>
+			{t.test && (
+				<div class="nr-ctas">
+					<CallToAction href={TEST_PAGE}>
+						{t.test}
+						<Icon icon="arrow-right" size="1.1em" />
+					</CallToAction>
+				</div>
+			)}
+			<p class="legal" id="support">{ty(t.support)} <a href={CONTACT[lang]}>{t.supportLink}</a> · <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a></p>
+			<p class="legal"><a href={PRIVACY[lang]}>{t.privacy}</a> · <a href={TERMS[lang]}>{t.terms}</a></p>
+		</section>
+	</main>
+
+	<ContactCTA lang={lang} />
+</div>
+
+<script type="application/ld+json" is:inline set:html={JSON.stringify(jsonLd)} />
+
+<style>
+	.nr-head {
+		display: flex;
+		align-items: center;
+		gap: 1.25rem;
+	}
+
+	.nr-icon {
+		flex: none;
+		width: 5rem;
+		height: 5rem;
+		border-radius: 22%;
+		box-shadow: var(--shadow-md);
+	}
+
+	.nr-kicker {
+		color: var(--link-color);
+		font-weight: 600;
+		font-size: var(--text-sm);
+	}
+
+	.lead,
+	.story {
+		max-width: 60ch;
+		font-size: var(--text-lg);
+	}
+
+	.story {
+		color: var(--gray-200);
+	}
+
+	/* The stores' place until the game is on them: a plain line, no badge to tap. */
+	.nr-soon {
+		display: inline-flex;
+		align-items: center;
+		align-self: flex-start;
+		gap: 0.6rem;
+		padding: 0.6rem 1.1rem;
+		border: 1px solid var(--gray-800);
+		border-radius: 999px;
+		background-color: var(--gray-999_40);
+		box-shadow: var(--shadow-sm);
+		color: var(--gray-0);
+		font-family: var(--font-brand);
+		font-weight: 500;
+		line-height: 1.3;
+	}
+
+	.nr-soon :global(svg) {
+		flex: none;
+		color: var(--link-color);
+	}
+
+	.nr-ctas {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 1rem 1.75rem;
+	}
+
+	.box {
+		border: 1px solid var(--gray-800);
+		border-radius: 0.75rem;
+		padding: 1.5rem;
+		background-color: var(--gray-999_40);
+		box-shadow: var(--shadow-sm);
+	}
+
+	.box p {
+		color: var(--gray-400);
+	}
+
+	.section-title {
+		font-size: var(--text-xl);
+		color: var(--gray-0);
+	}
+
+	.cover {
+		width: 100%;
+		height: auto;
+		border-radius: 1.5rem;
+		border: 1px solid var(--gray-800);
+		box-shadow: var(--shadow-sm);
+	}
+
+	.grid-2,
+	.grid-3 {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 2.5rem;
+	}
+
+	.grid-2 h3,
+	.grid-3 h3 {
+		font-size: var(--text-lg);
+		color: var(--gray-0);
+	}
+
+	.screens {
+		text-align: center;
+	}
+
+	.screens-grid {
+		display: grid;
+		gap: 1.25rem;
+		grid-template-columns: 1fr;
+	}
+
+	.screens-grid img {
+		width: 100%;
+		height: auto;
+		border-radius: 1.25rem;
+		border: 1px solid var(--gray-800);
+		box-shadow: var(--shadow-sm);
+		background: var(--gradient-subtle);
+	}
+
+	.faq {
+		display: grid;
+		gap: 0.25rem;
+	}
+
+	.faq details {
+		border-bottom: 1px solid var(--gray-800);
+		padding: 0.75rem 0;
+	}
+
+	.faq details:last-child {
+		border-bottom: 0;
+	}
+
+	.faq summary {
+		cursor: pointer;
+		color: var(--gray-0);
+		font-family: var(--font-brand);
+		font-size: var(--text-md);
+	}
+
+	.faq details p {
+		margin-top: 0.75rem;
+		max-width: 65ch;
+	}
+
+	.faq-link a {
+		color: var(--link-color);
+		font-weight: 600;
+		text-decoration: 1px solid underline transparent;
+		text-underline-offset: 0.25em;
+	}
+
+	.faq-link a:hover,
+	.faq-link a:focus {
+		text-decoration-color: currentColor;
+	}
+
+	.closing {
+		align-items: center;
+		text-align: center;
+	}
+
+	.closing .nr-ctas {
+		justify-content: center;
+	}
+
+	.legal {
+		color: var(--gray-400);
+		font-size: var(--text-sm);
+	}
+
+	@media (min-width: 50em) {
+		.nr-icon {
+			width: 7rem;
+			height: 7rem;
+		}
+
+		.box {
+			border-radius: 1.5rem;
+			padding: 2.5rem;
+		}
+
+		.grid-2 {
+			grid-template-columns: repeat(2, 1fr);
+			gap: 2.5rem 5rem;
+		}
+
+		.screens-grid {
+			grid-template-columns: repeat(2, 1fr);
+			gap: 1.75rem;
+		}
+	}
+
+	@media (min-width: 60em) {
+		.grid-3 {
+			grid-template-columns: repeat(3, 1fr);
+			gap: 2.5rem 3rem;
+		}
+	}
+</style>
