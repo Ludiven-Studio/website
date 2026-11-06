@@ -1,0 +1,240 @@
+---
+// The studio, under the games: a daylight band in both themes, as the studio's work is the client's. French and
+// English pages lead to the contact form and the projects; the others to the mail address, as those pages are not
+// translated.
+import { getImage } from 'astro:assets';
+import logo from '../assets/LudivenStudioLogo.png';
+import { MAIL, type Lang } from '../data/siteNav';
+import { fr } from '../data/homeGames';
+
+interface Props {
+	lang: Lang;
+}
+
+interface StudioText {
+	kicker: string;
+	title: string;
+	text: string;
+	chips: string[];
+	cta: { label: string; href: string };
+	links: { label: string; href: string; hreflang?: string }[];
+	mail?: boolean;
+}
+
+const TEXT: Record<Lang, StudioText> = {
+	fr: {
+		kicker: 'Le studio',
+		title: 'Développeur Unity depuis 2010',
+		text: "Je conçois et développe vos applications, jeux et expériences VR, de l'idée à la mise en production.",
+		chips: ['Jeux vidéo', 'Applications mobiles', 'Réalité virtuelle'],
+		cta: { label: fr('Un projet ? Parlons-en'), href: '/contact/' },
+		links: [
+			{ label: 'Voir les projets', href: '/work/' },
+			{ label: 'Les prestations', href: '/prestations/' },
+		],
+	},
+	en: {
+		kicker: 'The studio',
+		title: 'Unity developer since 2010',
+		text: 'I design and build your apps, games and VR experiences, from the first idea to release.',
+		chips: ['Video games', 'Mobile apps', 'Virtual reality'],
+		cta: { label: "A project? Let's talk", href: '/en/contact/' },
+		links: [
+			{ label: 'See the projects', href: '/en/work/' },
+			{ label: 'Services', href: '/en/services/' },
+		],
+	},
+	es: {
+		kicker: 'El estudio',
+		title: 'Desarrollador Unity desde 2010',
+		text: 'Diseño y desarrollo sus aplicaciones, juegos y experiencias de realidad virtual, de la idea a la publicación.',
+		chips: ['Videojuegos', 'Aplicaciones móviles', 'Realidad virtual'],
+		cta: { label: '¿Un proyecto? Hablemos', href: `mailto:${MAIL}` },
+		links: [{ label: 'Ver los proyectos (en inglés)', href: '/en/work/', hreflang: 'en' }],
+		mail: true,
+	},
+	de: {
+		kicker: 'Das Studio',
+		title: 'Unity-Entwickler seit 2010',
+		text: 'Ich konzipiere und entwickle Ihre Apps, Spiele und VR-Erlebnisse, von der Idee bis zur Veröffentlichung.',
+		chips: ['Videospiele', 'Mobile Apps', 'Virtuelle Realität'],
+		cta: { label: 'Ein Projekt? Schreiben Sie mir', href: `mailto:${MAIL}` },
+		links: [{ label: 'Projekte ansehen (auf Englisch)', href: '/en/work/', hreflang: 'en' }],
+		mail: true,
+	},
+	it: {
+		kicker: 'Lo studio',
+		title: 'Sviluppatore Unity dal 2010',
+		text: "Progetto e sviluppo le vostre app, i vostri giochi e le vostre esperienze VR, dall'idea alla pubblicazione.",
+		chips: ['Videogiochi', 'App mobili', 'Realtà virtuale'],
+		cta: { label: 'Un progetto? Parliamone', href: `mailto:${MAIL}` },
+		links: [{ label: 'Vedi i progetti (in inglese)', href: '/en/work/', hreflang: 'en' }],
+		mail: true,
+	},
+};
+
+const { lang } = Astro.props;
+const t = TEXT[lang];
+const logoImg = await getImage({ src: logo, width: 520, format: 'webp' });
+---
+
+<section class="studio" id="studio" aria-labelledby={`studio-title-${lang}`}>
+	<div class="studio-in">
+		<div class="studio-text">
+			<p class="studio-kicker">{t.kicker}</p>
+			<h2 id={`studio-title-${lang}`}>{t.title}</h2>
+			<p class="studio-lead">{t.text}</p>
+			<ul class="studio-chips">
+				{t.chips.map((c) => <li>{c}</li>)}
+			</ul>
+			<p class="studio-actions">
+				<a class="studio-cta" href={t.cta.href}>{t.cta.label}</a>
+				{
+					t.links.map((l) => (
+						<a class="studio-link" href={l.href} hreflang={l.hreflang}>
+							{l.label}
+						</a>
+					))
+				}
+			</p>
+			{t.mail && (
+				<p class="studio-mail">
+					<a href={`mailto:${MAIL}`}>{MAIL}</a>
+				</p>
+			)}
+		</div>
+		<img class="studio-logo" src={logoImg.src} alt="Ludiven Studio" width="520" height="390" loading="lazy" decoding="async" />
+	</div>
+</section>
+
+<style>
+	/* A daylight band in both themes: its colours are fixed. */
+	.studio {
+		margin-top: 4rem;
+		background: #ebe4fa;
+		color: #1a1533;
+		scroll-margin-top: 1rem;
+	}
+	:global(.theme-dark) .studio {
+		background: #f5f2fc;
+	}
+
+	.studio-in {
+		display: grid;
+		gap: 2rem;
+		max-width: 76rem;
+		margin-inline: auto;
+		padding: 3.25rem 1.25rem;
+	}
+
+	.studio-text {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 1rem;
+	}
+
+	.studio-kicker {
+		color: #5b21b6;
+		font-weight: 700;
+		font-size: 0.9375rem;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+	}
+
+	.studio h2 {
+		color: #1a1533;
+		font-family: var(--font-brand);
+		font-weight: 600;
+		font-size: 2.125rem;
+		line-height: 1.1;
+		text-wrap: balance;
+	}
+
+	.studio-lead {
+		max-width: 38rem;
+		color: #4f4775;
+		font-size: 1.125rem;
+		line-height: 1.55;
+	}
+
+	.studio-chips {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.6rem;
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+	.studio-chips li {
+		padding: 0.35rem 0.9rem;
+		border: 1px solid #c9c0ea;
+		border-radius: 999rem;
+		color: #3b3363;
+		font-weight: 600;
+	}
+
+	.studio-actions {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.9rem 1.4rem;
+		margin-top: 0.5rem;
+	}
+	.studio-cta {
+		padding: 0.8rem 1.5rem;
+		border-radius: 999rem;
+		background: #7c3aed;
+		color: #fff;
+		font-family: var(--font-brand);
+		font-weight: 600;
+		font-size: 1.0625rem;
+		text-decoration: none;
+	}
+	.studio-cta:hover {
+		background: #6d28d9;
+	}
+	.studio-link,
+	.studio-mail a {
+		color: #5b21b6;
+		font-weight: 700;
+		text-decoration: none;
+	}
+	.studio-link:hover,
+	.studio-mail a:hover {
+		text-decoration: underline;
+	}
+	.studio a:focus-visible {
+		outline: 3px solid #7c3aed;
+		outline-offset: 3px;
+	}
+
+	.studio-logo {
+		display: none;
+	}
+
+	@media (min-width: 56em) {
+		.studio {
+			margin-top: 6rem;
+		}
+		.studio-in {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			align-items: center;
+			gap: 3rem;
+			padding: 4.5rem 1.5rem;
+		}
+		.studio h2 {
+			font-size: 2.625rem;
+		}
+		.studio-lead {
+			font-size: 1.1875rem;
+		}
+		.studio-logo {
+			display: block;
+			justify-self: center;
+			width: 100%;
+			max-width: 27rem;
+			height: auto;
+		}
+	}
+</style>

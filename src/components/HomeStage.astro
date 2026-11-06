@@ -1,0 +1,696 @@
+---
+// The homepage stage: the studio's games and apps, one at a time on a night scene, with a row of thumbnails that
+// pick the slide (WAI-ARIA tabbed carousel). The slides sit in a native scroll-snap track, so a phone swipes them
+// even before the script runs. The script turns the thumbnails into tabs and adds the rotation: a slide every 7 s,
+// held while the pointer or the focus is inside or the stage is off screen, stopped for good by a tab, a key or a
+// swipe, never started under reduced motion, with a button to stop or start it.
+import StoreBadges from './StoreBadges.astro';
+import { HOME_GAMES, UI, note, soon, type Lang } from '../data/homeGames';
+
+interface Props {
+	lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = UI[lang];
+const n = HOME_GAMES.length;
+const titleId = `stage-title-${lang}`;
+const panelId = (id: string): string => `stage-${id}`;
+const tabId = (id: string): string => `stage-tab-${id}`;
+---
+
+<section class="stage" data-stage aria-roledescription={t.carousel} aria-labelledby={titleId}>
+	<h2 class="sr-only" id={titleId}>{t.title}</h2>
+
+	<div class="stage-frame">
+		<button
+			type="button"
+			class="stage-toggle"
+			data-toggle
+			data-stop={t.stop}
+			data-start={t.start}
+			aria-label={t.stop}
+			hidden
+		>
+			<svg class="ico-stop" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+				<rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor"></rect>
+				<rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor"></rect>
+			</svg>
+			<svg class="ico-start" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+				<path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5Z" fill="currentColor"></path>
+			</svg>
+		</button>
+
+		<div class="stage-track" data-track aria-live="off">
+			{
+				HOME_GAMES.map((g, i) => {
+					const main = g.href
+						? { href: g.href[lang], label: g.type === 'app' ? t.app : t.game }
+						: g.test
+							? { href: g.test, label: t.test }
+							: undefined;
+					return (
+						<article
+							class="slide"
+							id={panelId(g.id)}
+							role="tabpanel"
+							data-slide
+							aria-roledescription={t.slide}
+							aria-label={`${i + 1} ${t.of} ${n}`}
+							style={`--pos-desk: ${g.art.desk}; --pos-phone: ${g.art.phone}`}
+						>
+							<div class="slide-art">
+								<img
+									src={g.art.src[lang]}
+									alt=""
+									width={g.art.w}
+									height={g.art.h}
+									loading={i === 0 ? 'eager' : 'lazy'}
+									fetchpriority={i === 0 ? 'high' : 'low'}
+									decoding="async"
+									data-stage-img
+								/>
+							</div>
+							<div class="slide-head">
+								<p class="slide-kicker" data-kind={g.kind}>{g.kicker[lang]}</p>
+								<h3 class="slide-title">{g.name}</h3>
+							</div>
+							<div class="slide-rest">
+								<p class="slide-pitch">{g.pitch[lang]}</p>
+								<StoreBadges
+									class="store-badges--compact slide-badges"
+									lang={lang}
+									playStore={g.play?.[lang]}
+									appStore={g.apple?.[lang]}
+									soon={soon(lang)}
+								/>
+								<p class="slide-actions">
+									{main && (
+										<a class="slide-main" href={main.href} hreflang={main.href === g.test && lang !== 'fr' ? 'fr' : undefined}>
+											{main.label}
+										</a>
+									)}
+									{g.web && lang === 'fr' && (
+										<a class="slide-link" href={g.web}>
+											{t.web}
+										</a>
+									)}
+									{g.test && main?.href !== g.test && (
+										<a class="slide-link" href={g.test} hreflang={lang !== 'fr' ? 'fr' : undefined}>
+											{t.test}
+										</a>
+									)}
+								</p>
+							</div>
+						</article>
+					);
+				})
+			}
+		</div>
+	</div>
+
+	<div class="stage-thumbs" role="tablist" aria-label={t.title} data-tabs>
+		{
+			HOME_GAMES.map((g, i) => (
+				<button
+					type="button"
+					class="thumb"
+					role="tab"
+					id={tabId(g.id)}
+					aria-controls={panelId(g.id)}
+					aria-selected={i === 0 ? 'true' : 'false'}
+					tabindex={i === 0 ? 0 : -1}
+					data-tab
+				>
+					<img class="thumb-icon" src={g.icon} alt="" width="44" height="44" loading="lazy" decoding="async" data-stage-img />
+					<span class="thumb-text">
+						<strong class="thumb-name">
+							{g.short ? (
+								<>
+									<span class="thumb-full">{g.name}</span>
+									<span class="thumb-short" aria-hidden="true">
+										{g.short}
+									</span>
+								</>
+							) : (
+								g.name
+							)}
+						</strong>
+						<span class="thumb-note" data-kind={g.kind}>
+							{note(g, lang)}
+						</span>
+					</span>
+					<span class="thumb-bar" aria-hidden="true"><span></span></span>
+				</button>
+			))
+		}
+	</div>
+</section>
+
+<script>
+	const DELAY = 7000;
+	const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+	function setup(root: HTMLElement): void {
+		const track = root.querySelector<HTMLElement>('[data-track]');
+		const toggle = root.querySelector<HTMLButtonElement>('[data-toggle]');
+		if (!track || !toggle) return;
+		const slides = Array.from(root.querySelectorAll<HTMLElement>('[data-slide]'));
+		const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-tab]'));
+		const n = slides.length;
+		let index = 0;
+		let playing = false;
+		let hovered = false;
+		let focused = false;
+		let onScreen = true;
+		let held = true;
+		let lastMove = performance.now();
+
+		const row = root.querySelector<HTMLElement>('[data-tabs]');
+		const nearest = (): number => Math.min(n - 1, Math.max(0, Math.round(track.scrollLeft / track.clientWidth)));
+		// On a phone the thumbnails scroll sideways: bring the current one into the row, never the page.
+		const showTab = (): void => {
+			if (!row || row.scrollWidth <= row.clientWidth) return;
+			const tab = tabs[index];
+			const left = tab.offsetLeft - row.offsetLeft;
+			const pad = 20;
+			let to = row.scrollLeft;
+			if (left - pad < row.scrollLeft) to = left - pad;
+			else if (left + tab.offsetWidth + pad > row.scrollLeft + row.clientWidth) to = left + tab.offsetWidth + pad - row.clientWidth;
+			if (to !== row.scrollLeft) row.scrollTo({ left: to, behavior: reduced.matches ? 'auto' : 'smooth' });
+		};
+		const mark = (): void => {
+			tabs.forEach((tab, i) => {
+				const on = i === index;
+				tab.setAttribute('aria-selected', on ? 'true' : 'false');
+				tab.tabIndex = on ? 0 : -1;
+			});
+			showTab();
+			// Only the slide in view takes the focus and the reader: the others are out of the frame.
+			slides.forEach((s, i) => (s.inert = i !== index));
+			restartBar();
+		};
+		// The bar under the current thumbnail counts the 7 s, from zero each time they restart.
+		const restartBar = (): void => {
+			root.dataset.run = '';
+			void root.offsetWidth;
+			root.dataset.run = playing && !held ? 'on' : '';
+		};
+		const setPlaying = (on: boolean): void => {
+			playing = on;
+			lastMove = performance.now();
+			toggle.dataset.state = on ? 'playing' : 'stopped';
+			toggle.setAttribute('aria-label', (on ? toggle.dataset.stop : toggle.dataset.start) ?? '');
+			// A rotating carousel stays quiet; once it stands still, a new slide is announced.
+			track.setAttribute('aria-live', on ? 'off' : 'polite');
+			restartBar();
+		};
+		const go = (i: number, byUser: boolean): void => {
+			index = (i + n) % n;
+			track.scrollTo({ left: index * track.clientWidth, behavior: reduced.matches ? 'auto' : 'smooth' });
+			lastMove = performance.now();
+			if (byUser) setPlaying(false);
+			mark();
+		};
+
+		tabs.forEach((tab, i) => tab.addEventListener('click', () => go(i, true)));
+		row?.addEventListener('keydown', (e) => {
+			const k = (e as KeyboardEvent).key;
+			const to = k === 'ArrowRight' ? index + 1 : k === 'ArrowLeft' ? index - 1 : k === 'Home' ? 0 : k === 'End' ? n - 1 : null;
+			if (to === null) return;
+			e.preventDefault();
+			go(to, true);
+			tabs[index].focus();
+		});
+		toggle.addEventListener('click', () => setPlaying(!playing));
+
+		// A swipe, a wheel or a drag of the track is the visitor taking over: the rotation stops for good.
+		for (const type of ['pointerdown', 'touchstart', 'wheel'] as const) {
+			track.addEventListener(type, () => playing && setPlaying(false), { passive: true });
+		}
+		let settle = 0;
+		track.addEventListener(
+			'scroll',
+			() => {
+				window.clearTimeout(settle);
+				settle = window.setTimeout(() => {
+					const i = nearest();
+					if (i !== index) {
+						index = i;
+						mark();
+					}
+				}, 120);
+			},
+			{ passive: true },
+		);
+
+		root.addEventListener('pointerenter', (e) => {
+			if (e.pointerType === 'mouse') hovered = true;
+		});
+		root.addEventListener('pointerleave', () => (hovered = false));
+		// The focus holds the rotation, except on its own button: a click on « start » must start it.
+		root.addEventListener('focusin', (e) => (focused = e.target !== toggle));
+		root.addEventListener('focusout', (e) => {
+			const next = e.relatedTarget as Node | null;
+			focused = !!next && root.contains(next) && next !== toggle;
+		});
+		new IntersectionObserver(([entry]) => (onScreen = entry.isIntersecting), { threshold: 0.4 }).observe(root);
+		window.addEventListener('resize', () => track.scrollTo({ left: index * track.clientWidth, behavior: 'auto' }));
+
+		// The 7 s only count while nothing holds the stage: the slide stays 7 s after the pointer leaves.
+		window.setInterval(() => {
+			const free = playing && !hovered && !focused && onScreen && !document.hidden;
+			if (free === held) {
+				held = !free;
+				restartBar();
+			}
+			if (!free) lastMove = performance.now();
+			else if (performance.now() - lastMove >= DELAY) go(index + 1, false);
+		}, 250);
+
+		toggle.hidden = false;
+		mark();
+		setPlaying(!reduced.matches);
+	}
+
+	document.querySelectorAll<HTMLElement>('[data-stage]').forEach(setup);
+
+	// Once the page has loaded, fetch the other slides' art and icons, so a slide never arrives half empty.
+	window.addEventListener('load', () => {
+		document.querySelectorAll<HTMLImageElement>('[data-stage-img][loading="lazy"]').forEach((img) => (img.loading = 'eager'));
+	});
+</script>
+
+<style>
+	/* The stage is a night scene in both themes: its colours are the --sc-night-* ones. */
+	.stage {
+		position: relative;
+		min-width: 0;
+	}
+
+	.stage-frame {
+		position: relative;
+		background: var(--sc-night-surface);
+		color: var(--sc-night-ink);
+	}
+
+	.stage-toggle {
+		position: absolute;
+		z-index: 2;
+		top: 0.75rem;
+		right: 0.75rem;
+		display: grid;
+		place-items: center;
+		width: 2.75rem;
+		height: 2.75rem;
+		border: 0;
+		border-radius: 50%;
+		background: rgb(14 11 31 / 0.72);
+		color: var(--sc-night-ink);
+		cursor: pointer;
+	}
+	.stage-toggle[hidden] {
+		display: none;
+	}
+	.stage-toggle:focus-visible {
+		outline: 3px solid var(--sc-gold);
+		outline-offset: 2px;
+	}
+	.stage-toggle[data-state='playing'] .ico-start,
+	.stage-toggle[data-state='stopped'] .ico-stop {
+		display: none;
+	}
+
+	.stage-track {
+		display: flex;
+		overflow-x: auto;
+		scroll-snap-type: x mandatory;
+		overscroll-behavior-x: contain;
+		scrollbar-width: none;
+	}
+	.stage-track::-webkit-scrollbar {
+		display: none;
+	}
+
+	/* Phones: the art on top with the name over its foot, then the pitch, the badges and the buttons. */
+	.slide {
+		flex: 0 0 100%;
+		scroll-snap-align: start;
+		scroll-snap-stop: always;
+		display: grid;
+		grid-template-rows: auto 1fr;
+		grid-template-areas: 'art' 'rest';
+		min-width: 0;
+	}
+
+	.slide-art {
+		grid-area: art;
+		position: relative;
+		aspect-ratio: 13 / 9;
+		overflow: hidden;
+		background: var(--sc-night-surface-2);
+	}
+	.slide-art img {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		object-position: var(--pos-phone);
+	}
+	.slide-art::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		background: linear-gradient(180deg, rgb(26 21 51 / 0) 40%, rgb(26 21 51 / 0.94) 100%);
+	}
+
+	.slide-head {
+		grid-area: art;
+		align-self: end;
+		z-index: 1;
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 0.5rem;
+		padding: 0 1.25rem 1rem;
+	}
+
+	.slide-kicker {
+		padding: 0.2rem 0.75rem;
+		border-radius: 999rem;
+		background: var(--sc-gold);
+		color: var(--sc-gold-ink);
+		font-weight: 700;
+		font-size: 0.8125rem;
+		line-height: 1.4;
+	}
+	.slide-kicker[data-kind='live'] {
+		background: var(--sc-night-surface-2);
+		color: var(--sc-night-ink);
+		box-shadow: inset 0 0 0 1px var(--sc-night-line);
+	}
+
+	.slide-title {
+		font-family: var(--font-brand);
+		font-weight: 600;
+		font-size: 2.25rem;
+		line-height: 1.05;
+		color: #fff;
+	}
+
+	.slide-rest {
+		grid-area: rest;
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 0.9rem;
+		padding: 0.9rem 1.25rem 1.5rem;
+	}
+
+	.slide-pitch {
+		font-size: 1.0625rem;
+		line-height: 1.5;
+		color: var(--sc-night-muted);
+	}
+
+	/* The « coming soon » tag rides above a faded badge: the margin keeps it off the pitch. */
+	.slide-rest :global(.slide-badges) {
+		--badge-h: 2.625rem;
+		--soon-bg: var(--sc-gold);
+		--soon-ink: var(--sc-gold-ink);
+		justify-content: flex-start;
+		margin-top: 0.35rem;
+	}
+
+	.slide-actions {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.75rem 1.4rem;
+		width: 100%;
+	}
+
+	.slide-main {
+		flex: 1 1 100%;
+		text-align: center;
+		padding: 0.8rem 1.5rem;
+		border-radius: 999rem;
+		background: var(--sc-accent);
+		color: var(--sc-accent-ink);
+		font-family: var(--font-brand);
+		font-weight: 600;
+		font-size: 1.0625rem;
+		text-decoration: none;
+		transition: filter 0.15s ease;
+	}
+	.slide-main:hover {
+		filter: brightness(1.12);
+	}
+
+	.slide-link {
+		font-weight: 700;
+		color: var(--sc-night-link);
+		text-decoration: none;
+	}
+	.slide-link:hover {
+		text-decoration: underline;
+	}
+
+	.slide-main:focus-visible,
+	.slide-link:focus-visible,
+	.slide-rest :global(.slide-badges a:focus-visible) {
+		outline: 3px solid var(--sc-gold);
+		outline-offset: 3px;
+	}
+
+	/* The thumbnails: a row that scrolls sideways on a phone. */
+	.stage-thumbs {
+		display: flex;
+		gap: 0.6rem;
+		overflow-x: auto;
+		scrollbar-width: none;
+		padding: 1rem 1.25rem 0.25rem;
+	}
+	.stage-thumbs::-webkit-scrollbar {
+		display: none;
+	}
+
+	.thumb {
+		position: relative;
+		flex: none;
+		width: 7rem;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.4rem;
+		padding: 0.6rem 0.4rem 0.7rem;
+		border: 1px solid var(--sc-line);
+		border-radius: 1rem;
+		background: var(--sc-surface);
+		color: var(--sc-ink);
+		font: inherit;
+		text-align: center;
+		cursor: pointer;
+		transition: border-color 0.15s ease, background-color 0.15s ease;
+	}
+	.thumb:hover {
+		border-color: var(--sc-accent);
+	}
+	.thumb[aria-selected='true'] {
+		border: 2px solid var(--sc-accent);
+		background: var(--sc-surface-2);
+		padding: calc(0.6rem - 1px) calc(0.4rem - 1px) calc(0.7rem - 1px);
+	}
+	.thumb:focus-visible {
+		outline: 3px solid var(--sc-accent);
+		outline-offset: 3px;
+	}
+
+	.thumb-icon {
+		width: 2.75rem;
+		height: 2.75rem;
+		border-radius: 22%;
+		flex: none;
+	}
+
+	.thumb-text {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+	}
+	.thumb-name {
+		font-family: var(--font-brand);
+		font-weight: 600;
+		font-size: 0.8125rem;
+		line-height: 1.2;
+	}
+	/* The full name is always read out; it shows once the thumbnails are wide enough for it. */
+	.thumb-full {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
+		white-space: nowrap;
+	}
+	.thumb-note {
+		display: none;
+		font-size: 0.875rem;
+		line-height: 1.3;
+		color: var(--sc-muted);
+	}
+	.thumb-note[data-kind='new'] {
+		color: var(--sc-flame);
+		font-weight: 700;
+	}
+
+	.thumb-bar {
+		position: absolute;
+		left: 0.9rem;
+		right: 0.9rem;
+		bottom: 0.4rem;
+		height: 3px;
+		border-radius: 3px;
+		overflow: hidden;
+		background: transparent;
+	}
+	.thumb-bar span {
+		display: block;
+		height: 100%;
+		width: 100%;
+		transform: scaleX(0);
+		transform-origin: left;
+		background: var(--sc-accent);
+	}
+	.stage[data-run='on'] .thumb[aria-selected='true'] .thumb-bar {
+		background: var(--sc-line);
+	}
+	.stage[data-run='on'] .thumb[aria-selected='true'] .thumb-bar span {
+		animation: thumb-fill 7s linear forwards;
+	}
+	@keyframes thumb-fill {
+		to {
+			transform: scaleX(1);
+		}
+	}
+
+	/* Desktops: a rounded stage, the art on the right fading into the night, the text on the left, and the
+	   thumbnails in one row across its foot. */
+	@media (min-width: 56em) {
+		.stage-frame {
+			border-radius: 1.75rem;
+			overflow: hidden;
+		}
+
+		.stage-toggle {
+			top: 1.25rem;
+			right: 1.25rem;
+		}
+
+		.slide {
+			position: relative;
+			grid-template-rows: auto 1fr;
+			grid-template-columns: minmax(0, 34rem) 1fr;
+			grid-template-areas: 'head .' 'rest .';
+			min-height: 34rem;
+		}
+
+		.slide-art {
+			position: absolute;
+			inset: 0 0 0 auto;
+			width: 56%;
+			aspect-ratio: auto;
+			background: none;
+			-webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 28%);
+			mask-image: linear-gradient(90deg, transparent 0%, #000 28%);
+		}
+		.slide-art img {
+			object-position: var(--pos-desk);
+		}
+		.slide-art::after {
+			content: none;
+		}
+
+		.slide-head {
+			grid-area: head;
+			align-self: auto;
+			gap: 1.1rem;
+			padding: 3rem 3rem 0;
+		}
+		.slide-kicker {
+			font-size: 0.875rem;
+			padding: 0.3rem 0.9rem;
+		}
+		.slide-title {
+			font-size: clamp(2.75rem, 4.6vw, 4rem);
+			line-height: 1;
+		}
+
+		.slide-rest {
+			gap: 1.1rem;
+			padding: 1.1rem 3rem 7rem;
+		}
+		.slide-pitch {
+			font-size: 1.25rem;
+		}
+		.slide-rest :global(.slide-badges) {
+			--badge-h: 3.125rem;
+		}
+		.slide-main {
+			flex: none;
+			font-size: 1.125rem;
+		}
+
+		.stage-thumbs {
+			position: relative;
+			z-index: 1;
+			display: grid;
+			grid-template-columns: repeat(5, minmax(0, 1fr));
+			gap: 0.75rem;
+			overflow: visible;
+			margin: -4.5rem 1.5rem 0;
+			padding: 0;
+		}
+		.thumb {
+			width: auto;
+			flex-direction: row;
+			align-items: center;
+			gap: 0.65rem;
+			padding: 0.85rem 0.85rem 1.05rem;
+			text-align: left;
+			border-radius: 1.125rem;
+			box-shadow: 0 10px 30px rgb(14 11 31 / 0.18);
+		}
+		.thumb[aria-selected='true'] {
+			padding: calc(0.85rem - 1px) calc(0.85rem - 1px) calc(1.05rem - 1px);
+		}
+		.thumb-name {
+			font-size: 1rem;
+		}
+		.thumb-note {
+			display: block;
+		}
+	}
+
+	@media (min-width: 80em) {
+		.thumb-full {
+			position: static;
+			width: auto;
+			height: auto;
+			overflow: visible;
+			clip: auto;
+			white-space: normal;
+		}
+		.thumb-short {
+			display: none;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.thumb,
+		.slide-main {
+			transition: none;
+		}
+	}
+</style>

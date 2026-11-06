@@ -1,482 +1,352 @@
 ---
-import { getCollection } from 'astro:content';
-
-// Layout import — provides basic page elements: <head>, <nav>, <footer> etc.
+// The homepage: the studio's games and apps on the night stage, then the daily challenge, the browser mini-games
+// and the studio. The other languages have the stage and the studio (src/pages/<lang>/index.astro).
 import BaseLayout from '../layouts/BaseLayout.astro';
+import HomeStage from '../components/HomeStage.astro';
+import HomeStudio from '../components/HomeStudio.astro';
+import { games, type GameTile } from '../data/games';
+import { HOME } from '../data/siteNav';
+import { fr } from '../data/homeGames';
+import { POPULAR_DAYS, topPlayed } from '../lib/popular';
 
-// Component Imports
-import CallToAction from '../components/CallToAction.astro';
-import GameCard from '../components/GameCard.astro';
-import Grid from '../components/Grid.astro';
-import Hero from '../components/Hero.astro';
-import Icon from '../components/Icon.astro';
-import Pill from '../components/Pill.astro';
-import PortfolioPreview from '../components/PortfolioPreview.astro';
-import { getImage } from 'astro:assets';
-import logo from '../assets/LudivenStudioLogo.png';
-import { games } from '../data/games';
-
-const logoImg = await getImage({ src: logo, width: 520, format: 'webp' });
-
-// Page section components
-import ContactCTA from '../components/ContactCTA.astro';
-import Skills from '../components/Skills.astro';
-
-// Content Fetching: List four most recent work projects
-const projects = (await getCollection('work'))
-	.sort((a, b) => b.data.publishDate.valueOf() - a.data.publishDate.valueOf())
-	.slice(0, 4);
-
-const playableCount = games.filter((g) => g.status === 'play').length;
-
-// Full Astro Component Syntax:
-// https://docs.astro.build/basics/astro-components/
+const playable = games.filter((g) => g.status === 'play' && g.href);
+// The most played games lead (read once per build, as on /jeux/), the newest fill in; a visitor's favorites take
+// their place (the script below).
+const byId = new Map(playable.map((g) => [g.id, g]));
+const top = (await topPlayed([...byId.keys()], 4, POPULAR_DAYS)).map((id) => byId.get(id)!);
+const newest = [...playable].sort((a, b) => b.added.localeCompare(a.added));
+const lead = [...new Set([...top, ...newest])].slice(0, 4);
+const tile = (g: GameTile): string => `/assets/jeux/tile/${g.id}.jpg`;
+const full = (g: GameTile): string => `/assets/jeux/${g.id}.jpg`;
 ---
 
 <BaseLayout
-	title="Ludiven Studio — Développement Unity : applications, jeux, VR & mini-jeux"
-	description="Ludiven Studio — développeur Unity depuis 2010 : applications mobiles, jeux, expériences VR et solutions interactives, de la conception à la mise en production. Et des dizaines de mini-jeux gratuits à jouer dans le navigateur (défi du jour, classements)."
+	scene
+	title="Ludiven Studio — Jeux mobiles, applis de pétanque et développement Unity"
+	description="Les jeux et applis de Ludiven Studio (Dragon Gems Swipe, Pétanque Game, Meet et Scan), des mini-jeux gratuits avec un défi chaque jour, et le développement Unity depuis 2010."
+	alternates={HOME}
 >
-	<div class="stack gap-20 lg:gap-48">
-		<div class="wrapper stack gap-8 lg:gap-20">
-			<a class="daily-banner" href="/jeux/defi/">
-				<span class="db-icon" aria-hidden="true">🎯</span>
-				<span class="db-text">
-					<strong>Le défi du jour t'attend</strong>
-					<span data-db-sub>{playableCount} jeux gratuits, sans pub ni compte — un nouveau défi chaque jour</span>
-				</span>
-				<span class="db-cta">Jouer</span>
-			</a>
+	<main class="home">
+		<h1 class="sr-only">{fr('Ludiven Studio : jeux mobiles, applis de pétanque, mini-jeux et développement Unity')}</h1>
 
-			<header class="hero">
-				<Hero
-					title="Bienvenue chez Ludiven Studio"
-					tagline="Développeur Unity depuis 2010 — je conçois et développe vos applications, jeux et expériences VR, de l'idée à la mise en production."
-					align="start"
-				>
-					<div class="roles">
-						<Pill><Icon icon="games" size="1.33em" /> Jeux-Vidéos</Pill>
-						<Pill><Icon icon="mobile" size="1.33em" /> Applications mobiles</Pill>
-						<Pill><Icon icon="virtual-reality" size="1.33em" /> Réalité Virtuelle</Pill>
-					</div>
-				</Hero>
-
-				<img
-					alt="Ludiven Studio"
-					width="520"
-					height="390"
-					src={logoImg.src}
-					fetchpriority="high"
-				/>
-			</header>
-
-			<div class="stack gap-8">
-					<Skills />
-					<div class="services-cta">
-						<CallToAction href="/prestations/">Toutes mes prestations <Icon icon="arrow-right" size="1.2em" /></CallToAction>
-					</div>
-				</div>
+		<div class="home-stage">
+			<HomeStage lang="fr" />
 		</div>
 
-		<main class="wrapper stack gap-20 lg:gap-48">
-			<section class="section with-background with-cta" id="games-section">
-				<header class="section-header stack gap-2 lg:gap-4">
-					<h2>Jeux de logique et d'adresse</h2>
-					<p>Entraîne ta logique et tes réflexes avec des mini-jeux. Quelques minutes par jour, sans prise de tête.</p>
-				</header>
+		<section class="home-wrap daily" aria-labelledby="daily-title">
+			<span class="daily-icon" aria-hidden="true">
+				<svg viewBox="0 0 24 24" width="30" height="30">
+					<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
+					<circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2" />
+					<circle cx="12" cy="12" r="1.6" fill="currentColor" />
+				</svg>
+			</span>
+			<div class="daily-text">
+				<h2 id="daily-title">Ton défi du jour</h2>
+				<p class="daily-streak" data-daily-streak hidden></p>
+				<p>Un nouveau défi chaque jour sur {playable.length} mini-jeux gratuits, sans pub ni compte.</p>
+			</div>
+			<a class="daily-cta" href="/jeux/defi/">Jouer le défi</a>
+		</section>
 
-				<div class="gallery">
-					<ul class="games-teaser" data-teaser-default>
-						<li>
-							<GameCard
-								title="Somme Toute"
-								pitch="Équilibre chaque ligne et chaque colonne pour atteindre la somme cible."
-								icon="strategy"
-								href="/jeux/somme-toute/"
-								status="play"
-							/>
+		<section class="home-wrap mini" aria-labelledby="mini-title">
+			<div class="mini-head">
+				<h2 id="mini-title">Mini-jeux du navigateur</h2>
+				<a class="mini-all" href="/jeux/">Les {playable.length} mini-jeux</a>
+			</div>
+			<ul class="mini-grid" data-mini>
+				{
+					playable.map((g) => (
+						<li data-game-id={g.id} hidden={!lead.includes(g)} data-lead={lead.includes(g) ? lead.indexOf(g) : undefined}>
+							<a class="mini-card" href={g.href}>
+								<img
+									src={tile(g)}
+									srcset={`${tile(g)} 400w, ${full(g)} 1200w`}
+									sizes="(min-width: 64em) 18rem, 50vw"
+									alt=""
+									width="400"
+									height="250"
+									loading="lazy"
+									decoding="async"
+									onerror="this.remove()"
+								/>
+								<span class="mini-body">
+									<strong>{g.title}</strong>
+									<span class="mini-pitch">{g.pitch}</span>
+								</span>
+							</a>
 						</li>
-						<li>
-							<GameCard
-								title="Sudoku"
-								pitch="Le grand classique, en 4×4, 6×6 ou 9×9, à plusieurs niveaux."
-								icon="games"
-								href="/jeux/sudoku/"
-								status="play"
-							/>
-						</li>
-						<li class="teaser-extra">
-							<GameCard
-								title="Reines Cocottes"
-								pitch="Une cocotte couronnée par ligne, colonne et couleur, façon LinkedIn Queens."
-								icon="trophy"
-								href="/jeux/reines/"
-								status="play"
-							/>
-						</li>
-					</ul>
+					))
+				}
+			</ul>
+		</section>
 
-					<ul class="games-teaser" data-teaser-favorites hidden>
-						{
-							games
-								.filter((game) => game.status === 'play')
-								.map((game) => (
-									<li data-game-id={game.id} hidden>
-										<GameCard
-											title={game.title}
-											pitch={game.pitch}
-											icon={game.icon}
-											href={game.href}
-											status={game.status}
-											image={game.image}
-										/>
-									</li>
-								))
-						}
-					</ul>
-				</div>
-
-				<div class="cta">
-					<CallToAction href="/jeux/">
-						Tous les mini-jeux
-						<Icon icon="arrow-right" size="1.2em" />
-					</CallToAction>
-				</div>
-			</section>
-
-			<section class="section with-background with-cta bg-variant">
-				<header class="section-header stack gap-2 lg:gap-4">
-					<h2>Projets & réalisations</h2>
-					<p>Un aperçu de mon savoir-faire : projets récents et collaborations menées au fil des années</p>
-				</header>
-
-				<div class="gallery">
-					<Grid variant="offset">
-						{
-							projects.map((project) => (
-								<li>
-									<PortfolioPreview project={project} />
-								</li>
-							))
-						}
-					</Grid>
-				</div>
-
-				<div class="cta">
-					<CallToAction href="/work/">
-						Tous les projets
-						<Icon icon="arrow-right" size="1.2em" />
-					</CallToAction>
-				</div>
-			</section>
-<!-- 
-			<section class="section with-background bg-variant">
-				
-				<header class="section-header stack gap-2 lg:gap-4">
-					<h2>Mentions</h2>
-					<p>
-						I have been fortunate enough to receive praise for my work in several publications. Take
-						a look below to learn more.
-					</p>
-				</header>				
-				<div class="gallery">
-					<Grid variant="small">
-						{
-							['Medium', 'BuzzFeed', 'The Next Web', 'awwwards.', 'TechCrunch'].map((brand) => (
-								<li class="mention-card">
-									<p>{brand}</p>
-								</li>
-							))
-						}
-					</Grid>
-				</div>
-			</section>
--->
-		</main>
-
-		<ContactCTA />
-	</div>
+		<HomeStudio lang="fr" />
+	</main>
 </BaseLayout>
 
 <script>
 	import { globalStreak } from '../lib/streak';
 
-	// Returning players see their streak in the daily banner — the reason to tap is
-	// "don't break it", not the catalogue size.
-	const sub = document.querySelector('[data-db-sub]');
-	if (sub) {
-		const st = globalStreak();
-		if (st.atRisk) sub.textContent = `🔥 Ta série de ${st.count} jour${st.count > 1 ? 's' : ''} est en jeu — joue un défi aujourd'hui !`;
-		else if (st.playedToday && st.count > 1) sub.textContent = `🔥 ${st.count} jours d'affilée — défi du jour fait. Un autre ?`;
+	const NBSP = String.fromCharCode(160);
+	const days = (n: number): string => `${n} jour${n > 1 ? 's' : ''}`;
+
+	// A returning player reads the streak at stake, or the one kept today.
+	const streakLine = document.querySelector<HTMLElement>('[data-daily-streak]');
+	const st = globalStreak();
+	if (streakLine && st.count > 0) {
+		streakLine.textContent = st.atRisk
+			? `Ta série de ${days(st.count)} est en jeu${NBSP}: joue un défi aujourd'hui${NBSP}!`
+			: `Série en cours${NBSP}: ${days(st.count)}. Défi du jour fait, un autre${NBSP}?`;
+		streakLine.hidden = false;
 	}
 
-	// Lead the home teaser with the visitor's favorites. Fewer than 3 favorites →
-	// favorites first, then fill up to 3 with other games. 3+ favorites → favorites only.
-	const MIN = 3;
-
+	// The visitor's favorites lead the mini-games, then the build's pick fills the row up to four.
+	const SHOW = 4;
 	let favs: string[] = [];
 	try {
-		favs = JSON.parse(localStorage.getItem('ludiven-favorites') || '[]');
+		const raw: unknown = JSON.parse(localStorage.getItem('ludiven-favorites') || '[]');
+		favs = Array.isArray(raw) ? raw.filter((x): x is string => typeof x === 'string') : [];
 	} catch {
 		favs = [];
 	}
-
-	const favList = document.querySelector('[data-teaser-favorites]');
-	if (Array.isArray(favs) && favs.length && favList) {
-		const items = Array.from(favList.querySelectorAll<HTMLElement>('[data-game-id]'));
-		const byId = new Map(items.map((li) => [li.dataset.gameId || '', li]));
-		const allIds = items.map((li) => li.dataset.gameId || ''); // registry order
-		const favIds = favs.filter((id) => byId.has(id)); // visitor order, existing games
-
-		const showIds =
-			favIds.length >= MIN
-				? favIds
-				: [...favIds, ...allIds.filter((id) => !favIds.includes(id))].slice(0, MIN);
-
-		if (showIds.length) {
-			items.forEach((li) => (li.hidden = true));
-			showIds.forEach((id) => {
-				const li = byId.get(id);
-				if (li) {
-					li.hidden = false;
-					favList.appendChild(li); // reorder: favorites first
-				}
-			});
-
-			document.querySelector('[data-teaser-default]')?.setAttribute('hidden', '');
-			favList.removeAttribute('hidden');
-
-		}
+	const list = document.querySelector<HTMLElement>('[data-mini]');
+	if (list && favs.length) {
+		const items = Array.from(list.querySelectorAll<HTMLElement>('[data-game-id]'));
+		const byId = new Map(items.map((li) => [li.dataset.gameId ?? '', li]));
+		const lead = items
+			.filter((li) => li.dataset.lead !== undefined)
+			.sort((a, b) => Number(a.dataset.lead) - Number(b.dataset.lead));
+		const picked = [...favs.map((id) => byId.get(id)).filter((li): li is HTMLElement => !!li), ...lead]
+			.filter((li, i, all) => all.indexOf(li) === i)
+			.slice(0, SHOW);
+		items.forEach((li) => (li.hidden = true));
+		picked.forEach((li) => {
+			li.hidden = false;
+			list.appendChild(li);
+		});
 	}
 </script>
 
 <style>
-	/* One-tap entry to today's challenge, above the freelance hero: the games audience
-	   gets its action before any scrolling. */
-	.daily-banner {
+	.home {
+		color: var(--sc-ink);
+	}
+
+	.home-wrap {
+		max-width: 76rem;
+		margin-inline: auto;
+	}
+
+	/* Phones: the stage runs to the screen's edges; wider screens give it the page's width. */
+	@media (min-width: 56em) {
+		.home-stage {
+			max-width: 76rem;
+			margin-inline: auto;
+			padding-inline: 1.5rem;
+		}
+	}
+
+	.daily {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
-		gap: 0.9rem;
-		padding: 0.8rem 1.1rem;
-		border: 1.5px solid var(--accent-regular);
-		border-radius: 1.1rem;
-		background: var(--gradient-subtle);
-		text-decoration: none;
-		color: var(--gray-0);
-		box-shadow: var(--shadow-sm);
-		transition: box-shadow var(--theme-transition), transform 0.15s ease;
+		gap: 1rem 1.25rem;
+		margin: 1.75rem 1rem 0;
+		padding: 1.25rem;
+		border: 1px solid var(--sc-line);
+		border-radius: 1.4rem;
+		background: var(--sc-surface);
+		box-shadow: var(--sc-shadow);
 	}
-	.daily-banner:hover,
-	.daily-banner:focus-visible {
-		box-shadow: var(--shadow-md);
-		transform: translateY(-1px);
-	}
-	.db-icon {
-		font-size: 1.6rem;
-		line-height: 1;
-	}
-	.db-text {
-		display: flex;
-		flex-direction: column;
-		gap: 0.1rem;
-		min-width: 0;
-		flex: 1;
-	}
-	.db-text strong {
-		font-family: var(--font-brand);
-		font-weight: 700;
-		font-size: var(--text-base);
-	}
-	.db-text span {
-		color: var(--gray-300);
-		font-size: var(--text-sm);
-		line-height: 1.35;
-	}
-	.db-cta {
+	.daily-icon {
+		display: grid;
+		place-items: center;
 		flex: none;
-		background: var(--accent-regular);
-		color: var(--accent-text-over);
-		font-family: var(--font-brand);
-		font-weight: 700;
-		font-size: var(--text-base);
-		border-radius: 999rem;
-		padding: 0.5rem 1.4rem;
-		box-shadow: var(--shadow-sm);
+		width: 3rem;
+		height: 3rem;
+		border-radius: 0.9rem;
+		background: var(--sc-surface-2);
+		color: var(--sc-flame);
 	}
-	@media (min-width: 50em) {
-		.daily-banner {
-			padding: 1rem 1.5rem;
-		}
-		.db-text strong {
-			font-size: var(--text-md);
-		}
-	}
-
-	.hero {
+	.daily-text {
+		flex: 1 1 14rem;
 		display: flex;
 		flex-direction: column;
-		align-items: center;
-		gap: 2rem;
+		gap: 0.25rem;
+		color: var(--sc-muted);
 	}
-
-	.roles {
-		display: none;
+	.daily h2 {
+		color: var(--sc-ink);
+		font-family: var(--font-brand);
+		font-weight: 600;
+		font-size: 1.375rem;
 	}
-
-	.hero img {
-		width: 100%;
-		max-width: 28rem;
-		height: auto;
-		object-fit: contain;
+	.daily-streak {
+		color: var(--sc-flame);
+		font-weight: 700;
 	}
-
-	@media (min-width: 50em) {
-		.hero {
-			display: grid;
-			grid-template-columns: 6fr 4fr;
-			padding-inline: 2.5rem;
-			gap: 3.75rem;
-			align-items: center;
-		}
-
-		.roles {
-			margin-top: 0.5rem;
-			display: flex;
-			gap: 0.5rem;
-		}
-
-		.hero img {
-			max-width: 100%;
-		}
-	}
-
-	/* ====================================================== */
-
-	.section {
-		display: grid;
-		gap: 2rem;
-	}
-
-	.with-background {
-		position: relative;
-	}
-
-	.with-background::before {
-		--hero-bg: var(--bg-image-subtle-2);
-
-		content: '';
-		position: absolute;
-		pointer-events: none;
-		left: 50%;
-		width: 100vw;
-		aspect-ratio: calc(2.25 / var(--bg-scale));
-		top: 0;
-		transform: translateY(-75%) translateX(-50%);
-		background:
-			url('/assets/backgrounds/noise.png') top center/220px repeat,
-			var(--hero-bg) center center / var(--bg-gradient-size) no-repeat,
-			var(--gray-999);
-		background-blend-mode: overlay, normal, normal, normal;
-		mix-blend-mode: var(--bg-blend-mode);
-		z-index: -1;
-	}
-
-	.with-background.bg-variant::before {
-		--hero-bg: var(--bg-image-subtle-1);
-	}
-
-	.section-header {
-		justify-self: center;
+	.daily-cta {
+		flex: 1 1 100%;
+		padding: 0.8rem 1.75rem;
+		border-radius: 999rem;
+		background: var(--sc-gold);
+		color: var(--sc-gold-ink);
+		font-family: var(--font-brand);
+		font-weight: 600;
+		font-size: 1.125rem;
 		text-align: center;
-		max-width: 50ch;
-		font-size: var(--text-md);
-		color: var(--gray-300);
+		text-decoration: none;
+		transition: filter 0.15s ease;
+	}
+	.daily-cta:hover {
+		filter: brightness(1.06);
 	}
 
-	.section-header h2 {
-		font-size: var(--text-2xl);
+	.mini {
+		margin-top: 3rem;
+		padding-inline: 1rem;
+	}
+	.mini-head {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 0.5rem 1rem;
+	}
+	.mini h2 {
+		color: var(--sc-ink);
+		font-family: var(--font-brand);
+		font-weight: 600;
+		font-size: 1.75rem;
+	}
+	.mini-all {
+		color: var(--sc-link);
+		font-weight: 700;
+		text-decoration: none;
+	}
+	.mini-all:hover {
+		text-decoration: underline;
 	}
 
-	@media (min-width: 50em) {
-		.section {
-			grid-template-columns: repeat(4, 1fr);
-			grid-template-areas: 'header header header header' 'gallery gallery gallery gallery';
-			gap: 5rem;
-		}
-
-		.section.with-cta {
-			grid-template-areas: 'header header header cta' 'gallery gallery gallery gallery';
-		}
-
-		.section-header {
-			grid-area: header;
-			font-size: var(--text-lg);
-		}
-
-		.section-header h2 {
-			font-size: var(--text-4xl);
-		}
-
-		.with-cta .section-header {
-			justify-self: flex-start;
-			text-align: left;
-		}
-
-		.gallery {
-			grid-area: gallery;
-		}
-
-		.cta {
-			grid-area: cta;
-		}
-	}
-
-	/* ====================================================== */
-
-	.games-teaser {
+	.mini-grid {
 		display: grid;
-		grid-template-columns: 1fr;
-		gap: 1.5rem;
-		list-style: none;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 0.75rem;
+		margin: 1.25rem 0 0;
 		padding: 0;
-		margin: 0;
+		list-style: none;
 	}
-
-	/* Let the `hidden` attribute actually hide a teaser list (display:grid would win). */
-	.games-teaser[hidden] {
+	.mini-grid li[hidden] {
 		display: none;
 	}
+	.mini-card {
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+		overflow: hidden;
+		border: 1px solid var(--sc-line);
+		border-radius: 1.1rem;
+		background: var(--sc-surface);
+		color: var(--sc-ink);
+		text-decoration: none;
+		transition: border-color 0.15s ease, transform 0.15s ease;
+	}
+	.mini-card:hover {
+		border-color: var(--sc-accent);
+		transform: translateY(-2px);
+	}
+	.mini-card img {
+		display: block;
+		width: 100%;
+		aspect-ratio: 16 / 10;
+		object-fit: cover;
+		background: var(--sc-surface-2);
+	}
+	.mini-body {
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+		padding: 0.75rem 0.85rem 0.9rem;
+	}
+	.mini-body strong {
+		font-family: var(--font-brand);
+		font-weight: 600;
+		font-size: 1rem;
+		line-height: 1.25;
+	}
+	.mini-pitch {
+		display: none;
+		color: var(--sc-muted);
+		font-size: 0.9375rem;
+		line-height: 1.45;
+	}
 
-	@media (min-width: 50em) {
-		.games-teaser {
-			grid-template-columns: repeat(3, 1fr);
-			gap: 2rem;
+	.home a:focus-visible {
+		outline: 3px solid var(--sc-accent);
+		outline-offset: 3px;
+	}
+
+	@media (min-width: 40em) {
+		.daily {
+			margin-inline: 1.5rem;
+			padding: 1.5rem 1.75rem;
+		}
+		.daily-cta {
+			flex: none;
+		}
+		.mini {
+			padding-inline: 1.5rem;
 		}
 	}
 
-	/* ====================================================== */
-
-	.mention-card {
-		display: flex;
-		height: 7rem;
-		justify-content: center;
-		align-items: center;
-		text-align: center;
-		border: 1px solid var(--gray-800);
-		border-radius: 1.5rem;
-		color: var(--gray-300);
-		background: var(--gradient-subtle);
-		box-shadow: var(--shadow-sm);
-	}
-
-	@media (min-width: 50em) {
-		.mention-card {
-			border-radius: 1.5rem;
-			height: 9.5rem;
+	@media (min-width: 56em) {
+		.daily {
+			margin: 3.5rem auto 0;
+			max-width: 73rem;
+			padding: 1.75rem 2rem;
+			gap: 1.5rem;
+		}
+		.daily-icon {
+			width: 3.75rem;
+			height: 3.75rem;
+			border-radius: 1.1rem;
+		}
+		.daily h2 {
+			font-size: 1.75rem;
+		}
+		.mini {
+			margin-top: 4.5rem;
+		}
+		.mini h2 {
+			font-size: 2.125rem;
+		}
+		.mini-grid {
+			grid-template-columns: repeat(4, minmax(0, 1fr));
+			gap: 1.25rem;
+			margin-top: 1.5rem;
+		}
+		.mini-body {
+			padding: 0.9rem 1rem 1.1rem;
+		}
+		.mini-body strong {
+			font-size: 1.1875rem;
+		}
+		.mini-pitch {
+			display: -webkit-box;
+			-webkit-line-clamp: 2;
+			-webkit-box-orient: vertical;
+			overflow: hidden;
 		}
 	}
-	.services-cta {
-		display: flex;
-		justify-content: center;
+
+	@media (prefers-reduced-motion: reduce) {
+		.mini-card,
+		.daily-cta {
+			transition: none;
+		}
+		.mini-card:hover {
+			transform: none;
+		}
 	}
 </style>
