@@ -2005,3 +2005,29 @@
 - 13:32 : commité et poussé à la demande de l'utilisateur (« pousse la sortie iOS ») : les 5 commits d'ios-release
   (dont ceux des sessions Dragon's Gems, Pétanque Game et Tools, repris tels quels) et cette section seulement. Statut
   : terminé. Réservations libérées.
+- 13:40 : en ligne : a170c58 déployé (environ 7 min) ; store_ios servi dans les deux version.json, iOS pour Pétanque
+  Game et Dragon Gems dans le catalogue, lien App Store sur /petanque-game/, « 750 levels » sur /en/dragons-gems/
+
+## 2026-11-06 — Dragon Gems 1.0.1 : politique (ticket 0062), conditions d'utilisation, page des sociétés, et ménage de la refonte (session website)
+- Statut : en cours (2026-11-06T13:40+01:00). Demande de l'utilisateur : (transmis par le Producer : Raphaël « je vais
+  m'occuper de mettre sur les stores. juste finalise le site web ») la politique 1.0.1 recalée sur main, la page
+  /publicite/societes/ de Tools, en ligne avant la soumission de la 1.0.1 ; supprimer ce que la refonte a laissé sans
+  usage ; push au mot de Raphaël
+- Réservations actives : `src/pages{,/en}/dragons-gems/{confidentialite,cgu}.astro`,
+  `src/components/DragonsGemsLanding.astro` et `src/data/dragonsGems.ts` (lien des CGU),
+  `src/pages{,/en,/es,/de,/it}/publicite/societes.astro` (commit 7828cc6 de Tools repris tel quel),
+  `src/components/Skills.astro` et `public/assets/backgrounds/` (suppression), dans le worktree
+  website-worktrees/dg-1.0.1, branche dg-1.0.1 ; rien dans ce dossier.
+- Ressources : serveur de dev sur le port 4531 ; eslint, `astro check`. Build annoncé ici avant.
+- 13:40 : branche dg-1.0.1 (partie d'origin/main a170c58), non poussée : 601870d (politique 1.0.1 FR et EN : Accepter /
+  Refuser, six mois, nos vidéos après un refus ; les ajouts de la 1.0.0 gardés), 16d6028 (CGU FR et EN, repris de
+  dragons-gems-consent 37a6a63), 9a053d2 (CGU en couleurs « Scène »), 1b65b90 (page des sociétés de Tools, 7828cc6
+  repris tel quel), 1c9cddd (Skills.astro et public/assets/backgrounds/ supprimés, plus rien ne les cite). eslint OK.
+  Lancement du build complet dans mon worktree dg-1.0.1 (son dist/)…
+- 13:47 : la session Dragon Gems confirme les 7 points dans le code de house-ads ; ses deux précisions ajoutées
+  (804c5f6) : « Activer les pubs » vaut « Accepter » (et la question de suivi d'Apple le suit aussi), la fenêtre
+  renvoie à la liste des sociétés (/publicite/societes/). Build complet OK (218 pages, astro check 0 erreur, précache
+  389, liens OK), check-home.mjs 109 contrôles OK sur le build, pages relues (politique, CGU, sociétés FR et DE, bureau
+  et téléphone sombre). Push au mot de Raphaël : « pousse la 1.0.1 de Dragon Gems et le ménage du site »
+- 15:37 : poussé sur le mot de Raphaël (« Ok pousse », en réponse à la ligne « pousse la 1.0.1 de Dragon Gems et le
+  ménage du site ») : les 6 commits de dg-1.0.1 et cette section seulement. Statut : terminé. Réservations libérées.
