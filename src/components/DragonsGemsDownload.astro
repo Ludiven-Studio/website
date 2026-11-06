@@ -1,6 +1,6 @@
 ---
 // The Dragon Gems Swipe download page, in five languages: the store badges (a store that does not list the game yet
-// says so), then the web game and the Android test build.
+// says so), then the web game.
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Icon from './Icon.astro';
 import AppStage from './AppStage.astro';
@@ -8,7 +8,7 @@ import MoreApps from './MoreApps.astro';
 import DragonsGemsBadges from './DragonsGemsBadges.astro';
 import { HOME_GAMES } from '../data/homeGames';
 import ShareButton from './ShareButton.astro';
-import { APP_NAME, DOWNLOAD_PATHS, ICON, LANDING_PATHS, TEST_APK, WEB_GAME, copy, ogImage, screens, typo, type Lang } from '../data/dragonsGems';
+import { APP_NAME, DOWNLOAD_PATHS, ICON, LANDING_PATHS, WEB_GAME, copy, ogImage, screens, typo, type Lang } from '../data/dragonsGems';
 
 interface Props {
 	lang: Lang;
@@ -21,7 +21,6 @@ const stage = HOME_GAMES.find((g) => g.id === 'dragons-gems')!.art;
 const shots = screens(lang);
 const options = [
 	{ href: WEB_GAME, icon: 'eclats' as const, title: t.playWeb, note: t.playWebNote },
-	{ href: TEST_APK, icon: 'mobile' as const, title: t.testApk, note: t.testApkNote },
 ];
 ---
 
@@ -142,10 +141,6 @@ const options = [
 	}
 
 	@media (min-width: 50em) {
-		.options {
-			grid-template-columns: 1fr 1fr;
-		}
-
 		.shots {
 			grid-template-columns: repeat(4, 1fr);
 		}

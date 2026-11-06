@@ -29,7 +29,7 @@ export const DOWNLOAD_PATHS: Record<Lang, string> = {
 	it: '/it/dragons-gems/scarica/',
 };
 
-/** The web game, its Android test build, the making-of and the privacy policy (French and English only). */
+/** The web game, its Android test build (unlisted: see testerLinks.ts), the making-of and the privacy policy (French and English only). */
 export const WEB_GAME = '/jeux/eclats/';
 export const TEST_APK = '/jeux/eclats/test/';
 export const MAKING_OF: Record<Lang, string> = { fr: '/work/dragons-gems/', en: '/en/work/dragons-gems/', es: '/en/work/dragons-gems/', de: '/en/work/dragons-gems/', it: '/en/work/dragons-gems/' };
@@ -74,8 +74,6 @@ export interface Copy {
 	closing: string;
 	playWeb: string;
 	playWebNote: string;
-	testApk: string;
-	testApkNote: string;
 	download: string;
 	makingOfTitle: string;
 	makingOf: string;
@@ -132,8 +130,6 @@ export const copy: Record<Lang, Copy> = {
 		closing: "Disponible sur l'App Store et Google Play",
 		playWeb: 'Jouer dans le navigateur',
 		playWebNote: 'La version web, tout de suite : 100 niveaux et le défi du jour.',
-		testApk: 'Version de test Android',
-		testApkNote: 'Pour les testeurs : le dernier APK de test, à installer à la main.',
 		download: 'Télécharger',
 		makingOfTitle: 'Comment le jeu est fait',
 		makingOf: 'Le moteur du jeu, la parité entre le site et l’appli, les sons synthétisés, les captures et vidéos tournées par un robot : la fiche projet raconte les coulisses.',
@@ -195,8 +191,6 @@ export const copy: Record<Lang, Copy> = {
 		closing: 'Out now on the App Store and Google Play',
 		playWeb: 'Play in your browser',
 		playWebNote: 'The web version, right now: 100 levels and the daily challenge.',
-		testApk: 'Android test build',
-		testApkNote: 'For testers: the latest test APK, installed by hand.',
 		download: 'Download',
 		makingOfTitle: 'How the game is made',
 		makingOf: 'The game engine, the parity between the website and the app, the synthesised sounds, the screenshots and videos shot by a bot: the project page tells the making-of.',
@@ -258,8 +252,6 @@ export const copy: Record<Lang, Copy> = {
 		closing: 'Ya disponible en el App Store y Google Play',
 		playWeb: 'Jugar en el navegador',
 		playWebNote: 'La versión web, ahora mismo: 100 niveles y el reto del día.',
-		testApk: 'Versión de prueba para Android',
-		testApkNote: 'Para los testers: el último APK de prueba, para instalar a mano.',
 		download: 'Descargar',
 		makingOfTitle: 'Cómo está hecho el juego',
 		makingOf: 'El motor del juego, la paridad entre la web y la app, los sonidos sintetizados, las capturas y los vídeos grabados por un robot: la ficha del proyecto cuenta cómo se hizo (en inglés).',
@@ -321,8 +313,6 @@ export const copy: Record<Lang, Copy> = {
 		closing: 'Jetzt im App Store und bei Google Play',
 		playWeb: 'Im Browser spielen',
 		playWebNote: 'Die Webversion, sofort: 100 Level und die Tagesaufgabe.',
-		testApk: 'Android-Testversion',
-		testApkNote: 'Für Tester: das neueste Test-APK, von Hand zu installieren.',
 		download: 'Herunterladen',
 		makingOfTitle: 'Wie das Spiel entsteht',
 		makingOf: 'Die Spiel-Engine, die Parität zwischen Website und App, die synthetisierten Klänge, die Screenshots und Videos, die ein Bot dreht: Die Projektseite erzählt, wie es gemacht ist (auf Englisch).',
@@ -384,8 +374,6 @@ export const copy: Record<Lang, Copy> = {
 		closing: 'Disponibile su App Store e Google Play',
 		playWeb: 'Gioca nel browser',
 		playWebNote: 'La versione web, subito: 100 livelli e la sfida del giorno.',
-		testApk: 'Versione di prova per Android',
-		testApkNote: "Per i tester: l'ultimo APK di prova, da installare a mano.",
 		download: 'Scarica',
 		makingOfTitle: 'Come è fatto il gioco',
 		makingOf: 'Il motore del gioco, la parità tra il sito e l’app, i suoni sintetizzati, le schermate e i video girati da un robot: la scheda del progetto racconta il dietro le quinte (in inglese).',
