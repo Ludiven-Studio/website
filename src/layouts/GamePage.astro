@@ -215,9 +215,9 @@ const hasDaily = gameId in DAILY_LB;
 		padding: 1.5rem 1.25rem;
 		max-width: 34ch;
 		text-align: center;
-		border: 1px solid var(--gray-800);
+		border: 1px solid var(--sc-line);
 		border-radius: 12px;
-		background: var(--gray-999);
+		background: var(--sc-surface);
 	}
 	.game-down.on {
 		display: flex;
@@ -226,12 +226,12 @@ const hasDaily = gameId in DAILY_LB;
 		margin: 0;
 		font-family: var(--font-brand);
 		font-weight: 600;
-		color: var(--gray-0);
+		color: var(--sc-ink);
 	}
 	.game-down-hint {
 		margin: 0;
 		font-size: var(--text-sm);
-		color: var(--gray-300);
+		color: var(--sc-muted);
 	}
 	.game-down button {
 		font: inherit;
@@ -240,13 +240,13 @@ const hasDaily = gameId in DAILY_LB;
 		padding: 8px 18px;
 		border: none;
 		border-radius: 999px;
-		background: var(--accent-regular);
-		color: var(--accent-text-over);
+		background: var(--sc-accent);
+		color: var(--sc-accent-ink);
 		cursor: pointer;
 	}
 	.game-down a {
 		font-size: var(--text-sm);
-		color: var(--gray-300);
+		color: var(--sc-muted);
 	}
 	.game-foot {
 		align-items: center;
@@ -257,7 +257,7 @@ const hasDaily = gameId in DAILY_LB;
 	.game-pitch {
 		max-width: 60ch;
 		margin: 0;
-		color: var(--gray-300);
+		color: var(--sc-muted);
 	}
 	.game-app {
 		display: inline-flex;
@@ -265,18 +265,18 @@ const hasDaily = gameId in DAILY_LB;
 		gap: 0.8rem;
 		max-width: 100%;
 		padding: 0.6rem 1rem 0.6rem 0.6rem;
-		border: 1px solid var(--gray-800);
+		border: 1px solid var(--sc-line);
 		border-radius: 1rem;
-		background: var(--gray-999_40);
-		box-shadow: var(--shadow-sm);
-		color: var(--gray-0);
+		background: var(--sc-surface);
+		box-shadow: var(--sc-shadow);
+		color: var(--sc-ink);
 		text-decoration: none;
 		text-align: start;
 		transition: border-color 0.15s ease, transform 0.15s ease;
 	}
 	.game-app:hover,
 	.game-app:focus-visible {
-		border-color: var(--accent-regular);
+		border-color: var(--sc-accent);
 		transform: translateY(-1px);
 	}
 	.game-app img {
@@ -290,7 +290,7 @@ const hasDaily = gameId in DAILY_LB;
 		gap: 0.1rem;
 	}
 	.game-app small {
-		color: var(--gray-300);
+		color: var(--sc-muted);
 		font-size: var(--text-sm);
 	}
 	@media (prefers-reduced-motion: reduce) {
@@ -306,7 +306,7 @@ const hasDaily = gameId in DAILY_LB;
 		display: inline-flex;
 		align-items: center;
 		gap: 0.4rem;
-		color: var(--gray-300);
+		color: var(--sc-muted);
 		text-decoration: none;
 		font-family: var(--font-brand);
 		font-weight: 500;
@@ -314,7 +314,7 @@ const hasDaily = gameId in DAILY_LB;
 	}
 	.back:hover,
 	.back:focus-visible {
-		color: var(--accent-regular);
+		color: var(--sc-accent);
 	}
 	.game-head h1 {
 		font-size: var(--text-xl);

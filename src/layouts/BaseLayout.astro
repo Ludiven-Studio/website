@@ -36,11 +36,11 @@ const path = Astro.url.pathname;
 const pageUrl = new URL(path, site).href;
 const isGamePage = /^\/jeux\/[^/]+\/?$/.test(path) && !/^\/jeux\/(defi|boutique)\/?$/.test(path); // a game page, not the index, the daily hub or the shop
 // The phone tab bar: French pages, but not a game (its controls own the foot of the screen) nor the map and list apps.
-// The redesigned pages sit on the plain « Scène » ground: the homepages and, for now, the apps' and mini-games' pages.
+// The redesigned pages sit on the plain « Scène » ground: the homepages and, for now, the apps', the mini-games' and the games' pages.
 const appPage =
 	/^\/(?:(?:en|es|de|it)\/)?(?:dragons-gems|petanque-game|petanque-scanner|nino-rush|petanque-meet|petanque)(?:\/(?:telecharger|download|descargar|herunterladen|scarica))?\/?$/.test(path) &&
 	!/^\/(?:en\/)?petanque-meet\/?$/.test(path);
-const sceneOn = scene ?? (appPage || /^\/jeux\/(?:defi\/)?$/.test(path));
+const sceneOn = scene ?? (appPage || isGamePage || !!gameChrome || /^\/jeux\/(?:defi\/)?$/.test(path));
 const tabBar = lang === 'fr' && !isGamePage && !gameChrome && !/^\/(?:rencontres|courses)(?:\/|$)|^\/petanque-meet\/(?:moderation\/?)?$/.test(path);
 // Matched game (if any) — reused for JSON-LD and the auto OG preview image.
 const m = path.match(/^\/jeux\/([^/]+)\/?$/);

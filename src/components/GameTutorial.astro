@@ -135,9 +135,9 @@ const steps = TUTORIALS[gameId] ?? [];
 	}
 
 	.tuto-open {
-		border: 1.5px solid var(--gray-700);
+		border: 1.5px solid var(--sc-line);
 		background: transparent;
-		color: var(--gray-300);
+		color: var(--sc-muted);
 		font-family: var(--font-brand);
 		font-weight: 500;
 		font-size: var(--text-sm);
@@ -150,8 +150,8 @@ const steps = TUTORIALS[gameId] ?? [];
 	}
 	.tuto-open:hover,
 	.tuto-open:focus-visible {
-		color: var(--accent-regular);
-		border-color: var(--accent-regular);
+		color: var(--sc-accent);
+		border-color: var(--sc-accent);
 	}
 
 	.tuto-overlay {
@@ -173,13 +173,13 @@ const steps = TUTORIALS[gameId] ?? [];
 		position: relative;
 		width: 100%;
 		max-width: 26rem;
-		background: var(--gray-999);
-		border: 1px solid var(--gray-800);
+		background: var(--sc-surface);
+		border: 1px solid var(--sc-line);
 		border-radius: 1.25rem;
 		box-shadow: var(--shadow-lg);
 		padding: 1.9rem 1.5rem 1.25rem;
 		text-align: center;
-		color: var(--gray-0);
+		color: var(--sc-ink);
 	}
 	.tuto-close {
 		position: absolute;
@@ -189,8 +189,8 @@ const steps = TUTORIALS[gameId] ?? [];
 		height: 32px;
 		border-radius: 50%;
 		border: none;
-		background: var(--gray-900);
-		color: var(--gray-200);
+		background: var(--sc-surface-2);
+		color: var(--sc-ink-2);
 		font-size: 14px;
 		line-height: 1;
 		cursor: pointer;
@@ -211,10 +211,10 @@ const steps = TUTORIALS[gameId] ?? [];
 		font-weight: 600;
 		font-size: var(--text-xl);
 		margin: 0.6rem 0 0.4rem;
-		color: var(--gray-0);
+		color: var(--sc-ink);
 	}
 	.tuto-card p {
-		color: var(--gray-300);
+		color: var(--sc-muted);
 		font-size: var(--text-base);
 		line-height: 1.55;
 		margin: 0 auto;
@@ -232,11 +232,11 @@ const steps = TUTORIALS[gameId] ?? [];
 		width: 8px;
 		height: 8px;
 		border-radius: 50%;
-		background: var(--gray-700);
+		background: var(--sc-line);
 		transition: background var(--theme-transition);
 	}
 	.tuto-dot.active {
-		background: var(--accent-regular);
+		background: var(--sc-accent);
 	}
 
 	.tuto-remember {
@@ -245,7 +245,7 @@ const steps = TUTORIALS[gameId] ?? [];
 		justify-content: center;
 		gap: 0.45rem;
 		margin-bottom: 0.85rem;
-		color: var(--gray-400);
+		color: var(--sc-muted);
 		font-size: var(--text-sm);
 		cursor: pointer;
 		user-select: none;
@@ -253,7 +253,7 @@ const steps = TUTORIALS[gameId] ?? [];
 	.tuto-remember-input {
 		width: 15px;
 		height: 15px;
-		accent-color: var(--accent-regular);
+		accent-color: var(--sc-accent);
 		cursor: pointer;
 	}
 
@@ -270,18 +270,18 @@ const steps = TUTORIALS[gameId] ?? [];
 	.tuto-skip {
 		background: none;
 		border: none;
-		color: var(--gray-400);
+		color: var(--sc-muted);
 		font: inherit;
 		font-size: var(--text-sm);
 		cursor: pointer;
 	}
 	.tuto-skip:hover {
-		color: var(--gray-200);
+		color: var(--sc-ink-2);
 	}
 	.tuto-prev {
-		border: 1.5px solid var(--gray-700);
+		border: 1.5px solid var(--sc-line);
 		background: transparent;
-		color: var(--gray-200);
+		color: var(--sc-ink-2);
 		font: inherit;
 		font-weight: 500;
 		font-size: var(--text-sm);
@@ -292,8 +292,8 @@ const steps = TUTORIALS[gameId] ?? [];
 	.tuto-next,
 	.tuto-done {
 		border: none;
-		background: var(--accent-regular);
-		color: var(--accent-text-over);
+		background: var(--sc-accent);
+		color: var(--sc-accent-ink);
 		font: inherit;
 		font-weight: 600;
 		font-size: var(--text-sm);
