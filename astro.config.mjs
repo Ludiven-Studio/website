@@ -58,7 +58,8 @@ export default defineConfig({
                 !page.includes('/prototypes') &&
                 !page.includes('/jeux/petanque/test') &&
                 !page.includes('/jeux/eclats/test') &&
-                !page.includes('/jeux/eclats/nuit'),
+                !page.includes('/jeux/eclats/nuit') &&
+                !page.includes('/beta-'),
         }),
         AstroPWA({
             registerType: 'autoUpdate',
@@ -82,7 +83,9 @@ export default defineConfig({
                 // The one exception is this legacy store-listing page: it has no index.html, so
                 // workbox derives the URL "PetanqueARDistances", which 404s — and a single bad
                 // entry aborts the WHOLE install, leaving every visitor on a frozen old worker.
-                globIgnores: ['**/PetanqueARDistances/**'],
+                // The apps' unlisted beta pages (/<app>/beta-<code>/) stay out too: every visitor
+                // downloads sw.js, so listing them there would publish their paths.
+                globIgnores: ['**/PetanqueARDistances/**', '**/beta-*/**'],
                 navigateFallback: null,
                 cleanupOutdatedCaches: true,
                 maximumFileSizeToCacheInBytes: 3_500_000,

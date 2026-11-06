@@ -40,6 +40,8 @@ const appPage =
 	/^\/(?:(?:en|es|de|it)\/)?(?:dragons-gems|petanque-game|petanque-scanner|nino-rush|petanque-meet|petanque)(?:\/(?:telecharger|download|descargar|herunterladen|scarica))?\/?$/.test(path) &&
 	!/^\/(?:en\/)?petanque-meet\/?$/.test(path);
 const sceneOn = scene ?? appPage;
+// An app's unlisted beta page (/<app>/beta-<code>/): kept out of search engines, the sitemap and the precache.
+const unlisted = path.includes('/beta-');
 // The phone tab bar: French pages, but not a game (its controls own the foot of the screen) nor the map and list apps.
 const tabBar = lang === 'fr' && !isGamePage && !gameChrome && !/^\/(?:rencontres|courses)(?:\/|$)|^\/petanque-meet\/(?:moderation\/?)?$/.test(path);
 // Matched game (if any) — reused for JSON-LD and the auto OG preview image.
@@ -77,7 +79,7 @@ if (path === '/' || path === '') {
 
 <html lang={lang}>
 	<head>
-		<MainHead title={title} description={description} image={ogImage} type={type} noindex={noindex} lang={lang} altLang={altLang} alternates={alternates} />
+		<MainHead title={title} description={description} image={ogImage} type={type} noindex={noindex || unlisted} lang={lang} altLang={altLang} alternates={alternates} />
 		{jsonLd && <script type="application/ld+json" is:inline set:html={JSON.stringify(jsonLd)} />}
 	</head>
 	<body class:list={{ 'has-tabbar': tabBar }}>
