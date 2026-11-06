@@ -400,13 +400,13 @@ import LangSwitch from '../../components/LangSwitch.astro';
 	.legal {
 		max-width: 68ch;
 		margin-inline: auto;
-		color: var(--gray-200);
+		color: var(--sc-ink-2);
 		font-size: var(--text-md);
 		line-height: 1.6;
 	}
 	.legal h2 {
 		font-size: var(--text-xl);
-		color: var(--gray-0);
+		color: var(--sc-ink);
 	}
 	.legal ul {
 		padding-left: 1.2rem;
@@ -415,7 +415,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 		gap: 0.35rem;
 	}
 	.legal a {
-		color: var(--accent-regular);
+		color: var(--sc-link);
 		text-decoration: 1px solid underline transparent;
 		text-underline-offset: 0.25em;
 		transition: text-decoration-color var(--theme-transition);
@@ -426,21 +426,21 @@ import LangSwitch from '../../components/LangSwitch.astro';
 	}
 	.updated {
 		font-size: var(--text-sm);
-		color: var(--gray-300);
+		color: var(--sc-muted);
 	}
 	.summary {
-		border: 1px solid var(--gray-800);
-		border-left: 3px solid var(--accent-regular);
+		border: 1px solid var(--sc-line);
+		border-left: 3px solid var(--sc-accent);
 		border-radius: 0.5rem;
 		padding: 1rem 1.25rem;
-		background: var(--gray-999_40);
+		background: var(--sc-surface);
 	}
 	.summary p {
 		margin-bottom: 0.5rem;
 	}
 	code {
 		font-size: 0.9em;
-		background: var(--gray-999_40);
+		background: var(--sc-surface);
 		padding: 0.1em 0.35em;
 		border-radius: 0.25em;
 	}
@@ -456,12 +456,12 @@ import LangSwitch from '../../components/LangSwitch.astro';
 	}
 	th,
 	td {
-		border: 1px solid var(--gray-800);
+		border: 1px solid var(--sc-line);
 		padding: 0.5rem 0.65rem;
 		text-align: left;
 		vertical-align: top;
 	}
 	th {
-		color: var(--gray-0);
+		color: var(--sc-ink);
 	}
 </style>
