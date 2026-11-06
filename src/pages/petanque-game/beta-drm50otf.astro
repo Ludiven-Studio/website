@@ -1,0 +1,132 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+// Unlisted: noindex, out of the sitemap and of the offline precache (astro.config.mjs).
+// The 1.0.7 store build under the .beta id, signed with the dev key, on a prerelease of this repo.
+const BETA = {
+	version: '1.0.7',
+	date: '2026-11-06',
+	size: 160034995,
+	android: '7.1',
+	sha256: 'fd9ab6d63ea0e9c91a5b322a3f8342fb7227997685f11175740691a4de0f7c8c',
+	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-game-beta/petanque-game-1.0.7-beta.apk',
+};
+const date = new Date(BETA.date).toLocaleDateString('fr-FR', { dateStyle: 'medium' });
+const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
+---
+
+<BaseLayout
+	title="Pétanque Game β — version 1.0.7 | Ludiven Studio"
+	description="Version bêta Android de Pétanque Game 1.0.7, pour les testeurs."
+	noindex
+>
+	<div class="wrapper beta-page stack gap-6">
+		<header class="stack gap-2">
+			<h1>Pétanque Game β</h1>
+			<p class="lead">
+				La version {BETA.version} telle qu'elle part sur le Play Store, à tester une dernière fois avant sa sortie. Elle s'appelle
+				« Pétanque Game β » et s'installe à côté du jeu du Play Store, sans toucher à ses données.
+			</p>
+		</header>
+
+		<section class="card notice stack gap-3">
+			<h2>À savoir avant d'installer</h2>
+			<ul>
+				<li>
+					<strong>C'est ton vrai compte.</strong> Connecte-toi avec Google comme dans le jeu du store : tu retrouves tes pièces, tes
+					coupes et ton classement. Ce que tu gagnes ou dépenses dans la β compte pour de vrai, et une partie en ligne peut te
+					faire jouer contre un joueur du store.
+				</li>
+				<li>
+					<strong>Pas d'achat.</strong> Le Play Store ne connaît pas la β : son magasin ne vend ni pièces ni « Sans publicité ».
+					Les achats avec des pièces marchent.
+				</li>
+				<li>
+					<strong>Pas de vraies pubs.</strong> La fenêtre des pubs s'ouvre comme dans le jeu du store. Si tu acceptes, une fenêtre
+					« Publicité de test » remplace chaque vidéo et chaque pub entre deux parties : touche OK. Les pièces des vidéos sont
+					bien données.
+				</li>
+				<li>
+					<strong>Pas de mise à jour par le Play Store.</strong> Une nouvelle bêta se télécharge sur cette page.
+				</li>
+			</ul>
+			<p class="muted">
+				Le reste marche comme dans le jeu du store : les parties contre l'ordinateur, à deux, en ligne, les ligues, les défis et
+				les rappels.
+			</p>
+		</section>
+
+		<section class="card stack gap-3">
+			<a class="download" href={BETA.url}>Télécharger Pétanque Game β {BETA.version}</a>
+			<p class="muted">{date} · {size} · Android {BETA.android} ou plus récent</p>
+			<p class="muted sha">SHA-256 : <code>{BETA.sha256}</code></p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>Installer sur Android</h2>
+			<ol>
+				<li>Ouvre cette page sur le téléphone et touche « Télécharger ».</li>
+				<li>
+					Ouvre le fichier téléchargé. Si Android bloque, autorise ton navigateur à installer des applis inconnues, puis réessaie.
+					Play Protect peut aussi prévenir que l'appli lui est inconnue : choisis de l'installer quand même.
+				</li>
+				<li>
+					L'icône « Pétanque Game β » apparaît à côté de celle de Pétanque Game. Au premier lancement, elle pose les questions
+					d'une première installation.
+				</li>
+			</ol>
+			<p class="muted">Pour l'enlever : appui long sur « Pétanque Game β », puis Désinstaller. Le jeu du store reste tel quel.</p>
+		</section>
+	</div>
+</BaseLayout>
+
+<style>
+	.beta-page {
+		max-width: 40rem;
+		margin-inline: auto;
+	}
+	.beta-page h1 {
+		font-size: var(--text-3xl);
+	}
+	.beta-page h2 {
+		font-size: var(--text-xl);
+	}
+	.lead,
+	.muted {
+		color: var(--gray-300);
+	}
+	.card {
+		padding: 1.5rem;
+		border: 1px solid var(--gray-800);
+		border-radius: 1rem;
+		background: var(--gray-999_40);
+	}
+	.notice {
+		border-color: var(--accent-regular);
+	}
+	.download {
+		display: inline-block;
+		padding: 0.9rem 1.4rem;
+		border-radius: 999px;
+		background: var(--accent-regular);
+		color: var(--accent-text-over);
+		font-weight: 600;
+		text-decoration: none;
+		text-align: center;
+	}
+	.download:hover,
+	.download:focus-visible {
+		background: var(--accent-dark);
+	}
+	.sha code {
+		overflow-wrap: anywhere;
+		font-size: var(--text-sm);
+	}
+	ol,
+	ul {
+		padding-inline-start: 1.25rem;
+	}
+	li + li {
+		margin-top: 0.4rem;
+	}
+</style>
