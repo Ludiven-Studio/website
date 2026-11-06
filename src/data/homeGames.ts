@@ -5,7 +5,7 @@ import * as dragonsGems from './dragonsGems';
 import * as petanqueGame from './petanqueGame';
 import { MEET_DOWNLOAD, MEET_STORES } from './petanqueMeet';
 import * as scanner from './petanqueScanner';
-import { ICON as NINO_ICON } from './ninoRush';
+import { ICON as NINO_ICON, LANDING_PATHS as NINO_PATHS, TEST_PAGE as NINO_TEST } from './ninoRush';
 
 export type Lang = 'fr' | 'en' | 'es' | 'de' | 'it';
 export type PerLang = Record<Lang, string>;
@@ -89,7 +89,8 @@ export const HOME_GAMES: HomeGame[] = [
 			de: 'Ein Physik-Plattformer: Roll mit dem Roten Panda Nino bis nach Hause.',
 			it: 'Un platform con la fisica: aiuta il panda rosso Nino a rotolare fino alla tana.',
 		},
-		test: '/nino-rush/telecharger/',
+		href: NINO_PATHS,
+		test: NINO_TEST,
 	},
 	{
 		id: 'petanque-game',
