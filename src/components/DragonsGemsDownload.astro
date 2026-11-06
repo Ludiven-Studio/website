@@ -3,8 +3,10 @@
 // says so), then the web game and the Android test build.
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Icon from './Icon.astro';
-import LangSwitch from './LangSwitch.astro';
+import AppStage from './AppStage.astro';
+import MoreApps from './MoreApps.astro';
 import DragonsGemsBadges from './DragonsGemsBadges.astro';
+import { HOME_GAMES } from '../data/homeGames';
 import ShareButton from './ShareButton.astro';
 import { APP_NAME, DOWNLOAD_PATHS, ICON, LANDING_PATHS, TEST_APK, WEB_GAME, copy, ogImage, screens, typo, type Lang } from '../data/dragonsGems';
 
@@ -15,7 +17,7 @@ interface Props {
 const { lang } = Astro.props;
 const t = copy[lang];
 const ty = (s: string) => typo(lang, s);
-const others = (Object.keys(DOWNLOAD_PATHS) as Lang[]).filter((l) => l !== lang).map((l) => ({ lang: l, href: DOWNLOAD_PATHS[l] }));
+const stage = HOME_GAMES.find((g) => g.id === 'dragons-gems')!.art;
 const shots = screens(lang);
 const options = [
 	{ href: WEB_GAME, icon: 'eclats' as const, title: t.playWeb, note: t.playWebNote },
@@ -24,48 +26,38 @@ const options = [
 ---
 
 <BaseLayout title={t.dl.title} description={t.description} image={ogImage(lang)} lang={lang} alternates={DOWNLOAD_PATHS}>
+	<div>
+		<AppStage lang={lang} name={APP_NAME} icon={ICON} kicker={t.dl.kicker} lead={ty(t.dl.lead)} art={{ ...stage, src: stage.src[lang] }}>
+			<DragonsGemsBadges lang={lang} />
+			<p class="waiting">{ty(t.dl.waiting)}</p>
+			<div class="options">
+				{options.map((o) => (
+					<a class="option" href={o.href}>
+						<Icon icon={o.icon} color="var(--sc-gold)" size="1.8rem" />
+						<span>
+							<strong>{o.title}</strong>
+							<small>{ty(o.note)}</small>
+						</span>
+					</a>
+				))}
+			</div>
+			<div class="as-actions">
+				<a class="sc-link" href={LANDING_PATHS[lang]}>{t.dl.back} <Icon icon="arrow-right" size="1em" /></a>
+				<ShareButton id="dragons-gems" title={APP_NAME} lang={lang} />
+			</div>
+		</AppStage>
+	</div>
+
 	<main class="wrapper">
 		<div class="dg-dl stack gap-12">
-			<LangSwitch lang={lang} links={others} />
-
-			<section class="hero">
-				<div class="hero-copy stack gap-4">
-					<div class="title-row">
-						<img class="dg-icon" src={ICON} alt="" width="96" height="96" />
-						<div>
-							<p class="kicker">{t.dl.kicker}</p>
-							<h1>{APP_NAME}</h1>
-						</div>
-					</div>
-					<p class="lead">{ty(t.dl.lead)}</p>
-					<DragonsGemsBadges lang={lang} />
-					<p class="waiting">{ty(t.dl.waiting)}</p>
-					<div class="options">
-						{options.map((o) => (
-							<a class="option" href={o.href}>
-								<Icon icon={o.icon} color="var(--link-color)" size="1.8rem" />
-								<span>
-									<strong>{o.title}</strong>
-									<small>{ty(o.note)}</small>
-								</span>
-							</a>
-						))}
-					</div>
-					<div class="links">
-						<a class="back" href={LANDING_PATHS[lang]}>{t.dl.back} <Icon icon="arrow-right" size="1em" /></a>
-						<ShareButton id="dragons-gems" title={APP_NAME} lang={lang} />
-					</div>
-				</div>
-				<img class="phone" src={shots[0]} alt={ty(t.shotsAlt[0] ?? '')} width="540" height="1170" />
-			</section>
-
 			<section class="stack gap-6">
 				<h2>{t.dl.screensTitle}</h2>
 				<div class="shots">
-					{/* The first one is the big phone above. */}
-					{shots.slice(1).map((src, i) => <img src={src} alt={ty(t.shotsAlt[i + 1] ?? '')} width="540" height="1170" loading="lazy" decoding="async" />)}
+					{shots.map((src, i) => <img src={src} alt={ty(t.shotsAlt[i] ?? '')} width="540" height="1170" loading="lazy" decoding="async" />)}
 				</div>
 			</section>
+
+			<MoreApps lang={lang} current="dragons-gems" />
 		</div>
 	</main>
 </BaseLayout>
@@ -75,51 +67,14 @@ const options = [
 		padding-block: 1rem 4rem;
 	}
 
-	.hero {
-		display: grid;
-		gap: 2.5rem;
-		align-items: center;
-	}
-
-	.title-row {
-		display: flex;
-		align-items: center;
-		gap: 1rem;
-	}
-
-	.dg-icon {
-		flex: none;
-		width: 4.5rem;
-		height: 4.5rem;
-		border-radius: 22%;
-		box-shadow: var(--shadow-md);
-	}
-
-	.kicker {
-		color: var(--link-color);
-		font-weight: 600;
-		font-size: var(--text-sm);
-	}
-
-	h1 {
-		font-size: var(--text-3xl);
-		line-height: 1.1;
-		color: var(--gray-0);
-	}
-
 	h2 {
 		font-size: var(--text-xl);
-		color: var(--gray-0);
+		color: var(--sc-ink);
 		text-align: center;
 	}
 
-	.lead {
-		font-size: var(--text-lg);
-		max-width: 50ch;
-	}
-
 	.waiting {
-		color: var(--gray-200);
+		color: var(--sc-night-muted);
 		font-weight: 600;
 	}
 
@@ -133,10 +88,9 @@ const options = [
 		align-items: center;
 		gap: 1rem;
 		padding: 1rem 1.25rem;
-		border: 1px solid var(--gray-800);
+		border: 1px solid var(--sc-night-line);
 		border-radius: 1rem;
-		background-color: var(--gray-999_40);
-		box-shadow: var(--shadow-sm);
+		background-color: var(--sc-night-surface-2);
 		color: inherit;
 		text-decoration: none;
 		transition: transform 0.15s ease, border-color 0.15s ease;
@@ -145,7 +99,7 @@ const options = [
 	.option:hover,
 	.option:focus-visible {
 		transform: translateY(-2px);
-		border-color: var(--accent-regular);
+		border-color: var(--sc-gold);
 	}
 
 	.option span {
@@ -154,33 +108,12 @@ const options = [
 	}
 
 	.option strong {
-		color: var(--gray-0);
+		color: var(--sc-night-ink);
 	}
 
 	.option small {
-		color: var(--gray-400);
+		color: var(--sc-night-muted);
 		font-size: var(--text-sm);
-	}
-
-	.links {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 1rem 1.75rem;
-	}
-
-	.back {
-		color: var(--link-color);
-		font-weight: 600;
-	}
-
-	.phone {
-		justify-self: center;
-		width: min(17rem, 70vw);
-		height: auto;
-		border-radius: 1.5rem;
-		border: 1px solid var(--gray-800);
-		box-shadow: var(--shadow-lg);
 	}
 
 	.shots {
@@ -193,8 +126,8 @@ const options = [
 		width: 100%;
 		height: auto;
 		border-radius: 1.25rem;
-		border: 1px solid var(--gray-800);
-		box-shadow: var(--shadow-sm);
+		border: 1px solid var(--sc-line);
+		box-shadow: var(--sc-shadow);
 	}
 
 	@media (prefers-reduced-motion: reduce) {
@@ -209,10 +142,6 @@ const options = [
 	}
 
 	@media (min-width: 50em) {
-		.hero {
-			grid-template-columns: 1.3fr 1fr;
-		}
-
 		.options {
 			grid-template-columns: 1fr 1fr;
 		}

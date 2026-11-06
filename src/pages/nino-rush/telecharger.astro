@@ -1,6 +1,11 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import { APK_SIZE, APK_URL, APK_VERSION, ICON, LOGO, SCREENS, SHARE_IMAGE } from '../../data/ninoRush';
+import AppStage from '../../components/AppStage.astro';
+import MoreApps from '../../components/MoreApps.astro';
+import { HOME_GAMES } from '../../data/homeGames';
+import { APK_SIZE, APK_URL, APK_VERSION, ICON, SCREENS, SHARE_IMAGE } from '../../data/ninoRush';
+
+const stage = HOME_GAMES.find((g) => g.id === 'nino-rush')!.art;
 ---
 
 <BaseLayout
@@ -9,27 +14,23 @@ import { APK_SIZE, APK_URL, APK_VERSION, ICON, LOGO, SCREENS, SHARE_IMAGE } from
 	image={SHARE_IMAGE}
 	noindex
 >
+	<div>
+		<AppStage
+			lang="fr"
+			name="Nino Rush"
+			icon={ICON}
+			kicker="Version de test Android"
+			art={{ ...stage, src: stage.src.fr }}
+			lead="Nino le panda roux roule vers son terrier à travers 10 mondes et 100 niveaux. Trouve les étoiles, échappe au gros rocher, creuse dans 12 casse-têtes et dessine tes propres niveaux."
+		>
+			<a class="sc-btn" href={APK_URL}>Télécharger pour Android</a>
+			<p class="meta">Version {APK_VERSION} · {APK_SIZE} · Android 8 ou plus récent, 64 bits</p>
+			<p class="meta">Se joue en paysage. Compte facultatif, pour garder ta progression d'un téléphone à l'autre.</p>
+		</AppStage>
+	</div>
+
 	<main class="wrapper">
 		<div class="nino-dl stack gap-12">
-			<section class="hero">
-				<div class="hero-copy stack gap-4">
-					<div class="title-row">
-						<img class="app-icon" src={ICON} alt="" width="96" height="96" />
-						<div>
-							<p class="kicker">Version de test Android</p>
-							<h1>Nino Rush</h1>
-						</div>
-					</div>
-					<p class="lead">Nino le panda roux roule vers son terrier à travers 10 mondes et 100 niveaux. Trouve les étoiles, échappe au gros rocher, creuse dans 12 casse-têtes et dessine tes propres niveaux.</p>
-					<div class="stack gap-2">
-						<a class="download" href={APK_URL}>Télécharger pour Android</a>
-						<p class="meta">Version {APK_VERSION} · {APK_SIZE} · Android 8 ou plus récent, 64 bits</p>
-					</div>
-					<p class="meta">Se joue en paysage. Compte facultatif, pour garder ta progression d'un téléphone à l'autre.</p>
-				</div>
-				<img class="logo" src={LOGO} alt="Logo de Nino Rush" width="640" height="335" />
-			</section>
-
 			<section class="stack gap-6">
 				<h2>Dans le jeu</h2>
 				<div class="shots">
@@ -56,6 +57,8 @@ import { APK_SIZE, APK_URL, APK_VERSION, ICON, LOGO, SCREENS, SHARE_IMAGE } from
 					</ul>
 				</div>
 			</section>
+
+			<MoreApps lang="fr" current="nino-rush" />
 		</div>
 	</main>
 </BaseLayout>
@@ -65,75 +68,18 @@ import { APK_SIZE, APK_URL, APK_VERSION, ICON, LOGO, SCREENS, SHARE_IMAGE } from
 		padding-block: 1rem 4rem;
 	}
 
-	.hero {
-		display: grid;
-		gap: 2.5rem;
-		align-items: center;
-	}
-
-	.title-row {
-		display: flex;
-		align-items: center;
-		gap: 1rem;
-	}
-
-	.app-icon {
-		flex: none;
-		width: 4.5rem;
-		height: 4.5rem;
-		border-radius: 22%;
-		box-shadow: var(--shadow-md);
-	}
-
-	.kicker {
-		color: var(--link-color);
-		font-weight: 600;
-		font-size: var(--text-sm);
-	}
-
-	h1 {
-		font-size: var(--text-3xl);
-		line-height: 1.1;
-		color: var(--gray-0);
-	}
-
 	h2 {
 		font-size: var(--text-xl);
-		color: var(--gray-0);
+		color: var(--sc-ink);
 	}
 
-	.lead {
-		font-size: var(--text-lg);
-		max-width: 50ch;
-	}
-
+	/* On the night stage. */
 	.meta {
-		color: var(--gray-300);
+		color: var(--sc-night-muted);
 		font-size: var(--text-sm);
-	}
-
-	.download {
-		display: inline-block;
-		padding: 0.9rem 1.6rem;
-		border-radius: 999px;
-		background: var(--accent-regular);
-		color: var(--accent-text-over);
-		font-weight: 600;
-		text-align: center;
-		text-decoration: none;
 	}
 
 	.download:hover,
-	.download:focus-visible {
-		background: var(--accent-dark);
-	}
-
-	.logo {
-		justify-self: center;
-		width: min(24rem, 80vw);
-		height: auto;
-	}
-
 	.shots {
 		display: grid;
 		gap: 1.25rem;
@@ -143,8 +89,8 @@ import { APK_SIZE, APK_URL, APK_VERSION, ICON, LOGO, SCREENS, SHARE_IMAGE } from
 		width: 100%;
 		height: auto;
 		border-radius: 1rem;
-		border: 1px solid var(--gray-800);
-		box-shadow: var(--shadow-sm);
+		border: 1px solid var(--sc-line);
+		box-shadow: var(--sc-shadow);
 	}
 
 	.columns {
@@ -154,9 +100,9 @@ import { APK_SIZE, APK_URL, APK_VERSION, ICON, LOGO, SCREENS, SHARE_IMAGE } from
 
 	.card {
 		padding: 1.5rem;
-		border: 1px solid var(--gray-800);
+		border: 1px solid var(--sc-line);
 		border-radius: 1rem;
-		background: var(--gray-999_40);
+		background: var(--sc-surface);
 	}
 
 	ol,
@@ -169,14 +115,6 @@ import { APK_SIZE, APK_URL, APK_VERSION, ICON, LOGO, SCREENS, SHARE_IMAGE } from
 	}
 
 	@media (min-width: 50em) {
-		.hero {
-			grid-template-columns: 1.2fr 1fr;
-		}
-
-		.download {
-			align-self: flex-start;
-		}
-
 		.shots,
 		.columns {
 			grid-template-columns: 1fr 1fr;

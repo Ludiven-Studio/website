@@ -1,24 +1,22 @@
 ---
 // The Dragon Gems Swipe product page, in five languages. The portfolio entry at /work/dragons-gems/ tells
 // the making-of; the download page is /dragons-gems/telecharger/.
-import Hero from './Hero.astro';
 import Icon from './Icon.astro';
-import CallToAction from './CallToAction.astro';
+import AppStage from './AppStage.astro';
+import MoreApps from './MoreApps.astro';
 import ContactCTA from './ContactCTA.astro';
-import LangSwitch from './LangSwitch.astro';
 import DragonsGemsBadges from './DragonsGemsBadges.astro';
 import ShareButton from './ShareButton.astro';
+import { HOME_GAMES } from '../data/homeGames';
 import {
 	APP_NAME,
 	CONTACT,
 	DOWNLOAD_PATHS,
 	ICON,
-	LANDING_PATHS,
 	MAKING_OF,
 	PRIVACY,
 	WEB_GAME,
 	copy,
-	feature,
 	screens,
 	typo,
 	video,
@@ -32,7 +30,7 @@ interface Props {
 const { lang } = Astro.props;
 const t = copy[lang];
 const ty = (s: string) => typo(lang, s);
-const others = (Object.keys(LANDING_PATHS) as Lang[]).filter((l) => l !== lang).map((l) => ({ lang: l, href: LANDING_PATHS[l] }));
+const stage = HOME_GAMES.find((g) => g.id === 'dragons-gems')!.art;
 const shots = screens(lang);
 const clip = video(lang);
 
@@ -60,28 +58,18 @@ const jsonLd = [
 ---
 
 <div class="stack gap-20">
-	<main class="wrapper stack gap-15">
-		<div class="stack gap-8">
-			<LangSwitch lang={lang} links={others} />
-			<div class="dg-head">
-				<img class="dg-icon" src={ICON} alt="" width="96" height="96" />
-				<div class="stack gap-2">
-					<p class="dg-kicker">{t.kicker}</p>
-					<Hero title={APP_NAME} tagline={ty(t.tagline)} align="start" />
-				</div>
-			</div>
-			<p class="lead">{ty(t.intro)}</p>
+	<div>
+		<AppStage lang={lang} name={APP_NAME} icon={ICON} kicker={t.kicker} tagline={ty(t.tagline)} lead={ty(t.intro)} art={{ ...stage, src: stage.src[lang] }}>
 			<DragonsGemsBadges lang={lang} />
-			<div class="dg-ctas">
-				<CallToAction href={DOWNLOAD_PATHS[lang]}>
-					{t.download}
-					<Icon icon="arrow-right" size="1.1em" />
-				</CallToAction>
-				<a class="dg-alt" href={WEB_GAME}>{t.playWeb} <Icon icon="arrow-right" size="1em" /></a>
+			<div class="as-actions">
+				<a class="sc-btn" href={DOWNLOAD_PATHS[lang]}>{t.download} <Icon icon="arrow-right" size="1.1em" /></a>
+				<a class="sc-link" href={WEB_GAME}>{t.playWeb} <Icon icon="arrow-right" size="1em" /></a>
 				<ShareButton id="dragons-gems" title={APP_NAME} lang={lang} />
 			</div>
-			<img class="cover" src={feature(lang)} alt={`${APP_NAME} — ${t.tagline}`} width="1024" height="500" />
-		</div>
+		</AppStage>
+	</div>
+
+	<main class="wrapper stack gap-15">
 
 		<section class="stack gap-4">
 			<p class="story">{ty(t.story)}</p>
@@ -152,15 +140,14 @@ const jsonLd = [
 		<section class="stack gap-4 closing">
 			<h2 class="section-title">{ty(t.closing)}</h2>
 			<div class="dg-ctas">
-				<CallToAction href={DOWNLOAD_PATHS[lang]}>
-					{t.download}
-					<Icon icon="arrow-right" size="1.1em" />
-				</CallToAction>
-				<a class="dg-alt" href={WEB_GAME}>{t.playWeb} <Icon icon="arrow-right" size="1em" /></a>
+				<a class="sc-btn" href={DOWNLOAD_PATHS[lang]}>{t.download} <Icon icon="arrow-right" size="1.1em" /></a>
+				<a class="sc-link" href={WEB_GAME}>{t.playWeb} <Icon icon="arrow-right" size="1em" /></a>
 			</div>
 			<p class="legal" id="support">{ty(t.support)} <a href={CONTACT[lang]}>{t.supportLink}</a> · <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a></p>
 			<p class="legal"><a href={PRIVACY[lang]}>{t.privacy}</a></p>
 		</section>
+
+		<MoreApps lang={lang} current="dragons-gems" />
 	</main>
 
 	<ContactCTA lang={lang} />
@@ -181,26 +168,6 @@ const jsonLd = [
 </script>
 
 <style>
-	.dg-head {
-		display: flex;
-		align-items: center;
-		gap: 1.25rem;
-	}
-
-	.dg-icon {
-		flex: none;
-		width: 5rem;
-		height: 5rem;
-		border-radius: 22%;
-		box-shadow: var(--shadow-md);
-	}
-
-	.dg-kicker {
-		color: var(--link-color);
-		font-weight: 600;
-		font-size: var(--text-sm);
-	}
-
 	.lead,
 	.story {
 		max-width: 60ch;
@@ -208,7 +175,7 @@ const jsonLd = [
 	}
 
 	.story {
-		color: var(--gray-200);
+		color: var(--sc-ink-2);
 	}
 
 	.dg-ctas {
@@ -218,41 +185,21 @@ const jsonLd = [
 		gap: 1rem 1.75rem;
 	}
 
-	.dg-alt {
-		color: var(--link-color);
-		font-weight: 600;
-		text-decoration: 1px solid underline transparent;
-		text-underline-offset: 0.25em;
-	}
-
-	.dg-alt:hover,
-	.dg-alt:focus {
-		text-decoration-color: currentColor;
-	}
-
 	.box {
-		border: 1px solid var(--gray-800);
+		border: 1px solid var(--sc-line);
 		border-radius: 0.75rem;
 		padding: 1.5rem;
-		background-color: var(--gray-999_40);
-		box-shadow: var(--shadow-sm);
+		background-color: var(--sc-surface);
+		box-shadow: var(--sc-shadow);
 	}
 
 	.box p {
-		color: var(--gray-400);
+		color: var(--sc-muted);
 	}
 
 	.section-title {
 		font-size: var(--text-xl);
-		color: var(--gray-0);
-	}
-
-	.cover {
-		width: 100%;
-		height: auto;
-		border-radius: 1.5rem;
-		border: 1px solid var(--gray-800);
-		box-shadow: var(--shadow-sm);
+		color: var(--sc-ink);
 	}
 
 	.grid-2 {
@@ -263,7 +210,7 @@ const jsonLd = [
 
 	.grid-2 h3 {
 		font-size: var(--text-lg);
-		color: var(--gray-0);
+		color: var(--sc-ink);
 	}
 
 	.screens {
@@ -282,9 +229,9 @@ const jsonLd = [
 		width: 100%;
 		height: auto;
 		border-radius: 1.25rem;
-		border: 1px solid var(--gray-800);
-		box-shadow: var(--shadow-sm);
-		background: var(--gradient-subtle);
+		border: 1px solid var(--sc-line);
+		box-shadow: var(--sc-shadow);
+		background: var(--sc-surface-2);
 	}
 
 	.faq {
@@ -293,7 +240,7 @@ const jsonLd = [
 	}
 
 	.faq details {
-		border-bottom: 1px solid var(--gray-800);
+		border-bottom: 1px solid var(--sc-line);
 		padding: 0.75rem 0;
 	}
 
@@ -303,7 +250,7 @@ const jsonLd = [
 
 	.faq summary {
 		cursor: pointer;
-		color: var(--gray-0);
+		color: var(--sc-ink);
 		font-family: var(--font-brand);
 		font-size: var(--text-md);
 	}
@@ -318,7 +265,7 @@ const jsonLd = [
 	}
 
 	.making-of-cta a {
-		color: var(--link-color);
+		color: var(--sc-link);
 		font-weight: 600;
 		text-decoration: 1px solid underline transparent;
 		text-underline-offset: 0.25em;
@@ -339,16 +286,11 @@ const jsonLd = [
 	}
 
 	.legal {
-		color: var(--gray-400);
+		color: var(--sc-muted);
 		font-size: var(--text-sm);
 	}
 
 	@media (min-width: 50em) {
-		.dg-icon {
-			width: 7rem;
-			height: 7rem;
-		}
-
 		.box {
 			border-radius: 1.5rem;
 			padding: 2.5rem;

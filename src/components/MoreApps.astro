@@ -1,0 +1,145 @@
+---
+// The studio's other games and apps, at the foot of an app's page: the homepage's stage cards, minus this one.
+import { HOME_GAMES, note, type Lang } from '../data/homeGames';
+
+interface Props {
+	lang: Lang;
+	/** The page's own app, left out (its id in homeGames). */
+	current: string;
+}
+
+const TITLE: Record<Lang, string> = {
+	fr: 'Nos autres jeux et applis',
+	en: 'Our other games and apps',
+	es: 'Nuestros otros juegos y apps',
+	de: 'Unsere anderen Spiele und Apps',
+	it: 'I nostri altri giochi e app',
+};
+
+const { lang, current } = Astro.props;
+const games = HOME_GAMES.filter((g) => g.id !== current)
+	.map((g) => ({ g, href: g.href?.[lang] ?? g.test }))
+	.filter((x): x is { g: (typeof HOME_GAMES)[number]; href: string } => !!x.href);
+---
+
+<section class="ma" aria-labelledby={`ma-title-${lang}`}>
+	<h2 id={`ma-title-${lang}`}>{TITLE[lang]}</h2>
+	<ul>
+		{
+			games.map(({ g, href }) => (
+				<li>
+					<a href={href} hreflang={href === g.test && lang !== 'fr' ? 'fr' : undefined}>
+						<img class="ma-art" src={g.art.src[lang]} alt="" width={g.art.w} height={g.art.h} loading="lazy" decoding="async" style={`object-position: ${g.art.phone}`} />
+						<span class="ma-body">
+							<img class="ma-icon" src={g.icon} alt="" width="40" height="40" loading="lazy" decoding="async" />
+							<span>
+								<strong>{g.name}</strong>
+								<span class="ma-note">{note(g, lang)}</span>
+							</span>
+						</span>
+					</a>
+				</li>
+			))
+		}
+	</ul>
+</section>
+
+<style>
+	.ma {
+		display: grid;
+		gap: 1.25rem;
+	}
+	.ma h2 {
+		color: var(--sc-ink);
+		font-family: var(--font-brand);
+		font-weight: 600;
+		font-size: 1.75rem;
+	}
+	.ma ul {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 0.75rem;
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+	.ma a {
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+		overflow: hidden;
+		border: 1px solid var(--sc-line);
+		border-radius: 1.1rem;
+		background: var(--sc-surface);
+		color: var(--sc-ink);
+		text-decoration: none;
+		transition: border-color 0.15s ease, transform 0.15s ease;
+	}
+	.ma a:hover {
+		border-color: var(--sc-accent);
+		transform: translateY(-2px);
+	}
+	.ma a:focus-visible {
+		outline: 3px solid var(--sc-accent);
+		outline-offset: 3px;
+	}
+	.ma-art {
+		display: block;
+		width: 100%;
+		aspect-ratio: 16 / 10;
+		object-fit: cover;
+		background: var(--sc-night-surface-2);
+	}
+	.ma-body {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		padding: 0.7rem 0.8rem 0.85rem;
+	}
+	.ma-icon {
+		flex: none;
+		width: 2.25rem;
+		height: 2.25rem;
+		border-radius: 22%;
+	}
+	.ma-body > span {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+	}
+	.ma strong {
+		font-family: var(--font-brand);
+		font-weight: 600;
+		font-size: 0.9375rem;
+		line-height: 1.2;
+	}
+	.ma-note {
+		color: var(--sc-muted);
+		font-size: 0.8125rem;
+	}
+
+	@media (min-width: 56em) {
+		.ma h2 {
+			font-size: 2.125rem;
+		}
+		.ma ul {
+			grid-template-columns: repeat(4, minmax(0, 1fr));
+			gap: 1.25rem;
+		}
+		.ma strong {
+			font-size: 1.0625rem;
+		}
+		.ma-note {
+			font-size: 0.875rem;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.ma a {
+			transition: none;
+		}
+		.ma a:hover {
+			transform: none;
+		}
+	}
+</style>

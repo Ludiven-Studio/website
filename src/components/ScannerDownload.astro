@@ -3,7 +3,7 @@
 // at work. Pétanque Scanner by default, or the app passed in.
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Icon from './Icon.astro';
-import LangSwitch from './LangSwitch.astro';
+import MoreApps from './MoreApps.astro';
 import ShareButton from './ShareButton.astro';
 import { SCANNER, type LandingLang, type PetanqueApp } from '../data/petanqueApps';
 
@@ -17,9 +17,6 @@ const c = app.copy[lang];
 const t = app.download[lang];
 // French wants a no-break space before : ? ! ; the shared copy has plain ones.
 const typo = (s: string) => (lang === 'fr' ? s.replace(/ ([:?!;])/g, ' $1') : s);
-const others = (Object.keys(app.downloadPaths) as LandingLang[])
-	.filter((l) => l !== lang)
-	.map((l) => ({ lang: l, href: app.downloadPaths[l] }));
 const strap = c.title.split(' — ')[1] ?? c.title;
 const tagline = strap.charAt(0).toUpperCase() + strap.slice(1);
 const free = `${c.priceBody.split('. ')[0]}.`;
@@ -46,8 +43,6 @@ const video = app.video?.(lang);
 >
 	<main class="wrapper">
 		<div class:list={['scan-dl', 'stack', 'gap-12', { 'is-game': app.id === 'game' }]}>
-			<LangSwitch lang={lang} links={others} />
-
 			<section class="hero">
 				<div class="hero-copy">
 					<p class="kicker">{t.kicker}</p>
@@ -176,6 +171,8 @@ const video = app.video?.(lang);
 					{typo(c.legalIntro)} <a href={c.privacy.href}>{c.privacy.label}</a> · <a href={c.terms.href}>{c.terms.label}</a>
 				</p>
 			</div>
+
+			<MoreApps lang={lang} current={app.id === 'game' ? 'petanque-game' : 'petanque-scan'} />
 		</div>
 	</main>
 </BaseLayout>
@@ -542,20 +539,20 @@ const video = app.video?.(lang);
 		gap: 0.6rem;
 		align-content: start;
 		padding: 1.5rem;
-		border: 1px solid var(--gray-800);
+		border: 1px solid var(--sc-line);
 		border-radius: 1.25rem;
-		background: var(--gray-999_40);
-		box-shadow: var(--shadow-sm);
+		background: var(--sc-surface);
+		box-shadow: var(--sc-shadow);
 	}
 
 	.point h2 {
 		font-size: var(--text-lg);
-		color: var(--gray-0);
+		color: var(--sc-ink);
 		text-wrap: balance;
 	}
 
 	.point p {
-		color: var(--gray-400);
+		color: var(--sc-muted);
 	}
 
 	.film {
@@ -572,13 +569,13 @@ const video = app.video?.(lang);
 	.film h2,
 	.closing h2 {
 		font-size: var(--text-2xl);
-		color: var(--gray-0);
+		color: var(--sc-ink);
 	}
 
 	.film-copy p {
 		margin-top: 0.5rem;
 		max-width: 26rem;
-		color: var(--gray-400);
+		color: var(--sc-muted);
 	}
 
 	/* "au-dessus" broke on its hyphen. */
@@ -627,7 +624,7 @@ const video = app.video?.(lang);
 		gap: 0.35rem;
 		text-align: center;
 		font-size: var(--text-sm);
-		color: var(--gray-300);
+		color: var(--sc-muted);
 	}
 
 	.more {

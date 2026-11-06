@@ -2,12 +2,13 @@
 // The product page of a pétanque app in its five languages: Pétanque Scanner by default, or the app passed in.
 // The portfolio entry (/work/<slug>/) covers how it was made instead.
 
-import Hero from './Hero.astro';
 import Icon from './Icon.astro';
+import AppStage from './AppStage.astro';
+import MoreApps from './MoreApps.astro';
 import ContactCTA from './ContactCTA.astro';
-import LangSwitch from './LangSwitch.astro';
 import ShareButton from './ShareButton.astro';
 import { SCANNER, type LandingLang, type PetanqueApp } from '../data/petanqueApps';
+import { HOME_GAMES } from '../data/homeGames';
 
 interface Props {
 	lang: LandingLang;
@@ -15,9 +16,7 @@ interface Props {
 }
 
 const { lang, app = SCANNER } = Astro.props;
-const others = (Object.keys(app.landingPaths) as LandingLang[])
-	.filter((l) => l !== lang)
-	.map((l) => ({ lang: l, href: app.landingPaths[l] }));
+const home = HOME_GAMES.find((g) => g.id === (app.id === 'game' ? 'petanque-game' : 'petanque-scan'))!;
 const t = app.copy[lang];
 const play = `/assets/badges/google-play-${lang}.png`;
 // No localized App Store badge on file for de/it: Apple allows the English one everywhere.
@@ -56,10 +55,8 @@ const jsonLd = [
 ---
 
 <div class="stack gap-20">
-	<main class="wrapper stack gap-15">
-		<div class="stack gap-8">
-			<LangSwitch lang={lang} links={others} />
-			<Hero title={app.name} tagline={t.tagline} align="start" />
+	<div>
+		<AppStage lang={lang} name={app.name} icon={home.icon} kicker={home.kicker[lang]} lead={t.tagline} art={{ ...home.art, src: home.art.src[lang] }}>
 			<div class="store-badges">
 				{badges.map((b) => (b.href ? (
 					<a href={b.href} target="_blank" rel="noopener">
@@ -73,9 +70,11 @@ const jsonLd = [
 				)))}
 			</div>
 			{soon && t.soon && <p class="soon-note">{t.soon}</p>}
-			<div class="share"><ShareButton id={app.id} title={app.name} kind={app.id === 'game' ? 'game' : 'app'} lang={lang} /></div>
-			<img class="cover" src={app.heroes[lang]} alt={t.heroAlt} />
-		</div>
+			<div class="as-actions"><ShareButton id={app.id} title={app.name} kind={app.id === 'game' ? 'game' : 'app'} lang={lang} /></div>
+		</AppStage>
+	</div>
+
+	<main class="wrapper stack gap-15">
 
 		<section class="stack gap-4">
 			<h2 class="section-title">{t.stepsTitle}</h2>
@@ -202,6 +201,8 @@ const jsonLd = [
 				{t.legalIntro} <a href={t.privacy.href}>{t.privacy.label}</a> · <a href={t.terms.href}>{t.terms.label}</a>
 			</p>
 		</section>
+
+		<MoreApps lang={lang} current={home.id} />
 	</main>
 
 	<ContactCTA lang={lang} />
@@ -223,24 +224,16 @@ const jsonLd = [
 
 <style>
 	.box {
-		border: 1px solid var(--gray-800);
+		border: 1px solid var(--sc-line);
 		border-radius: 0.75rem;
 		padding: 1.5rem;
-		background-color: var(--gray-999_40);
-		box-shadow: var(--shadow-sm);
+		background-color: var(--sc-surface);
+		box-shadow: var(--sc-shadow);
 	}
 
 	.section-title {
 		font-size: var(--text-xl);
-		color: var(--gray-0);
-	}
-
-	.cover {
-		width: 100%;
-		height: auto;
-		border-radius: 1.5rem;
-		border: 1px solid var(--gray-800);
-		box-shadow: var(--shadow-sm);
+		color: var(--sc-ink);
 	}
 
 	.lead {
@@ -257,18 +250,18 @@ const jsonLd = [
 	.steps h3,
 	.grid-2 h3 {
 		font-size: var(--text-lg);
-		color: var(--gray-0);
+		color: var(--sc-ink);
 	}
 
 	.step-n {
 		display: inline-block;
 		min-width: 1.6em;
-		color: var(--accent-regular);
+		color: var(--sc-accent);
 		font-variant-numeric: tabular-nums;
 	}
 
 	.box p {
-		color: var(--gray-400);
+		color: var(--sc-muted);
 	}
 
 	.screens {
@@ -287,9 +280,9 @@ const jsonLd = [
 		width: 100%;
 		height: auto;
 		border-radius: 1.25rem;
-		border: 1px solid var(--gray-800);
-		box-shadow: var(--shadow-sm);
-		background: var(--gradient-subtle);
+		border: 1px solid var(--sc-line);
+		box-shadow: var(--sc-shadow);
+		background: var(--sc-surface-2);
 	}
 
 	.faq {
@@ -298,7 +291,7 @@ const jsonLd = [
 	}
 
 	.faq details {
-		border-bottom: 1px solid var(--gray-800);
+		border-bottom: 1px solid var(--sc-line);
 		padding: 0.75rem 0;
 	}
 
@@ -308,7 +301,7 @@ const jsonLd = [
 
 	.faq summary {
 		cursor: pointer;
-		color: var(--gray-0);
+		color: var(--sc-ink);
 		font-family: var(--font-brand);
 		font-size: var(--text-md);
 	}
@@ -324,7 +317,7 @@ const jsonLd = [
 
 	/* The site's link colour: --accent-text-over is white in the light theme, on a white box. */
 	.making-of-cta a {
-		color: var(--link-color);
+		color: var(--sc-link);
 		text-decoration: 1px solid underline transparent;
 		text-underline-offset: 0.25em;
 		transition: text-decoration-color var(--theme-transition);
@@ -340,7 +333,7 @@ const jsonLd = [
 	}
 
 	.legal {
-		color: var(--gray-400);
+		color: var(--sc-muted);
 		font-size: var(--text-sm);
 	}
 
@@ -362,24 +355,19 @@ const jsonLd = [
 		right: -0.5rem;
 		padding: 0.15rem 0.6rem;
 		border-radius: 999px;
-		background: var(--accent-regular);
-		color: var(--accent-text-over);
+		background: var(--sc-accent);
+		color: var(--sc-accent-ink);
 		font-size: var(--text-sm);
 		font-weight: 700;
 		line-height: 1.3;
 		white-space: nowrap;
-		box-shadow: var(--shadow-sm);
+		box-shadow: var(--sc-shadow);
 	}
 
 	.soon-note {
-		color: var(--gray-300);
+		color: var(--sc-muted);
 		font-weight: 600;
 		text-align: center;
-	}
-
-	.share {
-		display: flex;
-		justify-content: center;
 	}
 
 	@media (min-width: 50em) {

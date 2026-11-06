@@ -2,7 +2,7 @@
 // The Pétanque Meet download page, in the app's five languages: the store badges first, then the app at work.
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Icon from './Icon.astro';
-import LangSwitch from './LangSwitch.astro';
+import MoreApps from './MoreApps.astro';
 import StoreBadges from './StoreBadges.astro';
 import ShareButton from './ShareButton.astro';
 import { MEET_DOWNLOAD, MEET_STORES } from '../data/petanqueMeet';
@@ -17,7 +17,6 @@ const { lang } = Astro.props;
 const t = MEET_DOWNLOAD[lang];
 const langs = Object.keys(MEET_DOWNLOAD) as Lang[];
 const paths = Object.fromEntries(langs.map((l) => [l, MEET_DOWNLOAD[l].path])) as Record<Lang, string>;
-const others = langs.filter((l) => l !== lang).map((l) => ({ lang: l, href: paths[l] }));
 const stores = MEET_STORES[lang];
 const dir = '/assets/petanque-meet/download';
 const first = t.screens[0];
@@ -26,8 +25,6 @@ const first = t.screens[0];
 <BaseLayout title={t.title} description={t.description} image={`${dir}/og-${lang}.jpg`} lang={lang} alternates={paths}>
 	<main class="wrapper">
 		<div class="meet-dl stack gap-12">
-			<LangSwitch lang={lang} links={others} />
-
 			<section class="hero">
 				<div class="hero-copy">
 					<p class="app-name">
@@ -160,6 +157,8 @@ const first = t.screens[0];
 				))}
 				{t.legalNote && ` ${t.legalNote}`}
 			</p>
+
+			<MoreApps lang={lang} current="petanque-meet" />
 		</div>
 	</main>
 </BaseLayout>
@@ -500,20 +499,20 @@ const first = t.screens[0];
 		gap: 0.6rem;
 		align-content: start;
 		padding: 1.5rem;
-		border: 1px solid var(--gray-800);
+		border: 1px solid var(--sc-line);
 		border-radius: 1.25rem;
-		background: var(--gray-999_40);
-		box-shadow: var(--shadow-sm);
+		background: var(--sc-surface);
+		box-shadow: var(--sc-shadow);
 	}
 
 	.point h2 {
 		font-size: var(--text-lg);
-		color: var(--gray-0);
+		color: var(--sc-ink);
 		text-wrap: balance;
 	}
 
 	.point p {
-		color: var(--gray-400);
+		color: var(--sc-muted);
 	}
 
 	.film {
@@ -530,13 +529,13 @@ const first = t.screens[0];
 	.film h2,
 	.closing h2 {
 		font-size: var(--text-2xl);
-		color: var(--gray-0);
+		color: var(--sc-ink);
 	}
 
 	.film-copy p {
 		margin-top: 0.5rem;
 		max-width: 26rem;
-		color: var(--gray-400);
+		color: var(--sc-muted);
 	}
 
 	.teaser {
@@ -561,12 +560,12 @@ const first = t.screens[0];
 
 	.guides-copy h2 {
 		font-size: var(--text-2xl);
-		color: var(--gray-0);
+		color: var(--sc-ink);
 	}
 
 	.guides-copy p {
 		margin-top: 0.5rem;
-		color: var(--gray-400);
+		color: var(--sc-muted);
 	}
 
 	/* A row to swipe on a phone, four side by side from a tablet. */
@@ -609,12 +608,12 @@ const first = t.screens[0];
 
 	.guide h3 {
 		font-size: var(--text-md);
-		color: var(--gray-0);
+		color: var(--sc-ink);
 	}
 
 	.guide p {
 		font-size: var(--text-sm);
-		color: var(--gray-400);
+		color: var(--sc-muted);
 	}
 
 	.closing {
@@ -653,7 +652,7 @@ const first = t.screens[0];
 	.after {
 		text-align: center;
 		font-size: var(--text-sm);
-		color: var(--gray-300);
+		color: var(--sc-muted);
 	}
 
 	@media (min-width: 40em) {

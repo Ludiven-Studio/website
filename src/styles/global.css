@@ -155,6 +155,57 @@
 	--sc-shadow: 0 10px 30px rgb(0 0 0 / 0.35);
 }
 
+/* « Scène » buttons and links, shared by the redesigned pages. */
+.sc-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.45rem;
+	padding: 0.8rem 1.5rem;
+	border: 0;
+	border-radius: 999rem;
+	background: var(--sc-accent);
+	color: var(--sc-accent-ink);
+	font-family: var(--font-brand);
+	font-weight: 600;
+	font-size: 1.0625rem;
+	line-height: 1.2;
+	text-decoration: none;
+	cursor: pointer;
+	transition: filter 0.15s ease;
+}
+.sc-btn:hover {
+	filter: brightness(1.12);
+}
+.sc-btn--gold {
+	background: var(--sc-gold);
+	color: var(--sc-gold-ink);
+}
+.sc-btn--gold:hover {
+	filter: brightness(1.05);
+}
+.sc-link {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	color: var(--sc-link);
+	font-weight: 700;
+	text-decoration: none;
+}
+.sc-link:hover {
+	text-decoration: underline;
+}
+.sc-btn:focus-visible,
+.sc-link:focus-visible {
+	outline: 3px solid var(--sc-accent);
+	outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+	.sc-btn {
+		transition: none;
+	}
+}
+
 html,
 body {
 	min-height: 100%;
