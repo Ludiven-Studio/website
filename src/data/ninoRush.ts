@@ -1,8 +1,8 @@
 // The Nino Rush test build, published by NinoRush/tools/publish_test_apk.py under a name that never changes.
 // Raise the version and size by hand at each new one.
 export const APK_URL = 'https://github.com/Ludiven-Studio/website/releases/download/nino-rush-dev/NinoRush-test.apk';
-export const APK_VERSION = '1.0.8';
-export const APK_SIZE = '85,0 Mo';
+export const APK_VERSION = '1.0.11';
+export const APK_SIZE = '86,9 Mo';
 
 const A = '/nino-rush';
 
