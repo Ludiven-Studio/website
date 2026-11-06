@@ -3,7 +3,6 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import Hero from '../../components/Hero.astro';
 import CallToAction from '../../components/CallToAction.astro';
 import Icon from '../../components/Icon.astro';
-import LangSwitch from '../../components/LangSwitch.astro';
 
 // Keep in step with the package: Documentation/Prefab Fusion Manual.md in the LudivenTools repo.
 const features: { title: string; body: string }[] = [
@@ -40,7 +39,6 @@ const description = 'Prefab Fusion is a Unity editor tool: copy-pasted prefab pa
 <BaseLayout title={title} description={description} image="/assets/work/og/prefab-fusion.jpg" lang="en" altLang="/prefab-fusion/">
 	<main class="wrapper stack gap-12 product">
 		<div class="stack gap-4">
-			<LangSwitch lang="en" href="/prefab-fusion/" />
 			<Hero
 				title="Prefab Fusion"
 				tagline="A Unity editor tool to refactor prefabs: copy-pasted parts become one nested prefab, near-copies become variants, with every value and reference kept."
@@ -115,24 +113,24 @@ const description = 'Prefab Fusion is a Unity editor tool: copy-pasted prefab pa
 <style>
 	.product {
 		max-width: 68ch;
-		color: var(--gray-200);
+		color: var(--sc-ink-2);
 		font-size: var(--text-md);
 		line-height: 1.6;
 	}
 	.product h2 {
 		font-size: var(--text-xl);
-		color: var(--gray-0);
+		color: var(--sc-ink);
 	}
 	.product h3 {
 		font-size: var(--text-lg);
-		color: var(--gray-0);
+		color: var(--sc-ink);
 	}
 	.status {
 		align-self: center;
 		padding: 0.4rem 1rem;
-		border: 1px solid var(--accent-regular);
+		border: 1px solid var(--sc-accent);
 		border-radius: 999rem;
-		color: var(--gray-0);
+		color: var(--sc-ink);
 		font-size: var(--text-sm);
 	}
 	.features {
@@ -141,10 +139,10 @@ const description = 'Prefab Fusion is a Unity editor tool: copy-pasted prefab pa
 	}
 	.feature {
 		padding: 1.25rem 1.5rem;
-		border: 1px solid var(--gray-800);
+		border: 1px solid var(--sc-line);
 		border-radius: 1rem;
-		background-color: var(--gray-999_40);
-		box-shadow: var(--shadow-sm);
+		background-color: var(--sc-surface);
+		box-shadow: var(--sc-shadow);
 	}
 	/* Wider than the text column, centered on it, so the windows stay readable. */
 	.shots {
@@ -164,12 +162,12 @@ const description = 'Prefab Fusion is a Unity editor tool: copy-pasted prefab pa
 		width: 100%;
 		height: auto;
 		border-radius: 0.75rem;
-		border: 1px solid var(--gray-800);
+		border: 1px solid var(--sc-line);
 		box-shadow: var(--shadow-md);
 	}
 	.shots figcaption {
 		font-size: var(--text-sm);
-		color: var(--gray-300);
+		color: var(--sc-muted);
 		text-align: center;
 	}
 	.product ul {
@@ -180,7 +178,7 @@ const description = 'Prefab Fusion is a Unity editor tool: copy-pasted prefab pa
 	}
 	.product code {
 		font-size: 0.9em;
-		color: var(--gray-0);
+		color: var(--sc-ink);
 	}
 	.mail {
 		display: flex;

@@ -7,7 +7,6 @@ import ContactCTA from '../../../components/ContactCTA.astro';
 import Hero from '../../../components/Hero.astro';
 import Icon from '../../../components/Icon.astro';
 import Pill from '../../../components/Pill.astro';
-import LangSwitch from '../../../components/LangSwitch.astro';
 import StoreBadges from '../../../components/StoreBadges.astro';
 
 interface Props {
@@ -37,7 +36,6 @@ const { Content } = await entry.render();
 			<header>
 				<div class="wrapper stack gap-2">
 					<a class="back-link" href="/en/work/"><Icon icon="arrow-left" /> My projects</a>
-					<LangSwitch lang="en" href={`/work/${entry.slug}/`} />
 					<Hero title={entry.data.title} align="start">
 						<div class="details">
 							<div class="tags">
@@ -99,7 +97,7 @@ const { Content } = await entry.render();
 <style>
 	header {
 		padding-bottom: 2.5rem;
-		border-bottom: 1px solid var(--gray-800);
+		border-bottom: 1px solid var(--sc-line);
 	}
 
 	.back-link {
@@ -192,9 +190,9 @@ const { Content } = await entry.render();
 		width: 100%;
 		height: auto;
 		border-radius: 1.25rem;
-		border: 1px solid var(--gray-800);
-		box-shadow: var(--shadow-sm);
-		background: var(--gradient-subtle);
+		border: 1px solid var(--sc-line);
+		box-shadow: var(--sc-shadow);
+		background: var(--sc-surface-2);
 	}
 
 	@media (min-width: 50em) {
@@ -222,9 +220,9 @@ const { Content } = await entry.render();
 
 	.content :global(img) {
 		border-radius: 1.5rem;
-		box-shadow: var(--shadow-sm);
-		background: var(--gradient-subtle);
-		border: 1px solid var(--gray-800);
+		box-shadow: var(--sc-shadow);
+		background: var(--sc-surface-2);
+		border: 1px solid var(--sc-line);
 	}
 
 	.content :global(blockquote) {
@@ -234,7 +232,7 @@ const { Content } = await entry.render();
 		line-height: 1.1;
 		padding-inline-start: 1.5rem;
 		border-inline-start: 0.25rem solid var(--accent-dark);
-		color: var(--gray-0);
+		color: var(--sc-ink);
 	}
 
 	.back-link,
@@ -298,8 +296,8 @@ const { Content } = await entry.render();
 		max-width: 100%;
 		padding: 0.5rem 1.25rem;
 		border-radius: 999rem;
-		background: var(--accent-regular);
-		color: var(--accent-text-over);
+		background: var(--sc-accent);
+		color: var(--sc-accent-ink);
 		font-family: var(--font-brand);
 		font-size: var(--text-md);
 		font-weight: 600;
@@ -315,13 +313,13 @@ const { Content } = await entry.render();
 
 	.app-page--web {
 		background: transparent;
-		color: var(--gray-0);
-		box-shadow: inset 0 0 0 2px var(--accent-regular);
+		color: var(--sc-ink);
+		box-shadow: inset 0 0 0 2px var(--sc-accent);
 	}
 
 	.app-page--web:hover,
 	.app-page--web:focus-visible {
-		background: var(--accent-regular);
-		color: var(--accent-text-over);
+		background: var(--sc-accent);
+		color: var(--sc-accent-ink);
 	}
 </style>

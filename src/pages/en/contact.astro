@@ -3,7 +3,6 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import Hero from '../../components/Hero.astro';
 import CallToAction from '../../components/CallToAction.astro';
 import Icon from '../../components/Icon.astro';
-import LangSwitch from '../../components/LangSwitch.astro';
 ---
 
 <BaseLayout
@@ -14,7 +13,6 @@ import LangSwitch from '../../components/LangSwitch.astro';
 >
 	<main class="wrapper stack gap-12 contact">
 		<div class="stack gap-8">
-			<LangSwitch lang="en" href="/contact/" />
 			<Hero title="Contact" tagline="A project, a question, or help with one of my tools or apps: write to me." />
 		</div>
 
@@ -60,13 +58,13 @@ import LangSwitch from '../../components/LangSwitch.astro';
 <style>
 	.contact {
 		max-width: 68ch;
-		color: var(--gray-200);
+		color: var(--sc-ink-2);
 		font-size: var(--text-md);
 		line-height: 1.6;
 	}
 	.contact h2 {
 		font-size: var(--text-xl);
-		color: var(--gray-0);
+		color: var(--sc-ink);
 	}
 	.contact ul {
 		padding-left: 1.2rem;
@@ -75,7 +73,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 		gap: 0.35rem;
 	}
 	.contact section a {
-		color: var(--accent-regular);
+		color: var(--sc-accent);
 		text-decoration: 1px solid underline transparent;
 		text-underline-offset: 0.25em;
 		transition: text-decoration-color var(--theme-transition);

@@ -4,7 +4,6 @@ import Hero from '../../components/Hero.astro';
 import OfferScene, { type OfferSceneId } from '../../components/OfferScene.astro';
 import FocusItem, { type FocusIconId } from '../../components/FocusItem.astro';
 import ContactCTA from '../../components/ContactCTA.astro';
-import LangSwitch from '../../components/LangSwitch.astro';
 
 // Mirrors /prestations — keep both lists in step when the offer changes.
 const services: { scene: OfferSceneId; title: string; body: string }[] = [
@@ -44,7 +43,6 @@ const jsonLd = {
 	<div class="stack gap-20">
 		<main class="wrapper stack gap-15">
 			<div class="stack gap-8">
-				<LangSwitch lang="en" href="/prestations/" />
 				<Hero
 					title="Services"
 					tagline="A Unity developer since 2010, I take your project from concept to production: apps, games and immersive experiences — in France and remotely."
@@ -83,16 +81,16 @@ const jsonLd = {
 
 <style>
 	.box {
-		border: 1px solid var(--gray-800);
+		border: 1px solid var(--sc-line);
 		border-radius: 0.75rem;
 		padding: 1.5rem;
-		background-color: var(--gray-999_40);
-		box-shadow: var(--shadow-sm);
+		background-color: var(--sc-surface);
+		box-shadow: var(--sc-shadow);
 	}
 
 	.section-title {
 		font-size: var(--text-xl);
-		color: var(--gray-0);
+		color: var(--sc-ink);
 	}
 
 	.section-title::after {
@@ -124,7 +122,7 @@ const jsonLd = {
 	}
 
 	.services p {
-		color: var(--gray-400);
+		color: var(--sc-muted);
 	}
 
 	@media (min-width: 50em) {

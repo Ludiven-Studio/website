@@ -98,16 +98,16 @@ import { WEB3FORMS_ACCESS_KEY } from '../data/site';
 		max-width: 42rem;
 		margin-inline: auto;
 		width: 100%;
-		border: 1px solid var(--gray-800);
+		border: 1px solid var(--sc-line);
 		border-radius: 1.5rem;
 		padding: 2rem;
-		background-color: var(--gray-999_40);
-		box-shadow: var(--shadow-sm);
+		background-color: var(--sc-surface);
+		box-shadow: var(--sc-shadow);
 	}
 
 	.suggest-head {
 		text-align: center;
-		color: var(--gray-300);
+		color: var(--sc-muted);
 	}
 
 	.suggest-head h2 {
@@ -130,16 +130,16 @@ import { WEB3FORMS_ACCESS_KEY } from '../data/site';
 		font-family: var(--font-brand);
 		font-weight: 500;
 		font-size: var(--text-sm);
-		color: var(--gray-300);
+		color: var(--sc-muted);
 	}
 
 	.field select,
 	.field textarea,
 	.field input {
 		font: inherit;
-		color: var(--gray-0);
-		background-color: var(--gray-999);
-		border: 1px solid var(--gray-700);
+		color: var(--sc-ink);
+		background-color: var(--sc-surface);
+		border: 1px solid var(--sc-line);
 		border-radius: 0.75rem;
 		padding: 0.7rem 0.9rem;
 		transition: border-color var(--theme-transition);
@@ -154,7 +154,7 @@ import { WEB3FORMS_ACCESS_KEY } from '../data/site';
 	.field textarea:focus-visible,
 	.field input:focus-visible {
 		outline: none;
-		border-color: var(--accent-regular);
+		border-color: var(--sc-accent);
 	}
 
 	.submit {
@@ -166,8 +166,8 @@ import { WEB3FORMS_ACCESS_KEY } from '../data/site';
 		padding: 0.7rem 1.4rem;
 		border: none;
 		border-radius: 999rem;
-		color: var(--accent-text-over);
-		background-color: var(--accent-regular);
+		color: var(--sc-accent-ink);
+		background-color: var(--sc-accent);
 		transition:
 			transform var(--theme-transition),
 			box-shadow var(--theme-transition);
@@ -190,7 +190,7 @@ import { WEB3FORMS_ACCESS_KEY } from '../data/site';
 	}
 
 	.form-status.is-ok {
-		color: var(--accent-regular);
+		color: var(--sc-accent);
 	}
 
 	.form-status.is-error {
@@ -200,6 +200,6 @@ import { WEB3FORMS_ACCESS_KEY } from '../data/site';
 	.form-note {
 		margin: 0;
 		font-size: var(--text-sm);
-		color: var(--gray-400);
+		color: var(--sc-muted);
 	}
 </style>

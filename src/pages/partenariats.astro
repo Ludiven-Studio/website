@@ -81,7 +81,7 @@ const description = 'Des mini-jeux aux couleurs d’un club, d’un tournoi ou d
 <style>
 	h2 {
 		font-size: var(--text-2xl);
-		color: var(--gray-0);
+		color: var(--sc-ink);
 	}
 
 	.case {
@@ -95,14 +95,14 @@ const description = 'Des mini-jeux aux couleurs d’un club, d’un tournoi ou d
 		display: block;
 		border-radius: 0.9rem;
 		overflow: hidden;
-		border: 1px solid var(--gray-800);
+		border: 1px solid var(--sc-line);
 		box-shadow: var(--shadow-md);
 		transition: border-color var(--theme-transition), transform var(--theme-transition);
 	}
 
 	.shot:hover,
 	.shot:focus-visible {
-		border-color: var(--accent-regular);
+		border-color: var(--sc-accent);
 		transform: translateY(-2px);
 	}
 
@@ -114,25 +114,25 @@ const description = 'Des mini-jeux aux couleurs d’un club, d’un tournoi ou d
 
 	h3 {
 		font-size: var(--text-xl);
-		color: var(--gray-0);
+		color: var(--sc-ink);
 		margin: 0;
 	}
 
 	.meta {
 		margin: 0.35rem 0 0;
-		color: var(--gray-400);
+		color: var(--sc-muted);
 		font-size: var(--text-sm);
 	}
 
 	ul {
 		margin: 0;
 		padding-left: 1.2rem;
-		color: var(--gray-300);
+		color: var(--sc-muted);
 		line-height: 1.6;
 	}
 
 	.play {
-		color: var(--accent-regular);
+		color: var(--sc-accent);
 		font-weight: 600;
 		text-decoration: none;
 	}
@@ -143,7 +143,7 @@ const description = 'Des mini-jeux aux couleurs d’un club, d’un tournoi ou d
 	}
 
 	.next p {
-		color: var(--gray-300);
+		color: var(--sc-muted);
 		line-height: 1.6;
 		margin: 0;
 	}

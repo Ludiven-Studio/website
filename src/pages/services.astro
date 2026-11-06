@@ -73,10 +73,10 @@ const description = "Des petits services web gratuits et utilisables sans compte
 		gap: 0.6rem;
 		padding: 1.75rem;
 		border-radius: 0.9rem;
-		background: var(--gray-999_40);
-		border: 1px solid var(--gray-800);
-		box-shadow: var(--shadow-sm);
-		color: var(--gray-300);
+		background: var(--sc-surface);
+		border: 1px solid var(--sc-line);
+		box-shadow: var(--sc-shadow);
+		color: var(--sc-muted);
 		text-decoration: none;
 		transition:
 			border-color var(--theme-transition),
@@ -86,7 +86,7 @@ const description = "Des petits services web gratuits et utilisables sans compte
 
 	.service:hover,
 	.service:focus-visible {
-		border-color: var(--accent-regular);
+		border-color: var(--sc-accent);
 		box-shadow: var(--shadow-md);
 		transform: translateY(-2px);
 	}
@@ -97,7 +97,7 @@ const description = "Des petits services web gratuits et utilisables sans compte
 
 	.service h2 {
 		font-size: var(--text-xl);
-		color: var(--gray-0);
+		color: var(--sc-ink);
 	}
 
 	.service p {
@@ -109,11 +109,11 @@ const description = "Des petits services web gratuits et utilisables sans compte
 		margin-top: auto;
 		padding-top: 0.5rem;
 		font-size: var(--text-sm);
-		color: var(--accent-regular);
+		color: var(--sc-accent);
 	}
 
 	.services-more {
-		color: var(--gray-400);
+		color: var(--sc-muted);
 		font-size: var(--text-sm);
 	}
 
