@@ -241,7 +241,7 @@ try {
 		);
 		const want = [
 			['Dragon Gems Swipe', 'play.google.com', 1, '/dragons-gems/', 'Découvrir le jeu'],
-			['Nino Rush', '', 2, '/nino-rush/telecharger/', 'Essayer la version de test (Android)'],
+			['Nino Rush', '', 2, '/nino-rush/', 'Découvrir le jeu'],
 			['Pétanque Game', 'play.google.com', 1, '/petanque-game/', 'Découvrir le jeu'],
 			['Pétanque Meet', 'play.google.com apps.apple.com', 0, '/petanque-meet/', "Découvrir l'appli"],
 			['Pétanque Scan', 'play.google.com apps.apple.com', 0, '/petanque-scanner/', "Découvrir l'appli"],
@@ -251,6 +251,8 @@ try {
 			line(g && g.name === name && g.stores === stores && g.faded === faded && g.main === main && g.label === label,
 				`slide ${i + 1}: ${name}, its stores, faded badges and main link`, JSON.stringify(g));
 		});
+		const test = await page.$$eval('[data-slide]', (els) => els[1].querySelector('.slide-link')?.getAttribute('href'));
+		line(test === '/nino-rush/telecharger/', 'Nino Rush: the test build as its second link', String(test));
 		if (shots) await page.locator('[data-stage]').screenshot({ path: `${shots}/stage-phone-slide4.png` });
 
 		const tb = await page.evaluate(() => ({
@@ -332,6 +334,10 @@ try {
 		['/es/petanque-scanner/', 'Juegos', false],
 		['/nino-rush/confidentialite/', 'Jeux', true],
 		['/de/nino-rush/confidentialite/', 'Spiele', false],
+		['/nino-rush/', 'Jeux', true],
+		['/en/nino-rush/', 'Games', false],
+		['/it/petanque-game/scarica/', 'Giochi', false],
+		['/petanque-meet/telecharger/', 'Jeux', true],
 	];
 	for (const [path, lit, tabBar] of PAGES) {
 		const { ctx, page, errors } = await open(path, 'phone');
@@ -343,6 +349,35 @@ try {
 		line(got.lit === lit && got.tabBar === tabBar && got.chrome && !(await overflow(page)) && !errors.length,
 			`${path}: ${lit ?? 'no link'} lit, ${tabBar ? 'with' : 'without'} the tab bar, no overflow, no error`, JSON.stringify({ got, errors }));
 		await ctx.close();
+	}
+
+	// 7. The apps' pages: one title, the plain ground, the other four apps at the foot (never the page's own).
+	const APPS = [
+		['/dragons-gems/', 'dragons-gems', true],
+		['/de/dragons-gems/herunterladen/', 'dragons-gems', true],
+		['/nino-rush/', 'nino-rush', true],
+		['/nino-rush/telecharger/', 'nino-rush', true],
+		['/petanque-game/', 'petanque-game', true],
+		['/es/petanque-game/descargar/', 'petanque-game', false],
+		['/en/petanque-scanner/', 'petanque-scan', true],
+		['/petanque-meet/telecharger/', 'petanque-meet', false],
+	];
+	const OWN = { 'dragons-gems': 'Dragon Gems Swipe', 'nino-rush': 'Nino Rush', 'petanque-game': 'Pétanque Game', 'petanque-meet': 'Pétanque Meet', 'petanque-scan': 'Pétanque Scan' };
+	for (const [path, id, stage] of APPS) {
+		for (const view of ['desk', 'phone']) {
+			const { ctx, page, errors } = await open(path, view, { scheme: view === 'phone' ? 'dark' : 'light' });
+			const got = await page.evaluate(() => ({
+				h1: document.querySelectorAll('h1').length,
+				stage: !!document.querySelector('header.as'),
+				ground: document.querySelector('.backgrounds').classList.contains('scene'),
+				more: [...document.querySelectorAll('.ma a')].map((a) => a.querySelector('strong').textContent),
+				hrefs: [...document.querySelectorAll('.ma a')].map((a) => a.getAttribute('href')),
+			}));
+			const ok = got.h1 === 1 && got.stage === stage && got.ground && got.more.length === 4 && !got.more.includes(OWN[id]) &&
+				got.hrefs.every((h) => h && h.startsWith('/')) && !(await overflow(page)) && !errors.length;
+			line(ok, `${path} ${view}: one title, ${stage ? 'the night stage' : 'its own hero'}, the other four apps, no overflow, no error`, JSON.stringify({ got, errors }));
+			await ctx.close();
+		}
 	}
 } finally {
 	await browser.close();
