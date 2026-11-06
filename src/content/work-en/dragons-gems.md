@@ -46,7 +46,7 @@ gallery:
   The game was born on this website, among its mini-games. One swipe slides the whole board to the edge, as
   in 2048; three gems of the same color that touch explode, and the board slides again. Every rule was kept
   or dropped on a measurement: a bot plays thousands of games to tell whether a variant makes more chains,
-  whether a level can be won, in how many moves. The bot also picks the map's 250 levels and their move
+  whether a level can be won, in how many moves. The bot also picks the 750 levels and their move
   limits: enough for an average player to win four in five, a little less one level in ten.
 </p>
 

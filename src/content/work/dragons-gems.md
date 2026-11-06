@@ -47,7 +47,7 @@ gallery:
   bord, comme dans 2048&nbsp;; trois gemmes de la même couleur qui se touchent explosent, et le plateau
   reglisse. Chaque règle a été gardée ou jetée sur une mesure&nbsp;: un robot joue des milliers de parties
   pour dire si une variante fait plus de chaînes, si un niveau se gagne, en combien de coups. C'est lui qui
-  choisit les 250 niveaux de la carte et leur nombre de coups&nbsp;: assez pour qu'un joueur moyen en gagne
+  choisit les 750 niveaux et leur nombre de coups&nbsp;: assez pour qu'un joueur moyen en gagne
   quatre sur cinq, un peu moins un niveau sur dix.
 </p>
 
