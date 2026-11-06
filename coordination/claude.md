@@ -1805,3 +1805,171 @@
   (df7c8cb), page de téléchargement en 1.0.12, 83,9 Mo (aea2d01), comme l'APK publié sur nino-rush-dev (sha256 vérifié)
   ; build complet OK dans mon worktree (207 pages, précache 377, liens OK) ; mes fichiers et cette section seulement.
   Statut : terminé. Réservations libérées.
+
+## 2026-11-06 — Dragon Gems : politique de la 1.0.0 (ticket 0059 : « Yes, suited », module Google sur iPhone) (session website)
+- Statut : en cours (2026-11-06T01:48+01:00). Demande de l'utilisateur : (transmis par la session « sessions claude et
+  playtest », ticket 0059 de la session Dragon Gems) la 1.0.0 part en store depuis le main de DragonsGemsSwipe : la
+  politique EN doit dire « Yes, suited » (§6, §14), le §11 FR et EN ajouter que sur iPhone le module de connexion de
+  Google recueille aussi des informations sur l'appareil, puis la date ; sur une branche partie de main pour la 1.0.0,
+  et le §11 reporté sur dragons-gems-consent ; vérifié, sans push, push au mot de Raphaël
+- Réservations actives : `src/pages/dragons-gems/confidentialite.astro`,
+  `src/pages/en/dragons-gems/confidentialite.astro` (dans le worktree website-worktrees/dg-1.0.0-policy, branche
+  dg-1.0.0-policy, et dans website-worktrees/dragons-gems-consent).
+- Ressources : serveur de dev sur le port 4524 ; eslint, `astro check`. Build annoncé ici avant.
+- 01:53 : corrections écrites sans commit : branche dg-1.0.0-policy (partie d'origin/main 070f416) : EN « Yes, suited »
+  au §6 et au §14, §11 FR et EN (sur iPhone le module de connexion de Google recueille aussi des informations sur
+  l'appareil), date au 6 novembre ; branche dragons-gems-consent : le même §11, date au 6 novembre (son §6 et son §14
+  disent déjà « Accept » / « Accepter », comme la branche house-ads de l'appli). eslint OK et astro check 0 erreur dans
+  les deux ; contrôle en dev, bureau et téléphone : nouveaux textes présents, anciens absents, ancre #suppression
+  présente, aucun débordement ni erreur console ; captures relues. Lancement du build complet dans mon worktree
+  dg-1.0.0-policy, puis dans dragons-gems-consent (chacun écrit son dist/, .astro/, public/vendor/), pas dans le
+  dossier partagé…
+- 01:57 : builds complets OK : dg-1.0.0-policy 192 pages, précache 362 entrées ; dragons-gems-consent 194 pages,
+  précache 364 entrées ; liens OK, astro check 0 erreur, HTML construit relu. Commits, pas poussés : branche
+  dg-1.0.0-policy 8e4383a (EN « Yes, suited », §6 et §14) et affafc7 (§11 FR et EN, module de connexion de Google sur
+  iPhone, date du 6 novembre) ; branche dragons-gems-consent e2a65e6 (le même §11, date du 6 novembre). La 1.0.0 part
+  avec dg-1.0.0-policy seule, par un push séparé ; dragons-gems-consent part avec la 1.0.1 (sa fusion après
+  dg-1.0.0-policy bloquera sur le §6 et le §14 EN : garder la version de la branche). Ticket 0059 répondu. Push au mot
+  de Raphaël. Réservations maintenues.
+- 02:02 : à la demande de la session Producer, §11 précisé dans les deux branches, en accord avec l'App Privacy de
+  Dragon Gems : sur iPhone, le module de connexion de Google recueille aussi, pour Google, la position approximative
+  (pour faire fonctionner la connexion), des identifiants de l'appareil et du compte et des données d'usage (pour les
+  statistiques de Google). eslint OK, astro check sans erreur, contrôle en dev bureau et téléphone OK (première
+  formulation absente), captures relues. Lancement du build complet dans dg-1.0.0-policy, puis dans
+  dragons-gems-consent (chacun son dist/, .astro/, public/vendor/), pas dans le dossier partagé…
+- 02:05 : builds complets OK (dg-1.0.0-policy 192 pages, précache 362 ; dragons-gems-consent 194 pages, précache 364 ;
+  liens OK, astro check 0 erreur), HTML construit relu. Commits, pas poussés : afa5a97 sur dg-1.0.0-policy (après
+  8e4383a et affafc7) et b288357 sur dragons-gems-consent (après e2a65e6). Ticket 0059 complété. Push au mot de
+  Raphaël. Réservations maintenues.
+- 08:47 : ticket 0061 (vidéos maison après « Non merci ») : les 9 points écrits dans dg-1.0.0-policy, pages FR et EN
+  (Dragon Gems n'a pas d'autre langue) ; eslint OK ; astro check, contrôle et build en cours, pas de push
+- 08:50 : ticket 0061 fait et répondu : commit d755b84 sur dg-1.0.0-policy (après 8e4383a, affafc7, afa5a97), pas
+  poussé ; pages FR et EN ; contrôle du texte rendu (bureau et téléphone), build complet du worktree OK (astro check 0
+  erreur, 192 pages, précache 362, liens OK). Push au mot de Raphaël. Réservations maintenues
+- 09:17 : poussé à la demande de l'utilisateur (« pousse la politique 1.0.0 de Dragon Gems ») : main avancé sur
+  dg-1.0.0-policy (070f416..d755b84 : 8e4383a, affafc7, afa5a97, d755b84), git push. Pas de commit du journal : la
+  session Nino Rush a des fichiers préparés dans l'index (ninoRush.ts, telecharger.astro, sa section), laissés intacts.
+  Attente du déploiement…
+- 09:23 : en ligne : d755b84 déployé en 5 min 35 s ; pages FR et EN servies avec le nouveau texte (house_ad_shown, «
+  Yes, suited », GitHub dans les destinataires). Statut : terminé. Réservations libérées pour dg-1.0.0-policy ; celle
+  de dragons-gems-consent est maintenue (1.0.1)
+
+## 2026-11-06 — Accueil : carrousel des jeux en haut, défi du jour plus bas, et trois directions de refonte (session website)
+- Statut : en cours (2026-11-06T02:27+01:00). Demande de l'utilisateur : (transmis par la session « sessions claude et
+  playtest », mots de Raphaël : « Je me demande si on ne devrait pas mettre en avant les nouveaux jeux ludiven sur le
+  site web plutôt que les défis du jour », puis « Oui peut être un carousel. Peut être appeler codex ou Claude design
+  pour proposer une refonte du site web ») un carrousel des jeux en haut de l'accueil (Dragon Gems, Nino Rush bientôt,
+  les applis de pétanque, badges des stores), lisible sur téléphone, accessible, textes dans les 5 langues, sombre ; le
+  défi du jour plus bas ; trois directions de refonte (l'évolution codée, Codex à l'aveugle, la mienne avec l'outil de
+  design) et une planche pour Raphaël ; rien de poussé ni publié
+- Réservations actives : `src/pages/index.astro`, `src/components/GamesCarousel.astro` et `src/data/homeGames.ts`
+  (nouveaux), dans le worktree website-worktrees/home-carousel, branche home-carousel.
+- Ressources : serveur de dev sur le port 4525 ; eslint, `astro check`. Build annoncé ici avant.
+- 02:54 : carrousel écrit dans le worktree home-carousel (src/components/GamesCarousel.astro, src/data/homeGames.ts,
+  src/pages/index.astro, et la nouvelle icône public/assets/petanque-ar/icon.webp, ajoutée à ma réservation) : 5
+  diapositives (Dragon Gems, Nino Rush bientôt, Pétanque Game, Meet, Scan), descriptions courtes des fiches Google Play
+  dans les 5 langues, badges des stores, rotation de 7 s arrêtée au survol, au focus et au premier geste, jamais en
+  mouvement réduit, bouton pause ; le défi du jour sous le carrousel, et premier pour un joueur dont la série est en
+  cours. eslint OK, astro check 0 erreur, 35 contrôles Playwright OK (bureau et téléphone, clair et sombre, 5 langues
+  sur une page d'essai supprimée depuis). Direction de Codex faite (ticket 0060, shots/redesign/codex/), la mienne sur
+  un canevas de design privé. Lancement du build complet dans mon worktree home-carousel (écrit son dist/, .astro/,
+  public/vendor/), pas dans le dossier partagé…
+- 02:59 : build complet OK (192 pages, précache 362, liens OK). Correction : les icônes des diapositives hors champ se
+  chargent aussi après la page, pour qu'une diapositive n'arrive pas à moitié vide ; contrôle ajouté, 36 contrôles OK.
+  Nouveau build complet dans mon worktree home-carousel…
+- 03:06 : build complet OK (192 pages, précache 362, liens OK) ; captures prises sur le site construit. Commit 0e6142f
+  sur la branche home-carousel, pas poussé : carrousel, données en 5 langues, accueil réordonné, icône de Pétanque
+  Scan. Planche envoyée à Raphaël (shots/redesign/planche-refonte.png) : avant, A l'évolution codée, B Codex « Escales
+  ludiques » (ticket 0060 clos, ligne dans .collab/LOG.md), C « Scène » (canevas de design privé), recommandation A
+  maintenant puis C avec la barre du bas de B, et 5 questions (dont les accueils traduits, environ une journée). Push
+  au mot de Raphaël. Réservations maintenues.
+- 12:10 : remplacé par la refonte « Scène » (section suivante) sur la décision de Raphaël : la branche home-carousel
+  n'est pas poussée et reste en réserve. Statut : terminé. Réservations libérées.
+
+## 2026-11-06 — Accueil : refonte « Scène », menu traduit, barre du bas et accueils en 5 langues (session website)
+- Statut : en cours (2026-11-06T08:23+01:00). Demande de l'utilisateur : (transmis par la session « sessions claude et
+  playtest », réponses de Raphaël à la planche) on ne pousse pas A, on construit la piste C « Scène » avec la barre du
+  bas de B sur téléphone pour le défi du jour ; accueils traduits /en/, /es/, /de/, /it/ avec le menu et les hreflang,
+  mini-jeux en français ; lien « Essayer la version de test (Android) » sur Nino Rush, en ligne seulement après sa
+  politique 1.0.11 ; rotation toutes les 7 s avec les arrêts ; vérifié comme A ; planche avec l'effort restant ; rien
+  de poussé
+- Réservations actives : `src/components/Nav.astro`, `src/components/Footer.astro`, `src/layouts/BaseLayout.astro`
+  (menu, pied de page, barre du bas), `src/styles/global.css` (un bloc de couleurs « Scène »), `src/pages/index.astro`,
+  `src/pages/{en,es,de,it}/index.astro` (nouveaux), `src/components/Home*.astro`, `src/components/TabBar.astro`,
+  `src/data/homeGames.ts`, `src/data/siteNav.ts` (nouveaux), `public/assets/home/`,
+  `public/assets/petanque-ar/icon.webp` (nouveaux), `scripts/check-home.mjs` (nouveau), dans le worktree
+  website-worktrees/home-scene, branche home-scene ; rien dans ce dossier.
+- Ressources : serveur de dev sur le port 4526 ; eslint, `astro check`. Build annoncé ici avant.
+- 09:00 : écrit dans le worktree home-scene : menu traduit (5 langues) avec le défi du jour et la série, barre du bas
+  sur les pages françaises (pas sur les jeux, la carte ni les autres langues), pied de page traduit, accueil « Scène »
+  en français et /en/, /es/, /de/, /it/ ; les images de la scène viennent des dossiers Marketing des applis
+  (public/assets/home/) ; l'icône de Scan existait déjà (/assets/petanque/icon-scanner.webp), petanque-ar/icon.webp
+  n'est plus réservé. eslint OK, astro check 0 erreur, scripts/check-home.mjs 83 contrôles OK en dev. Lancement du
+  build complet dans mon worktree home-scene (écrit son dist/, .astro/, public/vendor/), pas dans le dossier partagé…
+- 09:10 : build complet OK dans home-scene (astro check 0 erreur, 196 pages, précache 368, liens OK, les 4 accueils
+  traduits dans le sitemap) ; check-home.mjs 84 contrôles OK en dev et sur le build ; 4 commits sur la branche
+  home-scene, pas poussés : d3e9e6d (menu, pied de page, barre du bas), 6d4465c (accueil), 45f6033 (accueils traduits),
+  9c3ed39 (contrôles), astro check OK à chacun. Planche envoyée à Raphaël (shots/redesign/planche-scene.png). À recaler
+  sur main après les pushes du matin ; le lien de test de Nino Rush attend sa politique 1.0.11 en ligne. Push au mot de
+  Raphaël. Réservations maintenues
+- 09:27 : home-scene recalée sur main (d755b84, politique Dragon Gems 1.0.0 en ligne) : 929007f, adbbea2, 915469e,
+  bf260e7 ; astro check 0 erreur 0 avertissement. Push au mot de Raphaël, après la politique 1.0.11 de Nino Rush
+- 09:46 : politique 1.0.11 de Nino Rush en ligne (main 976c3b7) : le bouton de test reste. home-scene recalée sur
+  976c3b7. Lancement du build complet dans mon worktree home-scene (écrit son dist/, .astro/, public/vendor/), pas dans
+  le dossier partagé…
+- 09:52 : build complet OK sur 976c3b7 (astro check 0 erreur 0 avertissement, 206 pages, précache 378, liens OK) ;
+  check-home.mjs 86 contrôles OK sur le build (pages de confidentialité de Nino Rush ajoutées au tour des pages).
+  home-scene : e9c4b4e, e654dc3, 29c5047, 474e65a, pas poussés. Push au mot de Raphaël
+- 10:27 : réponses de Raphaël (transmis par le Producer) : oui au menu, à la bande claire du studio et à l'ordre ; la
+  refonte entière part d'un coup, sur son mot. Bloc 1, pages des applis (début 10:15) : scène commune AppStage, rangée
+  « Nos autres jeux », couleurs « Scène » sur les pages de Dragon Gems, Nino Rush (nouvelle page produit de 09:58),
+  Pétanque Game, Scan, Meet et /petanque/ ; réservations ajoutées :
+  src/components/{AppStage,MoreApps,DragonsGemsLanding,DragonsGemsDownload,DragonsGemsBadges,PetanqueLanding,ScannerDownload,MeetDownload,NinoRushLanding}.astro,
+  src/pages/nino-rush/telecharger.astro, src/pages/petanque.astro. Recalée sur main a3d41a3. Lancement du build complet
+  dans mon worktree home-scene (son dist/), pas dans le dossier partagé…
+- 10:32 : bloc 1 fini (10:15-10:32) : 30f27eb (pages des applis), 1973a4d (Nino Rush mène à sa page, la version de test
+  en second lien), 81f9ed4 (contrôles) ; eslint OK, astro check 0 erreur (aussi à 30f27eb seul), build complet 211
+  pages, précache 384, liens OK, check-home.mjs 107 contrôles OK sur le build. Bloc 2 (mini-jeux, /jeux/ et
+  /jeux/defi/) : réservations ajoutées src/pages/jeux/index.astro, src/pages/jeux/defi.astro,
+  src/components/{GameCard,GameFold,GameTools,GameSearch,GameTileSize,GameFavorites}.astro
+- 10:35 : bloc 2 (mini-jeux) écrit : en-tête de nuit et fond uni sur /jeux/ et /jeux/defi/, couleurs « Scène » des
+  tuiles, rubriques, recherche et tailles ; check-games-page.mjs OK (27 contrôles). Lancement du build complet dans mon
+  worktree home-scene (son dist/)…
+- 10:39 : bloc 2 fini (10:33-10:38) : f3398a9 fd7aac9 ; build complet 211 pages, précache 384, liens OK ;
+  check-home.mjs 107 contrôles OK sur le build ; check-games-page.mjs OK. Bloc 3 (cadre des pages de jeu) :
+  réservations ajoutées src/layouts/GamePage.astro, src/components/GameTutorial.astro,
+  src/components/GameFullscreen.astro (couleurs seulement)
+- 10:52 : bloc 3 (cadre des pages de jeu) écrit : fond uni et couleurs « Scène » dans GamePage, GameTutorial,
+  GameFullscreen et ShareButton (couleurs seulement, la structure du plein écran et de .game-art inchangée) ;
+  check-billard-fullscreen OK ; check-game-popups : 7 échecs sur les jeux sans défi (atelier, rayou, 5 illusions), les
+  mêmes sur l'ancien code (témoin sur d755b84) : pas liés à la refonte. Lancement du build complet dans mon worktree
+  home-scene (son dist/)…
+- 10:57 : bloc 3 fini (10:39-10:57) : 366f754 (cadre des pages de jeu), 38ba9c3 (contrôles) ; astro check 0 erreur,
+  build complet 211 pages, précache 384, liens OK ; check-home.mjs 108 contrôles OK sur le build. Bloc 4 (pages du
+  studio) : réservations ajoutées src/pages/{prestations,services,work,about,contact,partenariats,labo}.astro,
+  src/pages/en/{services,work,contact,prefab-fusion}.astro, src/pages/prefab-fusion.astro,
+  src/pages/work/[...slug].astro, src/pages/en/work/[...slug].astro,
+  src/components/{ContactCTA,CallToAction,Hero,PortfolioPreview,Skills,ServiceScene,OfferScene,FocusItem,SuggestionForm}.astro
+  (couleurs seulement)
+- 11:08 : bloc 4 (pages du studio) écrit : fond uni et couleurs « Scène » (prestations, services, projets et fiches, à
+  propos, contact, partenariats, labo, Prefab Fusion, et l'anglais) ; le bouton du site (CallToAction) en violet «
+  Scène », l'appel au contact (ContactCTA) en carte de nuit ; drapeaux retirés, le choix de langue du menu les
+  remplace. Lancement du build complet dans mon worktree home-scene (son dist/)…
+- 11:37 : build du bloc 4 OK (211 pages, précache 384, liens OK, astro check 0 erreur ; astro check a pris 12 min, PC
+  chargé par un Unity) ; check-home a trouvé, sous cette charge, une vignette de la scène en retard après Fin et Début
+  : le défilement s'arrêtait en route et la position intermédiaire était prise. Corrigé dans HomeStage (seule une piste
+  au repos sur une diapositive compte). Nouveau build complet et contrôle en cours dans mon worktree home-scene…
+- 11:52 : bloc 4 fini (10:58-11:52, dont environ 35 min d'attente du build sous la charge d'un Unity) : correctif de la
+  scène, pages du studio, contrôles ; build complet 211 pages, précache 384, liens OK ; check-home.mjs 108 contrôles OK
+  sur le build. Raphaël (dans cette session) : attendre la fin des blocs 5 et 6, puis tout pousser d'un coup. Bloc 5
+  (pages légales) : réservations ajoutées pour les styles seulement des pages confidentialite, cgu et mentions-legales
+  (36 pages, toutes langues)
+- 11:56 : blocs 5 et 6 écrits : couleurs « Scène » des 36 pages légales (styles seulement, liens en --sc-link) ; fond
+  uni sur tout le site (les anciens fonds peints retirés de BaseLayout), fond du body, couleur de barre du navigateur
+  (MainHead, réservé aussi), bandeau de mise à jour ; check-game-popups exempte les jeux sans défi du jour. Lancement
+  du build complet et des contrôles finaux dans mon worktree home-scene (son dist/)…
+- 12:10 : blocs 5 et 6 finis (11:53-12:09) : pages légales, fond uni partout, check-game-popups corrigé ; contrôles
+  finaux sur le build : astro check 0 erreur, 211 pages, précache 384, liens OK, check-home 109, check-games-page,
+  check-game-popups (61 jeux) et check-billard-fullscreen OK. Commité et poussé à la demande de l'utilisateur («
+  Attendre la fin », puis tout pousser d'un coup) : les 18 commits de home-scene et cette section seulement. Statut :
+  terminé. Réservations libérées.

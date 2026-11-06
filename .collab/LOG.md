@@ -52,3 +52,5 @@ Une ligne par ticket : date · id · résumé · décision.
 - 2026-10-27 · 0056 · relecture finale du diff de la nuit (Codex, revue) · 3 retenus : chronologie unique des éclats sous le souffle (gemmes chargées, comète), annonce de chaque coup au lecteur d'écran
 - 2026-10-27 · 0057 · les dix leçons (Codex, revue) · 1 retenu (niveau 9 : bandeau quand la jauge est pleine), 7 phrases proposées pour le site et l'app ensemble (parité)
 - 2026-10-27 · 0058 · moteur des règles (Codex, revue) · 2 points : plateau vide après un souffle (possible sur le papier, 0 fois sur 3 622 souffles mesurés, proposé pour le moteur et l'app), jauge non remplie par le souffle (voulu)
+
+- 2026-11-06 · 0060 · refonte de l'accueil, direction à l'aveugle (Codex, critique et 3 maquettes) · direction B « Escales ludiques » sur la planche de Raphaël ; retenus pour la recommandation : la barre du bas avec « Défi du jour », les badges des seuls stores réels ; 5 erreurs d'image signalées
