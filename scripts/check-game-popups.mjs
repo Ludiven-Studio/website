@@ -59,8 +59,11 @@ try {
 			const b = await page.evaluate(() => ({
 				inline: [...document.querySelectorAll('.lb-root')].filter((el) => !el.closest('.lbc-panel')).length,
 				pill: document.querySelectorAll('.lbc-pill').length,
+				// GamePage mounts the daily banner only for a game with a daily challenge (DAILY_LB).
+				daily: !!document.querySelector('astro-island[component-url*="DefiChallenge"]'),
 			}));
-			line(g, b.inline === 0 && b.pill === (NO_DAILY_BOARD.has(g) ? 0 : 1), `?defi: board behind one trophy (inline ${b.inline}, trophies ${b.pill})`);
+			const want = b.daily && !NO_DAILY_BOARD.has(g) ? 1 : 0;
+			line(g, b.inline === 0 && b.pill === want, `?defi: ${b.daily ? 'board behind one trophy' : 'no daily, no board'} (inline ${b.inline}, trophies ${b.pill})`);
 		} catch (e) {
 			line(g, false, `crashed: ${e.message.split('\n')[0]}`);
 		}
