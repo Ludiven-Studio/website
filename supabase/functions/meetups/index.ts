@@ -27,6 +27,10 @@ import { ipKey, ipQuotaEnabled } from '../_shared/ipKey.ts';
 import { deleteAccount } from '../_shared/account.ts';
 import { appleOf } from '../_shared/apple.ts';
 import { dropPosters, thumbOf } from '../_shared/posters.ts';
+import {
+	P_CONTACTS_PER_DAY, P_CONTACTS_PER_IP_DAY, P_HIDE_IPS, P_HIDE_REPORTERS, P_MAX_OPEN, P_REASON_LABEL, P_REASONS,
+	partnerFields, shapePartnerSearch,
+} from '../_shared/partners.ts';
 
 const CORS = {
 	'Access-Control-Allow-Origin': '*',
@@ -503,6 +507,45 @@ async function followedTournaments(db: SupabaseClient, uid: string, nowMs: numbe
 		.sort((x, y) => String(x.starts_at).localeCompare(String(y.starts_at)));
 }
 
+// ---- partner searches (rules in _shared/partners.ts) ----
+
+/** Never the number nor the IP: those leave only through partner_contact. */
+const P_COLS = 'id, tournament_id, player_id, first_name, poster, contest_starts_at, format, category, level, note';
+
+/** Searches whose contest has started go, with their numbers; contacts and reports follow (cascade). */
+async function purgePartnerSearches(db: SupabaseClient, nowIso: string): Promise<void> {
+	const { error } = await db.from('meetup_partner_searches').delete().lte('contest_starts_at', nowIso);
+	if (error) throw error;
+}
+
+/** How many players asked for each of these numbers. Only the author is told. */
+async function partnerContactCounts(db: SupabaseClient, ids: string[]): Promise<Map<string, number>> {
+	const counts = await Promise.all(ids.map(async (id) => {
+		const { count, error } = await db.from('meetup_partner_contacts')
+			.select('player_id', { count: 'exact', head: true }).eq('search_id', id);
+		if (error) throw error;
+		return [id, count ?? 0] as const;
+	}));
+	return new Map(counts);
+}
+
+/** The player's searches still ahead, for the Agenda, with their tournament's name. */
+async function myPartnerSearches(db: SupabaseClient, uid: string, nowIso: string): Promise<Record<string, unknown>[]> {
+	const { data, error } = await db.from('meetup_partner_searches')
+		.select(`${P_COLS}, hidden, meetup_tournaments!inner(title, club_name)`)
+		.eq('player_id', uid).gt('contest_starts_at', nowIso).order('contest_starts_at').limit(20);
+	if (error) throw error;
+	const rows = (data ?? []) as Record<string, unknown>[];
+	const counts = await partnerContactCounts(db, rows.map((r) => r.id as string));
+	return rows.map((r) => {
+		const t = (r.meetup_tournaments ?? {}) as { title?: string; club_name?: string };
+		return {
+			...shapePartnerSearch(r, uid, counts.get(String(r.id))),
+			hidden: Boolean(r.hidden), tournamentTitle: t.title ?? '', clubName: t.club_name ?? '',
+		};
+	});
+}
+
 const POSTER_THUMB_MAX_BYTES = 200 * 1024;
 
 /** Posters of tournaments a week past, so storage does not grow forever. */
@@ -816,6 +859,7 @@ Deno.serve(async (req) => {
 					followed: uid ? await followedTournaments(db, uid, nowMs) : [],
 					activeTournaments: uid ? await activeTournaments(db, uid, nowMs) : 0,
 					maxTournaments: MAX_ACTIVE_TOURNAMENTS,
+					partnerSearches: uid ? await myPartnerSearches(db, uid, nowIso) : [],
 				});
 			}
 
@@ -1129,7 +1173,10 @@ Deno.serve(async (req) => {
 				if (isOrganizer) shaped.followers = (await followerCounts(db, [String(row.id)])).get(String(row.id)) ?? 0;
 				// Imported from a committee calendar: the app offers "C'est mon club".
 				const claimable = !isOrganizer && await isImportAccount(db, String(owner));
-				return json({ tournament: shaped, isOrganizer, following, claimable });
+				const { count: partnerSearches } = await db.from('meetup_partner_searches')
+					.select('id', { count: 'exact', head: true })
+					.eq('tournament_id', body.tournamentId).eq('hidden', false).gt('contest_starts_at', nowIso);
+				return json({ tournament: shaped, isOrganizer, following, claimable, partnerSearches: partnerSearches ?? 0 });
 			}
 
 			// Follow or unfollow: { tournamentId, follow }. Only a tournament still on the
@@ -1597,6 +1644,9 @@ Deno.serve(async (req) => {
 				await db.from('meetup_tournaments').delete().eq('organizer_id', body.targetPlayerId);
 				await db.from('meetup_tournament_reports').delete().eq('reporter_id', body.targetPlayerId);
 				await db.from('meetup_tournament_follows').delete().eq('player_id', body.targetPlayerId);
+				await db.from('meetup_partner_searches').delete().eq('player_id', body.targetPlayerId);
+				await db.from('meetup_partner_contacts').delete().eq('player_id', body.targetPlayerId);
+				await db.from('meetup_partner_reports').delete().eq('reporter_id', body.targetPlayerId);
 				await db.from('meetup_spots').delete().eq('first_organizer', body.targetPlayerId).eq('source', 'user');
 				await db.from('meetup_quota').delete().eq('subject', body.targetPlayerId);
 				// Every create charged two counters, the player AND the IP. Clearing only the
@@ -1604,6 +1654,156 @@ Deno.serve(async (req) => {
 				// day, with an empty map as the only symptom. Same caller, same hash.
 				const purgeIp = await ipKey(req);
 				if (purgeIp) await db.from('meetup_quota').delete().eq('subject', purgeIp);
+				return json({ ok: true });
+			}
+
+			// ---- partner searches: a player, or two who need a third, look for teammates for one
+			// contest of a tournament. The number is never listed: partner_contact gives it to one
+			// signed-in player at a time, counted. A search goes with its contest's start.
+
+			// { tournamentId } -> the searches still ahead, without numbers.
+			case 'list_partner_searches': {
+				if (!isUuid(body.tournamentId)) return bad('bad request');
+				await purgePartnerSearches(db, nowIso);
+				const { data, error } = await db.from('meetup_partner_searches').select(P_COLS)
+					.eq('tournament_id', body.tournamentId).eq('hidden', false).gt('contest_starts_at', nowIso)
+					.order('contest_starts_at').order('created_at').limit(100);
+				if (error) throw error;
+				const uid = await whoAmI();
+				const rows = (data ?? []) as Record<string, unknown>[];
+				const counts = await partnerContactCounts(db, rows.filter((r) => uid && r.player_id === uid).map((r) => r.id as string));
+				return json({ searches: rows.map((r) => shapePartnerSearch(r, uid, counts.get(String(r.id)))) });
+			}
+
+			// { tournamentId, poster, contestStartsAt, format, category, level, note, phone, name }.
+			// One per player per tournament: posting again updates it.
+			case 'post_partner_search': {
+				if (!isUuid(body.tournamentId)) return bad('bad request');
+				const uid = await whoAmI();
+				if (!uid) return bad(LOGIN, 401);
+				const name = cleanName(body.name);
+				if (!name) return bad('Prénom invalide (2 à 24 caractères, sans lien).');
+				const { data: t } = await db.from('meetup_tournaments').select('id, contests, status, hidden')
+					.eq('id', body.tournamentId).maybeSingle();
+				if (!t || t.hidden || t.status !== 'open') return bad('Ce concours n’est plus en ligne.', 409);
+				const fields = partnerFields(body, t.contests, nowMs, isOffensive, cleanPhone);
+				if (typeof fields === 'string') return bad(fields);
+				const ip = await ipKey(req);
+				if (await isBanned(db, uid, ip, true)) return bad(BANNED, 403);
+				await purgePartnerSearches(db, nowIso);
+				const { data: own } = await db.from('meetup_partner_searches').select('id, hidden')
+					.eq('tournament_id', t.id).eq('player_id', uid).maybeSingle();
+				if (own?.hidden) return bad('Ton annonce sur ce concours a été masquée après des signalements.', 403);
+				if (!own) {
+					const { count } = await db.from('meetup_partner_searches').select('id', { count: 'exact', head: true })
+						.eq('player_id', uid);
+					if ((count ?? 0) >= P_MAX_OPEN) {
+						return bad(`Tu as déjà ${P_MAX_OPEN} annonces en ligne. Fermes-en une dans « Agenda ».`, 429);
+					}
+					if (await overQuota(db, req, uid, 'creates')) return bad("Trop d'annonces aujourd'hui. Réessaie demain.", 429);
+				}
+				const row = { tournament_id: t.id, player_id: uid, player_ip: ip, first_name: name, ...fields };
+				const { data: saved, error } = own
+					? await db.from('meetup_partner_searches').update(row).eq('id', own.id).select(P_COLS).single()
+					: await db.from('meetup_partner_searches').insert(row).select(P_COLS).single();
+				if (error) throw error;
+				return json({ search: shapePartnerSearch(saved as Record<string, unknown>, uid, 0) });
+			}
+
+			// { searchId }: its author closes it ("J'ai trouvé"); the number goes with it.
+			case 'close_partner_search': {
+				if (!isUuid(body.searchId)) return bad('bad request');
+				const uid = await whoAmI();
+				if (!uid) return bad(LOGIN, 401);
+				const { error } = await db.from('meetup_partner_searches').delete().eq('id', body.searchId).eq('player_id', uid);
+				if (error) throw error;
+				return json({ ok: true });
+			}
+
+			// { searchId } -> { phone }. A number asked again costs nothing; new ones are capped.
+			case 'partner_contact': {
+				if (!isUuid(body.searchId)) return bad('bad request');
+				const uid = await whoAmI();
+				if (!uid) return bad(LOGIN, 401);
+				const { data: s } = await db.from('meetup_partner_searches').select('id, player_id, phone, hidden, contest_starts_at')
+					.eq('id', body.searchId).maybeSingle();
+				if (!s || s.hidden || Date.parse(String(s.contest_starts_at)) <= nowMs) {
+					return bad('Cette annonce n’est plus en ligne.', 409);
+				}
+				if (s.player_id === uid) return json({ phone: s.phone });
+				const ip = await ipKey(req);
+				if (await isBanned(db, uid, ip, false)) return bad(BANNED, 403);
+				const { count: asked } = await db.from('meetup_partner_contacts').select('player_id', { count: 'exact', head: true })
+					.eq('search_id', s.id).eq('player_id', uid);
+				if ((asked ?? 0) === 0) {
+					const since = new Date(nowMs - 86400_000).toISOString();
+					const { count: mine } = await db.from('meetup_partner_contacts').select('search_id', { count: 'exact', head: true })
+						.eq('player_id', uid).gte('created_at', since);
+					if ((mine ?? 0) >= P_CONTACTS_PER_DAY) return bad('Tu as demandé assez de numéros pour aujourd’hui. Réessaie demain.', 429);
+					if (ip) {
+						const { count: fromIp } = await db.from('meetup_partner_contacts').select('search_id', { count: 'exact', head: true })
+							.eq('player_ip', ip).gte('created_at', since);
+						if ((fromIp ?? 0) >= P_CONTACTS_PER_IP_DAY) return bad('Trop de numéros demandés aujourd’hui. Réessaie demain.', 429);
+					}
+					const { error } = await db.from('meetup_partner_contacts')
+						.upsert({ search_id: s.id, player_id: uid, player_ip: ip }, { onConflict: 'search_id,player_id', ignoreDuplicates: true });
+					if (error) throw error;
+				}
+				return json({ phone: s.phone });
+			}
+
+			// { searchId, reason }: mailed to the moderator; two reporters from two IPs hide it.
+			case 'report_partner_search': {
+				if (!isUuid(body.searchId)) return bad('bad request');
+				const playerId = await whoAmI();
+				if (!playerId) return bad(LOGIN, 401);
+				const reason = String(body.reason ?? '');
+				if (!P_REASONS.includes(reason)) return bad('Motif inconnu.');
+				const { data: s } = await db.from('meetup_partner_searches').select(`${P_COLS}, hidden`)
+					.eq('id', body.searchId).maybeSingle();
+				if (!s) return bad('unknown search', 404);
+				const ip = await ipKey(req);
+				if (ip) {
+					// One daily cap across games, tournaments and searches.
+					const since = new Date(nowMs - 86400_000).toISOString();
+					let total = 0;
+					for (const table of ['meetup_reports', 'meetup_tournament_reports', 'meetup_partner_reports']) {
+						const { count } = await db.from(table).select('id', { count: 'exact', head: true })
+							.eq('reporter_ip', ip).gte('created_at', since);
+						total += count ?? 0;
+					}
+					if (total >= REPORT_IP_CAP) return bad('Trop de signalements aujourd’hui. Réessaie demain.', 429);
+				}
+				const { error } = await db.from('meetup_partner_reports')
+					.insert({ search_id: s.id, reporter_id: playerId, reporter_ip: ip, reason });
+				if (error && error.code !== '23505') throw error;
+				if (error) return json({ ok: true });
+				const { data: reports } = await db.from('meetup_partner_reports').select('reporter_ip').eq('search_id', s.id);
+				const all = reports ?? [];
+				const ips = new Set(all.map((r) => r.reporter_ip).filter(Boolean));
+				let hidden = Boolean(s.hidden);
+				const enoughIps = ipQuotaEnabled() ? ips.size >= P_HIDE_IPS : true;
+				if (!hidden && all.length >= P_HIDE_REPORTERS && enoughIps) {
+					await db.from('meetup_partner_searches').update({ hidden: true }).eq('id', s.id);
+					hidden = true;
+				}
+				const label = P_REASON_LABEL[reason] ?? reason;
+				const { data: tour } = await db.from('meetup_tournaments').select(T_EMBED).eq('id', s.tournament_id).maybeSingle();
+				if (tour) {
+					await mailTournament(shapeTournament(tour as Record<string, unknown>),
+						`<b>Annonce de partenaire : ${esc(label)}</b> — ${all.length} signalement(s)${hidden ? ', <b>annonce masquée</b>' : ''}.`
+							+ `<br>${esc(String(s.first_name))} (${esc(String(s.poster))}, ${esc(String(s.format))}, ${esc(String(s.level))}) : « ${esc(String(s.note ?? ''))} »`,
+						`Pétanque Meet : signalement d'annonce (${label})`);
+				}
+				return json({ ok: true });
+			}
+
+			// { adminKey, searchId, hidden }: the moderator hides a search, or shows it again.
+			case 'moderate_partner_search': {
+				if (!isAdmin(body.adminKey)) return bad('forbidden', 403);
+				if (!isUuid(body.searchId)) return bad('bad request');
+				const { error } = await db.from('meetup_partner_searches').update({ hidden: body.hidden !== false }).eq('id', body.searchId);
+				if (error) throw error;
 				return json({ ok: true });
 			}
 
