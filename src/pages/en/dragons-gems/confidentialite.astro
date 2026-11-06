@@ -36,7 +36,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li>The game is played <strong>without an account</strong>. Your progress is kept on your phone.</li>
 				<li>An optional <strong>Google or Apple account</strong> saves your progress online, to find it on all your devices.</li>
 				<li>The daily challenge, endless mode and summit challenge leaderboards show <strong>your name and your score</strong> to everyone. Nothing else.</li>
-				<li><strong>Optional videos</strong> give hearts and coins: Unity's if you agree to have them tailored to your interests, otherwise videos of our other games and apps. The app asks for neither your location, nor your contacts, nor your photos.</li>
+				<li><strong>Optional videos</strong> give hearts and coins: Unity's if you accept them, otherwise videos of our other games and apps. The app asks for neither your location, nor your contacts, nor your photos.</li>
 				<li><strong>Usage statistics</strong> with no identifier (levels played, videos, purchases…) go to our own server, in Germany.</li>
 				<li>Optional <strong>in-app purchases</strong> (coins, unlimited hearts), paid through Google Play or the App Store.</li>
 				<li>You can <strong>delete your account</strong> at any time from the app's Settings.</li>
@@ -148,13 +148,13 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 						</tr>
 						<tr>
 							<td>Advertising id (on iPhone, only if you allow tracking), other device and app ids, IP address (approximate location), ad interactions, time of use, purchase history, technical information (model, language, screen, connection, performance) and, on Android, the app stores installed</td>
-							<td>Show the videos you ask for, measure them, fight fraud and tailor them to your interests</td>
+							<td>Show the videos you ask for, measure them, fight fraud and tailor them to your interests (on iPhone, only if you allow tracking)</td>
 							<td>Your consent (art. 6.1.a)</td>
 							<td>Unity (LevelPlay, Unity Ads, ironSource Ads), which shares them with advertisers</td>
 						</tr>
 						<tr>
-							<td>Your choice about ads</td>
-							<td>Remember it and pass it on to Unity</td>
+							<td>Your choice about ads and its date</td>
+							<td>Remember it for six months, then ask you again; pass it on to Unity</td>
 							<td>Legal obligation</td>
 							<td>Your phone; Unity; Umami counts the yeses and noes, with no identifier (see §8)</td>
 						</tr>
@@ -205,14 +205,20 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				account, nor your name, nor your progress.
 			</p>
 			<p>
-				<strong>Your consent.</strong> Before the first video, the game asks whether videos may be tailored to
-				your interests ("Yes, suited" or "No thanks"). Unity's module starts only after "Yes, suited". After
-				"No thanks", or as long as you have not answered, Unity receives nothing: rewards come through videos of
-				our other games and apps, downloaded from our site. You can change your mind at any time: Settings ›
-				"Ad choices". Going back to "No thanks" is passed on to Unity at once, and also opts you out of the sale
-				of your data under US state laws. On iPhone, after a yes, Apple asks for your permission to track;
-				without it, the iPhone's advertising id is not used. You can also reset or delete the advertising id in your phone's settings. To learn
+				<strong>Your consent.</strong> Before the first video, the game asks whether you accept Unity's video ads
+				("Accept" or "Refuse"). Unity's module starts only after "Accept". After "Refuse", Unity receives
+				nothing: rewards come through videos of our other games and apps, downloaded from our site, and the game
+				offers once per session to turn Unity's videos on. Your choice holds for six months, then the game asks
+				you again. You can change your mind at any time: Settings › "Ad choices". On iPhone, after "Accept",
+				Apple asks for your permission to track; without it, the iPhone's advertising id is not used and the
+				videos are not tailored to your interests, which for Unity also opts you out of the sale of your data
+				under US state laws. You can also reset or delete the advertising id in your phone's settings. To learn
 				more: <a href="https://unity.com/legal/game-player-and-app-user-privacy-policy" target="_blank" rel="noopener">Unity's privacy policy</a>.
+			</p>
+			<p>
+				<strong>Our games' and apps' videos.</strong> They go through no ad network and do not track you. Their
+				"Discover" button opens the game's or app's page in the store; on Google Play, the link says that it comes
+				from Dragon Gems Swipe and from which video, with no identifier. The App Store link says nothing.
 			</p>
 		</section>
 
@@ -279,7 +285,8 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li>your sign-in session and your email address, if you are signed in;</li>
 				<li>your name and the leaderboards' technical id;</li>
 				<li>your settings: language, theme and reminders;</li>
-				<li>your choice about ads, the number of videos watched that day, the numbers of your latest purchases, the results waiting to be sent to the leaderboards, the list and pictures of the videos of our other games; Unity's modules also keep their own data there.</li>
+				<li>your choice about ads, the number of videos watched that day, the numbers of your latest purchases and the results waiting to be sent to the leaderboards; Unity's modules also keep their own data there;</li>
+				<li>a copy of the list and pictures of our other games' and apps' videos, to show them without waiting for the network; it holds nothing about you. The videos themselves are played online, except one that comes with the app.</li>
 			</ul>
 			<p>
 				All of this stays on the device and is erased when you uninstall the app.
@@ -364,7 +371,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<h2>14. Children</h2>
 			<p>
 				The game is not meant for children under 13 and is played without an account. If you are under 15,
-				ask your parents before answering "Yes, suited" to videos, before a purchase and before signing in
+				ask your parents before answering "Accept" to videos, before a purchase and before signing in
 				with an account. Pick a name that is not your real name. If you are a parent and want an account or a
 				name removed, write to us: we will delete it.
 			</p>

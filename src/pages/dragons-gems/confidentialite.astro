@@ -31,7 +31,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li>Le jeu se joue <strong>sans compte</strong>. Ta progression est gardée sur ton téléphone.</li>
 				<li>Un <strong>compte Google ou Apple</strong>, facultatif, sauvegarde ta progression en ligne pour la retrouver sur tous tes appareils.</li>
 				<li>Les classements du défi du jour, du mode infini et du défi du sommet montrent <strong>ton pseudo et ton score</strong>, à tout le monde. Rien d'autre.</li>
-				<li>Des <strong>vidéos facultatives</strong> offrent des cœurs et des pièces&nbsp;: celles de Unity si tu acceptes qu'elles soient adaptées à tes centres d'intérêt, sinon des vidéos de nos autres jeux et applis. L'application ne demande ni ta position, ni tes contacts, ni tes photos.</li>
+				<li>Des <strong>vidéos facultatives</strong> offrent des cœurs et des pièces&nbsp;: celles de Unity si tu les acceptes, sinon des vidéos de nos autres jeux et applis. L'application ne demande ni ta position, ni tes contacts, ni tes photos.</li>
 				<li>Des <strong>statistiques d'usage</strong> sans identifiant (niveaux joués, vidéos, achats…) partent sur notre propre serveur, en Allemagne.</li>
 				<li>Des <strong>achats intégrés</strong> facultatifs (pièces, cœurs illimités), payés par Google Play ou l'App Store.</li>
 				<li>Tu peux <strong>supprimer ton compte</strong> à tout moment depuis les Réglages de l'application.</li>
@@ -146,13 +146,13 @@ import LangSwitch from '../../components/LangSwitch.astro';
 						</tr>
 						<tr>
 							<td>Identifiant publicitaire (sur iPhone, seulement si tu autorises le suivi), autres identifiants de l'appareil et de l'application, adresse IP (position approximative), interactions avec les annonces, durée d'utilisation, historique d'achats, informations techniques (modèle, langue, écran, connexion, performances) et, sur Android, les magasins d'applications installés</td>
-							<td>Afficher les vidéos que tu demandes, les mesurer, lutter contre la fraude et les adapter à tes centres d'intérêt</td>
+							<td>Afficher les vidéos que tu demandes, les mesurer, lutter contre la fraude et les adapter à tes centres d'intérêt (sur iPhone, seulement si tu autorises le suivi)</td>
 							<td>Ton consentement (art. 6.1.a)</td>
 							<td>Unity (LevelPlay, Unity Ads, ironSource Ads), qui les partage avec des annonceurs</td>
 						</tr>
 						<tr>
-							<td>Ton choix sur la publicité</td>
-							<td>T'en souvenir et le transmettre à Unity</td>
+							<td>Ton choix sur la publicité et sa date</td>
+							<td>T'en souvenir six mois, puis te le redemander&nbsp;; le transmettre à Unity</td>
 							<td>Obligation légale</td>
 							<td>Ton téléphone&nbsp;; Unity&nbsp;; Umami compte les oui et les non, sans identifiant (voir §8)</td>
 						</tr>
@@ -204,18 +204,25 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				ne lui transmettons ni ton compte, ni ton pseudo, ni ta progression.
 			</p>
 			<p>
-				<strong>Ton accord.</strong> Avant la première vidéo, le jeu te demande si les vidéos peuvent être
-				adaptées à tes centres d'intérêt («&nbsp;Oui, adaptées&nbsp;» ou «&nbsp;Non merci&nbsp;»). Le module de
-				Unity ne démarre qu'après «&nbsp;Oui, adaptées&nbsp;». Après «&nbsp;Non merci&nbsp;», ou tant que tu
-				n'as pas répondu, Unity ne reçoit rien&nbsp;: les récompenses passent par des vidéos de nos autres jeux
-				et applis, téléchargées depuis notre site. Tu peux changer d'avis à tout moment&nbsp;: Réglages ›
-				«&nbsp;Choix publicitaires&nbsp;». Un retour à «&nbsp;Non merci&nbsp;» est transmis tout de suite à
-				Unity, et vaut aussi refus de la vente de tes données au sens des lois des États américains. Sur
-				iPhone, après un oui, Apple te demande l'autorisation de suivi&nbsp;; sans elle, l'identifiant
-				publicitaire de l'iPhone n'est pas utilisé. Tu peux aussi
+				<strong>Ton accord.</strong> Avant la première vidéo, le jeu te demande si tu acceptes les vidéos
+				publicitaires de Unity («&nbsp;Accepter&nbsp;» ou «&nbsp;Refuser&nbsp;»). Le module de Unity ne démarre
+				qu'après «&nbsp;Accepter&nbsp;». Après «&nbsp;Refuser&nbsp;», Unity ne reçoit rien&nbsp;: les récompenses
+				passent par des vidéos de nos autres jeux et applis, téléchargées depuis notre site, et le jeu te
+				propose une fois par session d'activer les vidéos de Unity. Ton choix vaut six mois, puis le jeu te le
+				redemande. Tu peux changer d'avis à tout moment&nbsp;: Réglages › «&nbsp;Choix publicitaires&nbsp;». Sur
+				iPhone, après «&nbsp;Accepter&nbsp;», Apple te demande l'autorisation de suivi&nbsp;; sans elle,
+				l'identifiant publicitaire de l'iPhone n'est pas utilisé et les vidéos ne sont pas adaptées à tes centres
+				d'intérêt, ce qui vaut aussi, pour Unity, refus de la vente de tes données au sens des lois des États
+				américains. Tu peux aussi
 				réinitialiser ou supprimer l'identifiant publicitaire dans les réglages de ton téléphone. Pour en
 				savoir plus&nbsp;: la
 				<a href="https://unity.com/legal/game-player-and-app-user-privacy-policy" target="_blank" rel="noopener">politique de confidentialité de Unity</a>.
+			</p>
+			<p>
+				<strong>Les vidéos de nos jeux et applis.</strong> Elles ne passent par aucune régie et ne te suivent pas.
+				Leur bouton «&nbsp;Découvrir&nbsp;» ouvre la fiche du jeu ou de l'appli dans le store&nbsp;; sur Google Play,
+				le lien indique qu'il vient de Dragon Gems Swipe et de quelle vidéo, sans aucun identifiant. Le lien vers
+				l'App Store n'indique rien.
 			</p>
 		</section>
 
@@ -284,7 +291,8 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li>ta session de connexion et ton adresse mail, si tu es connecté&nbsp;;</li>
 				<li>ton pseudo et l'identifiant technique des classements&nbsp;;</li>
 				<li>tes réglages&nbsp;: langue, thème et rappels&nbsp;;</li>
-				<li>ton choix sur la publicité, le nombre de vidéos regardées dans la journée, les numéros de tes derniers achats, les résultats en attente d'envoi aux classements, la liste et les images des vidéos de nos autres jeux&nbsp;; les modules de Unity y gardent aussi leurs propres données.</li>
+				<li>ton choix sur la publicité, le nombre de vidéos regardées dans la journée, les numéros de tes derniers achats et les résultats en attente d'envoi aux classements&nbsp;; les modules de Unity y gardent aussi leurs propres données&nbsp;;</li>
+				<li>une copie de la liste et des images des vidéos de nos autres jeux et applis, pour les montrer sans attendre le réseau&nbsp;; elle ne contient rien sur toi. Les vidéos, elles, sont lues en ligne, sauf une, livrée avec l'application.</li>
 			</ul>
 			<p>
 				Tout cela reste sur l'appareil et disparaît quand tu désinstalles l'application.
@@ -371,7 +379,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			<h2>14. Mineurs</h2>
 			<p>
 				Le jeu ne s'adresse pas aux enfants de moins de 13 ans et se joue sans compte. Si tu as moins de
-				15 ans, demande à tes parents avant de répondre «&nbsp;Oui, adaptées&nbsp;» sur les vidéos, avant un
+				15 ans, demande à tes parents avant de répondre «&nbsp;Accepter&nbsp;» sur les vidéos, avant un
 				achat et avant de te connecter avec un compte. Choisis un pseudo qui n'est pas ton vrai nom. Si tu es
 				parent et souhaites faire supprimer un compte ou un pseudo, écris-nous&nbsp;: nous le supprimerons.
 			</p>
