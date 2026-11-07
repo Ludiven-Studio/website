@@ -245,6 +245,41 @@
 - 2026-10-22 ~08:50 : build complet lancé (écrit `dist/`, `.astro/`, `public/vendor/`), puis guards Playwright sur les ports 4366-4440.
 - Fait : `shop.ts` (catalogue Unity, prix en cocoins), `ShopPanel.tsx`, `bouleLook.ts`, `decors.ts` (place, crépuscule, port), terrains irréguliers en partie libre, niveaux et en ligne (salons `petanque2-*`), défi du jour inchangé (piste égale, boule standard). Vérifié : vitest 127/127, astro check 0 erreur, build + précache + liens OK, guards shop/levels/daily/turns/pad/read/sfx/mp/resync OK, audit téléphone sans chevauchement. `check-petanque-camera` : un point (« full lob ») échoue aussi sur HEAD (témoin rejoué dans un worktree supprimé ensuite) : antérieur à ce travail. Quatre guards périmés depuis le 26/09 (carte « Libre ») corrigés.
 
+## 2026-10-22 — Page Contact (FR/EN) et page Prefab Fusion (EN), session LudivenTools
+- Statut : en cours (2026-10-22T08:22+02:00). Demande de l'utilisateur : le profil éditeur de l'Asset Store
+  exige une page de contact sur le site, et un lien de support pour l'outil Prefab Fusion.
+- Réservations actives : `src/pages/contact.astro` (nouveau), `src/pages/en/contact.astro` (nouveau),
+  `src/pages/en/prefab-fusion.astro` (nouveau), `src/components/Footer.astro` (un lien « Contact »).
+- Ressources : serveur de dev sur le port 4451 ; `npx astro check` en fin de lot. Pas de `npm run build` sans
+  l'annoncer ici d'abord.
+- 08:40 : pages écrites, captures bureau/téléphone/sombre OK (serveur 4451 arrêté). Lancement de `npm run lint`
+  puis `npm run build` (écrit `dist/` et `.astro/`).
+- 08:31 : terminé, non commité (en attente de l'utilisateur). `node_modules/.bin` absent : étapes du build lancées
+  à la main avec `node`. eslint OK sur les 4 fichiers, `astro check` 0 erreur, `astro build` OK (138 pages),
+  `check-precache` OK, `check-links` OK ; les 3 pages sont dans le sitemap (hreflang FR/EN sur Contact).
+  Réservations gardées jusqu'au commit. Au commit : seulement mes 4 fichiers, pas ce journal (fichier mixte).
+- Commité et poussé à la demande de l'utilisateur (`434b183`, mes 4 fichiers seulement). Statut : terminé.
+  Réservations libérées : `src/pages/contact.astro`, `src/pages/en/contact.astro`, `src/pages/en/prefab-fusion.astro`,
+  `src/components/Footer.astro`. Suite prévue : remplacer « Coming soon » par le lien Asset Store à la sortie.
+
+## 2026-10-22 — Prefab Fusion : fiche dans « Projets » (FR/EN) et page produit en français, session LudivenTools
+- Statut : en cours (2026-10-22T10:20+02:00). Demande de l'utilisateur : une nouvelle entrée dans les projets et une page
+  en français pour l'outil Prefab Fusion, avec des captures de la nouvelle interface.
+- Réservations actives : `src/content/work/prefab-fusion.md` (nouveau), `src/content/work-en/prefab-fusion.md` (nouveau),
+  `src/pages/prefab-fusion.astro` (nouveau), `src/pages/en/prefab-fusion.astro`, `public/assets/prefab-fusion/` (nouveau),
+  `public/assets/work/og/prefab-fusion.jpg` (nouveau, fait à la main avec les réglages de `generate-work-og.mjs` pour ne pas
+  réécrire les autres images), `src/pages/contact.astro` (le lien Prefab Fusion vise la page en français).
+- Ressources : serveur de dev sur le port 4452 ; `astro check` en fin de lot. Pas de build sans l'annoncer ici d'abord.
+- 10:35 : pages écrites, `astro check` 0 erreur, captures bureau/téléphone/sombre sans erreur (serveur 4452 arrêté).
+  Lancement de eslint sur mes fichiers puis de `astro build` (écrit `dist/` et `.astro/`), `check-precache` et `check-links`.
+- 10:40 : terminé, non commité (en attente de l'utilisateur). eslint OK sur mes 3 pages, `astro build` OK (141 pages),
+  `check-precache` OK (294 entrées), `check-links` OK ; les 4 pages Prefab Fusion sont dans le sitemap. Réservations
+  gardées jusqu'au commit. Au commit : seulement mes fichiers, pas ce journal (fichier mixte).
+- Commité à la demande de l'utilisateur (`08e5852`, mes 12 fichiers seulement), pas encore poussé. Statut : terminé.
+  Réservations libérées : `src/content/work/prefab-fusion.md`, `src/content/work-en/prefab-fusion.md`,
+  `src/pages/prefab-fusion.astro`, `src/pages/en/prefab-fusion.astro`, `public/assets/prefab-fusion/`,
+  `public/assets/work/og/prefab-fusion.jpg`, `src/pages/contact.astro`. Suite : pousser quand l'utilisateur le demande.
+
 ## 2026-10-22 — Pétanque Meet : présentation de la fiche projet et boutons vers les stores
 - Statut : en cours (2026-10-22, Europe/Paris). Demande de l'utilisateur : la présentation de la fiche Pétanque Meet
   n'est pas terrible, améliorer les boutons vers les stores, de même sur la page de consultation (la carte).
@@ -263,6 +298,15 @@
   écrasement forcé est bien détecté).
 - Commité à la demande de l'utilisateur (« commit et push ») : mes 12 fichiers et cette section seulement (journal
   mixte). Statut : terminé. Réservations libérées.
+
+## 2026-10-22 — Prefab Fusion : nombre de tests sur la fiche « Projets », puis push, session LudivenTools
+- Statut : en cours (2026-10-22T12:26+02:00). Demande de l'utilisateur : commit et push. L'outil a maintenant 38 tests
+  (un ajouté avec un correctif), sans échec sur les six versions d'Unity ; la fiche dit encore 37.
+- Réservations actives : `src/content/work/prefab-fusion.md`, `src/content/work-en/prefab-fusion.md` (le nombre seulement).
+- Ressources : aucune (ni serveur ni build : seul un nombre change dans le texte).
+- 12:30 : commité (`cd6bb9d`, mes 2 fichiers seulement) et poussé avec `08e5852` à la demande de l'utilisateur
+  (`25e4b4c..cd6bb9d`). Statut : terminé. Réservations libérées : `src/content/work/prefab-fusion.md`,
+  `src/content/work-en/prefab-fusion.md`. Ce journal reste non commité (fichier mixte).
 
 ## 2026-10-22 — Pétanque Meet : la carte en anglais, et plus d'installation de la carte sur le téléphone
 - Statut : en cours (2026-10-22, Europe/Paris). Demande de l'utilisateur : une version EN de `/petanque-meet/` comme
@@ -519,19 +563,6 @@
 - 01:22 : commité à la demande de l'utilisateur, non poussé : mon fichier et cette section seulement. Statut : terminé.
   Réservations libérées.
 
-## 2026-10-24 — Pétanque Scanner : clips promo Meet pour l'appli (session Petanque AR)
-- Statut : en cours (2026-10-24T03:36+02:00). Demande de l'utilisateur : héberger les clips promo Pétanque Meet (5
-  langues) et promo.json que la prochaine version de l'appli lira en streaming
-- Réservations actives : `public/petanque-scanner/promo/` (nouveau).
-- Ressources : eslint, `astro check`. Build annoncé ici avant.
-- 03:38 : 5 mp4 copiés à l'identique depuis StreamingAssets/MeetPromo (meet_<lang>.mp4, 5,1 Mo en tout) et promo.json ;
-  aucune page ne les cite. Pas d'eslint (ni JS ni Astro touché). Lancement du build complet (écrit dist/, .astro/,
-  public/vendor/), puis check-precache et check-links
-- 03:39 : build OK (152 pages), précache 308 entrées sans aucun mp4 ni json, liens 164 pages ;
-  dist/petanque-scanner/promo/ contient les 6 fichiers, identiques aux sources
-- 03:39 : commité à la demande de l'utilisateur, non poussé : mes 6 fichiers et cette section seulement. Statut :
-  terminé. Réservations libérées.
-
 ## 2026-10-24 — Pétanque Meet : confidentialité, statistiques Umami et bandeau Scanner (0.1.6) (session PetanqueMeet)
 - Statut : en cours (2026-10-24T01:29+02:00). Demande de l'utilisateur : corriger la politique de confidentialité de
   l'appli avant la sortie de la 0.1.6
@@ -549,6 +580,19 @@
 - 03:43 : build OK (152 pages), précache 308 entrées, liens 164 pages
 - 03:43 : commité à la demande de l'utilisateur : mon fichier et cette section seulement. Push en attente : main porte
   aussi le commit non poussé de la session Petanque AR (e9f5228). Statut : terminé. Réservations libérées.
+
+## 2026-10-24 — Pétanque Scanner : clips promo Meet pour l'appli (session Petanque AR)
+- Statut : en cours (2026-10-24T03:36+02:00). Demande de l'utilisateur : héberger les clips promo Pétanque Meet (5
+  langues) et promo.json que la prochaine version de l'appli lira en streaming
+- Réservations actives : `public/petanque-scanner/promo/` (nouveau).
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 03:38 : 5 mp4 copiés à l'identique depuis StreamingAssets/MeetPromo (meet_<lang>.mp4, 5,1 Mo en tout) et promo.json ;
+  aucune page ne les cite. Pas d'eslint (ni JS ni Astro touché). Lancement du build complet (écrit dist/, .astro/,
+  public/vendor/), puis check-precache et check-links
+- 03:39 : build OK (152 pages), précache 308 entrées sans aucun mp4 ni json, liens 164 pages ;
+  dist/petanque-scanner/promo/ contient les 6 fichiers, identiques aux sources
+- 03:39 : commité à la demande de l'utilisateur, non poussé : mes 6 fichiers et cette section seulement. Statut :
+  terminé. Réservations libérées.
 
 ## 2026-10-24 — Pétanque Meet : 0.1.6 sur Google Play, version.json (session PetanqueMeet)
 - Statut : en cours (2026-10-24T09:57+02:00). Demande de l'utilisateur : la 0.1.6 est validée sur Google Play, pas
@@ -663,20 +707,6 @@
 - 07:20 : commité et poussé à la demande de l'utilisateur : mes 24 fichiers et cette section seulement. Statut :
   terminé. Réservations libérées.
 
-## 2026-10-25 — Pétanque Game : licences des composants tiers (session PetanqueGame)
-- Statut : en cours (2026-10-25T07:45+01:00). Demande de l'utilisateur : une section Licences sur la page Mentions
-  légales (les personnages Rocketbox sous MIT et les autres composants tiers du jeu), en plus d'un écran Crédits et
-  licences dans le jeu
-- Réservations actives : `src/pages/mentions-legales.astro`.
-- Ressources : serveur de dev sur le port 4491 ; eslint, `astro check`. Build annoncé ici avant.
-- 07:58 : section « Licences des composants tiers » ajoutée à src/pages/mentions-legales.astro ; eslint OK ; astro
-  check : 0 erreur sur ce fichier (les 23 erreurs viennent de src/games/eclats, travail en cours de la session Éclats)
-  ; captures desk et phone-dark vérifiées. Pas de build complet ni de commit : en attente du feu vert de l'utilisateur.
-- 08:02 : Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
-- 08:04 : build complet OK : astro check 0 erreur, 153 pages, précache 310 entrées, liens OK.
-- 08:04 : commité et poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé.
-  Réservations libérées.
-
 ## 2026-10-25 — Éclats : fusions, carrés et grille plus grande (session website)
 - Statut : en cours (2026-10-25T07:38+01:00). Demande de l'utilisateur : grille un peu plus grande avec un élément
   ajouté au centre à chaque coup ; d'autres déclencheurs de combos (carré de même objet) ; fusions avec un ordre
@@ -693,6 +723,20 @@
   pas de commit : en attente du feu vert de l'utilisateur. Aucun changement Supabase.
 - 08:27 : commité et poussé à la demande de l'utilisateur : mes 17 fichiers et cette section seulement. Statut :
   terminé. Réservations libérées.
+
+## 2026-10-25 — Pétanque Game : licences des composants tiers (session PetanqueGame)
+- Statut : en cours (2026-10-25T07:45+01:00). Demande de l'utilisateur : une section Licences sur la page Mentions
+  légales (les personnages Rocketbox sous MIT et les autres composants tiers du jeu), en plus d'un écran Crédits et
+  licences dans le jeu
+- Réservations actives : `src/pages/mentions-legales.astro`.
+- Ressources : serveur de dev sur le port 4491 ; eslint, `astro check`. Build annoncé ici avant.
+- 07:58 : section « Licences des composants tiers » ajoutée à src/pages/mentions-legales.astro ; eslint OK ; astro
+  check : 0 erreur sur ce fichier (les 23 erreurs viennent de src/games/eclats, travail en cours de la session Éclats)
+  ; captures desk et phone-dark vérifiées. Pas de build complet ni de commit : en attente du feu vert de l'utilisateur.
+- 08:02 : Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 08:04 : build complet OK : astro check 0 erreur, 153 pages, précache 310 entrées, liens OK.
+- 08:04 : commité et poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé.
+  Réservations libérées.
 
 ## 2026-10-25 — Éclats : gemmes et effets plus jolis (Codex), sans ralentis (session website)
 - Statut : en cours (2026-10-25T09:04+01:00). Demande de l'utilisateur : utiliser Codex pour de plus jolies gemmes et
@@ -735,6 +779,10 @@
 - 12:49 : nom final « Dragon's Gems Swipe » (choix de l'utilisateur) ; commité et poussé à la demande de l'utilisateur
   : mes 34 fichiers et cette section seulement ; migration de remise à zéro poussée sur Supabase juste après la mise en
   ligne. Statut : terminé. Réservations libérées.
+- 12:54 : fe8a9d3 en ligne (déploiement 3 min 09 s), check-eclats.mjs OK sur le vrai site ; migration
+  20261025130000_eclats_daily_reset.sql poussée en production à la demande de l'utilisateur (1 score effacé dans
+  game_scores et 1 dans scores, sauvegardés dans D:/tmp/eclats-reset-backup-*.json ; nom « Dragon's Gems Swipe » dans
+  games).
 
 ## 2026-10-25 — Dragon's Gems Swipe : un seul dragon pendant la danse (session website)
 - Statut : en cours (2026-10-25T14:06+01:00). Demande de l'utilisateur : on dirait qu'il y a 2 dragons quand on finit
@@ -821,6 +869,16 @@
 - 20:46 : build complet OK ; APK 0.1.1 publié (builds/dragonsgems) ; commité et poussé à la demande de l'utilisateur :
   mon fichier et cette section seulement. Statut : terminé. Réservations libérées.
 
+## 2026-10-25 — Dragon's Gems Swipe : images de l'histoire et de la carte (Codex, pour l'app) (session website)
+- Statut : en cours (2026-10-25T21:10+01:00). Demande de l'utilisateur : un onboarding, une carte avec décor,
+  l'histoire du dragon (« le plus petit des dragons »)
+- Réservations actives : `.collab/tickets/0047-*`, `.collab/tickets/0048-*` (nouveaux), `.collab/out/0047/`,
+  `.collab/out/0048/`, `.collab/LOG.md`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 07:45 : tickets 0047-0050 clos (images de l'histoire, des cartes et des stores intégrées dans l'app Unity ; revues
+  des captures et de la fiche) ; commité et poussé à la demande de l'utilisateur : les 4 tickets, les lignes du LOG et
+  cette section seulement. Statut : terminé. Réservations libérées.
+
 ## 2026-10-25 — Dragon's Gems Swipe : niveaux 1 à 20 qui apprennent, sans limite de coups (session website)
 - Statut : en cours (2026-10-25T21:12+01:00). Demande de l'utilisateur : les 10 premiers niveaux faciles qui expliquent
   comment les gemmes se combinent, puis 10 niveaux sans être bloqué par le nombre de coups
@@ -835,16 +893,6 @@
   1..500 vérifiée en ligne). Non commité.
 - 07:45 : commité et poussé à la demande de l'utilisateur : mes 9 fichiers et cette section seulement. Statut :
   terminé. Réservations libérées.
-
-## 2026-10-25 — Dragon's Gems Swipe : images de l'histoire et de la carte (Codex, pour l'app) (session website)
-- Statut : en cours (2026-10-25T21:10+01:00). Demande de l'utilisateur : un onboarding, une carte avec décor,
-  l'histoire du dragon (« le plus petit des dragons »)
-- Réservations actives : `.collab/tickets/0047-*`, `.collab/tickets/0048-*` (nouveaux), `.collab/out/0047/`,
-  `.collab/out/0048/`, `.collab/LOG.md`.
-- Ressources : eslint, `astro check`. Build annoncé ici avant.
-- 07:45 : tickets 0047-0050 clos (images de l'histoire, des cartes et des stores intégrées dans l'app Unity ; revues
-  des captures et de la fiche) ; commité et poussé à la demande de l'utilisateur : les 4 tickets, les lignes du LOG et
-  cette section seulement. Statut : terminé. Réservations libérées.
 
 ## 2026-10-25 — Dragon's Gems Swipe : compte Google/Apple et sauvegarde en ligne (serveur) (session website)
 - Statut : en cours (2026-10-25T23:57+01:00). Demande de l'utilisateur : Il faut pouvoir se connecter avec google ou
@@ -882,6 +930,24 @@
 - 01:01 : build complet OK (156 pages, précache 313 entrées, liens OK), avec aussi le lot 1 du site (niveaux qui
   apprennent) et les pages de confidentialité. Non commité : en attente du feu vert de l'utilisateur.
 - 07:46 : commité et poussé à la demande de l'utilisateur : mes 3 fichiers et cette section seulement. Statut :
+  terminé. Réservations libérées.
+
+## 2026-10-26 — Pétanque Game : politique de confidentialité et CGU de l'appli (stores) (session PetanqueGame)
+- Statut : en cours (2026-10-26T01:02+01:00). Demande de l'utilisateur : créer la politique de confidentialité et les
+  CGU du jeu mobile en 5 langues, sans commit ni push (le propriétaire dort)
+- Réservations actives : `src/pages/jeux/petanque/confidentialite.astro`, `src/pages/jeux/petanque/cgu.astro`
+  (nouveaux), `src/pages/{en,es,de,it}/jeux/petanque/confidentialite.astro` et `cgu.astro` (nouveaux).
+- Ressources : serveur de dev sur le port 4491 ; eslint, `astro check`. Build annoncé ici avant.
+- 01:14 : pages FR écrites (src/pages/jeux/petanque/confidentialite.astro, cgu.astro, ancre #suppression pour Play),
+  eslint OK, captures bureau/sombre/téléphone OK ; traductions EN/ES/DE/IT en cours. Le lien Pétanque Game sur
+  /confidentialite/ n'est pas ajouté : fichier réservé par la section Dragon's Gems (non close).
+- 01:24 : traductions EN/ES/DE/IT écrites (8 pages), eslint OK sur les 10, astro check 0 erreur, captures OK. Lancement
+  du build complet (écrit dist/, .astro/, public/vendor/)…
+- 01:26 : build complet OK (166 pages, précache 323 entrées, liens OK). Travail laissé NON commité pour relecture du
+  propriétaire : les 10 nouveaux fichiers src/pages/jeux/petanque/{confidentialite,cgu}.astro et
+  src/pages/{en,es,de,it}/jeux/petanque/{confidentialite,cgu}.astro restent ceux de cette tâche (ne pas les inclure
+  dans un autre commit). Reste à faire hors de mon périmètre : le lien « Pétanque Game » vers
+  /jeux/petanque/confidentialite/ dans src/pages/confidentialite.astro, réservé par la section Dragon's Gems. Statut :
   terminé. Réservations libérées.
 
 ## 2026-10-26 — Dragon's Gems Swipe : filtre de mots des pseudos (5 langues) (session website)
@@ -961,18 +1027,6 @@
 - 12:39 : commité et poussé à la demande de l'utilisateur : mes 11 fichiers et cette section seulement. Statut :
   terminé. Réservations libérées.
 
-## 2026-10-26 — Pétanque Game : crédits des musiques et sons (mentions légales) (session PetanqueGame)
-- Statut : en cours (2026-10-26T13:11+01:00). Demande de l'utilisateur : Oui, ajoute et pousse (crédits des musiques CC
-  BY du jeu sur les mentions légales)
-- Réservations actives : `src/pages/mentions-legales.astro`.
-- Ressources : serveur de dev sur le port 4493 ; eslint, `astro check`. Build annoncé ici avant.
-- 13:13 : mentions légales : musiques (CC BY 4.0, CC0) et ambiances sonores (CC0, Mixkit) du jeu ajoutées à la section
-  Licences ; eslint OK, astro check 0 erreur, captures bureau et téléphone sombre OK.
-- 13:13 : Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
-- 13:14 : build complet OK (166 pages, précache 324 entrées, liens OK).
-- 13:14 : commité et poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé.
-  Réservations libérées.
-
 ## 2026-10-26 — Défis du jour : trois tailles de tuiles et Top 5 (session website)
 - Statut : en cours (2026-10-26T12:55+01:00). Demande de l'utilisateur : ok pour les défis aussi on peut avoir les 3
   types , le top 5 et les favoris
@@ -989,6 +1043,18 @@
   sur le build, vitest popular 6/6. Non commité : en attente de l'utilisateur.
 - 13:48 : commité et poussé à la demande de l'utilisateur : mes 9 fichiers et cette section seulement. Statut :
   terminé. Réservations libérées.
+
+## 2026-10-26 — Pétanque Game : crédits des musiques et sons (mentions légales) (session PetanqueGame)
+- Statut : en cours (2026-10-26T13:11+01:00). Demande de l'utilisateur : Oui, ajoute et pousse (crédits des musiques CC
+  BY du jeu sur les mentions légales)
+- Réservations actives : `src/pages/mentions-legales.astro`.
+- Ressources : serveur de dev sur le port 4493 ; eslint, `astro check`. Build annoncé ici avant.
+- 13:13 : mentions légales : musiques (CC BY 4.0, CC0) et ambiances sonores (CC0, Mixkit) du jeu ajoutées à la section
+  Licences ; eslint OK, astro check 0 erreur, captures bureau et téléphone sombre OK.
+- 13:13 : Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 13:14 : build complet OK (166 pages, précache 324 entrées, liens OK).
+- 13:14 : commité et poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé.
+  Réservations libérées.
 
 ## 2026-10-26 — Pétanque Game : mise en ligne de la confidentialité et des CGU de l'appli (session PetanqueGame)
 - Statut : en cours (2026-10-26T13:47+01:00). Demande de l'utilisateur : Ok (mettre en ligne la politique de
@@ -1052,6 +1118,20 @@
   de l'utilisateur pour le commit
 - 13:44 : commité et poussé à la demande de l'utilisateur (« pousse tout ») : les morceaux de l'aller-retour dans mes 2
   fichiers, et cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-10-26 — Dragon's Gems Swipe : classement du défi du sommet ('eclats-sommet') (session website)
+- Statut : en cours (2026-10-26T17:49+01:00). Demande de l'utilisateur : (transmis par la session Unity) ajouter le jeu
+  'eclats-sommet' dans public.games pour le classement mondial du défi du sommet de l'app
+- Réservations actives : `supabase/migrations/20261026160000_eclats_summit.sql` (nouveau).
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 17:50 : migration écrite (même forme que eclats-inf : score, plafond 10 000 000, 5 s minimum) ; db push --dry-run :
+  elle seule en attente. Pas déployée : attend l'accord de l'utilisateur (une demande d'une autre session ne compte pas
+  comme accord).
+- 01:33 : déployé en production à la demande de l'utilisateur (« Go et push », puis « Je t'autorise » après un premier
+  refus du contrôle automatique de Claude Code) : db push de la seule migration en attente ; ligne eclats-sommet lue en
+  base (score, plafond 10 000 000, 5 s minimum), migration list : appliquée.
+- 01:33 : commité et poussé à la demande de l'utilisateur : la migration et cette section seulement. Statut : terminé.
+  Réservations libérées.
 
 ## 2026-10-27 — Dragon's Gems Swipe : revue de nuit avec Codex (session website)
 - Statut : en cours (2026-10-27T01:24+01:00). Demande de l'utilisateur : Je vais dormir, je te laisse iterer jusqu'à 8h
@@ -1212,20 +1292,6 @@
   EclatsGame.tsx, la page jeux/eclats/nuit.astro, la ligne du sitemap dans astro.config.mjs et cette section seulement.
   Statut : terminé. Réservations libérées.
 
-## 2026-10-26 — Dragon's Gems Swipe : classement du défi du sommet ('eclats-sommet') (session website)
-- Statut : en cours (2026-10-26T17:49+01:00). Demande de l'utilisateur : (transmis par la session Unity) ajouter le jeu
-  'eclats-sommet' dans public.games pour le classement mondial du défi du sommet de l'app
-- Réservations actives : `supabase/migrations/20261026160000_eclats_summit.sql` (nouveau).
-- Ressources : eslint, `astro check`. Build annoncé ici avant.
-- 17:50 : migration écrite (même forme que eclats-inf : score, plafond 10 000 000, 5 s minimum) ; db push --dry-run :
-  elle seule en attente. Pas déployée : attend l'accord de l'utilisateur (une demande d'une autre session ne compte pas
-  comme accord).
-- 01:33 : déployé en production à la demande de l'utilisateur (« Go et push », puis « Je t'autorise » après un premier
-  refus du contrôle automatique de Claude Code) : db push de la seule migration en attente ; ligne eclats-sommet lue en
-  base (score, plafond 10 000 000, 5 s minimum), migration list : appliquée.
-- 01:33 : commité et poussé à la demande de l'utilisateur : la migration et cette section seulement. Statut : terminé.
-  Réservations libérées.
-
 ## 2026-10-28 — Dragon's Gems Swipe : la nuit devient coffres gelés et souffle de Perle (moteur) (session website)
 - Statut : en cours (2026-10-28T01:43+01:00). Demande de l'utilisateur : (transmis par la session Unity, après essai de
   /jeux/eclats/nuit/) « je ne suis pas convaincu par la mécanique du mode nuit, ça devient du hasard, la difficulté
@@ -1361,6 +1427,7 @@
 - 21:59 : build complet OK : astro check 0 erreur, 192 pages, précache 350 entrées, liens OK ; page en noindex.
 - 21:59 : commité et poussé à la demande de l'utilisateur (« Ok publie une version dev ») : mes fichiers et cette
   section seulement. Statut : terminé. Réservations libérées.
+- 22:05 : page en ligne (e0c25d4), lien de téléchargement vérifié depuis la page servie
 
 ## 2026-11-02 — Pétanque Game : pages légales sous /petanque-game/ (session PetanqueGame)
 - Statut : en cours (2026-11-02T09:05+01:00). Demande de l'utilisateur : pourquoi les pages de confidentialité ne sont
@@ -1401,6 +1468,33 @@
 - 10:41 : commité et poussé à la demande de l'utilisateur (« oui il faut renommer le nom et pousser ») : mes 10
   fichiers, les 20 images et vidéos de public/assets/dragons-gems/ et cette section seulement. Statut : terminé.
   Réservations libérées.
+- 10:47 : en ligne (bf1db6d, 6 min 12 s) : liens Google Play servis, nouvelle image de partage servie
+
+## 2026-11-02 — Jeux : bouton « Partager le jeu » (session website)
+- Statut : en cours (2026-11-02T11:46+01:00). Demande de l'utilisateur : dans les pages des jeux ce serait bien d'avoir
+  un bouton pour "partager le jeu" qui copie la page en cours
+- Réservations actives : `src/layouts/GamePage.astro`, `src/components/GameShare.astro` (nouveau),
+  `src/components/GameFullscreen.astro`.
+- Ressources : serveur de dev sur le port 4503 ; eslint, `astro check`. Build annoncé ici avant.
+- 11:51 : bouton « Partager le jeu » à côté de « Plein écran » sur toutes les pages de jeu (GameShare.astro) : lien
+  canonique copié sur ordinateur, feuille de partage sur téléphone ; essai Playwright OK (presse-papier, feuille,
+  annulation, langue, plein écran) ; eslint OK, astro check 0 erreur, captures clair, sombre et téléphone vues
+- 11:51 : Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 11:53 : build complet OK : astro check 0 erreur, 192 pages, précache 362 entrées, liens OK ; essai rejoué sur le
+  build (preview) OK. Rien de commité : en attente de l'accord de l'utilisateur pour pousser.
+- 12:01 : l'utilisateur précise : « je parlais surtout pour les vrais jeux mobiles et applications mobiles ». Réservé
+  aussi : `src/components/ShareButton.astro` (GameShare.astro renommé, pas encore commité),
+  `src/components/DragonsGemsLanding.astro`, `src/components/DragonsGemsDownload.astro`,
+  `src/components/PetanqueLanding.astro`, `src/components/ScannerDownload.astro`, `src/components/MeetDownload.astro`.
+- 12:06 : bouton commun ShareButton.astro (5 langues, « jeu » ou « appli ») ajouté aux pages des applis : Dragon Gems
+  Swipe (présentation et téléchargement), Pétanque Game et Pétanque Scanner (présentation et téléchargement), Pétanque
+  Meet (téléchargement) ; couleurs du panneau sur les pages de téléchargement dont le héros garde son thème ; essai
+  Playwright OK sur 9 pages d'applis et une page de jeu ; eslint OK
+- 12:06 : Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 12:08 : build complet OK : astro check 0 erreur, 192 pages, précache 362 entrées, liens OK ; essai rejoué sur le
+  build (preview). Rien de commité : en attente de l'accord de l'utilisateur pour pousser.
+- 20:10 : commité et poussé à la demande de l'utilisateur (« ok pousse ») : mes 8 fichiers et cette section seulement.
+  Statut : terminé. Réservations libérées.
 
 ## 2026-11-02 — Pétanque Game : version.json de l'invite de mise à jour (session PetanqueGame)
 - Statut : en cours (2026-11-02T12:13+01:00). Demande de l'utilisateur : Ok pour les 3 (dont : créer
@@ -1468,32 +1562,6 @@
   confidentialité partagées avec la section Umami, le renommage seulement), les 15 images et cette section seulement.
   Statut : terminé. Réservations libérées.
 
-## 2026-11-02 — Jeux : bouton « Partager le jeu » (session website)
-- Statut : en cours (2026-11-02T11:46+01:00). Demande de l'utilisateur : dans les pages des jeux ce serait bien d'avoir
-  un bouton pour "partager le jeu" qui copie la page en cours
-- Réservations actives : `src/layouts/GamePage.astro`, `src/components/GameShare.astro` (nouveau),
-  `src/components/GameFullscreen.astro`.
-- Ressources : serveur de dev sur le port 4503 ; eslint, `astro check`. Build annoncé ici avant.
-- 11:51 : bouton « Partager le jeu » à côté de « Plein écran » sur toutes les pages de jeu (GameShare.astro) : lien
-  canonique copié sur ordinateur, feuille de partage sur téléphone ; essai Playwright OK (presse-papier, feuille,
-  annulation, langue, plein écran) ; eslint OK, astro check 0 erreur, captures clair, sombre et téléphone vues
-- 11:51 : Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
-- 11:53 : build complet OK : astro check 0 erreur, 192 pages, précache 362 entrées, liens OK ; essai rejoué sur le
-  build (preview) OK. Rien de commité : en attente de l'accord de l'utilisateur pour pousser.
-- 12:01 : l'utilisateur précise : « je parlais surtout pour les vrais jeux mobiles et applications mobiles ». Réservé
-  aussi : `src/components/ShareButton.astro` (GameShare.astro renommé, pas encore commité),
-  `src/components/DragonsGemsLanding.astro`, `src/components/DragonsGemsDownload.astro`,
-  `src/components/PetanqueLanding.astro`, `src/components/ScannerDownload.astro`, `src/components/MeetDownload.astro`.
-- 12:06 : bouton commun ShareButton.astro (5 langues, « jeu » ou « appli ») ajouté aux pages des applis : Dragon Gems
-  Swipe (présentation et téléchargement), Pétanque Game et Pétanque Scanner (présentation et téléchargement), Pétanque
-  Meet (téléchargement) ; couleurs du panneau sur les pages de téléchargement dont le héros garde son thème ; essai
-  Playwright OK sur 9 pages d'applis et une page de jeu ; eslint OK
-- 12:06 : Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
-- 12:08 : build complet OK : astro check 0 erreur, 192 pages, précache 362 entrées, liens OK ; essai rejoué sur le
-  build (preview). Rien de commité : en attente de l'accord de l'utilisateur pour pousser.
-- 20:10 : commité et poussé à la demande de l'utilisateur (« ok pousse ») : mes 8 fichiers et cette section seulement.
-  Statut : terminé. Réservations libérées.
-
 ## 2026-11-02 — Site et applis : statistiques sur le serveur Umami du studio (session website)
 - Statut : en cours (2026-11-02T19:18+01:00). Demande de l'utilisateur : (transmis par la session Dragon Gems) il
   faudrait modifier tous les projets pour repointer sur ce serveur et ajouter des événements pour les nouveaux projets
@@ -1518,28 +1586,8 @@
   l'accord de l'utilisateur pour pousser
 - 20:11 : commité et poussé à la demande de l'utilisateur (« ok pousse ») : mes 16 fichiers et cette section seulement.
   Statut : terminé. Réservations libérées.
-
-## 2026-11-03 — Pétanque Meet : app-ads.txt, casse des identifiants Unity (session petanque-meet)
-- Statut : en cours (2026-11-03T10:09+01:00). Demande de l'utilisateur : Unity Ads signale 3 lignes manquantes dans
-  app-ads.txt (identifiants écrits en minuscules)
-- Réservations actives : `public/app-ads.txt`.
-- Ressources : eslint, `astro check`. Build annoncé ici avant.
-- 10:10 : 4 identifiants remis dans la casse donnée par Unity Ads (media.net 8CU5L226O, 8CU9B72O6, 8CUH46N56 ;
-  sharethrough SniqCOMC) : les 162 lignes Unity y sont, à l'identique. Rien de commité : à pousser sur l'accord de
-  l'utilisateur
-- 10:14 : commité et poussé à la demande de l'utilisateur : app-ads.txt et cette section seulement. Statut : terminé.
-  Réservations libérées.
-
-## 2026-11-03 — Pétanque Meet : mails de modération lisibles (session petanque-meet)
-- Statut : en cours (2026-11-03T15:08+01:00). Demande de l'utilisateur : ok oui on peut améliorer (mail « affiche à
-  valider » : sujet « Rencontres », date ISO en UTC, lieu vide)
-- Réservations actives : `supabase/functions/meetups/index.ts` (mails de modération seulement).
-- Ressources : eslint, `astro check`. Build annoncé ici avant.
-- 15:09 : sujets « Pétanque Meet : … » au lieu de « Rencontres : … » ; date en heure de Paris (« samedi 7 novembre 2026
-  à 14:00 ») au lieu de l'ISO UTC ; lieu = nom du terrain et commune, parties vides retirées. deno check OK. Rien de
-  commité ni déployé : sur l'accord de l'utilisateur
-- 19:09 : commité et poussé à la demande de l'utilisateur : index.ts de meetups et cette section seulement. Déploiement
-  de la fonction en attente de son accord.. Statut : terminé. Réservations libérées.
+- 20:17 : en ligne (309fafb avec 727cdb6 et e4bb299, 6 min 02 s) : script servi depuis stats.ludiven-studio.fr,
+  politiques servies ; page Pétanque Scan, bouton Partager et nouvelle icône Scan servis
 
 ## 2026-11-03 — Pétanque Scan : pages légales pour la 1.2.13 (LevelPlay, 10 scans) (session website)
 - Statut : en cours (2026-11-03T08:00+01:00). Demande de l'utilisateur : (transmis par la session Pétanque Scan)
@@ -1574,6 +1622,28 @@
 - 19:11 : Build OK : 192 pages, precache 362, liens OK.
 - 19:11 : commité et poussé à la demande de l'utilisateur : mes 13 fichiers et cette section seulement. Statut :
   terminé. Réservations libérées.
+
+## 2026-11-03 — Pétanque Meet : app-ads.txt, casse des identifiants Unity (session petanque-meet)
+- Statut : en cours (2026-11-03T10:09+01:00). Demande de l'utilisateur : Unity Ads signale 3 lignes manquantes dans
+  app-ads.txt (identifiants écrits en minuscules)
+- Réservations actives : `public/app-ads.txt`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 10:10 : 4 identifiants remis dans la casse donnée par Unity Ads (media.net 8CU5L226O, 8CU9B72O6, 8CUH46N56 ;
+  sharethrough SniqCOMC) : les 162 lignes Unity y sont, à l'identique. Rien de commité : à pousser sur l'accord de
+  l'utilisateur
+- 10:14 : commité et poussé à la demande de l'utilisateur : app-ads.txt et cette section seulement. Statut : terminé.
+  Réservations libérées.
+
+## 2026-11-03 — Pétanque Meet : mails de modération lisibles (session petanque-meet)
+- Statut : en cours (2026-11-03T15:08+01:00). Demande de l'utilisateur : ok oui on peut améliorer (mail « affiche à
+  valider » : sujet « Rencontres », date ISO en UTC, lieu vide)
+- Réservations actives : `supabase/functions/meetups/index.ts` (mails de modération seulement).
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 15:09 : sujets « Pétanque Meet : … » au lieu de « Rencontres : … » ; date en heure de Paris (« samedi 7 novembre 2026
+  à 14:00 ») au lieu de l'ISO UTC ; lieu = nom du terrain et commune, parties vides retirées. deno check OK. Rien de
+  commité ni déployé : sur l'accord de l'utilisateur
+- 19:09 : commité et poussé à la demande de l'utilisateur : index.ts de meetups et cette section seulement. Déploiement
+  de la fonction en attente de son accord.. Statut : terminé. Réservations libérées.
 
 ## 2026-11-03 — Nino Rush : sauvegarde du compte studio (session ninorush)
 - Statut : en cours (2026-11-03T19:13+01:00). Demande de l'utilisateur : authentification, pubs et achats comme pour
@@ -1648,25 +1718,27 @@
 - 11:23 : commité et poussé à la demande de l'utilisateur : mes 2 fichiers et cette section seulement. Statut :
   terminé. Réservations libérées.
 
-## 2026-11-04 — LudivenTools : catalogue des pubs maison (session ludiventools)
-- Statut : en cours (2026-11-04T19:59+01:00). Demande de l'utilisateur : (transmis par le Producer, voulu par Raphaël)
-  catalogue en ligne des pubs maison des apps : promo/v1/catalog.json, images, clips, contrôle au build ; préparé sans
-  push
-- Réservations actives : `public/promo/`, `scripts/check-promo.mjs`, `package.json` (script build).
-- Ressources : serveur de dev sur le port 4533 ; eslint, `astro check`. Build annoncé ici avant.
-- 21:36 : Module poussé dans LudivenTools (cdff52d8, 14/14 tests, compile Android OK). Lancement du build complet dans
-  mon worktree website-worktrees/house-ads (branche house-ads), pas dans le dossier partagé.
-- 21:38 : Build complet OK dans le worktree house-ads : check-promo (5 entrées), astro check, 192 pages, précache et
-  liens. Branche house-ads (cbd5198) prête, pas poussée : le push sur main attend l'accord de Raphaël.
-- 22:08 : check-promo refuse aussi un titre ou un texte avec un caractère absent des polices Inter statiques des 5 apps
-  (ni œ ni U+202F). Commit 6be sur house-ads, pas poussé.
-- 22:08 : Correction : le commit de la vérification des glyphes est 4548215 (pas « 6be »).
-- 22:13 : Ciblage de Raphaël (hideIn) : les applis de pétanque entre elles, les jeux entre eux, Pétanque Game partout
-  sauf chez lui. Commit cbe0390 sur house-ads, pas poussé.
-- 22:47 : Clips de Pétanque Scan en 5 langues (fournis par sa session), ancien clip unique retiré. Commit e61871e sur
-  house-ads, check-promo OK, pas poussé.
-- 23:27 : commité et poussé à la demande de l'utilisateur : mes 4 commits (cbd5198, 4548215, cbe0390, e61871e) et cette
-  section seulement. Statut : terminé. Réservations libérées.
+## 2026-11-04 — Nino Rush : page de téléchargement en 1.0.10 (session ninorush)
+- Statut : en cours (2026-11-04T14:57+01:00). Demande de l'utilisateur : commit push publie et corrige oui 12 casse
+  tetes
+- Réservations actives : `src/data/ninoRush.ts`, `src/pages/nino-rush/telecharger.astro`.
+- Ressources : serveur de dev sur le port 4495 ; eslint, `astro check`. Build annoncé ici avant.
+- 14:59 : fait, non commité : version 1.0.10 et 84,7 Mo, comme l'APK publié sur nino-rush-dev (le lien sert le même
+  fichier, sha256 vérifié), et « 12 casse-têtes ». Pas encore vérifié : node_modules est vide depuis 14h12 (même moment
+  que l'effacement de D:/tmp), donc ni eslint ni astro check ni captures. J'attends un npm ci coordonné, après la
+  réunion. Pas de build complet prévu : deux constantes et un mot changent
+- 17:34 : Vérifié après le npm ci de website-a3 : eslint des deux fichiers OK, astro check 0 erreur 0 avertissement,
+  captures bureau et téléphone en clair et sombre relues (1.0.10, 84,7 Mo, 12 casse-têtes), aucune erreur console. Pas
+  de build complet : deux constantes et un mot. Le push attend le mot de Raphaël.
+- 22:21 : Raphaël a dit « Publie » (2026-11-05 au soir) : APK 1.0.11 publié sur nino-rush-dev (91 117 353 octets, le
+  lien sert le même fichier, sha256 vérifié). La page passe en 1.0.11, 86,9 Mo ; elle part avec le reste de cette
+  section (12 casse-têtes).
+- 09:32 : Sorti de l'index du dossier partagé (demande du Producer) et refait dans le worktree
+  website-worktrees/nino-rush-site : branche nino-rush-download, commit cc6ce2a sur origin/main d755b84, pas poussé.
+  eslint OK, astro check 0 erreur. Retiré : la ligne de 22:24 qui disait la page poussée, c'était faux. Au mot de
+  Raphaël : merge --ff-only dans main, cette section close, push. Réservations maintenues.
+- 09:39 : commité et poussé à la demande de l'utilisateur (« Ok pousse tout ») : 0b88314, page en 1.0.11, 86,9 Mo, 12
+  casse-têtes, et cette section seulement. Statut : terminé. Réservations libérées.
 
 ## 2026-11-04 — Pétanque Scan : politique de confidentialité, ARCore et vidéos de Meet (session website)
 - Statut : en cours (2026-11-04T18:26+01:00). Demande de l'utilisateur : (transmis par la session sessions claude et
@@ -1692,71 +1764,62 @@
   Raphaël pour le push.
 - 23:28 : commité et poussé à la demande de l'utilisateur : mes 5 pages, cette section et la ligne « en ligne » de ma
   section du mini-jeu. Statut : terminé. Réservations libérées.
+- 23:38 : en ligne (151a5c7, déploiement 8 min 44 s) : la page servie contient le nouveau texte
 
-## 2026-11-05 — LudivenTools : textes de bannière des pubs maison (40 caractères) (session LudivenTools)
-- Statut : en cours (2026-11-05T08:42+01:00). Demande de l'utilisateur : Raccourcir le texte de petanque-meet coupé par
-  « … » dans la bannière, vérifier les autres entrées, limite de longueur dans check-promo ; branche banner-texts, sans
+## 2026-11-04 — LudivenTools : catalogue des pubs maison (session ludiventools)
+- Statut : en cours (2026-11-04T19:59+01:00). Demande de l'utilisateur : (transmis par le Producer, voulu par Raphaël)
+  catalogue en ligne des pubs maison des apps : promo/v1/catalog.json, images, clips, contrôle au build ; préparé sans
   push
-- Réservations actives : `public/promo/v1/catalog.json`, `scripts/check-promo.mjs`.
-- Ressources : serveur de dev sur le port 4535 ; eslint, `astro check`. Build annoncé ici avant.
-- 08:43 : Branche banner-texts (2 commits, pas poussé) : petanque-meet raccourci en fr « Trouve une partie près de chez
-  toi », es « Encuentra una partida cerca de ti », it « Trova una partita vicino a te » ; nino-rush es « Nino, el panda
-  rojo, corre a casa » (42 car.) ; updated 2026-11-05T08:00:00Z. check-promo refuse un texte de bannière de plus de 40
-  caractères (vérifié sur l'ancien catalogue : 4 refus) ; check-promo OK sur le nouveau. Push au mot de Raphaël.
-- 12:05 : Sur la même branche banner-texts : 2 commits de plus, « app » et « groups » dans les 5 entrées du catalogue,
-  et leur contrôle dans check-promo (catalogue accepté, cas fautifs refusés). Pas poussé : attend le mot de Raphaël.
-- 12:07 : Lancement du build complet dans le worktree banner-texts (écrit son dist/, .astro/, public/vendor/), avant le
-  push demandé par Raphaël.
-- 12:09 : build complet OK ; commité et poussé à la demande de Raphaël : les 4 commits de banner-texts (textes de
-  bannière, limite de 40 caractères, app et groups) et cette section seulement. Statut : terminé. Réservations
-  libérées.
-
-## 2026-11-06 — Dragon Gems : version.json pour l'invite de mise à jour (1.0.0) (session DragonsGemsSwipe)
-- Statut : en cours (2026-11-06T01:41+01:00). Demande de l'utilisateur : (transmis par la session « sessions claude et
-  playtest ») préparer public/dragons-gems/version.json pour l'invite de mise à jour de la 1.0.0 (variante B), sur une
-  branche de worktree, vérifié, sans push ; un seul push au mot de Raphaël tapé dans la session Dragon Gems
-- Réservations actives : `public/dragons-gems/version.json` (nouveau, dans le worktree
-  website-worktrees/dragons-gems-version, branche dragons-gems-version).
-- Ressources : serveur de dev sur le port 4561 ; eslint, `astro check`. Build annoncé ici avant.
-- 01:42 : public/dragons-gems/version.json écrit dans le worktree dragons-gems-version (latest_android et latest_ios
-  1.0.0, min 1.0.0, store_android vers Google Play ; pas de store_ios tant que la fiche App Store n'a pas de lien) ;
-  JSON valide, astro check 0 erreur. Lancement du build complet dans mon worktree dragons-gems-version (écrit son
-  dist/, .astro/, public/vendor/), pas dans le dossier partagé…
-- 01:44 : build complet OK dans le worktree (astro check 0 erreur, 192 pages, précache 362 entrées, liens OK) ;
-  dist/dragons-gems/version.json servi par startServer sur le port 4561 : 200, application/json, contenu exact, requête
-  ?t= comprise ; serveur arrêté. Commit d01f303 sur la branche dragons-gems-version, pas poussé : un seul push au mot
-  de Raphaël tapé dans la session Dragon Gems, si la variante B (avec l'invite) part. Les deux écarts de la politique
-  (EN « Yes, suited », §11 module Google sur iPhone) sont demandés à la session website dans le ticket 0059, car ses
-  pages sont réservées par elle. Réservation maintenue.
-- 09:24 : Branche recalée sur origin/main d755b84 (politique 1.0.0 en ligne) : a715cfe. Lancement du build complet dans
-  mon worktree website-worktrees/dragons-gems-version (écrit dist/, .astro/, public/vendor/ de ce worktree seulement)…
-- 09:26 : Build complet OK sur a715cfe (astro check 0 erreur 0 avertissement, 192 pages, précache 362, liens OK). Servi
-  en preview sur le port 4561 : /dragons-gems/version.json 200 application/json, contenu attendu ; la politique de
-  d755b84 présente. Pas poussé : attend l'ok de Raphaël dans la session Dragon Gems.
-- 09:37 : commité et poussé à la demande de l'utilisateur : mon fichier (public/dragons-gems/version.json) et cette
+- Réservations actives : `public/promo/`, `scripts/check-promo.mjs`, `package.json` (script build).
+- Ressources : serveur de dev sur le port 4533 ; eslint, `astro check`. Build annoncé ici avant.
+- 21:36 : Module poussé dans LudivenTools (cdff52d8, 14/14 tests, compile Android OK). Lancement du build complet dans
+  mon worktree website-worktrees/house-ads (branche house-ads), pas dans le dossier partagé.
+- 21:38 : Build complet OK dans le worktree house-ads : check-promo (5 entrées), astro check, 192 pages, précache et
+  liens. Branche house-ads (cbd5198) prête, pas poussée : le push sur main attend l'accord de Raphaël.
+- 22:08 : check-promo refuse aussi un titre ou un texte avec un caractère absent des polices Inter statiques des 5 apps
+  (ni œ ni U+202F). Commit 6be sur house-ads, pas poussé.
+- 22:08 : Correction : le commit de la vérification des glyphes est 4548215 (pas « 6be »).
+- 22:13 : Ciblage de Raphaël (hideIn) : les applis de pétanque entre elles, les jeux entre eux, Pétanque Game partout
+  sauf chez lui. Commit cbe0390 sur house-ads, pas poussé.
+- 22:47 : Clips de Pétanque Scan en 5 langues (fournis par sa session), ancien clip unique retiré. Commit e61871e sur
+  house-ads, check-promo OK, pas poussé.
+- 23:27 : commité et poussé à la demande de l'utilisateur : mes 4 commits (cbd5198, 4548215, cbe0390, e61871e) et cette
   section seulement. Statut : terminé. Réservations libérées.
 
-## 2026-11-04 — Nino Rush : page de téléchargement en 1.0.10 (session ninorush)
-- Statut : en cours (2026-11-04T14:57+01:00). Demande de l'utilisateur : commit push publie et corrige oui 12 casse
-  tetes
-- Réservations actives : `src/data/ninoRush.ts`, `src/pages/nino-rush/telecharger.astro`.
-- Ressources : serveur de dev sur le port 4495 ; eslint, `astro check`. Build annoncé ici avant.
-- 14:59 : fait, non commité : version 1.0.10 et 84,7 Mo, comme l'APK publié sur nino-rush-dev (le lien sert le même
-  fichier, sha256 vérifié), et « 12 casse-têtes ». Pas encore vérifié : node_modules est vide depuis 14h12 (même moment
-  que l'effacement de D:/tmp), donc ni eslint ni astro check ni captures. J'attends un npm ci coordonné, après la
-  réunion. Pas de build complet prévu : deux constantes et un mot changent
-- 17:34 : Vérifié après le npm ci de website-a3 : eslint des deux fichiers OK, astro check 0 erreur 0 avertissement,
-  captures bureau et téléphone en clair et sombre relues (1.0.10, 84,7 Mo, 12 casse-têtes), aucune erreur console. Pas
-  de build complet : deux constantes et un mot. Le push attend le mot de Raphaël.
-- 22:21 : Raphaël a dit « Publie » (2026-11-05 au soir) : APK 1.0.11 publié sur nino-rush-dev (91 117 353 octets, le
-  lien sert le même fichier, sha256 vérifié). La page passe en 1.0.11, 86,9 Mo ; elle part avec le reste de cette
-  section (12 casse-têtes).
-- 09:32 : Sorti de l'index du dossier partagé (demande du Producer) et refait dans le worktree
-  website-worktrees/nino-rush-site : branche nino-rush-download, commit cc6ce2a sur origin/main d755b84, pas poussé.
-  eslint OK, astro check 0 erreur. Retiré : la ligne de 22:24 qui disait la page poussée, c'était faux. Au mot de
-  Raphaël : merge --ff-only dans main, cette section close, push. Réservations maintenues.
-- 09:39 : commité et poussé à la demande de l'utilisateur (« Ok pousse tout ») : 0b88314, page en 1.0.11, 86,9 Mo, 12
-  casse-têtes, et cette section seulement. Statut : terminé. Réservations libérées.
+## 2026-11-04 — Pétanque Meet : politique de confidentialité pour les pubs maison (session petanque-meet)
+- Statut : en cours (2026-11-04T22:53+01:00). Demande de l'utilisateur : (transmis par la session Producer) Pour ta
+  politique de confidentialité, oui : prépare le changement dans un worktree du site quand ta branche sera prête, en
+  suivant le journal du skill ludiven-site. La mise en ligne attendra le mot de Raphaël, avec la sortie des pubs
+  maison.
+- Réservations actives : `src/pages/petanque-meet/confidentialite.astro` (dans le worktree
+  website-worktrees/meet-privacy-house-ads, branche meet-privacy-house-ads).
+- Ressources : serveur de dev sur le port 4517 ; eslint, `astro check`. Build annoncé ici avant.
+- 22:56 : fait dans le worktree website-worktrees/meet-privacy-house-ads, commit 026ba74 sur la branche
+  meet-privacy-house-ads, pas poussé : §8 les annonces maison vues ou touchées (nom de l'appli présentée), §9 la
+  bannière présente nos autres applis de pétanque sous « Nos applis », liste et images lues sur ce site, mention de
+  provenance vers le store, Pétanque Scan seule jusqu'à la 0.1.7 ; §11 GitHub (GitHub Pages) hébergeur du site (mise à
+  jour et liste des annonces). eslint OK, astro check 0 erreur, captures bureau et téléphone sombre sans erreur
+  console. Pas de build complet : du texte dans une page. Au moment de publier : la date de mise à jour, puis fusion
+  dans main au mot de Raphaël, avec la sortie des pubs maison. Réservation maintenue.
+- 23:38 : ajout, commit 283dd9a sur la même branche, pas poussé : §9 sur iPhone, sans l'autorisation de suivi d'Apple,
+  les annonces ne sont pas personnalisées (correctif du consentement de Meet sur house-ads). eslint OK. Réservation
+  maintenue.
+- 11:39 : ajout, commit ae96082 sur la même branche, pas poussé : §9 la bannière est signée « Ludiven Studio » au lieu
+  de l'étiquette « Nos applis » (choix de Raphaël). eslint OK. Réservation maintenue.
+- 14:12 : ajout, commit ebb3380 sur la même branche, pas poussé : §9 la bannière présente nos autres applications,
+  d'abord celles de pétanque, puis sur Android un de nos jeux quand elles sont toutes installées (vérification qui
+  reste sur le téléphone) ; choix de Raphaël du 5 novembre. eslint OK, astro check 0 erreur, capture du §9 sans erreur.
+  Réservation maintenue.
+
+## 2026-11-04 — LudivenTools : page Voir les sociétés (pubs) (session ludiventools)
+- Statut : en cours (2026-11-04T23:44+01:00). Demande de l'utilisateur : (transmis par le Producer, voulu par Raphaël)
+  page « Voir les sociétés » de la fenêtre de consentement des applis, en 5 langues ; préparée sans push
+- Réservations actives : `src/pages/publicite/`, `src/pages/{en,es,de,it}/publicite/`.
+- Ressources : serveur de dev sur le port 4534 ; eslint, `astro check`. Build annoncé ici avant.
+- 23:49 : Commit 7828cc6 sur la branche ad-partners (worktree website-worktrees/ad-partners), pas poussé :
+  /publicite/societes/ en fr, en, es, de, it. eslint OK, astro check 0 erreur, captures bureau et téléphone (clair et
+  sombre) sans erreur console. La mise en ligne attend le mot de Raphaël, avec l'option A du consentement. Réservation
+  maintenue.
 
 ## 2026-11-04 — Nino Rush : page de confidentialité (session ninorush)
 - Statut : en cours (2026-11-04T23:55+01:00). Demande de l'utilisateur : (transmis par le Producer) la politique de
@@ -1805,6 +1868,194 @@
   (df7c8cb), page de téléchargement en 1.0.12, 83,9 Mo (aea2d01), comme l'APK publié sur nino-rush-dev (sha256 vérifié)
   ; build complet OK dans mon worktree (207 pages, précache 377, liens OK) ; mes fichiers et cette section seulement.
   Statut : terminé. Réservations libérées.
+
+## 2026-11-05 — Pétanque Scan : confidentialité, refus du suivi et retrait de l'accord (1.2.13) (session website)
+- Statut : en cours (2026-11-05T07:12+01:00). Demande de l'utilisateur : (transmis par la session « sessions claude et
+  playtest ») La 1.2.13 de Scan donne maintenant des pubs non personnalisées sur iPhone quand on refuse le suivi
+  d'Apple (ATT), et transmet un retrait du consentement à la régie. Ajoute ces deux points à sa politique, dans les 5
+  langues, sur une branche de worktree ; mise en ligne sur le mot de Raphaël, avec la sortie de la 1.2.13
+- Réservations actives : `src/pages{,/en,/es,/de,/it}/petanque-scanner/confidentialite.astro` (dans le worktree
+  website-worktrees/scan-privacy-att, branche scan-privacy-att).
+- Ressources : serveur de dev sur le port 4521 ; eslint, `astro check`. Build annoncé ici avant.
+- 07:21 : fait dans le worktree website-worktrees/scan-privacy-att, branche scan-privacy-att, pas poussée : a3772a4 en
+  5 langues (l'essentiel, §3 finalité, §4, §12, date au 5 novembre) : sur iPhone, refuser ou couper le suivi d'Apple
+  donne des pubs non personnalisées (LevelPlay reçoit false, pas d'IDFA ; un refus fait dans les réglages d'iOS compte
+  au lancement suivant), un retrait dans les réglages de l'appli arrête les pubs et part à LevelPlay, qui le transmet
+  aux régies ; 4a746a0 : contresens allemand corrigé (redemandé après 6 mois quelle que soit la réponse). Vérifié dans
+  le code de Scan (00e2bf0, 55693ec). eslint OK, astro check 0 erreur, les 5 pages en dev, bureau et téléphone : textes
+  présents, anciennes phrases absentes, aucun débordement, aucune erreur console. Pas de build complet : du texte dans
+  5 pages. Au moment de publier : la date de mise à jour, puis fusion dans main au mot de Raphaël, avec la sortie de la
+  1.2.13. Réservation maintenue.
+- 22:52 : 2026-11-07 : toujours en attente volontaire, avec la sortie de la 1.2.13 sur les stores ; branche
+  scan-privacy-att partie de 151a5c7, à recaler sur main avant publication
+
+## 2026-11-05 — Pétanque Scan : confidentialité pour les pubs maison (1.2.14) (session website)
+- Statut : en cours (2026-11-05T07:26+01:00). Demande de l'utilisateur : (transmis par la session « sessions claude et
+  playtest ») Prépare à part, sur une autre branche et sans pousser, les changements pour la sortie des pubs maison de
+  Scan (1.2.14) : la question « Activer les pubs ? » au §4 (« Activer les pubs » vaut un « Accepter », « Voir une vidéo
+  de nos applis » garde le refus), et les §3, §8 et §10 élargis au « catalogue de nos annonces maison, leurs images et
+  vidéos »
+- Réservations actives : `src/pages{,/en,/es,/de,/it}/petanque-scanner/confidentialite.astro` (dans le worktree
+  website-worktrees/scan-privacy-houseads, branche scan-privacy-houseads, empilée sur scan-privacy-att).
+- Ressources : serveur de dev sur le port 4522 ; eslint, `astro check`. Build annoncé ici avant.
+- 07:32 : fait dans le worktree website-worktrees/scan-privacy-houseads, commit 279db3b sur la branche
+  scan-privacy-houseads (empilée sur scan-privacy-att), pas poussée, en 5 langues, d'après la branche houseads de Scan
+  (c037200, 688f5bd) : §4 nos annonces maison à la place des pubs des partenaires (après un refus, ou quand LevelPlay
+  n'a rien), question « Activer les pubs ? » une fois par session après un refus (vaut un « Accepter », ATT ensuite sur
+  iPhone ; « Voir une vidéo de nos applis » garde le refus) ; §3, §8, §10 : catalogue de nos annonces maison, leurs
+  images et vidéos lus sur ce site ; en plus de la demande, d'après le code : §5 house_ad_shown et house_ad_opened
+  (depuis la 1.2.14), meet_promo_*, meet_store_opened et game_store_opened marqués « jusqu'à la 1.2.13 » ; §8 lien
+  Google Play avec la provenance (appli, annonce, place, sans identifiant), rien sur l'App Store ; §9 copie du
+  catalogue et des images gardée sur le téléphone ; ligne de version 1.2.14. eslint OK, astro check 0 erreur, les 5
+  pages en dev, bureau et téléphone : textes présents, anciennes phrases absentes, textes de la 1.2.13 toujours là,
+  aucun débordement, aucune erreur console. Pas de build complet : du texte dans 5 pages. Au moment de publier : fusion
+  après scan-privacy-att, date de mise à jour du jour de sortie de la 1.2.14, au mot de Raphaël. Réservation maintenue.
+- 22:52 : 2026-11-07 : toujours en attente volontaire, avec la sortie de la 1.2.14 ; branche scan-privacy-houseads
+  empilée sur scan-privacy-att, à recaler sur main avant publication
+
+## 2026-11-05 — Dragon Gems : confidentialité pour la 0.1.16 (Accepter / Refuser, vidéos de nos jeux) (session website)
+- Statut : en cours (2026-11-05T08:03+01:00). Demande de l'utilisateur : (transmis par la session « sessions claude et
+  playtest ») la politique de confidentialité de Dragon Gems décrit encore l'ancien consentement ; avec sa 0.1.16 elle
+  devient fausse. Appliquer le texte de remplacement de son docs/store.md, section « For 0.1.16 » (DragonsGemsSwipe
+  6cc4d6c, lecture seule), dans les langues de sa page, sur une branche de worktree ; mise en ligne avec la 0.1.16, sur
+  le mot de Raphaël
+- Réservations actives : `src/pages/dragons-gems/confidentialite.astro`,
+  `src/pages/en/dragons-gems/confidentialite.astro` (dans le worktree website-worktrees/dragons-gems-consent, branche
+  dragons-gems-consent).
+- Ressources : serveur de dev sur le port 4523 ; eslint, `astro check`. Build annoncé ici avant.
+- 08:09 : fait dans le worktree website-worktrees/dragons-gems-consent, branche dragons-gems-consent, pas poussée.
+  1e397f5 : le texte « For 0.1.16 » du docs/store.md de Dragon Gems (6cc4d6c), en FR tel quel et en EN traduit avec les
+  libellés de l'appli (Accept, Refuse, Ad choices) : l'essentiel ; §5 (ligne Unity sur le seul consentement, ligne du
+  choix avec sa date et les six mois, nouvelle ligne GitHub Pages pour les vidéos de nos jeux) ; §6 Ton accord
+  (Accepter ou Refuser, Unity ne reçoit rien après un refus, vidéos de nos jeux, une fois par session, six mois, ATT) ;
+  §8 house_ad_shown et house_ad_opened ; §11 GitHub et transferts ; §14 ; date au 5 novembre. 4b5beae, en plus et
+  séparable, d'après le code de la 0.1.16 (même module que Scan) : §10 la copie de la liste et des images gardée sur le
+  téléphone ; §6 le bouton « Découvrir » et le lien Google Play qui porte la provenance, sans identifiant. eslint OK,
+  astro check 0 erreur, les 2 pages en dev, bureau et téléphone : textes présents, anciens mots du consentement
+  absents, aucun débordement, aucune erreur console. Pas de build complet : du texte dans 2 pages. Au moment de publier
+  : la date, puis fusion dans main au mot de Raphaël, avec la 0.1.16. Réservation maintenue.
+- 08:10 : 4b5beae confirmé exact par la session Dragon Gems. 73f91a2 : §10 précisé (les vidéos de nos jeux sont lues en
+  ligne, sauf une, livrée avec l'application) ; eslint OK, les 2 pages en dev, bureau et téléphone, sans erreur. Pas
+  poussé : mise en ligne avec la 0.1.16, au mot de Raphaël. Réservation maintenue.
+- 22:52 : remplacée par la politique de la 1.0.1, en ligne depuis 7d5cc44 (601870d, 804c5f6) ; la branche
+  dragons-gems-consent n'a plus rien à publier (worktree à retirer). Statut : terminé. Réservations libérées.
+
+## 2026-11-05 — LudivenTools : textes de bannière des pubs maison (40 caractères) (session LudivenTools)
+- Statut : en cours (2026-11-05T08:42+01:00). Demande de l'utilisateur : Raccourcir le texte de petanque-meet coupé par
+  « … » dans la bannière, vérifier les autres entrées, limite de longueur dans check-promo ; branche banner-texts, sans
+  push
+- Réservations actives : `public/promo/v1/catalog.json`, `scripts/check-promo.mjs`.
+- Ressources : serveur de dev sur le port 4535 ; eslint, `astro check`. Build annoncé ici avant.
+- 08:43 : Branche banner-texts (2 commits, pas poussé) : petanque-meet raccourci en fr « Trouve une partie près de chez
+  toi », es « Encuentra una partida cerca de ti », it « Trova una partita vicino a te » ; nino-rush es « Nino, el panda
+  rojo, corre a casa » (42 car.) ; updated 2026-11-05T08:00:00Z. check-promo refuse un texte de bannière de plus de 40
+  caractères (vérifié sur l'ancien catalogue : 4 refus) ; check-promo OK sur le nouveau. Push au mot de Raphaël.
+- 12:05 : Sur la même branche banner-texts : 2 commits de plus, « app » et « groups » dans les 5 entrées du catalogue,
+  et leur contrôle dans check-promo (catalogue accepté, cas fautifs refusés). Pas poussé : attend le mot de Raphaël.
+- 12:07 : Lancement du build complet dans le worktree banner-texts (écrit son dist/, .astro/, public/vendor/), avant le
+  push demandé par Raphaël.
+- 12:09 : build complet OK ; commité et poussé à la demande de Raphaël : les 4 commits de banner-texts (textes de
+  bannière, limite de 40 caractères, app et groups) et cette section seulement. Statut : terminé. Réservations
+  libérées.
+
+## 2026-11-05 — Dragon Gems : conditions d'utilisation de l'appli (/dragons-gems/cgu/) (session website)
+- Statut : en cours (2026-11-05T08:49+01:00). Demande de l'utilisateur : (transmis par la session « sessions claude et
+  playtest ») Google Play demande une URL de conditions d'utilisation ; Dragon Gems n'en a pas : préparer ses CGU sur
+  le modèle de celles de Pétanque Game, d'après son docs/store.md (lecture seule), en français et en anglais comme sa
+  politique, sur la branche dragons-gems-consent ; mise en ligne avec la 0.1.16, sur le mot de Raphaël
+- Réservations actives : `src/pages/dragons-gems/cgu.astro`, `src/pages/en/dragons-gems/cgu.astro` (nouveaux),
+  `src/data/dragonsGems.ts` (TERMS et son libellé), `src/components/DragonsGemsLanding.astro` (un lien), dans le
+  worktree website-worktrees/dragons-gems-consent, branche dragons-gems-consent.
+- Ressources : serveur de dev sur le port 4523 ; eslint, `astro check`. Build annoncé ici avant.
+- 08:53 : pages FR et EN écrites (16 sections, sur le modèle de Pétanque Game), liens « Voir aussi » sur la politique
+  FR/EN et lien sur la page de l'appli (5 langues, ES/DE/IT vers l'anglais comme la politique) ; eslint OK, astro check
+  0 erreur, contrôle en dev OK (textes, 16 sections, hreflang, liens, aucun débordement ni erreur console). Lancement
+  du build complet dans mon worktree dragons-gems-consent (écrit son dist/, .astro/, public/vendor/), pas dans le
+  dossier partagé…
+- 08:55 : build complet OK dans le worktree (astro check 0 erreur, 194 pages, précache 364 entrées, liens OK). Commit
+  37a6a63 sur la branche dragons-gems-consent, pas poussé : /dragons-gems/cgu/ et /en/dragons-gems/cgu/ (compte
+  facultatif, pièces et cœurs, achats et restauration, rétractation, vidéos Accepter/Refuser, classements et franc-jeu,
+  modération, arrêt du service, droit applicable), liens depuis la politique FR/EN et la page de l'appli. Mise en ligne
+  avec la 0.1.16, au mot de Raphaël. Réservation maintenue.
+- 22:52 : en ligne depuis 7d5cc44 : les CGU de 37a6a63 reprises en couleurs « Scène » (16d6028, 9a053d2). Statut :
+  terminé. Réservations libérées.
+
+## 2026-11-06 — Pétanque Game : politique et CGU pour la 1.0.7 (connexion Google sur iPhone, retrait de l'accès Apple, statistiques) (session petanque-game)
+- Statut : en cours (2026-11-06T00:32+01:00). Demande de l'utilisateur : (transmis par la session Producer, consigne de
+  Raphaël pour la soumission de la 1.0.7) préparer W1 à W4 de docs/store.md « À publier avec la 1.0.7 » dans une
+  branche, prête à pousser sur le ok de Raphaël
+- Réservations actives : `src/pages{,/en,/es,/de,/it}/petanque-game/{confidentialite,cgu}.astro`, dans la branche
+  `pg-1.0.7-policy` (worktree `website-worktrees/pg-1.0.7-policy`), rien dans ce dossier.
+- Ressources : serveur de dev sur le port 4397 ; eslint, `astro check`. Build annoncé ici avant.
+- 00:42 : W1 à W4 et les dates écrits dans les dix pages (branche pg-1.0.7-policy) : plus de mention d'Umami Cloud ;
+  contrôles en cours (eslint, astro check), puis captures sur le port 4397 et build dans le worktree
+- 00:43 : eslint et astro check passés (0 erreur, 0 avertissement). Lancement du build complet dans le worktree
+  website-worktrees/pg-1.0.7-policy (écrit son dist/, .astro/, public/vendor/ à lui, rien dans ce dossier)
+- 00:46 : prêt, non poussé : branche pg-1.0.7-policy, commit be7a3c3 (10 pages, 5 langues), worktree
+  website-worktrees/pg-1.0.7-policy. Contrôlé : eslint, astro check (0 erreur, 0 avertissement), build complet
+  (précache et liens ok), texte rendu des 10 pages vérifié, capture téléphone sans erreur de console. À pousser sur le
+  « ok » de Raphaël, par la session petanque-game ; réservation maintenue jusque-là
+- 00:48 : réservé aussi, à la demande de la session Producer : `src/pages/mentions-legales.astro` (section Licences :
+  GoogleSignIn sur iPhone, les deux musiques que le jeu livre), dans la même branche pg-1.0.7-policy
+- 00:49 : mentions légales écrites dans la branche ; eslint et astro check passés ; nouveau build complet dans le
+  worktree (son dist/ à lui)
+- 00:51 : branche pg-1.0.7-policy prête, non poussée : be7a3c3 (politique et CGU, 5 langues) et dc580d3 (mentions
+  légales : GoogleSignIn, musiques). Contrôlée : eslint, astro check, build complet, texte rendu, console. À pousser
+  sur le « ok » de Raphaël
+- 00:54 : à la demande de la session Producer : §8 (« Sans publicité » sans compte) et statistiques du moteur Unity
+  (coupées) dans les cinq politiques ; eslint et astro check passés ; nouveau build complet dans le worktree
+- 00:55 : branche pg-1.0.7-policy prête, non poussée, trois commits : be7a3c3 (politique et CGU), dc580d3 (mentions
+  légales), 1bb26ea (§8 et statistiques du moteur). Contrôlée à chaque étape : eslint, astro check, build complet,
+  texte rendu. À pousser sur le « ok » de Raphaël
+- 09:25 : à la demande de la session Producer : branche pg-1.0.7-policy recalée sur origin/main d755b84 (politique
+  1.0.0 de Dragon Gems), sans conflit : 7ef3b57, 0dccf32, c69babe. Lancement d'eslint, astro check et du build complet
+  dans le worktree website-worktrees/pg-1.0.7-policy (son dist/, .astro/, public/vendor/ à lui, rien dans ce dossier)
+- 09:27 : branche pg-1.0.7-policy prête, non poussée, sur d755b84 : 7ef3b57 (politique et CGU), 0dccf32 (mentions
+  légales), c69babe (§8 et statistiques du moteur). Contrôlée après le recalage : eslint sur les 11 pages, astro check
+  (0 erreur, 0 avertissement), build complet (192 pages, précache 362, liens OK), texte rendu des 10 pages (plus
+  d'Umami Cloud, date du 6 novembre). À pousser sur le « ok site PG » de Raphaël ; réservation maintenue
+- 09:41 : poussé sur main au « ok site PG » de Raphaël, tapé dans la session petanque-game : 7ef3b57, 0dccf32, c69babe
+  (d755b84..c69babe). Déploiement GitHub de c69babe réussi ; en ligne, vérifié sur les pages : politique en 5 langues
+  datée du 6 novembre (W1 à W4, plus d'Umami Cloud), CGU (connexion Google sur iPhone), mentions légales (Google
+  Sign-In for iOS, les deux musiques). Worktree website-worktrees/pg-1.0.7-policy et branche pg-1.0.7-policy supprimés.
+  Cette section reste à commiter avec le journal, comme les autres. Statut : terminé. Réservations libérées.
+
+## 2026-11-06 — Pétanque Meet : annonces de partenaires sur un concours (serveur, branche meet-partner-search) (session petanque-meet)
+- Statut : en cours (2026-11-06T01:10+01:00). Demande de l'utilisateur : (transmis par le Producer, idée de Raphaël)
+  petites annonces sur un concours pour chercher un partenaire ou un 3e ; code et migration écrits et testés en local,
+  rien de poussé ni déployé, aucune exécution sur la base de production
+- Réservations actives : `supabase/functions/meetups/index.ts` (annonces de partenaires seulement),
+  `supabase/functions/_shared/account.ts`, `supabase/functions/_shared/partners.ts` et `partners_test.ts` (nouveaux),
+  `supabase/migrations/*_partner_searches.sql` (nouveau), dans le worktree `website-worktrees/meet-partner-search`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 01:15 : branche meet-partner-search commitée localement (b658f04), non poussée, non déployée : migration (testée en
+  local sur PGlite, 18 contrôles), actions list/post/close/partner_contact/report/moderate dans meetups, suppression du
+  compte ; deno check, deno test (6) et eslint OK. Aucune exécution sur la base de production.
+
+## 2026-11-06 — Dragon Gems : version.json pour l'invite de mise à jour (1.0.0) (session DragonsGemsSwipe)
+- Statut : en cours (2026-11-06T01:41+01:00). Demande de l'utilisateur : (transmis par la session « sessions claude et
+  playtest ») préparer public/dragons-gems/version.json pour l'invite de mise à jour de la 1.0.0 (variante B), sur une
+  branche de worktree, vérifié, sans push ; un seul push au mot de Raphaël tapé dans la session Dragon Gems
+- Réservations actives : `public/dragons-gems/version.json` (nouveau, dans le worktree
+  website-worktrees/dragons-gems-version, branche dragons-gems-version).
+- Ressources : serveur de dev sur le port 4561 ; eslint, `astro check`. Build annoncé ici avant.
+- 01:42 : public/dragons-gems/version.json écrit dans le worktree dragons-gems-version (latest_android et latest_ios
+  1.0.0, min 1.0.0, store_android vers Google Play ; pas de store_ios tant que la fiche App Store n'a pas de lien) ;
+  JSON valide, astro check 0 erreur. Lancement du build complet dans mon worktree dragons-gems-version (écrit son
+  dist/, .astro/, public/vendor/), pas dans le dossier partagé…
+- 01:44 : build complet OK dans le worktree (astro check 0 erreur, 192 pages, précache 362 entrées, liens OK) ;
+  dist/dragons-gems/version.json servi par startServer sur le port 4561 : 200, application/json, contenu exact, requête
+  ?t= comprise ; serveur arrêté. Commit d01f303 sur la branche dragons-gems-version, pas poussé : un seul push au mot
+  de Raphaël tapé dans la session Dragon Gems, si la variante B (avec l'invite) part. Les deux écarts de la politique
+  (EN « Yes, suited », §11 module Google sur iPhone) sont demandés à la session website dans le ticket 0059, car ses
+  pages sont réservées par elle. Réservation maintenue.
+- 09:24 : Branche recalée sur origin/main d755b84 (politique 1.0.0 en ligne) : a715cfe. Lancement du build complet dans
+  mon worktree website-worktrees/dragons-gems-version (écrit dist/, .astro/, public/vendor/ de ce worktree seulement)…
+- 09:26 : Build complet OK sur a715cfe (astro check 0 erreur 0 avertissement, 192 pages, précache 362, liens OK). Servi
+  en preview sur le port 4561 : /dragons-gems/version.json 200 application/json, contenu attendu ; la politique de
+  d755b84 présente. Pas poussé : attend l'ok de Raphaël dans la session Dragon Gems.
+- 09:37 : commité et poussé à la demande de l'utilisateur : mon fichier (public/dragons-gems/version.json) et cette
+  section seulement. Statut : terminé. Réservations libérées.
 
 ## 2026-11-06 — Dragon Gems : politique de la 1.0.0 (ticket 0059 : « Yes, suited », module Google sur iPhone) (session website)
 - Statut : en cours (2026-11-06T01:48+01:00). Demande de l'utilisateur : (transmis par la session « sessions claude et
@@ -1973,6 +2224,8 @@
   check-game-popups (61 jeux) et check-billard-fullscreen OK. Commité et poussé à la demande de l'utilisateur («
   Attendre la fin », puis tout pousser d'un coup) : les 18 commits de home-scene et cette section seulement. Statut :
   terminé. Réservations libérées.
+- 12:17 : en ligne : eb5e923 déployé en 5 min 40 s ; /, /en/, /es/, /de/, /it/, /dragons-gems/, /jeux/, /prestations/
+  répondent 200, l'accueil anglais sert la scène et ses hreflang
 
 ## 2026-11-06 — Dragon Gems Swipe et Pétanque Game : sortie sur l'App Store (session website)
 - Statut : en cours (2026-11-06T12:58+01:00). Demande de l'utilisateur : pour info Petanque Game et Dragon Gems
@@ -2007,6 +2260,60 @@
   : terminé. Réservations libérées.
 - 13:40 : en ligne : a170c58 déployé (environ 7 min) ; store_ios servi dans les deux version.json, iOS pour Pétanque
   Game et Dragon Gems dans le catalogue, lien App Store sur /petanque-game/, « 750 levels » sur /en/dragons-gems/
+
+## 2026-11-06 — Dragon Gems : store_ios dans version.json (sortie App Store) (session DragonsGemsSwipe)
+- Statut : en cours (2026-11-06T13:10+01:00). Demande de l'utilisateur : (transmis par la session « sessions claude et
+  playtest ») Dragon's Gems est sorti sur l'App Store : ajouter store_ios à public/dragons-gems/version.json, dans le
+  même push que la branche ios-release de la session website, au mot de Raphaël
+- Réservations actives : `public/dragons-gems/version.json` (dans le worktree website-worktrees/dragons-gems-version,
+  nouvelle branche dragons-gems-store-ios partie d'origin/main eb5e923).
+- Ressources : serveur de dev sur le port 4561 ; eslint, `astro check`. Build annoncé ici avant.
+- 13:10 : store_ios ajouté (https://apps.apple.com/app/id6829283627, la forme de dragonsGems.ts sur ios-release ; le
+  lien répond 200, « Dragon Gems Swipe: Bijou ») ; JSON valide, le champ store_ios est celui que lit UpdatePrompt.cs de
+  l'appli. Lancement du build complet dans mon worktree website-worktrees/dragons-gems-version (écrit son dist/,
+  .astro/, public/vendor/ seulement)…
+- 13:12 : build complet OK dans mon worktree (astro check 0 erreur 0 avertissement, 211 pages, précache 384, liens OK)
+  ; dist/dragons-gems/version.json identique à la source. Commit c3c1837 sur la branche dragons-gems-store-ios (partie
+  d'origin/main eb5e923), pas poussé : pour la session website, à reprendre tel quel sur ios-release (il ne touche que
+  ce fichier, absent d'ios-release). Push au mot de Raphaël. Réservation maintenue jusqu'au push.
+- 13:19 : à savoir : l'appli iPhone en ligne (1.0.0, en ligne depuis le 2026-11-05 20:42 UTC selon
+  itunes.apple.com/lookup) est un build d'avant l'invite de mise à jour : elle ne lit pas version.json. store_ios
+  servira aux versions iPhone suivantes ; c3c1837 reste valable tel quel.
+- 13:30 : pour la session website : ticket 0062 (politique de la 1.0.1 de Dragon Gems : dragons-gems-consent à recaler
+  sur origin/main, sans push ; ad-partners de la session LudivenTools dans le même push, au mot de Raphaël).
+- 15:53 : en ligne : store_ios est dans version.json sur main (7d5cc44), poussé par la session website au mot de
+  Raphaël ; ma branche dragons-gems-store-ios (c3c1837, même contenu) est supprimée, rien à commiter de mon côté.
+  Ticket 0062 clos (## Suite, ligne dans .collab/LOG.md). Statut : terminé. Réservations libérées.
+
+## 2026-11-06 — Pétanque Game : store_ios dans version.json (sortie App Store) (session PetanqueGame)
+- Statut : en cours (2026-11-06T13:12+01:00). Demande de l'utilisateur : (transmis par la session « sessions claude et
+  playtest ») Pétanque Game est sorti sur l'App Store : ajouter store_ios à public/jeux/petanque/version.json, dans le
+  même push que la branche ios-release de la session website, au mot de Raphaël
+- Réservations actives : `public/jeux/petanque/version.json` (dans le worktree website-worktrees/pg-store-ios, nouvelle
+  branche pg-store-ios partie d'origin/main eb5e923).
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 13:14 : store_ios ajouté (https://apps.apple.com/app/id6827514133, la forme de petanqueGame.ts sur ios-release ; le
+  lien répond 200, « Pétanque Game ») ; JSON valide, le champ store_ios est celui que lit UpdatePrompt.cs de l'appli
+  (lien https exigé) ; latest_ios reste 1.0.0 : c'est la version en ligne sur l'App Store (API d'Apple, sortie le 05/11
+  23:36). Lancement du build complet dans mon worktree website-worktrees/pg-store-ios (écrit son dist/, .astro/,
+  public/vendor/ seulement)…
+- 13:15 : prêt, non poussé : branche pg-store-ios, 88e1145 (partie d'origin/main eb5e923 ;
+  public/jeux/petanque/version.json seulement, le README.md que le worktree montre modifié n'est pas à moi et reste
+  hors du commit). Build complet OK : astro check 0 erreur 0 avertissement, 211 pages, précache 384, liens OK ;
+  dist/jeux/petanque/version.json porte store_ios. Pour la session website : à reprendre tel quel sur ios-release. Push
+  au mot de Raphaël
+- 15:47 : en ligne : repris sur ios-release (3d36419) et poussé par la session website au mot de Raphaël ; vérifié sur
+  www.ludiven-studio.fr/jeux/petanque/version.json (store_ios servi). Worktree website-worktrees/pg-store-ios et
+  branche pg-store-ios retirés. Statut : terminé. Réservations libérées.
+
+## 2026-11-06 — LudivenTools : catalogue maison, Pétanque Game et Dragon's Gems sur iOS (session LudivenTools)
+- Statut : en cours (2026-11-06T13:25+01:00). Demande de l'utilisateur : Producer : link.ios et toutes plateformes pour
+  petanque-game et dragon-gems, sortis sur l'App Store
+- Réservations actives : `public/promo/v1/catalog.json`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 13:25 : commité a1a9554 sur la branche catalog-ios (worktree website-worktrees/catalog-ios), partie d'origin/main
+  eb5e923, non poussé ; check-promo passe (5 entrées). À reprendre tel quel sur ios-release par website-a3.. Statut :
+  terminé. Réservations libérées.
 
 ## 2026-11-06 — Dragon Gems 1.0.1 : politique (ticket 0062), conditions d'utilisation, page des sociétés, et ménage de la refonte (session website)
 - Statut : en cours (2026-11-06T13:40+01:00). Demande de l'utilisateur : (transmis par le Producer : Raphaël « je vais
@@ -2060,76 +2367,6 @@
   en ligne avant le push : builds/petanquemeet-beta-0gn9lbmb/petanque-meet-beta-1.0.1.apk, servi identique (34 477 657
   octets, sha256 3d9e6436…aa9631e6). Statut : terminé. Réservations libérées.
 
-## 2026-11-06 — Pétanque Scan : page bêta discrète de la 1.2.13 (APK .beta) (session PetanqueScan)
-- Statut : en cours (2026-11-06T15:58+01:00). Demande de l'utilisateur : (transmis par le Producer) tester une dernière
-  fois la 1.2.13 avant soumission : un APK .beta à côté de l'appli du store, téléchargeable par un lien discret (page
-  testeurs non listée, noindex, hors menu et sitemap, chemin difficile à deviner) ; publication au mot de Raphaël tapé
-  dans la session Pétanque Scan
-- Réservations actives : `src/pages/petanque-scanner/beta-cd53d8qv.astro` (nouveau), dans le worktree
-  website-worktrees/scan-beta-1213, branche scan-beta-1213 ; rien dans ce dossier. Je pars de la règle /beta-…/ de la
-  session website (sitemap, précache, noindex).
-- Ressources : serveur de dev sur le port 4573 ; eslint, `astro check`. Build annoncé ici avant.
-- 16:03 : page écrite dans le worktree scan-beta-1213 : /petanque-scanner/beta-cd53d8qv/, noindex, liée de nulle part ;
-  l'APK ira dans la prerelease petanque-scanner-beta. eslint OK, astro check 0 erreur, captures bureau et téléphone
-  sombre relues. Taille, Android minimum et SHA-256 à remplir après le build. Rien de commité ni poussé : au mot de
-  Raphaël
-- 16:18 : APK construit (103,0 Mo, Android 7.1+, SHA-256 5adfb296…), chiffres posés sur la page ; branche repartie de
-  bd6032d (règles /beta-). Lancement du build complet dans mon worktree scan-beta-1213 (son dist/)…
-- 16:21 : build complet OK dans mon worktree (219 pages, précache 389 entrées sans la page, liens OK) ; la page a son
-  noindex, n'est ni dans le sitemap ni liée ailleurs. Commit local 9dfbcaf sur scan-beta-1213 (parent bd6032d), non
-  poussé. Publication (APK dans la prerelease petanque-scanner-beta, puis la page sur main) au mot de Raphaël
-- 16:41 : APK envoyé dans la prerelease petanque-scanner-beta (lien vérifié : 102982288 octets, HTTP 200). Page
-  commitée et poussée à la demande de l'utilisateur (« publie la bêta 1.2.13 de Pétanque Scan ») : mon fichier et cette
-  section seulement. Worktree scan-beta-1213 libéré. Statut : terminé. Réservations libérées.
-
-## 2026-11-06 — Dragon Gems : page bêta discrète de la 1.0.1 (APK .beta) (session DragonsGemsSwipe)
-- Statut : en cours (2026-11-06T15:53+01:00). Demande de l'utilisateur : (transmis par la session « sessions claude et
-  playtest ») tester une dernière fois la version prod avant soumission, avec un APK téléchargeable par un lien discret
-  : page testeurs non listée, noindex, hors menu et sitemap, chemin difficile à deviner ; publication au mot de Raphaël
-  tapé dans la session Dragon Gems
-- Réservations actives : `src/pages/jeux/eclats/test/beta-*.astro` (worktree website-worktrees/dragons-gems-version,
-  branche dragons-gems-beta).
-- Ressources : serveur de dev sur le port 4491 ; eslint, `astro check`. Build annoncé ici avant.
-- 15:57 : page écrite dans le worktree (branche dragons-gems-beta) : /jeux/eclats/test/beta-…/, noindex, liée de nulle
-  part, hors sitemap par le filtre /jeux/eclats/test existant (astro.config.mjs inchangé). eslint OK, astro check 0
-  erreur, captures bureau et téléphone sombre relues. Taille et SHA-256 de l'APK à remplir après le build ; l'APK ira
-  dans la prerelease dragons-gems-beta. Rien de commité ni poussé : au mot de Raphaël
-- 16:05 : page déplacée en src/pages/dragons-gems/beta-wnkmrlugi7.astro (/dragons-gems/beta-…/, la forme
-  /<app>/beta-<code>/ des règles de website-a3) ; ma réservation devient `src/pages/dragons-gems/beta-*.astro`. Branche
-  dragons-gems-beta avancée sur bd6032d (beta-pages : noindex, hors sitemap et hors précache pour /beta-). eslint OK
-- 16:30 : APK bêta construit (16:17-16:29) et vérifié : taille et SHA-256 mis sur la page. Lancement du build complet
-  dans mon worktree (écrit dist/, .astro/, public/vendor/ du worktree seulement)…
-- 16:36 : build complet OK dans mon worktree (sur d51f62f) : 220 pages, astro check 0 erreur, précache 389 sans la
-  page, sitemap sans /beta-, noindex servi, aucune page ne la lie ; captures relues. Prêt : envoi de l'APK (prerelease
-  dragons-gems-beta) et push de la page au mot de Raphaël « publie la bêta de Dragon Gems »
-- 16:41 : APK envoyé dans la prerelease dragons-gems-beta (le lien sert les octets du build, sha256 f41a18bb… vérifié)
-  ; commité et poussé à la demande de l'utilisateur (« publie la bêta de Dragon Gems ») : ma page et cette section
-  seulement. Statut : terminé. Réservations libérées.
-
-## 2026-11-06 — Dragon Gems : store_ios dans version.json (sortie App Store) (session DragonsGemsSwipe)
-- Statut : en cours (2026-11-06T13:10+01:00). Demande de l'utilisateur : (transmis par la session « sessions claude et
-  playtest ») Dragon's Gems est sorti sur l'App Store : ajouter store_ios à public/dragons-gems/version.json, dans le
-  même push que la branche ios-release de la session website, au mot de Raphaël
-- Réservations actives : `public/dragons-gems/version.json` (dans le worktree website-worktrees/dragons-gems-version,
-  nouvelle branche dragons-gems-store-ios partie d'origin/main eb5e923).
-- Ressources : serveur de dev sur le port 4561 ; eslint, `astro check`. Build annoncé ici avant.
-- 13:10 : store_ios ajouté (https://apps.apple.com/app/id6829283627, la forme de dragonsGems.ts sur ios-release ; le
-  lien répond 200, « Dragon Gems Swipe: Bijou ») ; JSON valide, le champ store_ios est celui que lit UpdatePrompt.cs de
-  l'appli. Lancement du build complet dans mon worktree website-worktrees/dragons-gems-version (écrit son dist/,
-  .astro/, public/vendor/ seulement)…
-- 13:12 : build complet OK dans mon worktree (astro check 0 erreur 0 avertissement, 211 pages, précache 384, liens OK)
-  ; dist/dragons-gems/version.json identique à la source. Commit c3c1837 sur la branche dragons-gems-store-ios (partie
-  d'origin/main eb5e923), pas poussé : pour la session website, à reprendre tel quel sur ios-release (il ne touche que
-  ce fichier, absent d'ios-release). Push au mot de Raphaël. Réservation maintenue jusqu'au push.
-- 13:19 : à savoir : l'appli iPhone en ligne (1.0.0, en ligne depuis le 2026-11-05 20:42 UTC selon
-  itunes.apple.com/lookup) est un build d'avant l'invite de mise à jour : elle ne lit pas version.json. store_ios
-  servira aux versions iPhone suivantes ; c3c1837 reste valable tel quel.
-- 13:30 : pour la session website : ticket 0062 (politique de la 1.0.1 de Dragon Gems : dragons-gems-consent à recaler
-  sur origin/main, sans push ; ad-partners de la session LudivenTools dans le même push, au mot de Raphaël).
-- 15:53 : en ligne : store_ios est dans version.json sur main (7d5cc44), poussé par la session website au mot de
-  Raphaël ; ma branche dragons-gems-store-ios (c3c1837, même contenu) est supprimée, rien à commiter de mon côté.
-  Ticket 0062 clos (## Suite, ligne dans .collab/LOG.md). Statut : terminé. Réservations libérées.
-
 ## 2026-11-06 — Pages bêta des applis : hors sitemap, hors précache, noindex (session website)
 - Statut : en cours (2026-11-06T15:52+01:00). Demande de l'utilisateur : (transmis par le Producer : Raphaël veut une
   bêta prod de chaque appli, Meet, Pétanque Game, Scan, Dragon's Gems, avec un APK .beta sur une page discrète
@@ -2156,6 +2393,77 @@
   », absente de sw.js (où /petanque-meet/test reste listée) et du sitemap (185 adresses, aucune /beta-) ;
   /petanque-meet/telecharger/ sans robots. Cette section part avec mon prochain push. Statut : terminé. Réservations
   libérées.
+
+## 2026-11-06 — Dragon Gems : page bêta discrète de la 1.0.1 (APK .beta) (session DragonsGemsSwipe)
+- Statut : en cours (2026-11-06T15:53+01:00). Demande de l'utilisateur : (transmis par la session « sessions claude et
+  playtest ») tester une dernière fois la version prod avant soumission, avec un APK téléchargeable par un lien discret
+  : page testeurs non listée, noindex, hors menu et sitemap, chemin difficile à deviner ; publication au mot de Raphaël
+  tapé dans la session Dragon Gems
+- Réservations actives : `src/pages/jeux/eclats/test/beta-*.astro` (worktree website-worktrees/dragons-gems-version,
+  branche dragons-gems-beta).
+- Ressources : serveur de dev sur le port 4491 ; eslint, `astro check`. Build annoncé ici avant.
+- 15:57 : page écrite dans le worktree (branche dragons-gems-beta) : /jeux/eclats/test/beta-…/, noindex, liée de nulle
+  part, hors sitemap par le filtre /jeux/eclats/test existant (astro.config.mjs inchangé). eslint OK, astro check 0
+  erreur, captures bureau et téléphone sombre relues. Taille et SHA-256 de l'APK à remplir après le build ; l'APK ira
+  dans la prerelease dragons-gems-beta. Rien de commité ni poussé : au mot de Raphaël
+- 16:05 : page déplacée en src/pages/dragons-gems/beta-wnkmrlugi7.astro (/dragons-gems/beta-…/, la forme
+  /<app>/beta-<code>/ des règles de website-a3) ; ma réservation devient `src/pages/dragons-gems/beta-*.astro`. Branche
+  dragons-gems-beta avancée sur bd6032d (beta-pages : noindex, hors sitemap et hors précache pour /beta-). eslint OK
+- 16:30 : APK bêta construit (16:17-16:29) et vérifié : taille et SHA-256 mis sur la page. Lancement du build complet
+  dans mon worktree (écrit dist/, .astro/, public/vendor/ du worktree seulement)…
+- 16:36 : build complet OK dans mon worktree (sur d51f62f) : 220 pages, astro check 0 erreur, précache 389 sans la
+  page, sitemap sans /beta-, noindex servi, aucune page ne la lie ; captures relues. Prêt : envoi de l'APK (prerelease
+  dragons-gems-beta) et push de la page au mot de Raphaël « publie la bêta de Dragon Gems »
+- 16:41 : APK envoyé dans la prerelease dragons-gems-beta (le lien sert les octets du build, sha256 f41a18bb… vérifié)
+  ; commité et poussé à la demande de l'utilisateur (« publie la bêta de Dragon Gems ») : ma page et cette section
+  seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-06 — Pétanque Scan : page bêta discrète de la 1.2.13 (APK .beta) (session PetanqueScan)
+- Statut : en cours (2026-11-06T15:58+01:00). Demande de l'utilisateur : (transmis par le Producer) tester une dernière
+  fois la 1.2.13 avant soumission : un APK .beta à côté de l'appli du store, téléchargeable par un lien discret (page
+  testeurs non listée, noindex, hors menu et sitemap, chemin difficile à deviner) ; publication au mot de Raphaël tapé
+  dans la session Pétanque Scan
+- Réservations actives : `src/pages/petanque-scanner/beta-cd53d8qv.astro` (nouveau), dans le worktree
+  website-worktrees/scan-beta-1213, branche scan-beta-1213 ; rien dans ce dossier. Je pars de la règle /beta-…/ de la
+  session website (sitemap, précache, noindex).
+- Ressources : serveur de dev sur le port 4573 ; eslint, `astro check`. Build annoncé ici avant.
+- 16:03 : page écrite dans le worktree scan-beta-1213 : /petanque-scanner/beta-cd53d8qv/, noindex, liée de nulle part ;
+  l'APK ira dans la prerelease petanque-scanner-beta. eslint OK, astro check 0 erreur, captures bureau et téléphone
+  sombre relues. Taille, Android minimum et SHA-256 à remplir après le build. Rien de commité ni poussé : au mot de
+  Raphaël
+- 16:18 : APK construit (103,0 Mo, Android 7.1+, SHA-256 5adfb296…), chiffres posés sur la page ; branche repartie de
+  bd6032d (règles /beta-). Lancement du build complet dans mon worktree scan-beta-1213 (son dist/)…
+- 16:21 : build complet OK dans mon worktree (219 pages, précache 389 entrées sans la page, liens OK) ; la page a son
+  noindex, n'est ni dans le sitemap ni liée ailleurs. Commit local 9dfbcaf sur scan-beta-1213 (parent bd6032d), non
+  poussé. Publication (APK dans la prerelease petanque-scanner-beta, puis la page sur main) au mot de Raphaël
+- 16:41 : APK envoyé dans la prerelease petanque-scanner-beta (lien vérifié : 102982288 octets, HTTP 200). Page
+  commitée et poussée à la demande de l'utilisateur (« publie la bêta 1.2.13 de Pétanque Scan ») : mon fichier et cette
+  section seulement. Worktree scan-beta-1213 libéré. Statut : terminé. Réservations libérées.
+
+## 2026-11-06 — Pétanque Game : page bêta discrète de la 1.0.7 (APK .beta) (session PetanqueGame)
+- Statut : en cours (2026-11-06T16:00+01:00). Demande de l'utilisateur : (transmis par le Producer) tester une dernière
+  fois la 1.0.7 avant soumission : un APK .beta à côté de l'appli du store, téléchargeable par un lien discret (page
+  testeurs non listée, noindex, hors menu et sitemap, chemin difficile à deviner) ; publication au mot de Raphaël tapé
+  dans la session Pétanque Game
+- Réservations actives : `src/pages/petanque-game/beta-drm50otf.astro` (nouveau), dans le worktree
+  website-worktrees/pg-beta-107, branche pg-beta-107 ; rien dans ce dossier. Je pars de la règle /beta-…/ de la session
+  website (sitemap, précache, noindex).
+- Ressources : serveur de dev sur le port 4600 ; eslint, `astro check`. Build annoncé ici avant.
+- 16:05 : page écrite dans le worktree (branche pg-beta-107, posée sur bd6032d, la règle /beta-…/ de la session
+  website) : /petanque-game/beta-drm50otf/, noindex, liée de nulle part. eslint OK, astro check 0 erreur 0
+  avertissement, captures bureau et téléphone relues. Taille et SHA-256 de l'APK à remplir après son build (file Gradle
+  du Producer) ; l'APK ira dans la prerelease petanque-game-beta. Rien de commité ni poussé : au mot de Raphaël
+- 16:45 : APK bêta construit (16:30-16:44) et vérifié (paquet .beta, clé dev, 3 ABI, pubs de test) : taille et SHA-256
+  mis sur la page. Lancement du build complet dans mon worktree pg-beta-107 (son dist/, .astro/, public/vendor/
+  seulement)…
+- 16:48 : build complet OK dans mon worktree pg-beta-107 (sur bd6032d) : 219 pages, astro check 0 erreur, précache 389
+  sans la page, liens OK ; la page a son noindex, n'est ni dans le sitemap ni dans sw.js, aucune page n'y mène. Prête,
+  non commitée ni poussée : APK (prerelease petanque-game-beta) et push au mot de Raphaël
+- 17:09 : poussé au mot de Raphaël tapé dans la session Pétanque Game : 620695c sur main (la page seule, posée sur
+  aa9b60b ; build complet refait sur cet arbre : 222 pages, précache 389, liens OK), en ligne après 307 s :
+  https://www.ludiven-studio.fr/petanque-game/beta-drm50otf/ (200, noindex, ni dans le sitemap ni dans sw.js). APK dans
+  la prerelease petanque-game-beta (petanque-game-1.0.7-beta.apk, 160 034 995 octets, SHA-256 servi = local). Worktree
+  pg-beta-107 et ses branches retirés. Statut : terminé. Réservations libérées.
 
 ## 2026-11-06 — Accès discrets aux bêtas et aux Dev des applis (5 tapes sur l'icône) (session website)
 - Statut : en cours (2026-11-06T16:53+01:00). Demande de l'utilisateur : (transmis par le Producer, Raphaël : « comment
