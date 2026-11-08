@@ -5,23 +5,23 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 // Profile_Android_Beta, APP_BETA). Unlisted: linked from nowhere; BaseLayout and astro.config keep /beta- paths
 // out of search engines, the sitemap and the precache.
 const APK = {
-	url: 'https://github.com/Ludiven-Studio/website/releases/download/dragons-gems-beta/dragonsgems-beta-v1.0.1.apk',
-	version: '1.0.1',
-	code: 100001,
-	size: 119544876,
-	sha256: '8b05c9564463803ad14f3bcfe09a3ee2e1019c16c714ecaf2ff2b55112e0a924',
-	commit: '08c25fd',
+	url: 'https://github.com/Ludiven-Studio/website/releases/download/dragons-gems-beta/dragonsgems-beta-v1.0.2.apk',
+	version: '1.0.2',
+	code: 100002,
+	size: 74195759,
+	sha256: 'bdc9489c2fc340bf8431b6520ce6a5253ea04036146627e37467b1f86e35bb7a',
+	commit: '0bcd0ed',
 };
 ---
 
 <BaseLayout
-	title="Dragon Gems Swipe — bêta 1.0.1 | Ludiven Studio"
-	description="La version 1.0.1 de Dragon Gems Swipe, à essayer avant son envoi aux stores."
+	title="Dragon Gems Swipe — bêta 1.0.2 | Ludiven Studio"
+	description="La version 1.0.2 de Dragon Gems Swipe, à essayer avant son envoi aux stores."
 	noindex
 >
 	<div class="wrapper beta-page stack gap-6">
 		<header class="stack gap-2">
-			<h1>Dragon Gems Swipe — bêta 1.0.1</h1>
+			<h1>Dragon Gems Swipe — bêta 1.0.2</h1>
 			<p class="lead">La version qui part sur les stores, à essayer une dernière fois avant l'envoi. Elle s'installe à côté de l'appli du Play Store, sous le nom « Dragon Gems β », avec sa propre partie.</p>
 		</header>
 
@@ -31,6 +31,7 @@ const APK = {
 				<li><strong>Les achats</strong> : Google Play ne connaît pas cette appli. Les boutons de la boutique restent grisés.</li>
 				<li><strong>Les pubs</strong> : la bêta n'en montre aucune, même après « Accepter ». Chaque vidéo proposée est une vidéo de nos jeux et applis.</li>
 				<li><strong>L'invite de mise à jour</strong> ne s'affiche pas.</li>
+				<li><strong>Les anciens téléphones 32 bits</strong> : la bêta est faite pour les téléphones 64 bits (ARM64) seulement. Le code est celui de la version des stores, qui marche aussi sur les 32 bits.</li>
 			</ul>
 			<h2>Ce qui compte pour de vrai</h2>
 			<ul>
