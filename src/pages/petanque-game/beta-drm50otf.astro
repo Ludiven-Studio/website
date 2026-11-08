@@ -2,30 +2,31 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 
 // Unlisted: noindex, out of the sitemap and of the offline precache (astro.config.mjs).
-// The 1.0.7 store build under the .beta id, signed with the dev key, on a prerelease of this repo.
+// The next store version, built from the game's main (79da7fa) under the .beta id, signed with the dev key,
+// ARM64 only, on a prerelease of this repo (the 1.0.7 APK stays there).
 const BETA = {
-	version: '1.0.7',
-	date: '2026-11-06',
-	size: 160034995,
+	version: '1.0.8',
+	date: '2026-11-08',
+	size: 101366181,
 	android: '7.1',
-	sha256: 'fd9ab6d63ea0e9c91a5b322a3f8342fb7227997685f11175740691a4de0f7c8c',
-	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-game-beta/petanque-game-1.0.7-beta.apk',
+	sha256: '25d4c1804e2d6a211cd7ff794754ba7c20afc033e8088eb02bce32ba23176f79',
+	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-game-beta/petanque-game-1.0.8-beta.apk',
 };
 const date = new Date(BETA.date).toLocaleDateString('fr-FR', { dateStyle: 'medium' });
 const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 ---
 
 <BaseLayout
-	title="Pétanque Game β — version 1.0.7 | Ludiven Studio"
-	description="Version bêta Android de Pétanque Game 1.0.7, pour les testeurs."
+	title="Pétanque Game β — version 1.0.8 | Ludiven Studio"
+	description="Version bêta Android de Pétanque Game 1.0.8, pour les testeurs."
 	noindex
 >
 	<div class="wrapper beta-page stack gap-6">
 		<header class="stack gap-2">
 			<h1>Pétanque Game β</h1>
 			<p class="lead">
-				La version {BETA.version} telle qu'elle part sur le Play Store, à tester une dernière fois avant sa sortie. Elle s'appelle
-				« Pétanque Game β » et s'installe à côté du jeu du Play Store, sans toucher à ses données.
+				La prochaine version, {BETA.version}, à tester avant son envoi au Play Store. Elle s'appelle « Pétanque Game β » et
+				s'installe à côté du jeu du Play Store, sans toucher à ses données.
 			</p>
 		</header>
 
@@ -44,7 +45,11 @@ const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 				<li>
 					<strong>Pas de vraies pubs.</strong> La fenêtre des pubs s'ouvre comme dans le jeu du store. Si tu acceptes, une fenêtre
 					« Publicité de test » remplace chaque vidéo et chaque pub entre deux parties : touche OK. Les pièces des vidéos sont
-					bien données.
+					bien données. Les vidéos de nos propres jeux et applis, elles, s'affichent comme dans la future version.
+				</li>
+				<li>
+					<strong>Téléphones 64 bits seulement.</strong> La β est faite pour les téléphones ARM64. Un ancien téléphone 32 bits ne
+					peut pas l'installer ; le jeu du Play Store, lui, marche aussi sur les 32 bits.
 				</li>
 				<li>
 					<strong>Pas de mise à jour par le Play Store.</strong> Une nouvelle bêta se télécharge sur cette page.
