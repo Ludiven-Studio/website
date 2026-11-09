@@ -40,6 +40,9 @@ export default defineConfig({
         '/de/jeux/petanque/confidentialite': '/de/petanque-game/confidentialite/',
         '/it/jeux/petanque/cgu': '/it/petanque-game/cgu/',
         '/it/jeux/petanque/confidentialite': '/it/petanque-game/confidentialite/',
+        // Dragon Gems' beta page is hidden until the next beta: testers who kept its link land on the
+        // product page. The next beta page takes this path back: drop this line then.
+        '/dragons-gems/beta-wnkmrlugi7': '/dragons-gems/',
     },
     integrations: [
         react(),

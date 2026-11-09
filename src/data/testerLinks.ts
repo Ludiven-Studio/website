@@ -9,5 +9,6 @@ export const TESTER_LINKS: Record<TesterApp, { beta?: string; dev?: string }> = 
 	'petanque-meet': { beta: '/petanque-meet/beta-0gn9lbmb/', dev: '/petanque-meet/test/' },
 	'petanque-scan': { beta: '/petanque-scanner/beta-cd53d8qv/', dev: '/petanque-scanner/test/' },
 	'petanque-game': { beta: '/petanque-game/beta-drm50otf/', dev: '/jeux/petanque/test/' },
-	'dragons-gems': { beta: '/dragons-gems/beta-wnkmrlugi7/', dev: DRAGONS_GEMS_DEV },
+	// No beta until the next one: its old page redirects to the product page (astro.config.mjs).
+	'dragons-gems': { dev: DRAGONS_GEMS_DEV },
 };
