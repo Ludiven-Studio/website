@@ -1,6 +1,7 @@
 // submit-score — the ONLY write path for game_scores (service_role, bypasses RLS).
 // Validates every submission against the per-game rules stored in `games`, enforces
-// the daily-challenge quota, and keeps the player's best score per challenge date.
+// the daily-challenge quota, and keeps the player's best score per challenge date, and on
+// the all-time boards whose game asks for it (games.free_play_best: Dragon Gems' endless and summit).
 // A run sent with a `submission_id` and sent again (a reply lost to the network) gets its first
 // answer back, without a second row or a second daily attempt (score_submissions).
 //
@@ -37,6 +38,7 @@ interface GameRules {
 	max_score_per_second: number | null;
 	max_attempts_per_day: number | null;
 	value_units_per_second: number | null; // time games: value ÷ this = seconds (100 = centis, 1000 = ms)
+	free_play_best: boolean | null; // free play keeps one row per player, the best (null before its migration)
 }
 
 const json = (body: unknown, status = 200): Response =>
@@ -116,7 +118,8 @@ Deno.serve(async (req) => {
 	// ---- Load the game's rules ----
 	const { data: game, error: gameErr } = await supabase
 		.from('games')
-		.select('id, metric, min_duration_seconds, max_score, max_score_per_second, max_attempts_per_day, value_units_per_second')
+		// '*', not a column list: this runs before the migration that adds free_play_best, and naming it would fail every game.
+		.select('*')
 		.eq('id', game_id)
 		.maybeSingle<GameRules>();
 	if (gameErr) return json({ error: 'rules lookup failed' }, 500);
@@ -144,14 +147,40 @@ Deno.serve(async (req) => {
 	const specific = validateGameSpecific(payload, game);
 	if (specific) return bad(specific);
 
-	// ---- Free play: validated append-only row, no quota, no best-retained ----
+	// ---- Free play: no quota, no date ----
 	if (!isDaily) {
-		const { error } = await supabase.from('game_scores').insert({
-			game_id, player_id, player_name: playerName, score,
-			raw_data: payload.raw_data ?? null, challenge_date: null,
-		});
-		if (error) return json({ error: 'insert failed' }, 500);
-		return answer({ retained: true, best_score: score, attempts_left: null, name_refused: nameRefused });
+		const row = { game_id, player_id, player_name: playerName, score, raw_data: payload.raw_data ?? null, challenge_date: null };
+		// Every run is a row (the pétanque events: the site ranks each pseudo's best itself).
+		if (!game.free_play_best) {
+			const { error } = await supabase.from('game_scores').insert(row);
+			if (error) return json({ error: 'insert failed' }, 500);
+			return answer({ retained: true, best_score: score, attempts_left: null, name_refused: nameRefused });
+		}
+		// One row per player, the best, like the daily; attempts counts the runs.
+		const mine = () => supabase.from('game_scores').select('id, score, attempts')
+			.eq('game_id', game_id).eq('player_id', player_id).is('challenge_date', null)
+			.maybeSingle<{ id: string; score: number; attempts: number }>();
+		let { data: best, error: readErr } = await mine();
+		if (readErr) return json({ error: 'best lookup failed' }, 500);
+		if (!best) {
+			const { error } = await supabase.from('game_scores').insert(row);
+			if (!error) return answer({ retained: true, best_score: score, attempts_left: null, name_refused: nameRefused });
+			// Another run of the same player got its row in first (game_scores_free_best_uniq): weigh this one against it.
+			if (error.code !== '23505') return json({ error: 'insert failed' }, 500);
+			({ data: best, error: readErr } = await mine());
+			if (readErr || !best) return json({ error: 'best lookup failed' }, 500);
+		}
+		const retained = game.metric === 'time' ? score < best.score : score > best.score;
+		const { error } = await supabase
+			.from('game_scores')
+			.update({
+				attempts: best.attempts + 1,
+				updated_at: new Date().toISOString(),
+				...(retained ? { score, player_name: playerName, raw_data: payload.raw_data ?? null } : {}),
+			})
+			.eq('id', best.id);
+		if (error) return json({ error: 'update failed' }, 500);
+		return answer({ retained, best_score: retained ? score : best.score, attempts_left: null, name_refused: nameRefused });
 	}
 
 	// ---- Daily challenge: quota + best-score-retained upsert ----
