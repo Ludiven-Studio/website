@@ -18,7 +18,7 @@ import Hero from '../../../components/Hero.astro';
 		<p class="updated">
 			Diese Erklärung betrifft <strong>die mobile App Pétanque Scan</strong>
 			(früher Pétanque Scanner, <code>com.raphbenpro.petanquear</code>) und nicht die Website ludiven-studio.fr, die über eine
-			<a href="/confidentialite/">eigene Datenschutzerklärung</a> verfügt. Letzte Aktualisierung: 5. November 2026 (Version 1.2.14: Unsere eigenen Anzeigen, von unserer Website geladen, ersetzen das Banner und das Video von Pétanque Meet; nach einer Ablehnung wird „Werbung aktivieren?“ einmal pro Sitzung angeboten, wenn du ein Video anforderst. Version 1.2.13: Die Werbung wechselt von Google AdMob zu Unity LevelPlay, mit unserem eigenen Einwilligungsfenster; auf dem iPhone ist die Werbung ohne Apples Tracking-Erlaubnis nicht personalisiert; ein Widerruf deiner Einwilligung wird an die Werbenetzwerke weitergegeben; Google Firebase entfällt; 10 kostenlose Scans pro Tag statt 3).
+			<a href="/confidentialite/">eigene Datenschutzerklärung</a> verfügt. Letzte Aktualisierung: 5. November 2026 (Version 1.2.14: Unsere eigenen Anzeigen, von unserer Website geladen, ersetzen das Banner und das Video von Pétanque Meet; nach einer Ablehnung wird „Werbung aktivieren?“ einmal pro Sitzung angeboten, wenn du ein Video anforderst; die Werbung wechselt von Google AdMob zu Unity LevelPlay, mit unserem eigenen Einwilligungsfenster; auf dem iPhone ist die Werbung ohne Apples Tracking-Erlaubnis nicht personalisiert; ein Widerruf deiner Einwilligung wird an die Werbenetzwerke weitergegeben; Google Firebase entfällt; 10 kostenlose Scans pro Tag statt 3).
 		</p>
 		<p class="updated">
 			Dies ist eine Höflichkeitsübersetzung. Bei Abweichungen gilt die
@@ -159,7 +159,7 @@ import Hero from '../../../components/Hero.astro';
 			<h2>4. Werbung und Einwilligung</h2>
 			<p>
 				Die App ist kostenlos und wird durch ein Werbebanner finanziert sowie durch ein freiwilliges Video,
-				das du ansehen kannst, um deine kostenlosen Scans aufzuladen. Seit Version 1.2.13 wird die Werbung
+				das du ansehen kannst, um deine kostenlosen Scans aufzuladen. Seit Version 1.2.14 wird die Werbung
 				über <strong>Unity LevelPlay</strong> mit den Werbenetzwerken <strong>ironSource Ads</strong> und
 				<strong>Unity Ads</strong> ausgeliefert (Unity Technologies und seine Tochtergesellschaft
 				ironSource). Google ist weder an der Werbung noch an deiner Einwilligung mehr beteiligt. Frühere
@@ -207,7 +207,7 @@ import Hero from '../../../components/Hero.astro';
 				du eingegeben hast, eine Kennung oder die Ergebnisse deiner Messungen.
 			</p>
 			<p>
-				Seit Version 1.2.13 erhält Firebase Analytics (Google) nichts mehr. Frühere Versionen senden,
+				Seit Version 1.2.14 erhält Firebase Analytics (Google) nichts mehr. Frühere Versionen senden,
 				solange sie nicht aktualisiert sind, diese Ereignisse noch dorthin, wenn du zugestimmt hattest.
 			</p>
 			<ul>
@@ -235,9 +235,9 @@ import Hero from '../../../components/Hero.astro';
 				<li><code>ad_unavailable</code> — es war keine Werbung zum Anzeigen verfügbar</li>
 				<li><code>house_ad_shown</code> — eine unserer eigenen Anzeigen wird gezeigt, mit ihrem Namen und ihrem Platz (Banner oder Video), nur einmal pro Anzeige und Platz in einer Sitzung (seit 1.2.14)</li>
 				<li><code>house_ad_opened</code> — du tippst auf eine unserer eigenen Anzeigen, mit ihrem Namen und ihrem Platz (seit 1.2.14)</li>
-				<li><code>meet_promo_shown</code> / <code>meet_promo_refill</code> / <code>meet_promo_closed</code> — das Video von Pétanque Meet wird gezeigt, lädt deine Scans auf oder wird geschlossen (bis 1.2.13)</li>
-				<li><code>meet_store_opened</code> — du öffnest die Seite von Pétanque Meet im Store, über das Banner oder das Video (bis 1.2.13)</li>
-				<li><code>game_store_opened</code> — du öffnest die Seite von Pétanque Game im Store, über das Banner (bis 1.2.13)</li>
+				<li><code>meet_promo_shown</code> / <code>meet_promo_refill</code> / <code>meet_promo_closed</code> — das Video von Pétanque Meet wird gezeigt, lädt deine Scans auf oder wird geschlossen (bis 1.2.12)</li>
+				<li><code>meet_store_opened</code> — du öffnest die Seite von Pétanque Meet im Store, über das Banner oder das Video (bis 1.2.12)</li>
+				<li><code>game_store_opened</code> — du öffnest die Seite von Pétanque Game im Store, über das Banner (bis 1.2.12)</li>
 				<li><code>premium_purchase_started</code> / <code>premium_purchase_success</code> / <code>premium_purchase_failed</code> — Schritte eines Kaufs, gegebenenfalls mit dem Grund des Scheiterns</li>
 				<li><code>premium_restore_success</code> — ein früherer Kauf wurde wiederhergestellt</li>
 				<li><code>premium_revoked</code> — der Store erkennt ein Premium nicht mehr an (zum Beispiel nach einer Erstattung)</li>
@@ -268,7 +268,7 @@ import Hero from '../../../components/Hero.astro';
 		<section class="stack gap-2">
 			<h2>6. Benachrichtigungen</h2>
 			<p>
-				Seit Version 1.2.13 erhält die App keine Benachrichtigungen mehr und fragt nicht mehr nach der
+				Seit Version 1.2.14 erhält die App keine Benachrichtigungen mehr und fragt nicht mehr nach der
 				Erlaubnis dafür. Frühere Versionen können, solange sie nicht aktualisiert sind, noch
 				Benachrichtigungen über Firebase Cloud Messaging (Google) erhalten, wenn du zugestimmt hattest; du
 				kannst sie in den Einstellungen deines Handys ausschalten.
@@ -303,7 +303,7 @@ import Hero from '../../../components/Hero.astro';
 				<strong>Unsere eigenen Anzeigen.</strong> Ein Tipp auf eine davon öffnet die Seite der vorgestellten
 				App im Store. Bei Google Play gibt der Link an, dass er von Pétanque Scan kommt, von welcher Anzeige und
 				von welchem Platz (Banner oder Video), ohne jede Kennung; der Link zum App Store gibt nichts an. Bis
-				Version 1.2.13 lud die App von unserer Website nur das Video von Pétanque Meet und, beim Öffnen des
+				Version 1.2.12 lud die App von unserer Website nur das Video von Pétanque Meet und, beim Öffnen des
 				Premium-Bildschirms, die Liste seiner Videos.
 			</p>
 		</section>
@@ -345,7 +345,7 @@ import Hero from '../../../components/Hero.astro';
 				<li><strong>Unity Technologies</strong> — Werbung (Unity LevelPlay, Unity Ads), wenn du zugestimmt hast.</li>
 				<li><strong>ironSource</strong>, Tochtergesellschaft von Unity Technologies — Werbung (ironSource Ads), wenn du zugestimmt hast. Die Auktionen von ironSource und Unity Ads können die Anzeigenanfrage an weitere Werbekäufer weitergeben (siehe §4).</li>
 				<li><strong>Google LLC</strong> — Google Play-Dienste für AR (ARCore), unter Android, in allen Versionen (siehe §2).</li>
-				<li><strong>Google Ireland Limited / Google LLC</strong> — nur für Versionen vor 1.2.13, solange sie nicht aktualisiert sind: Werbung (AdMob), Einwilligungsverwaltung (UMP), Reichweitenmessung (Firebase Analytics), Benachrichtigungen (Firebase Cloud Messaging) und Referenzzeit (Firebase Realtime Database), wenn du zugestimmt hattest.</li>
+				<li><strong>Google Ireland Limited / Google LLC</strong> — nur für Versionen vor 1.2.14, solange sie nicht aktualisiert sind: Werbung (AdMob), Einwilligungsverwaltung (UMP), Reichweitenmessung (Firebase Analytics), Benachrichtigungen (Firebase Cloud Messaging) und Referenzzeit (Firebase Realtime Database), wenn du zugestimmt hattest.</li>
 				<li><strong>Hetzner Online GmbH</strong> (Deutschland) — Hosting unseres Umami-Servers für die Reichweitenmessung. Noch nicht aktualisierte Versionen der App senden diese Messdaten weiterhin an <strong>Umami Software, Inc.</strong> (Gesellschaft nach US-amerikanischem Recht) über den Dienst Umami Cloud.</li>
 				<li><strong>GitHub, Inc.</strong> — Hosting unserer Website, gelesen für das Update-Angebot, den Katalog unserer eigenen Anzeigen, ihre Bilder und Videos (siehe §8).</li>
 				<li><strong>ntfy.sh</strong> — Benachrichtigungsdienst, der uns die Verkaufsmeldung übermittelt (siehe §7).</li>
@@ -362,7 +362,7 @@ import Hero from '../../../components/Hero.astro';
 			<h2>11. Speicherdauer</h2>
 			<ul>
 				<li><strong>Kamerabilder</strong>: für die Dauer der Berechnung, ausschließlich im Arbeitsspeicher (einige Millisekunden).</li>
-				<li><strong>Daten der Reichweitenmessung — Firebase (Versionen vor 1.2.13)</strong>: von Firebase Analytics <strong>höchstens 14 Monate</strong> gespeichert, entsprechend der in der Firebase-Konsole eingestellten Dauer. Aggregierte Berichte (die keinem Gerät zugeordnet werden können) können darüber hinaus aufbewahrt werden.</li>
+				<li><strong>Daten der Reichweitenmessung — Firebase (Versionen vor 1.2.14)</strong>: von Firebase Analytics <strong>höchstens 14 Monate</strong> gespeichert, entsprechend der in der Firebase-Konsole eingestellten Dauer. Aggregierte Berichte (die keinem Gerät zugeordnet werden können) können darüber hinaus aufbewahrt werden.</li>
 				<li><strong>Daten der Reichweitenmessung — Umami</strong>: in Form von Ereignisstatistiken <strong>24 Monate</strong> auf unserem Server gespeichert, dann gelöscht; seine Sicherungen werden 14 Tage aufbewahrt. Was Umami Cloud noch von nicht aktualisierten Versionen erhält, wird dort nach 6 Monaten gelöscht. Diese Daten sind mit keiner Gerätekennung verknüpft und erlauben es nicht, den Weg einer Person nachzuvollziehen.</li>
 				<li><strong>Scan-Zähler</strong>: wird jeden Tag zurückgesetzt.</li>
 				<li><strong>Werbedaten</strong>: nach den Regeln von Unity und ironSource.</li>

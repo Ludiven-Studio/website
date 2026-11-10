@@ -18,7 +18,7 @@ import Hero from '../../../components/Hero.astro';
 		<p class="updated">
 			This policy covers <strong>the Pétanque Scan mobile app</strong>
 			(formerly Pétanque Scanner, <code>com.raphbenpro.petanquear</code>), not the ludiven-studio.fr website, which has its
-			<a href="/confidentialite/">own policy</a>. Last updated: 5 November 2026 (version 1.2.14: our house ads, read from our website, replace the Pétanque Meet strip and video; after a refusal, "Turn ads on?" is offered once per session when you ask for a video. Version 1.2.13: advertising moves from Google AdMob to Unity LevelPlay, with our own consent window; on iPhone, without Apple's tracking permission, ads are not personalised; withdrawing your consent is passed on to the ad networks; Google Firebase is removed; 10 free scans a day instead of 3).
+			<a href="/confidentialite/">own policy</a>. Last updated: 5 November 2026 (version 1.2.14: our house ads, read from our website, replace the Pétanque Meet strip and video; after a refusal, "Turn ads on?" is offered once per session when you ask for a video; advertising moves from Google AdMob to Unity LevelPlay, with our own consent window; on iPhone, without Apple's tracking permission, ads are not personalised; withdrawing your consent is passed on to the ad networks; Google Firebase is removed; 10 free scans a day instead of 3).
 		</p>
 		<p class="updated">
 			This is a courtesy translation. In case of discrepancy, the
@@ -157,7 +157,7 @@ import Hero from '../../../components/Hero.astro';
 			<h2>4. Advertising and consent</h2>
 			<p>
 				The app is free and funded by an advertising banner, as well as by an optional video that you can
-				choose to watch to recharge your free scans. Since version 1.2.13, ads are served by <strong>Unity
+				choose to watch to recharge your free scans. Since version 1.2.14, ads are served by <strong>Unity
 				LevelPlay</strong> with the <strong>ironSource Ads</strong> and <strong>Unity Ads</strong> networks
 				(Unity Technologies and its subsidiary ironSource). Google no longer plays any part in the
 				advertising or in your consent. Earlier versions, until they are updated, still use Google AdMob and
@@ -203,7 +203,7 @@ import Hero from '../../../components/Hero.astro';
 				measurements.
 			</p>
 			<p>
-				Since version 1.2.13, Firebase Analytics (Google) receives nothing any more. Earlier versions, until
+				Since version 1.2.14, Firebase Analytics (Google) receives nothing any more. Earlier versions, until
 				they are updated, still send it these events if you had accepted.
 			</p>
 			<ul>
@@ -231,9 +231,9 @@ import Hero from '../../../components/Hero.astro';
 				<li><code>ad_unavailable</code> — no ad was available to show</li>
 				<li><code>house_ad_shown</code> — one of our house ads is shown, with its name and its spot (strip or video), only once per ad and spot in a session (since 1.2.14)</li>
 				<li><code>house_ad_opened</code> — you tap one of our house ads, with its name and its spot (since 1.2.14)</li>
-				<li><code>meet_promo_shown</code> / <code>meet_promo_refill</code> / <code>meet_promo_closed</code> — the Pétanque Meet video is shown, recharges your scans, or is closed (up to 1.2.13)</li>
-				<li><code>meet_store_opened</code> — you open Pétanque Meet's page in the store, from the strip or the video (up to 1.2.13)</li>
-				<li><code>game_store_opened</code> — you open Pétanque Game's page in the store, from the strip (up to 1.2.13)</li>
+				<li><code>meet_promo_shown</code> / <code>meet_promo_refill</code> / <code>meet_promo_closed</code> — the Pétanque Meet video is shown, recharges your scans, or is closed (up to 1.2.12)</li>
+				<li><code>meet_store_opened</code> — you open Pétanque Meet's page in the store, from the strip or the video (up to 1.2.12)</li>
+				<li><code>game_store_opened</code> — you open Pétanque Game's page in the store, from the strip (up to 1.2.12)</li>
 				<li><code>premium_purchase_started</code> / <code>premium_purchase_success</code> / <code>premium_purchase_failed</code> — steps of a purchase, with the reason for failure where applicable</li>
 				<li><code>premium_restore_success</code> — a previous purchase was restored</li>
 				<li><code>premium_revoked</code> — the store no longer recognises a Premium (after a refund, for example)</li>
@@ -262,7 +262,7 @@ import Hero from '../../../components/Hero.astro';
 		<section class="stack gap-2">
 			<h2>6. Notifications</h2>
 			<p>
-				Since version 1.2.13, the app no longer receives notifications and no longer asks to allow them.
+				Since version 1.2.14, the app no longer receives notifications and no longer asks to allow them.
 				Earlier versions, until they are updated, may still receive them through Firebase Cloud Messaging
 				(Google) if you had accepted them; you can turn them off in your phone's settings.
 			</p>
@@ -294,7 +294,7 @@ import Hero from '../../../components/Hero.astro';
 			<p>
 				<strong>Our house ads.</strong> Tapping one opens the page of the app it presents in the store. On
 				Google Play, the link says that it comes from Pétanque Scan, from which ad and which spot (strip or
-				video), with no identifier; the App Store link says nothing. Up to version 1.2.13, the app only read
+				video), with no identifier; the App Store link says nothing. Up to version 1.2.12, the app only read
 				the Pétanque Meet video from our website and, when the Premium screen opened, the list of its videos.
 			</p>
 		</section>
@@ -335,7 +335,7 @@ import Hero from '../../../components/Hero.astro';
 				<li><strong>Unity Technologies</strong> — advertising (Unity LevelPlay, Unity Ads), if you have accepted it.</li>
 				<li><strong>ironSource</strong>, a subsidiary of Unity Technologies — advertising (ironSource Ads), if you have accepted it. The ironSource and Unity Ads auctions may pass the ad request on to other ad buyers (see §4).</li>
 				<li><strong>Google LLC</strong> — Google Play Services for AR (ARCore), on Android, in all versions (see §2).</li>
-				<li><strong>Google Ireland Limited / Google LLC</strong> — only for versions earlier than 1.2.13, until they are updated: advertising (AdMob), consent management (UMP), analytics (Firebase Analytics), notifications (Firebase Cloud Messaging) and reference time (Firebase Realtime Database), if you had accepted them.</li>
+				<li><strong>Google Ireland Limited / Google LLC</strong> — only for versions earlier than 1.2.14, until they are updated: advertising (AdMob), consent management (UMP), analytics (Firebase Analytics), notifications (Firebase Cloud Messaging) and reference time (Firebase Realtime Database), if you had accepted them.</li>
 				<li><strong>Hetzner Online GmbH</strong> (Germany) — hosting of our Umami analytics server. Versions of the app not yet updated still send this analytics data to <strong>Umami Software, Inc.</strong> (a US company), via the Umami Cloud service.</li>
 				<li><strong>GitHub, Inc.</strong> — hosting of our website, read for the update offer, the catalogue of our house ads, their images and videos (see §8).</li>
 				<li><strong>ntfy.sh</strong> — notification service that passes the sale alert on to us (see §7).</li>
@@ -352,7 +352,7 @@ import Hero from '../../../components/Hero.astro';
 			<h2>11. Retention periods</h2>
 			<ul>
 				<li><strong>Camera images</strong>: for the duration of the computation, in RAM only (a few milliseconds).</li>
-				<li><strong>Analytics data — Firebase (versions earlier than 1.2.13)</strong>: kept by Firebase Analytics for <strong>14 months at most</strong>, according to the period set in the Firebase console. Aggregated reports (which cannot be linked to a device) may be kept longer.</li>
+				<li><strong>Analytics data — Firebase (versions earlier than 1.2.14)</strong>: kept by Firebase Analytics for <strong>14 months at most</strong>, according to the period set in the Firebase console. Aggregated reports (which cannot be linked to a device) may be kept longer.</li>
 				<li><strong>Analytics data — Umami</strong>: kept as event statistics for <strong>24 months</strong> on our server, then erased; its backups are kept 14 days. Those Umami Cloud still receives from versions not yet updated are erased there after 6 months. This data is not linked to any device identifier and does not allow anyone's journey to be reconstructed.</li>
 				<li><strong>Scan counter</strong>: reset every day.</li>
 				<li><strong>Advertising data</strong>: according to the rules of Unity and ironSource.</li>
