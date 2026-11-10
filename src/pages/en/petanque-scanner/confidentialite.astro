@@ -212,6 +212,7 @@ import Hero from '../../../components/Hero.astro';
 				<li><code>scan_cancelled</code> — a scan is abandoned, with whether it counted for the day</li>
 				<li><code>scan_blocked_quota</code> — a scan is refused because the daily limit has been reached</li>
 				<li><code>frame_jump_seen</code> — the AR tracking moved under the scan (its markers shifted), with the shift in centimetres (since 1.2.14)</li>
+				<li><code>floor_off_seen</code> — the detected ground looked wrong (the boules seemed to float or sink), with the gap in centimetres (since 1.2.14)</li>
 				<li><code>welcome_choice</code> — the mode chosen on the welcome screen (augmented reality or photo)</li>
 				<li><code>floor_confirmed</code> / <code>floor_rejected</code> — you confirm or reject the ground detection, with whether the scan starts over</li>
 				<li><code>cochonet_redo</code> — you ask to search for the jack again</li>
