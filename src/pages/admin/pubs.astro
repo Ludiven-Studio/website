@@ -1,0 +1,62 @@
+---
+// The house ads' admin: Raphaël's account only (the promo-admin function checks it), out of search engines,
+// the sitemap and the offline cache (astro.config.mjs).
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PromoAdmin from '../../components/admin/PromoAdmin';
+---
+
+<BaseLayout title="Pubs maison — admin | Ludiven Studio" description="Administration des pubs maison des applis." noindex>
+	<div class="wrapper stack gap-6">
+		<h1 class="pa-h1">Pubs maison</h1>
+		<PromoAdmin client:only="react" />
+	</div>
+</BaseLayout>
+
+<style is:global>
+	.pa-h1 { font-size: var(--text-xl); margin-top: 1.5rem; }
+	.pa-root { display: grid; gap: 1rem; margin-bottom: 3rem; }
+	.pa-note { color: var(--sc-muted); font-size: var(--text-sm); }
+	.pa-card { border: 1px solid var(--sc-line); border-radius: 0.75rem; padding: 1rem 1.25rem; background: var(--sc-surface); }
+	.pa-card ul { margin: 0.5rem 0 0 1.25rem; }
+	.pa-ok { border-color: #16a34a; }
+	.pa-error { border-color: #dc2626; }
+	.pa-error p, .pa-error li { color: #b91c1c; }
+	.pa-peek { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; border-color: var(--sc-accent); }
+	.pa-bar { display: flex; flex-wrap: wrap; gap: 0.75rem; justify-content: space-between; align-items: center; }
+	.pa-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+	.pa-btn { border: 1px solid var(--sc-line); border-radius: 999px; padding: 0.4rem 1rem; background: var(--sc-surface); color: var(--sc-ink); font: inherit; font-size: var(--text-sm); cursor: pointer; }
+	.pa-btn:disabled { opacity: 0.5; cursor: default; }
+	.pa-primary { background: var(--sc-accent); border-color: var(--sc-accent); color: #fff; font-weight: 700; }
+	.pa-danger { color: #b91c1c; border-color: #fca5a5; }
+	.pa-grid { display: grid; gap: 1rem; grid-template-columns: 1fr; }
+	@media (min-width: 60em) { .pa-grid { grid-template-columns: 16rem 1fr; } }
+	.pa-list { display: grid; gap: 0.5rem; align-content: start; }
+	.pa-item { display: flex; gap: 0.75rem; align-items: center; text-align: left; border: 1px solid var(--sc-line); border-radius: 0.75rem; padding: 0.5rem; background: var(--sc-surface); color: var(--sc-ink); font: inherit; cursor: pointer; }
+	.pa-item img { border-radius: 0.5rem; }
+	.pa-item span { display: grid; }
+	.pa-item small { color: var(--sc-muted); }
+	.pa-item--on { border-color: var(--sc-accent); box-shadow: 0 0 0 2px var(--sc-accent); }
+	.pa-editor { display: grid; gap: 1rem; border: 1px solid var(--sc-line); border-radius: 0.75rem; padding: 1rem; background: var(--sc-surface); }
+	.pa-tabs { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+	.pa-tab { border: 1px solid var(--sc-line); border-radius: 0.5rem; padding: 0.3rem 0.75rem; background: none; color: var(--sc-ink); font: inherit; font-size: var(--text-sm); cursor: pointer; }
+	.pa-tab--on { background: var(--sc-surface-2); border-color: var(--sc-accent); font-weight: 700; }
+	.pa-previews { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); align-items: start; }
+	.pa-banner { display: flex; gap: 0.6rem; align-items: center; width: 20rem; max-width: 100%; padding: 0.4rem 0.6rem; border-radius: 0.6rem; background: #fff; color: #1a1533; box-shadow: 0 1px 4px rgb(0 0 0 / 0.2); }
+	.pa-banner img, .pa-noimg { width: 48px; height: 48px; border-radius: 0.6rem; flex: none; background: #ddd; }
+	.pa-banner > span { display: grid; min-width: 0; }
+	.pa-banner-title { font-weight: 700; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.pa-banner-title small { font-weight: 400; font-size: 11px; color: #888; }
+	.pa-banner-text { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.pa-video { width: 12rem; aspect-ratio: 9 / 16; border-radius: 0.75rem; background: #000; }
+	.pa-video-under { display: flex; gap: 0.75rem; align-items: center; margin-top: 0.4rem; }
+	.pa-fake-btn { border-radius: 999px; padding: 0.2rem 0.8rem; background: var(--sc-accent); color: #fff; font-size: var(--text-sm); }
+	.pa-fields { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }
+	.pa-field { display: grid; gap: 0.25rem; font-size: var(--text-sm); }
+	.pa-field small { color: var(--sc-muted); }
+	.pa-field input:not([type='checkbox']) { border: 1px solid var(--sc-line); border-radius: 0.5rem; padding: 0.4rem 0.6rem; background: var(--sc-surface); color: var(--sc-ink); font: inherit; }
+	.pa-checks { display: flex; gap: 1rem; }
+	.pa-uploads { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: end; }
+	.pa-history ul { list-style: none; margin: 0.75rem 0 0; padding: 0; display: grid; gap: 0.5rem; }
+	.pa-history li { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: space-between; }
+	.pa-signin { display: grid; gap: 0.75rem; justify-items: start; }
+</style>

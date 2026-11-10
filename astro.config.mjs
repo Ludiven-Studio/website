@@ -62,7 +62,8 @@ export default defineConfig({
                 !page.includes('/jeux/petanque/test') &&
                 !page.includes('/jeux/eclats/test') &&
                 !page.includes('/jeux/eclats/nuit') &&
-                !page.includes('/beta-'),
+                !page.includes('/beta-') &&
+                !page.includes('/admin/'),
         }),
         AstroPWA({
             registerType: 'autoUpdate',
@@ -91,6 +92,7 @@ export default defineConfig({
                 globIgnores: [
                     '**/PetanqueARDistances/**',
                     '**/beta-*/**',
+                    'admin/**',
                     'petanque-meet/test/**',
                     'petanque-scanner/test/**',
                     'jeux/petanque/test/**',
