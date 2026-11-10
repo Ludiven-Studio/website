@@ -31,7 +31,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			Esta política se refiere a <strong>la aplicación móvil Pétanque Game</strong>
 			(<code>com.ludivenstudio.petanquegame</code>). El juego de petanca del sitio web
 			(<a href="/jeux/petanque/">ludiven-studio.fr/jeux/petanque</a>) y el resto del sitio tienen su
-			<a href="/confidentialite/">propia política</a>. Última actualización: 6 de noviembre de 2026 (inicio de sesión con Google en iPhone; retirada del acceso «Iniciar sesión con Apple» al eliminar la cuenta; estadísticas de uso enviadas a partir de la versión 1.0.7; copia de seguridad de Google en Android).
+			<a href="/confidentialite/">propia política</a>. Última actualización: 10 de noviembre de 2026 (versión 1.0.8: nuestros propios anuncios, nueva ventana «Publicidad personalizada», ya sin copia de seguridad de Google en Android).
 		</p>
 		<p class="updated">
 			Esta es una traducción de cortesía. En caso de discrepancia, prevalece la
@@ -41,10 +41,10 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 		<div class="summary">
 			<p><strong>Lo esencial:</strong></p>
 			<ul>
-				<li>Contra la máquina o entre dos en un teléfono, juegas <strong>sin cuenta</strong>, incluso sin conexión. Cuando el teléfono tiene internet, solo salen de él la publicidad si la has aceptado, unas estadísticas de uso anónimas y algunas comprobaciones técnicas (ver §2).</li>
+				<li>Contra la máquina o entre dos en un teléfono, juegas <strong>sin cuenta</strong>, incluso sin conexión. Cuando el teléfono tiene internet, solo salen de él la publicidad si la has aceptado, unas estadísticas de uso anónimas y algunas solicitudes a nuestro sitio web (la última versión del juego, nuestros propios anuncios) (ver §2).</li>
 				<li>Las monedas, la tienda, las ligas y el juego en línea necesitan una <strong>cuenta de Google</strong> (Android o iPhone) <strong>o de Apple</strong> (iPhone). Tu progreso se guarda entonces en <strong>Unity</strong>, nuestro proveedor, para que lo recuperes en todos tus teléfonos.</li>
 				<li><strong>Tu apodo es público</strong>: aparece en la lista de partidas públicas, lo ve tu rival y figura en la clasificación, con tu puntuación. No hay chat.</li>
-				<li>La publicidad <strong>solo se muestra con tu acuerdo</strong>, pedido en el primer inicio. Sin él, juegas igual, sin publicidad. No se revende ningún dato.</li>
+				<li>La publicidad de las redes publicitarias <strong>solo se muestra con tu acuerdo</strong>, pedido en el primer inicio. Sin él, juegas igual, sin anuncios entre partidas; solo pueden aparecer vídeos de nuestros otros juegos y apps, cuando pides una recompensa. No se revende ningún dato.</li>
 				<li>Puedes <strong>eliminar tu cuenta</strong> en cualquier momento: Opciones › «Eliminar mi cuenta» (<a href="#suppression">ver §11</a>).</li>
 			</ul>
 		</div>
@@ -72,7 +72,8 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<ul>
 				<li>la <strong>publicidad</strong>, si la has aceptado (ver §6);</li>
 				<li>unas <strong>estadísticas de uso</strong> sin identificador (ver §7);</li>
-				<li>la lectura del <strong>número de la última versión</strong> del juego en nuestro sitio web (ver §9).</li>
+				<li>la lectura del <strong>número de la última versión</strong> del juego en nuestro sitio web (ver §9);</li>
+				<li>la lectura de la lista de <strong>nuestros propios anuncios</strong> en nuestro sitio web, en cada inicio, y luego de la imagen y el vídeo del que se muestra (ver §6).</li>
 			</ul>
 			<p>
 				Si abres la clasificación sin haber iniciado sesión, el juego se conecta a Unity con un
@@ -181,15 +182,21 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 						</tr>
 						<tr>
 							<td>Identificador publicitario, otros identificadores del dispositivo, dirección IP, interacciones con los anuncios, tiempo de uso, compras hechas en el juego (declaradas por Unity Ads), información técnica (ver §6)</td>
-							<td>Mostrar anuncios elegidos según tus intereses, medirlos, luchar contra el fraude</td>
+							<td>Elegir los anuncios según tu perfil, limitar su repetición, medir su eficacia, luchar contra el fraude</td>
 							<td>Tu consentimiento (art. 6.1.a): sin él, no se inicia nada</td>
 							<td>Unity Technologies y su filial ironSource (Unity LevelPlay, ironSource Ads, Unity Ads); a través de sus subastas, otros compradores de publicidad (ver §6)</td>
 						</tr>
 						<tr>
-							<td>Tu respuesta en la ventana «Publicidad y privacidad» (aceptar o rechazar), su fecha y la versión del texto</td>
+							<td>Tu respuesta en la ventana «Publicidad personalizada» (aceptar o rechazar, o un sí dado antes de un vídeo), el día en que la diste y la versión del texto</td>
 							<td>Recordarla y poder demostrar tu elección</td>
 							<td>Obligación legal</td>
 							<td>Guardada solo en tu teléfono; Umami cuenta los sí y los no, sin identificador (ver §7)</td>
+						</tr>
+						<tr>
+							<td>Dirección IP del teléfono, cuando lee en nuestro sitio web la lista de nuestros propios anuncios, sus imágenes y sus vídeos</td>
+							<td>Mostrarte vídeos de nuestros otros juegos y apps (ver §6)</td>
+							<td>Interés legítimo</td>
+							<td>GitHub, proveedor de alojamiento de nuestro sitio web</td>
 						</tr>
 						<tr>
 							<td>Estadísticas de uso, sin cuenta ni identificador (ver §7)</td>
@@ -222,17 +229,13 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				cada dos partidas. Google no interviene ni en la publicidad de este juego ni en tu consentimiento.
 			</p>
 			<p>
-				<strong>Tu consentimiento.</strong> En el primer inicio, sea cual sea tu país, una ventana «Publicidad y
-				privacidad» te pregunta si aceptas que ironSource y Unity Ads (Unity Technologies) guarden y lean
-				información en tu teléfono, incluido su identificador de publicidad, para mostrarte anuncios elegidos
-				según tus intereses, deducidos de tu actividad en este juego y en otras aplicaciones, y medir su
-				eficacia. «Aceptar» y «Rechazar» tienen el mismo peso.
+				<strong>Tu consentimiento.</strong> En el primer inicio, sea cual sea tu país, una ventana «Publicidad personalizada» («Publicidad y privacidad» antes de la versión 1.0.8) te pregunta si aceptas que Unity Ads, ironSource (grupo Unity) y sus socios elijan los anuncios según tu perfil, limiten su repetición, midan su eficacia y luchen contra el fraude. Para ello, sus módulos guardan y leen información en tu teléfono, incluido su identificador de publicidad. El enlace «Ver las empresas» de la ventana lleva a la lista de las empresas implicadas (<a href="/es/publicite/societes/">Las empresas de publicidad en nuestras apps</a>), y otro a esta política. «Aceptar» y «Rechazar» tienen el mismo peso.
 			</p>
 			<ul>
-				<li><strong>Si rechazas</strong>, no se inicia ningún módulo publicitario: juegas igual, sin publicidad y sin los vídeos que dan monedas. Si tocas una oferta de vídeo, el juego te vuelve a preguntar.</li>
-				<li><strong>Tu respuesta</strong>, su fecha y la versión del texto se quedan en tu teléfono. El juego te vuelve a preguntar al cabo de 6 meses, tanto si aceptaste como si rechazaste, o antes si cambian nuestros socios publicitarios.</li>
+				<li><strong>Si rechazas</strong>, no se inicia ningún módulo publicitario y no se les transmite nada, ni siquiera tu rechazo: juegas igual, sin anuncios entre partidas. Las ofertas de vídeo siguen ahí: la primera vez que tocas una en una sesión, el juego te pregunta si quieres activar los anuncios. Un sí vale como un «Aceptar»; si no, y desde entonces hasta el final de la sesión, te muestra un vídeo de uno de nuestros otros juegos o apps, que da la misma recompensa (ver más abajo).</li>
+				<li><strong>Tu respuesta</strong>, el día en que la diste y la versión del texto se quedan en tu teléfono. El juego te vuelve a preguntar al cabo de 182 días (6 meses), tanto si aceptaste como si rechazaste, o antes si cambian nuestros socios publicitarios.</li>
 				<li><strong>Puedes cambiar de opinión en cualquier momento</strong>: Opciones › «Opciones de anuncios». Si retiras tu consentimiento durante una sesión, el juego deja de cargar anuncios en el acto; el módulo publicitario sigue cargado hasta que cierras el juego, y después ya no se inicia.</li>
-				<li><strong>En iPhone</strong>, el permiso de seguimiento de Apple solo se te pide después de un «Aceptar»; sin él, no se usa el identificador publicitario del iPhone.</li>
+				<li><strong>En iPhone</strong>, el permiso de seguimiento de Apple solo se te pide después de un sí. Si lo rechazas, o mientras no hayas respondido, los anuncios no son personalizados: el módulo publicitario recibe que no has aceptado la personalización, y no se usa el identificador publicitario del iPhone.</li>
 			</ul>
 			<p>
 				<strong>Si has aceptado</strong>, para mostrar los anuncios, elegirlos, medirlos y luchar contra el fraude,
@@ -246,6 +249,9 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<strong>«Sin anuncios»</strong>, una compra única, quita los anuncios entre partidas. Los vídeos
 				opcionales se siguen ofreciendo a quien quiera monedas: si has aceptado la publicidad, el módulo
 				publicitario sigue funcionando.
+			</p>
+			<p>
+				<strong>Nuestros propios anuncios.</strong> El juego también muestra vídeos de nuestros otros juegos y apps (Pétanque Meet, Pétanque Scan, Dragon Gems…): si has rechazado la publicidad y eliges nuestro vídeo para una recompensa, o si no hay ningún vídeo de nuestros socios listo. No interviene ninguna red publicitaria y no se transmite ningún dato a ningún socio. En cada inicio, incluso antes de que respondas a la ventana, el juego lee en nuestro sitio web la lista de estos anuncios; cuando se muestra uno, carga también su imagen y su vídeo. Como con cualquier página web, el proveedor de alojamiento del sitio (GitHub) ve la dirección IP de tu teléfono; no se envía nada más. La lista y las imágenes se quedan en tu teléfono para la próxima vez, y una copia incluida en el juego sirve cuando no tienes internet. En Android, el juego comprueba si la app presentada ya está en tu teléfono, para mostrarte otra en su lugar: solo lo comprueba con nuestras propias apps, y la respuesta no sale de tu teléfono. La recompensa llega tras 10 segundos de vídeo. «Descubrir» abre la ficha de la app en Google Play o en la App Store (en Google Play, con una mención que indica que viene de Pétanque Game); la recompensa no depende de ello. El juego cuenta, sin identificador, los vídeos mostrados y las fichas abiertas (ver §7).
 			</p>
 			<p>
 				También puedes restablecer o eliminar el identificador publicitario en los ajustes de tu teléfono.
@@ -268,8 +274,10 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><code>rated_end</code> — termina una partida clasificada (resultado, nivel de la puntuación);</li>
 				<li><code>daily_bonus</code>, <code>challenge_claim</code> — se recibe un bono diario (racha) o se cobra un desafío (monedas);</li>
 				<li><code>shop_buy</code>, <code>iap_buy</code> — se compra un objeto con monedas (objeto, precio), o con dinero (producto);</li>
-				<li><code>ad_consent</code> — tu respuesta en la ventana «Publicidad y privacidad» (sí o no);</li>
+				<li><code>ad_consent</code> — tu respuesta en la ventana «Publicidad personalizada» (sí o no);</li>
 				<li><code>ad_offer</code>, <code>ad_rewarded</code>, <code>ad_interstitial</code> — se ofrece o se ve un vídeo, se muestra un anuncio (ubicación, resultado);</li>
+				<li><code>house_ads_ask</code> — tu respuesta cuando una oferta de vídeo te propone activar los anuncios (sí o no);</li>
+				<li><code>house_ad</code>, <code>house_ad_open</code> — se muestra un vídeo de nuestros otros juegos y apps, o abres su ficha con «Descubrir» (cuál, ubicación);</li>
 				<li><code>account_gate</code>, <code>sign_in</code>, <code>sign_out</code>, <code>account_delete</code> — se pide la cuenta, se inicia sesión, se cierra sesión o se elimina la cuenta (Google o Apple, si ha funcionado);</li>
 				<li><code>ambience</code> — el «Ambiente» elegido en Opciones (lugar, ajuste del modo oscuro);</li>
 				<li><code>reminders</code>, <code>review_ask</code>, <code>howto</code>, <code>update_prompt</code>, <code>update_tapped</code> — tu respuesta sobre los recordatorios, la petición de valoración de la tienda, una página de «Cómo se juega», la propuesta de actualización.</li>
@@ -339,9 +347,10 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li>la copia de tu progreso (una por cuenta, y la del juego sin cuenta);</li>
 				<li>los ajustes que se quedan en el teléfono: mano que lanza, lado de la plataforma, lanzamiento simple o experto, vista de juego, idioma, tema, sonido, recordatorios;</li>
 				<li>tu sesión de Unity, si has iniciado sesión;</li>
-				<li>tu respuesta en la ventana «Publicidad y privacidad», su fecha y la versión del texto, y, si has aceptado, los datos de los módulos publicitarios (ver §6).</li>
+				<li>tu respuesta en la ventana «Publicidad personalizada», el día en que la diste y la versión del texto, y, si has aceptado, los datos de los módulos publicitarios (ver §6);</li>
+				<li>la lista de nuestros propios anuncios y sus imágenes, guardadas para la próxima vez (ver §6).</li>
 			</ul>
-			<p>En Android, todo esto también puede copiarse en la copia de seguridad de Google de tu teléfono, si está activada. Todo esto desaparece cuando desinstalas la aplicación, salvo que esa copia de seguridad lo restaure al volver a instalarla.</p>
+			<p>Todo esto desaparece cuando desinstalas la aplicación. Desde la versión 1.0.8, nada de esto se copia en la copia de seguridad de Google de tu teléfono Android ni se transfiere a un teléfono nuevo; una versión anterior podía copiarlo allí, y esa copia de seguridad restaurarlo al volver a instalarla.</p>
 		</section>
 
 		<section class="stack gap-2" id="suppression">
@@ -394,7 +403,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Apple Inc.</strong> — «Iniciar sesión con Apple», permiso de seguimiento, App Store (distribución, pago, ventana de valoración).</li>
 				<li><strong>Hetzner Online GmbH</strong> (Alemania) — alojamiento de nuestro servidor de estadísticas de uso (ver §7).</li>
 				<li><strong>Supabase, Inc.</strong> — alojamiento de nuestra función que retira el acceso «Iniciar sesión con Apple» (ver §11): recibe el código de Apple, el identificador de la aplicación y la dirección IP del teléfono, y no guarda nada.</li>
-				<li><strong>GitHub, Inc.</strong> — alojamiento de nuestro sitio web, consultado para comprobar si hay actualizaciones (ver §9).</li>
+				<li><strong>GitHub, Inc.</strong> — alojamiento de nuestro sitio web, consultado para comprobar si hay actualizaciones (ver §9) y para nuestros propios anuncios (ver §6); GitHub registra la dirección IP de cada visita para la seguridad de su servicio.</li>
 			</ul>
 			<p>
 				Salvo Hetzner, estos proveedores son empresas estadounidenses o sus filiales. Estas transferencias están amparadas por
@@ -411,7 +420,8 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Partidas en línea</strong>: una partida pública sale de la lista en cuanto empieza o la cierras; los lanzamientos no se guardan después de la partida.</li>
 				<li><strong>Estadísticas de uso</strong>: se guardan <strong>24 meses</strong> en nuestro servidor y luego se borran; sus copias de seguridad, 14 días.</li>
 				<li><strong>Datos publicitarios</strong>: según las normas de Unity y de ironSource.</li>
-				<li><strong>Tu respuesta sobre la publicidad</strong>: 6 meses en tu teléfono; después, el juego te vuelve a preguntar.</li>
+				<li><strong>Tu respuesta sobre la publicidad</strong>: 182 días (6 meses) en tu teléfono; después, el juego te vuelve a preguntar.</li>
+				<li><strong>Nuestros propios anuncios</strong>: su lista y sus imágenes se quedan en tu teléfono hasta que nuestro sitio web las sustituya o desinstales el juego.</li>
 				<li><strong>Compras</strong>: los números de transacción se quedan en tu progreso, hasta la eliminación de la cuenta; Google y Apple guardan sus propios justificantes.</li>
 				<li><strong>En el teléfono</strong>: hasta la desinstalación o la eliminación de la cuenta.</li>
 			</ul>

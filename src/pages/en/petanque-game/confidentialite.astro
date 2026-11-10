@@ -31,7 +31,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			This policy covers <strong>the Pétanque Game mobile app</strong>
 			(<code>com.ludivenstudio.petanquegame</code>). The pétanque game on the website
 			(<a href="/jeux/petanque/">ludiven-studio.fr/jeux/petanque</a>) and the rest of the website have their
-			<a href="/confidentialite/">own policy</a>. Last updated: 6 November 2026 (Google sign-in on iPhone; removal of the "Sign in with Apple" access when the account is deleted; usage statistics sent from version 1.0.7 on; Google backup on Android).
+			<a href="/confidentialite/">own policy</a>. Last updated: 10 November 2026 (version 1.0.8: our own ads, new "Personalised advertising" window, no more Google backup on Android).
 		</p>
 		<p class="updated">
 			This is a courtesy translation. In case of discrepancy, the
@@ -41,10 +41,10 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 		<div class="summary">
 			<p><strong>The essentials:</strong></p>
 			<ul>
-				<li>Against the computer or with two players on one phone, you play <strong>without an account</strong>, even offline. When the phone is online, only advertising if you accepted it, anonymous usage statistics and a few technical checks leave it (see §2).</li>
+				<li>Against the computer or with two players on one phone, you play <strong>without an account</strong>, even offline. When the phone is online, only advertising if you accepted it, anonymous usage statistics and a few requests to our website (the game's latest version, our own ads) leave it (see §2).</li>
 				<li>Coins, the shop, leagues and online play need a <strong>Google account</strong> (Android or iPhone) <strong>or Apple account</strong> (iPhone). Your progress is then saved with <strong>Unity</strong>, our provider, so you can get it back on all your phones.</li>
 				<li><strong>Your name is public</strong>: in the list of public games, on your opponent's phone and in the ranking, with your rating. There is no chat.</li>
-				<li>Ads are shown <strong>only with your consent</strong>, asked at first launch. Without it, you play as usual, with no ads. No data is resold.</li>
+				<li>Ads from ad networks are shown <strong>only with your consent</strong>, asked at first launch. Without it, you play as usual, with no ads between games; only videos of our other games and apps may play, when you ask for a reward. No data is resold.</li>
 				<li>You can <strong>delete your account</strong> at any time: Options › "Delete my account" (<a href="#suppression">see §11</a>).</li>
 			</ul>
 		</div>
@@ -72,7 +72,8 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<ul>
 				<li><strong>advertising</strong>, if you accepted it (see §6);</li>
 				<li><strong>usage statistics</strong> with no identifier (see §7);</li>
-				<li>reading the <strong>number of the latest version</strong> of the game on our website (see §9).</li>
+				<li>reading the <strong>number of the latest version</strong> of the game on our website (see §9);</li>
+				<li>reading the list of <strong>our own ads</strong> on our website, at each launch, then the picture and the video of the one that plays (see §6).</li>
 			</ul>
 			<p>
 				If you open the ranking without being signed in, the game connects to Unity with an
@@ -181,15 +182,21 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 						</tr>
 						<tr>
 							<td>Advertising ID, other device identifiers, IP address, interactions with ads, usage time, in-game purchases (declared by Unity Ads), technical information (see §6)</td>
-							<td>Showing ads chosen from your interests, measuring them, fighting fraud</td>
+							<td>Choosing ads based on your profile, limiting how often they repeat, measuring how well they work, fighting fraud</td>
 							<td>Your consent (Art. 6(1)(a)): without it, nothing starts</td>
 							<td>Unity Technologies and its subsidiary ironSource (Unity LevelPlay, ironSource Ads, Unity Ads); through their auctions, other ad buyers (see §6)</td>
 						</tr>
 						<tr>
-							<td>Your answer in the "Ads and privacy" window (accept or decline), its date and the version of the text</td>
+							<td>Your answer in the "Personalised advertising" window (accept or refuse, or a yes given before a video), the day you gave it and the version of the text</td>
 							<td>Remembering it and being able to prove your choice</td>
 							<td>Legal obligation</td>
 							<td>Kept on your phone only; Umami counts the yeses and noes, with no identifier (see §7)</td>
+						</tr>
+						<tr>
+							<td>IP address of the phone, when it reads the list of our own ads, their pictures and their videos on our website</td>
+							<td>Showing you videos of our other games and apps (see §6)</td>
+							<td>Legitimate interest</td>
+							<td>GitHub, our website's host</td>
 						</tr>
 						<tr>
 							<td>Usage statistics, with no account or identifier (see §7)</td>
@@ -222,17 +229,13 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				Google plays no part in this game's ads or in your consent.
 			</p>
 			<p>
-				<strong>Your consent.</strong> At first launch, whatever your country, an "Ads and privacy" window asks
-				whether you accept that ironSource and Unity Ads (Unity Technologies) store and read information on your
-				phone, including its advertising ID, to show you ads chosen from your interests, inferred from your
-				activity in this game and in other apps, and to measure how they perform. "Accept" and "Decline" carry
-				the same weight.
+				<strong>Your consent.</strong> At first launch, whatever your country, a "Personalised advertising" window ("Ads and privacy" before version 1.0.8) asks whether you accept that Unity Ads, ironSource (Unity group) and their partners choose ads based on your profile, limit how often they repeat, measure how well they work and fight fraud. To do so, their modules store and read information on your phone, including its advertising ID. The window's "See the companies" link leads to the list of the companies involved (<a href="/en/publicite/societes/">Advertising companies in our apps</a>), another one to this policy. "Accept" and "Refuse" carry the same weight.
 			</p>
 			<ul>
-				<li><strong>If you decline</strong>, no ad module starts: you play as usual, with no ads and without the videos that earn coins. If you tap a video offer, the game asks you again.</li>
-				<li><strong>Your answer</strong>, its date and the version of the text stay on your phone. The game asks again after 6 months, whether you accepted or declined, or sooner if our ad partners change.</li>
+				<li><strong>If you refuse</strong>, no ad module starts and nothing is passed on to them, not even your refusal: you play as usual, with no ads between games. The video offers stay: the first time you tap one in a session, the game asks whether you want to turn ads on. A yes counts as an "Accept"; otherwise, and from then on until the end of the session, it shows you a video of one of our other games or apps, which gives the same reward (see below).</li>
+				<li><strong>Your answer</strong>, the day you gave it and the version of the text stay on your phone. The game asks again after 182 days (6 months), whether you accepted or refused, or sooner if our ad partners change.</li>
 				<li><strong>You can change your mind at any time</strong>: Options › "Ad choices". If you withdraw your consent during a session, the game stops loading ads at once; the ad module stays loaded until you close the game, then no longer starts.</li>
-				<li><strong>On iPhone</strong>, Apple's tracking permission is only asked for after an "Accept"; without it, the iPhone's advertising ID is not used.</li>
+				<li><strong>On iPhone</strong>, Apple's tracking permission is only asked for after a yes. If you refuse it, or as long as you have not answered it, the ads are not personalised: the ad module is told that you did not accept personalisation, and the iPhone's advertising ID is not used.</li>
 			</ul>
 			<p>
 				<strong>If you accepted</strong>, to show the ads, choose them, measure them and fight fraud, the ironSource
@@ -244,6 +247,9 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<p>
 				<strong>"No ads"</strong>, a one-off purchase, removes the ads between games. The optional videos are
 				still offered to anyone who wants coins: if you accepted ads, the ad module therefore keeps running.
+			</p>
+			<p>
+				<strong>Our own ads.</strong> The game also shows videos of our other games and apps (Pétanque Meet, Pétanque Scan, Dragon Gems…): when you refused ads and choose our video for a reward, or when no video from our partners is ready. No ad network is involved and no data is passed on to any partner. At each launch, even before you answer the window, the game reads the list of these ads on our website; when one plays, it also loads its picture and its video. As for any web page, the website's host (GitHub) sees your phone's IP address; nothing else is sent. The list and the pictures stay on your phone for next time, and a copy shipped with the game is used when you have no internet. On Android, the game checks whether the app shown is already on your phone, to show you another one instead: it only checks our own apps, and the answer does not leave your phone. The reward comes after 10 seconds of video. "Discover" opens the app's page on Google Play or the App Store (on Google Play, with a tag saying it comes from Pétanque Game); the reward does not depend on it. The game counts, with no identifier, the videos shown and the pages opened (see §7).
 			</p>
 			<p>
 				You can also reset or delete the advertising ID in your phone's settings. To learn more, and for the
@@ -266,8 +272,10 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><code>rated_end</code> — a ranked game ends (result, rating band);</li>
 				<li><code>daily_bonus</code>, <code>challenge_claim</code> — a daily bonus (streak) or a challenge (coins) is collected;</li>
 				<li><code>shop_buy</code>, <code>iap_buy</code> — an item is bought with coins (item, price), or with money (product);</li>
-				<li><code>ad_consent</code> — your answer in the "Ads and privacy" window (yes or no);</li>
+				<li><code>ad_consent</code> — your answer in the "Personalised advertising" window (yes or no);</li>
 				<li><code>ad_offer</code>, <code>ad_rewarded</code>, <code>ad_interstitial</code> — a video is offered or watched, an ad is shown (placement, result);</li>
+				<li><code>house_ads_ask</code> — your answer when a video offer asks whether to turn ads on (yes or no);</li>
+				<li><code>house_ad</code>, <code>house_ad_open</code> — a video of our other games and apps plays, or you open its page with "Discover" (which one, placement);</li>
 				<li><code>account_gate</code>, <code>sign_in</code>, <code>sign_out</code>, <code>account_delete</code> — the account is asked for, a sign-in, a sign-out or a deletion takes place (Google or Apple, success);</li>
 				<li><code>ambience</code> — the "Look" chosen in Options (place, dark mode setting);</li>
 				<li><code>reminders</code>, <code>review_ask</code>, <code>howto</code>, <code>update_prompt</code>, <code>update_tapped</code> — your answer about reminders, the store's review request, a "How to play" page, the update offer.</li>
@@ -334,9 +342,10 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li>the copy of your progress (one per account, and the one for playing without an account);</li>
 				<li>the settings that stay with the phone: throwing hand, side of the pad, simple or expert throwing, game view, language, theme, sound, reminders;</li>
 				<li>your Unity session, if you are signed in;</li>
-				<li>your answer in the "Ads and privacy" window, its date and the version of the text, and, if you accepted, the ad modules' data (see §6).</li>
+				<li>your answer in the "Personalised advertising" window, the day you gave it and the version of the text, and, if you accepted, the ad modules' data (see §6);</li>
+				<li>the list of our own ads and their pictures, kept for next time (see §6).</li>
 			</ul>
-			<p>On Android, all of this may also be copied to your phone's Google backup, if it is on. All of this disappears when you uninstall the app, unless that backup restores it when you install the app again.</p>
+			<p>All of this disappears when you uninstall the app. From version 1.0.8 on, none of it is copied to your Android phone's Google backup or moved to a new phone; an older version could copy it there, and that backup could restore it when you installed the app again.</p>
 		</section>
 
 		<section class="stack gap-2" id="suppression">
@@ -390,7 +399,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Apple Inc.</strong> — "Sign in with Apple", tracking permission, App Store (distribution, payment, rating form).</li>
 				<li><strong>Hetzner Online GmbH</strong> (Germany) — hosting of our usage statistics server (see §7).</li>
 				<li><strong>Supabase, Inc.</strong> — hosting of our function that removes the "Sign in with Apple" access (see §11): it receives Apple's code, the app's identifier and the phone's IP address, and keeps nothing.</li>
-				<li><strong>GitHub, Inc.</strong> — hosting of our website, read for the update check (see §9).</li>
+				<li><strong>GitHub, Inc.</strong> — hosting of our website, read for the update check (see §9) and for our own ads (see §6); GitHub logs the IP address of each visit for the security of its service.</li>
 			</ul>
 			<p>
 				Apart from Hetzner, these providers are US companies or their subsidiaries. These transfers are governed by the mechanisms
@@ -407,7 +416,8 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Online games</strong>: a public game leaves the list as soon as it starts or you close it; throws are not kept after the game.</li>
 				<li><strong>Usage statistics</strong>: kept <strong>24 months</strong> on our server, then erased; its backups, 14 days.</li>
 				<li><strong>Advertising data</strong>: according to the rules of Unity and ironSource.</li>
-				<li><strong>Your answer about ads</strong>: 6 months on your phone, then the game asks again.</li>
+				<li><strong>Your answer about ads</strong>: 182 days (6 months) on your phone, then the game asks again.</li>
+				<li><strong>Our own ads</strong>: their list and their pictures stay on your phone until our website replaces them or you uninstall the game.</li>
 				<li><strong>Purchases</strong>: the transaction numbers stay in your progress, until the account is deleted; Google and Apple keep their own records.</li>
 				<li><strong>On the phone</strong>: until you uninstall the app or delete the account.</li>
 			</ul>
