@@ -297,3 +297,4 @@ xandr.com, 7353, RESELLER
 openx.com, 563905670, RESELLER, 6a698e2ec38604c6
 openx.com, 565175463, RESELLER, 6a698e2ec38604c6
 sharethrough.com, 5828, RESELLER, d53b998a7bd4ecd2
+playdigo.com, 1965, RESELLER
