@@ -51,7 +51,7 @@ const apps = [
 const suffix = lang === 'fr' ? '' : '-en';
 ---
 
-<BaseLayout title={TEXT.title} description={TEXT.description} image={`/assets/petanque/og-apps${suffix}.jpg`} lang={lang} altLang={other}>
+<BaseLayout title={TEXT.title} description={TEXT.description} image={`/assets/petanque/og-apps-v2${suffix}.jpg`} lang={lang} altLang={other}>
 	<main class="wrapper">
 		<div class="petanque-apps stack gap-10">
 			<header class="stack gap-2">
@@ -60,7 +60,7 @@ const suffix = lang === 'fr' ? '' : '-en';
 				<p class="lead">{TEXT.lead}</p>
 			</header>
 
-			<img class="banner" src={`/assets/petanque/banner-apps${suffix}.webp`} alt={TEXT.bannerAlt} width="1640" height="624" fetchpriority="high" />
+			<img class="banner" src={`/assets/petanque/banner-apps-v2${suffix}.webp`} alt={TEXT.bannerAlt} width="1640" height="624" fetchpriority="high" />
 
 			<div class="apps">
 				{apps.map((a) => (
