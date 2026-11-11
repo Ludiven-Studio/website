@@ -18,7 +18,7 @@ import Hero from '../../../components/Hero.astro';
 		<p class="updated">
 			Esta política se refiere a <strong>la aplicación móvil Pétanque Scan</strong>
 			(antes llamada Pétanque Scanner, <code>com.raphbenpro.petanquear</code>), y no al sitio web ludiven-studio.fr, que tiene su
-			<a href="/confidentialite/">propia política</a>. Última actualización: 4 de noviembre de 2026 (versión 1.2.13: la publicidad pasa de Google AdMob a Unity LevelPlay, con nuestra propia ventana de consentimiento; se retira Google Firebase; 10 escaneos gratis al día en lugar de 3).
+			<a href="/confidentialite/">propia política</a>. Última actualización: 5 de noviembre de 2026 (versión 1.2.14: nuestros anuncios propios, leídos en nuestro sitio, sustituyen a la franja y al vídeo de Pétanque Meet; tras un rechazo, «¿Activar los anuncios?» se propone una vez por sesión cuando pides un vídeo; la publicidad pasa de Google AdMob a Unity LevelPlay, con nuestra propia ventana de consentimiento; en iPhone, sin la autorización de seguimiento de Apple, la publicidad no es personalizada; la retirada de tu consentimiento se transmite a las redes publicitarias; se retira Google Firebase; 10 escaneos gratis al día en lugar de 3).
 		</p>
 		<p class="updated">
 			Esta es una traducción de cortesía. En caso de discrepancia, prevalece la
@@ -30,7 +30,7 @@ import Hero from '../../../components/Hero.astro';
 			<ul>
 				<li><strong>Las imágenes de tu cámara nunca salen de tu dispositivo.</strong> La detección de las bolas se calcula localmente en el móvil. Ninguna foto, ningún vídeo ni ninguna imagen se envía a un servidor ni se guarda de forma duradera, tampoco en el modo foto, donde la imagen tomada al disparar se queda en la memoria RAM.</li>
 				<li>No hay <strong>ninguna cuenta de usuario</strong>. No conocemos ni tu nombre, ni tu correo electrónico, ni tu ubicación. Nuestro único servidor es el de las estadísticas de uso (ver §5).</li>
-				<li>La publicidad solo se pone en marcha <strong>con tu consentimiento</strong>, que se pide en el primer inicio. Sin él, la aplicación funciona igual, sin los anuncios de nuestros socios. Puedes cambiar de opinión en cualquier momento. Las estadísticas de uso, sin cookies ni identificador, no dependen de esta elección (ver §5).</li>
+				<li>La publicidad solo se pone en marcha <strong>con tu consentimiento</strong>, que se pide en el primer inicio. Sin él, la aplicación funciona igual, sin los anuncios de nuestros socios. Puedes cambiar de opinión en cualquier momento. En iPhone, sin la autorización de seguimiento de Apple, la publicidad no es personalizada. Las estadísticas de uso, sin cookies ni identificador, no dependen de esta elección (ver §5).</li>
 				<li>La compra <strong>Premium elimina la publicidad</strong> y, en ese caso, el SDK publicitario ni siquiera se inicia.</li>
 			</ul>
 		</div>
@@ -98,7 +98,7 @@ import Hero from '../../../components/Hero.astro';
 					<tbody>
 						<tr>
 							<td>Identificador publicitario del dispositivo (GAID en Android, IDFA en iOS si autorizas el seguimiento), otros identificadores del dispositivo, dirección IP, interacciones con los anuncios, información técnica (ver §4)</td>
-							<td>Mostrar anuncios elegidos según tus intereses, medirlos, luchar contra el fraude</td>
+							<td>Mostrar anuncios, elegidos según tus intereses salvo en iPhone sin la autorización de seguimiento (ver §4), medirlos, luchar contra el fraude</td>
 							<td>Consentimiento (art. 6.1.a RGPD): sin él, no se pone en marcha nada</td>
 							<td>Unity Technologies y su filial ironSource (Unity LevelPlay, ironSource Ads, Unity Ads); a través de sus subastas, otros compradores de publicidad (ver §4)</td>
 						</tr>
@@ -134,7 +134,7 @@ import Hero from '../../../components/Hero.astro';
 						</tr>
 						<tr>
 							<td>Dirección IP, como para cualquier página web</td>
-							<td>Leer en nuestro sitio el número de la última versión, la lista de vídeos de Pétanque Meet y el vídeo que se muestra (ver §8)</td>
+							<td>Leer en nuestro sitio el número de la última versión, el catálogo de nuestros anuncios propios, sus imágenes y vídeos (ver §8)</td>
 							<td>Interés legítimo</td>
 							<td>GitHub (alojamiento de nuestro sitio)</td>
 						</tr>
@@ -158,7 +158,7 @@ import Hero from '../../../components/Hero.astro';
 			<h2>4. Publicidad y consentimiento</h2>
 			<p>
 				La aplicación es gratuita y se financia con un banner publicitario, así como con un vídeo opcional
-				que puedes elegir ver para recargar tus escaneos gratuitos. Desde la versión 1.2.13, la publicidad
+				que puedes elegir ver para recargar tus escaneos gratuitos. Desde la versión 1.2.14, la publicidad
 				la sirve <strong>Unity LevelPlay</strong> con las redes <strong>ironSource Ads</strong> y
 				<strong>Unity Ads</strong> (Unity Technologies y su filial ironSource). Google ya no interviene ni
 				en la publicidad ni en tu consentimiento. Las versiones anteriores, mientras no se actualicen,
@@ -171,17 +171,20 @@ import Hero from '../../../components/Hero.astro';
 				«Rechazar» tienen el mismo peso.
 			</p>
 			<ul>
-				<li><strong>Si aceptas</strong>: Unity LevelPlay se pone en marcha y muestra el banner y los vídeos.</li>
-				<li><strong>Si rechazas</strong>: no se pone en marcha ningún módulo publicitario. La aplicación funciona igual, sin los anuncios de nuestros socios: en su lugar, una franja presenta nuestras otras aplicaciones, Pétanque Meet o, en Android, Pétanque Game, y un vídeo corto de Pétanque Meet también recarga tus escaneos. Esta presentación solo envía los eventos de uso del §5 y, para el vídeo, la petición a nuestro sitio (ver §8).</li>
+				<li><strong>Si aceptas</strong>: Unity LevelPlay se pone en marcha y muestra el banner y los vídeos. Cuando no tiene ningún anuncio que mostrar, nuestros anuncios propios ocupan su lugar, tanto en el banner como en el vídeo.</li>
+				<li><strong>Si rechazas</strong>: no se pone en marcha ningún módulo publicitario. La aplicación funciona igual, sin los anuncios de nuestros socios: en su lugar, una franja muestra por turnos nuestros anuncios propios, de nuestras otras aplicaciones (hoy Pétanque Meet y, en Android, Pétanque Game), y un vídeo corto de una de ellas también recarga tus escaneos. Nuestros anuncios propios no pasan por ninguna red publicitaria y no te rastrean (ver §5 y §8).</li>
+				<li><strong>Tras un rechazo</strong>, cuando pides un vídeo para recargar tus escaneos, la aplicación te propone una vez por sesión activar la publicidad: «Activar anuncios» equivale a un «Aceptar» (en iPhone, se te pide entonces la autorización de seguimiento de Apple si aún no se te ha pedido), «Ver un vídeo de nuestras apps» mantiene tu rechazo y muestra uno de nuestros vídeos.</li>
 				<li><strong>Tu respuesta</strong>, su fecha y la versión del texto se quedan en tu teléfono. La aplicación te vuelve a preguntar a los 6 meses, tanto si aceptaste como si rechazaste, o antes si cambian nuestros socios publicitarios.</li>
-				<li><strong>En iOS</strong>, la autorización de seguimiento de Apple (<em>App Tracking Transparency</em>) solo se te pide después de un «Aceptar» y solo sirve para la publicidad; sin ella, no se usa el identificador publicitario del iPhone.</li>
+				<li><strong>Si retiras tu consentimiento</strong> en los ajustes de la aplicación (ver §12): la publicidad de nuestros socios se detiene enseguida, y la aplicación comunica esa retirada a Unity LevelPlay, que la transmite a las redes publicitarias.</li>
+				<li><strong>En iOS</strong>, la autorización de seguimiento de Apple (<em>App Tracking Transparency</em>) solo se te pide después de un «Aceptar» y solo sirve para la publicidad. Si la rechazas, o la desactivas más tarde en los ajustes del iPhone (la aplicación lo tiene en cuenta en su siguiente inicio), los anuncios se siguen mostrando, pero <strong>no son personalizados</strong>: la aplicación indica a Unity LevelPlay que rechazas la publicidad personalizada, LevelPlay lo transmite a las redes publicitarias y no se les comunica el identificador publicitario del iPhone.</li>
 				<li><strong>Las estadísticas de uso</strong> (ver §5) no dependen de tu respuesta: no contienen ni identificador publicitario, ni cookies, ni identificador del dispositivo.</li>
 				<li><strong>Si compras el Premium</strong>: la publicidad desaparece y el módulo publicitario ya no se pone en marcha.</li>
 			</ul>
 			<p>
 				<strong>Si has aceptado</strong>, para mostrar los anuncios, elegirlos, medirlos y luchar contra el
 				fraude, los módulos de ironSource y de Unity Ads reciben el <strong>identificador
-				publicitario</strong> de tu teléfono y otros identificadores del dispositivo, tu <strong>dirección
+				publicitario</strong> de tu teléfono (en iPhone, solo si autorizas el seguimiento) y otros identificadores del
+				dispositivo, tu <strong>dirección
 				IP</strong> (que da una ubicación aproximada, a escala de ciudad), tus interacciones con los
 				anuncios, tu tiempo de uso, información técnica (rendimiento, cierres inesperados) y, según Unity
 				Ads, las compras hechas en la aplicación. Sus subastas pueden transmitir la solicitud de anuncio a
@@ -203,7 +206,7 @@ import Hero from '../../../components/Hero.astro';
 				identificadores, ni el resultado de tus mediciones.
 			</p>
 			<p>
-				Desde la versión 1.2.13, Firebase Analytics (Google) ya no recibe nada. Las versiones anteriores,
+				Desde la versión 1.2.14, Firebase Analytics (Google) ya no recibe nada. Las versiones anteriores,
 				mientras no se actualicen, todavía le envían estos eventos si lo habías aceptado.
 			</p>
 			<ul>
@@ -211,6 +214,8 @@ import Hero from '../../../components/Hero.astro';
 				<li><code>scan_completed</code> — un escaneo termina, con el número de escaneos hechos en el día</li>
 				<li><code>scan_cancelled</code> — se abandona un escaneo, indicando si ha contado o no en el día</li>
 				<li><code>scan_blocked_quota</code> — se rechaza un escaneo porque se ha alcanzado el límite diario</li>
+				<li><code>frame_jump_seen</code> — el seguimiento de realidad aumentada se ha movido durante el escaneo (sus referencias se han desplazado), con el desplazamiento en centímetros (desde la 1.2.14)</li>
+				<li><code>floor_off_seen</code> — el suelo detectado parecía erróneo (las bolas parecían flotar o hundirse), con la diferencia en centímetros (desde la 1.2.14)</li>
 				<li><code>welcome_choice</code> — el modo elegido en la pantalla de bienvenida (realidad aumentada o foto)</li>
 				<li><code>floor_confirmed</code> / <code>floor_rejected</code> — validas o rechazas la detección del suelo, indicando si el escaneo vuelve a empezar</li>
 				<li><code>cochonet_redo</code> — pides que se vuelva a buscar el boliche</li>
@@ -229,9 +234,11 @@ import Hero from '../../../components/Hero.astro';
 				<li><code>paywall_watch_ad</code> — eliges ver un vídeo para recargar tus escaneos</li>
 				<li><code>ad_reward_earned</code> — el anuncio se ha visto hasta el final y los escaneos se recargan</li>
 				<li><code>ad_unavailable</code> — no había ningún anuncio disponible</li>
-				<li><code>meet_promo_shown</code> / <code>meet_promo_refill</code> / <code>meet_promo_closed</code> — se muestra el vídeo de Pétanque Meet, recarga tus escaneos o se cierra</li>
-				<li><code>meet_store_opened</code> — abres la ficha de Pétanque Meet en la tienda, desde la franja o el vídeo</li>
-				<li><code>game_store_opened</code> — abres la ficha de Pétanque Game en la tienda, desde la franja</li>
+				<li><code>house_ad_shown</code> — se muestra uno de nuestros anuncios propios, con su nombre y su lugar (franja o vídeo), una sola vez por anuncio y lugar en una sesión (desde la 1.2.14)</li>
+				<li><code>house_ad_opened</code> — tocas uno de nuestros anuncios propios, con su nombre y su lugar (desde la 1.2.14)</li>
+				<li><code>meet_promo_shown</code> / <code>meet_promo_refill</code> / <code>meet_promo_closed</code> — se muestra el vídeo de Pétanque Meet, recarga tus escaneos o se cierra (hasta la 1.2.12)</li>
+				<li><code>meet_store_opened</code> — abres la ficha de Pétanque Meet en la tienda, desde la franja o el vídeo (hasta la 1.2.12)</li>
+				<li><code>game_store_opened</code> — abres la ficha de Pétanque Game en la tienda, desde la franja (hasta la 1.2.12)</li>
 				<li><code>premium_purchase_started</code> / <code>premium_purchase_success</code> / <code>premium_purchase_failed</code> — pasos de una compra, con el motivo del fallo si lo hay</li>
 				<li><code>premium_restore_success</code> — se ha restaurado una compra anterior</li>
 				<li><code>premium_revoked</code> — la tienda ya no reconoce un Premium (tras un reembolso, por ejemplo)</li>
@@ -261,7 +268,7 @@ import Hero from '../../../components/Hero.astro';
 		<section class="stack gap-2">
 			<h2>6. Notificaciones</h2>
 			<p>
-				Desde la versión 1.2.13, la aplicación ya no recibe notificaciones ni pide permiso para ellas. Las
+				Desde la versión 1.2.14, la aplicación ya no recibe notificaciones ni pide permiso para ellas. Las
 				versiones anteriores, mientras no se actualicen, aún pueden recibirlas a través de Firebase Cloud
 				Messaging (Google) si las habías aceptado; puedes desactivarlas en los ajustes de tu teléfono.
 			</p>
@@ -286,11 +293,17 @@ import Hero from '../../../components/Hero.astro';
 			<h2>8. Lo que la aplicación lee en línea</h2>
 			<p>
 				<strong>Nuestro sitio.</strong> Al iniciarse, la aplicación lee en nuestro sitio, ludiven-studio.fr,
-				un pequeño archivo que indica el número de la última versión, para proponerte una actualización.
-				Cuando el vídeo de Pétanque Meet sustituye a un anuncio, también se lee en nuestro sitio. Al
-				abrir la pantalla Premium, la aplicación también lee allí la lista de vídeos de Pétanque Meet. No se
-				envía nada; como en cualquier página web, el alojamiento del sitio (GitHub) ve la dirección IP de tu
-				teléfono.
+				un pequeño archivo que indica el número de la última versión, para proponerte una actualización, así
+				como el catálogo de nuestros anuncios propios y sus imágenes; el vídeo de un anuncio se lee allí cuando
+				se te muestra. Estas lecturas se hacen sea cual sea tu elección sobre la publicidad. No se envía nada;
+				como en cualquier página web, el alojamiento del sitio (GitHub) ve la dirección IP de tu teléfono.
+			</p>
+			<p>
+				<strong>Nuestros anuncios propios.</strong> Tocar uno abre la ficha de la aplicación que presenta en
+				la tienda. En Google Play, el enlace indica que viene de Pétanque Scan, de qué anuncio y de qué lugar
+				(franja o vídeo), sin ningún identificador; el enlace a la App Store no indica nada. Hasta la versión
+				1.2.12, la aplicación solo leía en nuestro sitio el vídeo de Pétanque Meet y, al abrir la pantalla
+				Premium, la lista de sus vídeos.
 			</p>
 		</section>
 
@@ -310,7 +323,8 @@ import Hero from '../../../components/Hero.astro';
 				Tu respuesta a la ventana «Publicidad», con su fecha y la versión del texto, también se
 				guarda en las preferencias de la aplicación, para saber cuándo volver a preguntarte. Si has aceptado
 				la publicidad, los módulos de LevelPlay, ironSource y Unity Ads también guardan sus propios datos en
-				el teléfono.
+				el teléfono. Por último, la aplicación guarda una copia del catálogo de nuestros anuncios propios y
+				de sus imágenes, para mostrarlos sin esperar a la red; no contiene nada sobre ti.
 			</p>
 			<p>
 				Estos datos no se sincronizan con ningún servidor y la aplicación no los guarda en la nube. Desinstalar la
@@ -329,9 +343,9 @@ import Hero from '../../../components/Hero.astro';
 				<li><strong>Unity Technologies</strong> — publicidad (Unity LevelPlay, Unity Ads), si la has aceptado.</li>
 				<li><strong>ironSource</strong>, filial de Unity Technologies — publicidad (ironSource Ads), si la has aceptado. Las subastas de ironSource y de Unity Ads pueden transmitir la solicitud de anuncio a otros compradores de publicidad (ver §4).</li>
 				<li><strong>Google LLC</strong> — Servicios de Google Play para RA (ARCore), en Android, en todas las versiones (ver §2).</li>
-				<li><strong>Google Ireland Limited / Google LLC</strong> — solo para las versiones anteriores a la 1.2.13, mientras no se actualicen: publicidad (AdMob), gestión del consentimiento (UMP), medición de audiencia (Firebase Analytics), notificaciones (Firebase Cloud Messaging) y hora de referencia (Firebase Realtime Database), si las habías aceptado.</li>
+				<li><strong>Google Ireland Limited / Google LLC</strong> — solo para las versiones anteriores a la 1.2.14, mientras no se actualicen: publicidad (AdMob), gestión del consentimiento (UMP), medición de audiencia (Firebase Analytics), notificaciones (Firebase Cloud Messaging) y hora de referencia (Firebase Realtime Database), si las habías aceptado.</li>
 				<li><strong>Hetzner Online GmbH</strong> (Alemania) — alojamiento de nuestro servidor de medición de audiencia Umami. Las versiones de la aplicación aún no actualizadas siguen enviando estas mediciones a <strong>Umami Software, Inc.</strong> (sociedad estadounidense), a través del servicio Umami Cloud.</li>
-				<li><strong>GitHub, Inc.</strong> — alojamiento de nuestro sitio, que se lee para la propuesta de actualización, la lista de vídeos de Pétanque Meet y el vídeo que se muestra (ver §8).</li>
+				<li><strong>GitHub, Inc.</strong> — alojamiento de nuestro sitio, que se lee para la propuesta de actualización, el catálogo de nuestros anuncios propios, sus imágenes y vídeos (ver §8).</li>
 				<li><strong>ntfy.sh</strong> — servicio de notificaciones que nos transmite la alerta de venta (ver §7).</li>
 				<li><strong>Apple Inc.</strong> y <strong>Google LLC</strong> — distribución de la aplicación y tramitación de las compras integradas.</li>
 			</ul>
@@ -346,7 +360,7 @@ import Hero from '../../../components/Hero.astro';
 			<h2>11. Plazos de conservación</h2>
 			<ul>
 				<li><strong>Imágenes de la cámara</strong>: el tiempo del cálculo, solo en la memoria RAM (unos milisegundos).</li>
-				<li><strong>Datos de medición de audiencia — Firebase (versiones anteriores a la 1.2.13)</strong>: Firebase Analytics los conserva <strong>14 meses como máximo</strong>, según el plazo configurado en la consola de Firebase. Los informes agregados (que no pueden vincularse a un dispositivo) pueden conservarse más tiempo.</li>
+				<li><strong>Datos de medición de audiencia — Firebase (versiones anteriores a la 1.2.14)</strong>: Firebase Analytics los conserva <strong>14 meses como máximo</strong>, según el plazo configurado en la consola de Firebase. Los informes agregados (que no pueden vincularse a un dispositivo) pueden conservarse más tiempo.</li>
 				<li><strong>Datos de medición de audiencia — Umami</strong>: se conservan en forma de estadísticas de eventos <strong>24 meses</strong> en nuestro servidor y luego se borran; sus copias de seguridad se guardan 14 días. Las que aún recibe Umami Cloud de las versiones no actualizadas se borran allí al cabo de 6 meses. Estos datos no están vinculados a ningún identificador de dispositivo y no permiten reconstruir el recorrido de una persona.</li>
 				<li><strong>Contador de escaneos</strong>: se reinicia cada día.</li>
 				<li><strong>Datos publicitarios</strong>: según las normas de Unity y de ironSource.</li>
@@ -363,7 +377,7 @@ import Hero from '../../../components/Hero.astro';
 			</p>
 			<p><strong>En la práctica:</strong></p>
 			<ul>
-				<li><strong>Retirar o modificar tu consentimiento</strong>: pulsa «Gestionar mi consentimiento publicitario» en los ajustes de la aplicación: vuelve la ventana «Publicidad». Si rechazas, la publicidad de nuestros socios se detiene enseguida. El seguimiento en iOS también se desactiva en Ajustes › Privacidad y seguridad › Rastreo.</li>
+				<li><strong>Retirar o modificar tu consentimiento</strong>: pulsa «Gestionar mi consentimiento publicitario» en los ajustes de la aplicación: vuelve la ventana «Publicidad». Si rechazas, la publicidad de nuestros socios se detiene enseguida, y la aplicación comunica esa retirada a Unity LevelPlay, que la transmite a las redes publicitarias. En iOS, desactivar el seguimiento en Ajustes › Privacidad y seguridad › Rastreo hace que la publicidad deje de ser personalizada desde el siguiente inicio de la aplicación (ver §4).</li>
 				<li><strong>Borrar los datos locales</strong>: desinstala la aplicación o borra sus datos desde los ajustes del móvil.</li>
 				<li><strong>Restablecer tu identificador publicitario</strong>: Android → Ajustes › Google › Anuncios; iOS → Ajustes › Privacidad y seguridad › Rastreo.</li>
 				<li><strong>Borrar los datos publicitarios</strong>: los tiene Unity (ironSource, Unity Ads); pídele que los borre por los medios indicados en su política de privacidad (enlace en el §4).</li>
