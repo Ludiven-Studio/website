@@ -1,18 +1,22 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Hero from '../../components/Hero.astro';
+import LangSwitch from '../../components/LangSwitch.astro';
 ---
 
 <BaseLayout
 	title="Conditions d'utilisation de l'application Pétanque Meet | Ludiven Studio"
 	description="Conditions générales d'utilisation de l'application Pétanque Meet : compte, parties et concours publiés, règles de conduite, modération, responsabilité."
-	alternates={{ fr: '/petanque-meet/cgu/' }}
+	alternates={{ fr: '/petanque-meet/cgu/', en: '/en/petanque-meet/cgu/' }}
 >
 	<div class="wrapper stack gap-12 legal">
-		<Hero
-			title="Conditions d'utilisation — Pétanque Meet"
-			tagline="De vraies parties, de vrais prénoms, du respect."
-		/>
+		<div class="stack gap-8">
+			<LangSwitch lang="fr" links={[{ lang: 'en', href: '/en/petanque-meet/cgu/' }]} />
+			<Hero
+				title="Conditions d'utilisation — Pétanque Meet"
+				tagline="De vraies parties, de vrais prénoms, du respect."
+			/>
+		</div>
 
 		<p class="updated">
 			Application <strong>Pétanque Meet</strong> (<code>com.ludivenstudio.petanquemeet</code>) et carte des

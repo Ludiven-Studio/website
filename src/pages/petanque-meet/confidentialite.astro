@@ -1,18 +1,22 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Hero from '../../components/Hero.astro';
+import LangSwitch from '../../components/LangSwitch.astro';
 ---
 
 <BaseLayout
 	title="Confidentialité de l'application Pétanque Meet | Ludiven Studio"
 	description="Politique de confidentialité de l'application mobile Pétanque Meet : compte Google ou Apple, parties publiées sur la carte, concours, publicité, modération, droits RGPD."
-	alternates={{ fr: '/petanque-meet/confidentialite/' }}
+	alternates={{ fr: '/petanque-meet/confidentialite/', en: '/en/petanque-meet/confidentialite/' }}
 >
 	<div class="wrapper stack gap-12 legal">
-		<Hero
-			title="Confidentialité — Pétanque Meet"
-			tagline="Ce que tu publies sur la carte est public. Le reste n'est ni vendu ni cédé."
-		/>
+		<div class="stack gap-8">
+			<LangSwitch lang="fr" links={[{ lang: 'en', href: '/en/petanque-meet/confidentialite/' }]} />
+			<Hero
+				title="Confidentialité — Pétanque Meet"
+				tagline="Ce que tu publies sur la carte est public. Le reste n'est ni vendu ni cédé."
+			/>
+		</div>
 
 		<p class="updated">
 			Cette politique concerne <strong>l'application mobile Pétanque Meet</strong>

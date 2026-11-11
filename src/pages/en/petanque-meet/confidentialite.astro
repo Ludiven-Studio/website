@@ -1,0 +1,520 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import Hero from '../../../components/Hero.astro';
+import LangSwitch from '../../../components/LangSwitch.astro';
+---
+
+<BaseLayout
+	title="Privacy policy of the Pétanque Meet app | Ludiven Studio"
+	description="Privacy policy of the Pétanque Meet mobile app: Google or Apple account, games published on the map, tournaments, advertising, moderation, GDPR rights."
+	lang="en"
+	alternates={{ fr: '/petanque-meet/confidentialite/', en: '/en/petanque-meet/confidentialite/' }}
+>
+	<div class="wrapper stack gap-12 legal">
+		<div class="stack gap-8">
+			<LangSwitch lang="en" links={[{ lang: 'fr', href: '/petanque-meet/confidentialite/' }]} />
+			<Hero
+				title="Privacy — Pétanque Meet"
+				tagline="What you publish on the map is public. The rest is neither sold nor handed over."
+			/>
+		</div>
+
+		<p class="updated">
+			This policy covers <strong>the Pétanque Meet mobile app</strong>
+			(<code>com.ludivenstudio.petanquemeet</code>) and the meet-up map it shares with the website
+			(<a href="/en/petanque-meet/">ludiven-studio.fr/petanque-meet</a>). The rest of the website has its
+			<a href="/confidentialite/">own policy</a>. Last updated: 11 November 2026.
+		</p>
+		<p class="updated">
+			This is a courtesy translation. In case of discrepancy, the
+			<a href="/petanque-meet/confidentialite/" hreflang="fr">original French version</a> prevails.
+		</p>
+
+		<div class="summary">
+			<p><strong>The essentials:</strong></p>
+			<ul>
+				<li>Looking at the map needs <strong>no account</strong>. To publish, join or report a game, you sign in with <strong>Google or Apple</strong>.</li>
+				<li>What you publish is <strong>visible to everyone</strong>: the first name you enter, the pitch, the time, and for a tournament the club's information. Your email address, however, is never shown.</li>
+				<li>Your GPS location is used to centre the map and to compute distances, on your phone. <strong>It is never sent to us.</strong></li>
+				<li>An <strong>advertising banner</strong>, served by Unity LevelPlay (ironSource Ads and Unity Ads), funds the app. The ad networks receive nothing <strong>without your consent</strong>, requested at first launch. No data is resold.</li>
+				<li>You can <strong>delete your account</strong> at any time from the app.</li>
+			</ul>
+		</div>
+
+		<section class="stack gap-2">
+			<h2>1. Who is the data controller</h2>
+			<p>Publisher of the app and data controller:</p>
+			<ul>
+				<li>Company name: <strong>Ludiven Studio</strong></li>
+				<li>Legal form: EURL (French single-member limited company) with share capital of €1,000</li>
+				<li>Registration: 999&nbsp;253&nbsp;586 R.C.S. Vienne — SIRET 999&nbsp;253&nbsp;586&nbsp;00013</li>
+				<li>Registered office: 1166 route de la Ranche, 38440 Châtonnay, France</li>
+				<li>Contact: <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a></li>
+			</ul>
+			<p>See also the <a href="/mentions-legales/">legal notice</a> (in French).</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>2. Your account</h2>
+			<p>
+				To take action (publish a game or a tournament, sign up, report), you sign in with
+				<strong>Google</strong> (Android) or <strong>Apple</strong> (iPhone). We then receive an account
+				identifier and your email address; with Apple, this may be the relay address that hides yours. We never
+				receive your password. With Google, the sign-in service also keeps the name and photo of your Google
+				profile: we do not show them and do not use them.
+			</p>
+			<p>
+				This account is used to link your games and sign-ups to you, on all your devices, and to enforce the
+				rules. Your email address is shown only to you, in the "Account and help" screen, and is never shown to
+				other players.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>3. What is public</h2>
+			<p>
+				The map can be viewed by anyone, in the app as on the website, without an account. The following is
+				visible to everyone:
+			</p>
+			<ul>
+				<li><strong>For a game</strong>: the pitch (exact position of the pin and name of the place), the date and time, the format, the number of places, the <strong>organiser's first name</strong> and the <strong>first names of those signed up</strong>.</li>
+				<li><strong>For a tournament</strong>: the club's name, the title, the place, the date, the category, the entry fee, the details, and, if they were provided, the <strong>phone number</strong> and the <strong>poster</strong> (once approved by the publisher).</li>
+				<li>The <strong>tournaments you follow</strong> are visible to no one: the organiser only sees how many players follow theirs.</li>
+				<li>An <strong>anonymous marker</strong> per account, which makes it possible to recognise that several listings come from the same organiser, without revealing who they are.</li>
+			</ul>
+			<p>
+				The first name is the only free text of a game. It does not need to be complete: a first name or a
+				nickname is enough. Do not put a surname, a number or an address in it.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>4. Data processed</h2>
+			<div class="table-scroll">
+				<table>
+					<thead>
+						<tr>
+							<th>Data</th>
+							<th>Purpose</th>
+							<th>Legal basis</th>
+							<th>Recipient</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td>Account identifier and email address</td>
+							<td>Signing you in, linking your games to you</td>
+							<td>Performance of the contract (Art. 6(1)(b) GDPR)</td>
+							<td>Supabase; Google or Apple for sign-in</td>
+						</tr>
+						<tr>
+							<td>Games: pitch, time, format, places, organiser's first name</td>
+							<td>Publishing the game on the map</td>
+							<td>Performance of the contract</td>
+							<td>Supabase; public</td>
+						</tr>
+						<tr>
+							<td>Sign-ups: first name, number of places, role</td>
+							<td>Joining a game</td>
+							<td>Performance of the contract</td>
+							<td>Supabase; public</td>
+						</tr>
+						<tr>
+							<td>Tournaments: club, title, details, fee, optional phone number, optional poster</td>
+							<td>Announcing a tournament</td>
+							<td>Performance of the contract</td>
+							<td>Supabase; public once the poster is approved</td>
+						</tr>
+						<tr>
+							<td>Followed tournaments</td>
+							<td>Finding a tournament in your agenda; giving the organiser a number of interested players</td>
+							<td>Performance of the contract</td>
+							<td>Supabase; the organiser only sees a total</td>
+						</tr>
+						<tr>
+							<td>Coordinates of a new pitch</td>
+							<td>Finding the name of the place and of the town</td>
+							<td>Performance of the contract</td>
+							<td>OpenStreetMap (Nominatim), called by our server</td>
+						</tr>
+						<tr>
+							<td>Fingerprint of the IP address (see §6)</td>
+							<td>Limiting abuse and spam</td>
+							<td>Legitimate interest (Art. 6(1)(f))</td>
+							<td>Supabase</td>
+						</tr>
+						<tr>
+							<td>Reports: reason, your details for wrong information, identifier of the reporting account</td>
+							<td>Moderation</td>
+							<td>Legitimate interest</td>
+							<td>Supabase; the publisher, by email via Resend</td>
+						</tr>
+						<tr>
+							<td>"This is my club" request: your message (name, role in the club, phone number), your account's email address</td>
+							<td>Checking with the club that you represent it, then moving its tournaments to your account</td>
+							<td>Performance of the contract</td>
+							<td>Supabase; the publisher, by email via Resend</td>
+						</tr>
+						<tr>
+							<td>Text of a place search; for komoot, also the centre of the map shown, rounded to about ten kilometres, and the app's language</td>
+							<td>Finding a town or an address on the map</td>
+							<td>Performance of the contract</td>
+							<td>IGN (Géoplateforme) and komoot (Photon): each search goes to both</td>
+						</tr>
+						<tr>
+							<td>Usage statistics, with no account and no identifier (see §8)</td>
+							<td>Knowing which features are used and improving the app</td>
+							<td>Legitimate interest</td>
+							<td>Umami, on our server (Hetzner, Germany)</td>
+						</tr>
+						<tr>
+							<td>Advertising identifier and other device identifiers, IP address, interactions with ads, usage time, technical information, purchases (declared by Unity Ads; the app offers none) (see §9)</td>
+							<td>Showing, choosing and measuring the advertising banner, fighting fraud</td>
+							<td>Your consent (Art. 6(1)(a)). Up to version 0.1.6: your consent for personalised ads, legitimate interest otherwise</td>
+							<td>Unity Technologies and its subsidiary ironSource (Unity LevelPlay, ironSource Ads, Unity Ads); through their auctions, other ad buyers. Up to version 0.1.6: Google (AdMob) and its advertising partners</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+			<p>
+				The app does <strong>not</strong> collect your contacts or your photos (apart from the poster you
+				choose to send). Your GPS location is never sent to us (see §5). Your surname is only asked for in a
+				"This is my club" request, and only the publisher sees it. Your phone's advertising identifier is only
+				read by the ironSource and Unity Ads advertising modules, and only with your consent (see §9): we do
+				not receive it.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>5. Your location</h2>
+			<p>
+				The "Near me" button asks for access to your location <strong>only when you tap it</strong>. The app
+				reads one position, centres the map and computes the distances to the games, then stops location.
+				This position <strong>is never sent to us</strong>.
+			</p>
+			<p>
+				When you search for a place, komoot receives the centre of the map shown, <strong>rounded to about ten
+				kilometres</strong>, to suggest nearby places first. Right after "Near me", this centre is close to
+				your position: komoot therefore only knows its region.
+			</p>
+			<p>
+				What we receive is the location of the <strong>pitch</strong> you choose on the map for a game or a
+				tournament, never that of your device.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>6. Fighting abuse</h2>
+			<p>
+				The service counts, per day, the listings, sign-ups and reports of each account and each connection.
+				Your IP address is <strong>never stored</strong>: it is turned into a non-reversible fingerprint, mixed
+				with a secret known only to the server. Without this secret, the fingerprint cannot be traced back to
+				an address.
+			</p>
+			<p>
+				The texts entered go through an automatic filter (links, offensive words). A listing reported by
+				several players is hidden while the publisher checks it.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>7. Reports and moderation</h2>
+			<p>
+				You can report a game or a tournament (offensive first name, fake listing, unsuitable poster, nobody
+				came). Your report is <strong>anonymous towards other players</strong>: no one knows who made it. It
+				is, however, recorded with your account identifier, to prevent serial reporting.
+			</p>
+			<p>
+				The publisher is alerted by email and sees the listing, the first names, the reason, your details for
+				wrong information and the number of reports, never the identity of who reported. They can restore the
+				listing, remove it or suspend the offending account. For a suspended account, only the technical
+				identifier is kept, so that the suspension holds.
+			</p>
+			<p>
+				Tournament posters stay private until the publisher approves them. A rejected poster is erased at
+				once.
+			</p>
+			<p>
+				<strong>"This is my club".</strong> To take over your club's tournaments imported from a committee
+				calendar, you give your name, your role in the club and a phone number. The publisher receives this
+				message by email with your account's address, checks with the club, then replies to you by email.
+				No one else sees it.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>8. Usage statistics</h2>
+			<p>
+				The app sends to <strong>Umami</strong>, a cookie-free statistics tool installed on our own server, the
+				name of the actions taken (opening the app, opening a game, signing up, publishing, signing in,
+				sharing, reporting, seeing or tapping one of our house ads, with the name of the app shown…), together
+				with the platform, the app and system version, the language, the screen size and the phone model.
+			</p>
+			<p>
+				<strong>No</strong> first name, account identifier, email address, GPS location, search text or listing
+				identifier is included. These statistics are linked neither to your account nor to your identity.
+			</p>
+			<p>
+				Like any web service, Umami sees your phone's IP address. It does not keep it, but infers from it the
+				country, the region and the city. To count visitors, it groups the actions made from the same
+				connection and the same phone model, for one calendar month at most.
+			</p>
+			<p>
+				This server is rented from <strong>Hetzner Online GmbH</strong>, which hosts it in Germany. Each of the
+				studio's apps has its own separate statistics there, and no one else receives them. Versions of the app
+				that have not yet been updated still send them to Umami Cloud (Umami Software, Inc., United States).
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>9. Advertising</h2>
+			<p>
+				The app shows an <strong>advertising banner</strong> at the top of the screen. It funds the service,
+				which stays free, and it is served by <strong>Unity LevelPlay</strong> with the
+				<strong>ironSource Ads</strong> and <strong>Unity Ads</strong> networks (Unity Technologies and its
+				subsidiary ironSource). When no ad is available, or if you refuse advertising, the banner shows our
+				other apps instead, signed "Ludiven Studio". It shows our pétanque apps first; on Android, when they
+				are all already installed on your phone, it may show one of our games. To know this, the app checks
+				which of ours are installed there, and this information stays on your phone. Tapping the banner opens
+				the store page of the app shown, with a note saying that you come from Pétanque Meet. The app downloads
+				the list of these apps and their images from this website, sending nothing other than the request
+				itself. Nothing else is sent, apart from the fact that one of these apps was shown or tapped (see §8).
+				Up to version 0.1.6, this banner only presents Pétanque Scan.
+			</p>
+			<p>
+				<strong>Your consent.</strong> At first launch, the app asks whether you accept advertising from these
+				partners, with two identical buttons, "Accept" and "Refuse". Your choice stays on your phone and you are
+				asked again after 6 months. <strong>If you refuse, no advertising module is started</strong> and
+				nothing is sent to them: only our banner for our other apps is shown. You can change your mind at any
+				time: "Account and help" → "Ad choices". If you withdraw your consent, our partners' banner disappears
+				at once and the app reports the withdrawal to Unity LevelPlay. On iPhone, after an "Accept", the app
+				also asks for Apple's tracking permission; without it, the iPhone's advertising identifier is not used
+				and the ads are not personalised.
+			</p>
+			<p>
+				With your consent, to show ads, choose them according to your interests, measure them and fight fraud,
+				the ironSource and Unity Ads modules store and read information on your phone. They receive its
+				<strong>advertising identifier</strong> and other device identifiers, your <strong>IP address</strong>
+				(which gives an approximate location, at city level), your interactions with the ads, how long you use
+				the app, technical information (model, language, connection type, performance) and, according to Unity
+				Ads, your purchases (the app offers none). Their auctions may pass the ad request on to other ad
+				buyers. We pass on to them neither your account, nor your email address, nor your first name, nor your
+				games.
+			</p>
+			<p>
+				Versions of the app up to 0.1.6 still request their ads from <strong>Google AdMob</strong>. At each
+				launch they check Google's consent form, which then sees your phone's IP address; without your
+				consent, their ads are not personalised.
+			</p>
+			<p>
+				You can also reset or delete the advertising identifier in your phone's settings. To learn more, and
+				for ironSource's and Unity Ads' partners:
+				<a href="https://unity.com/legal/game-player-and-app-user-privacy-policy" target="_blank" rel="noopener">Unity's
+				privacy policy</a>, which covers Unity Ads, LevelPlay and ironSource. For versions up to 0.1.6: the
+				<a href="https://policies.google.com/privacy?hl=en" target="_blank" rel="noopener">Google Privacy
+				Policy</a>.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>10. What is stored on your phone</h2>
+			<ul>
+				<li>your sign-in session and your email address;</li>
+				<li>the first name you entered, the games you joined, the places you saved, the last spot shown on the map;</li>
+				<li>your preferences: language, theme, hidden organisers, messages already seen;</li>
+				<li>your choice about advertising and, if you accepted it, the data of the ironSource and Unity Ads advertising modules (see §9);</li>
+				<li>a cache of map tiles and posters, for faster display.</li>
+			</ul>
+			<p>
+				All of this stays on the device and disappears when you uninstall the app.
+			</p>
+			<p>
+				<strong>Reminders.</strong> If you accept it, the app schedules a reminder on your phone one hour
+				before your games. These are local notifications: no server sends you a message.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>11. Recipients and transfers outside the European Union</h2>
+			<p>
+				Your data is neither sold nor handed over. It is only processed by these providers:
+			</p>
+			<ul>
+				<li><strong>Supabase</strong> — database, accounts and poster storage. Data hosted in the European Union (Ireland).</li>
+				<li><strong>Google</strong> and <strong>Apple</strong> — signing in to your account and distribution of the app.</li>
+				<li><strong>Unity Technologies</strong> and its subsidiary <strong>ironSource</strong> — the advertising banner, with your consent (Unity LevelPlay, ironSource Ads, Unity Ads); their auctions may pass the ad request on to other ad buyers (see §9).</li>
+				<li><strong>Google (AdMob)</strong> — the advertising banner and its consent form, in versions of the app up to 0.1.6.</li>
+				<li><strong>BKG</strong> (German Federal Agency for Cartography and Geodesy) — map tiles (TopPlusOpen). As for any website, its servers see your phone's IP address.</li>
+				<li><strong>IGN</strong> (French National Institute of Geographic and Forest Information) — address search: each search is sent to it. Map tiles of the first versions of the app. Its servers also see your phone's IP address.</li>
+				<li><strong>komoot</strong> (Photon service, Germany) — worldwide place search: each search is sent to it, with the centre of the map shown rounded to about ten kilometres and the app's language.</li>
+				<li><strong>OpenStreetMap Foundation</strong> — name of a new pitch (Nominatim service). Only the pitch's coordinates are sent to it, by our server.</li>
+				<li><strong>Resend</strong> — sending moderation emails and replies to "This is my club" requests.</li>
+				<li><strong>Hetzner Online GmbH</strong> (Germany) — hosting of our usage statistics server (see §8). Versions of the app not yet updated still send these statistics to <strong>Umami Software, Inc.</strong> (Umami Cloud).</li>
+				<li><strong>GitHub</strong> (GitHub Pages) — hosting of this website, where the app checks whether there is a new version and reads the list of our house ads (see §9). As for any website, its servers see your phone's IP address.</li>
+			</ul>
+			<p>
+				The "Directions" button opens Google Maps or Apple Maps with the pitch's address. The "Share" button
+				passes a link to the listing to the app you choose. Their use is then governed by these services.
+			</p>
+			<p>
+				Some providers are US companies. These transfers are governed by the mechanisms of Chapter V of the
+				GDPR: standard contractual clauses and, for the providers concerned, certification under the
+				<em>EU-U.S. Data Privacy Framework</em>.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>12. Retention periods</h2>
+			{/* TODO legal: the server has no purge job yet. These durations need one before release. */}
+			<ul>
+				<li><strong>Games and sign-ups</strong>: removed from the map as soon as they are over or cancelled, then erased <strong>12 months</strong> after their date.</li>
+				<li><strong>Tournaments</strong>: removed from the map the next day, erased 12 months after their date. The poster is erased one week after the tournament. Following a tournament is erased once the tournament is over, at the latest with it.</li>
+				<li><strong>Reports</strong>: erased once dealt with, and at the latest 12 months later.</li>
+				<li><strong>"This is my club" requests</strong>: kept with your account, erased when you delete it.</li>
+				<li><strong>Anti-abuse counters</strong>: erased after 30 days.</li>
+				<li><strong>Account suspension</strong>: the technical identifier is kept for as long as the suspension lasts.</li>
+				<li><strong>Usage statistics</strong>: kept for <strong>24 months</strong> on our server, then erased; its backups, 14 days. Those Umami Cloud still receives from versions not yet updated are erased there after 6 months.</li>
+				<li><strong>Your choice about advertising</strong>: 6 months on your phone, then you are asked again.</li>
+				<li><strong>Advertising data</strong>: according to the rules of Unity and ironSource (see §9).</li>
+				<li><strong>Account</strong>: until you delete it.</li>
+			</ul>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>13. Deleting your account</h2>
+			<p>
+				In the app: <strong>"Account and help" → "Delete my account"</strong>. It is immediate and final:
+			</p>
+			<ul>
+				<li>your account and your email address are erased;</li>
+				<li>your upcoming games are cancelled (those signed up see it) and your first name is replaced by "Deleted account" on all your games;</li>
+				<li>your sign-ups, your tournaments, their posters, the tournaments you follow, your reports and your "This is my club" requests are erased;</li>
+				<li>on iPhone, the app asks you to sign in with Apple again, to remove Pétanque Meet's access to your Apple ID.</li>
+			</ul>
+			<p>
+				Your account is a Ludiven Studio account: the same one is used in our other apps. Deleting it also
+				erases what they have saved for it (saves).
+			</p>
+			<p>
+				Your past games stay in the database for a while, without a first name, linked to a technical
+				identifier that no longer points to any account. They then follow the periods in §12.
+			</p>
+			<p>
+				You can also ask for deletion by email at
+				<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>, from your account's address.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>14. Your rights</h2>
+			<p>
+				Under the GDPR, you have the right of access, rectification, erasure, restriction, objection and
+				portability. To exercise them, or to have a listing, a first name or a sign-up removed, write to
+				<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>. We reply within one month.
+			</p>
+			<p>
+				If you believe your rights are not being respected, you can lodge a complaint with the French data
+				protection authority, the CNIL (<a href="https://www.cnil.fr" target="_blank" rel="noopener">www.cnil.fr</a>),
+				3 place de Fontenoy, TSA 80715, 75334 Paris Cedex 07.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>15. Minors</h2>
+			<p>
+				The app is used to meet other players in real life. It is meant for people aged <strong>15 and
+				over</strong>. A minor must have their parents' consent, and should not go alone to a game with
+				strangers. If you are a parent and notice that a child has created an account, write to us: we will
+				delete it.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>16. Security</h2>
+			<p>
+				All exchanges are encrypted (HTTPS). The map's data can only be accessed by our server: no direct
+				access to the database is open, not even for reading. Your session is kept in the app's storage on
+				your phone.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>17. Changes</h2>
+			<p>
+				This policy may change with the app. The date of the last update appears at the top of the page. In
+				the event of a significant change, the app will let you know.
+			</p>
+			<p>See also the <a href="/en/petanque-meet/cgu/">app's terms of use</a>.</p>
+		</section>
+	</div>
+</BaseLayout>
+
+<style>
+	.legal {
+		max-width: 68ch;
+		margin-inline: auto;
+		color: var(--sc-ink-2);
+		font-size: var(--text-md);
+		line-height: 1.6;
+	}
+	.legal h2 {
+		font-size: var(--text-xl);
+		color: var(--sc-ink);
+	}
+	.legal ul {
+		padding-left: 1.2rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+	.legal a {
+		color: var(--sc-link);
+		text-decoration: 1px solid underline transparent;
+		text-underline-offset: 0.25em;
+		transition: text-decoration-color var(--theme-transition);
+	}
+	.legal a:hover,
+	.legal a:focus {
+		text-decoration-color: currentColor;
+	}
+	.updated {
+		font-size: var(--text-sm);
+		color: var(--sc-muted);
+	}
+	.summary {
+		border: 1px solid var(--sc-line);
+		border-left: 3px solid var(--sc-accent);
+		border-radius: 0.5rem;
+		padding: 1rem 1.25rem;
+		background: var(--sc-surface);
+	}
+	.summary p {
+		margin-bottom: 0.5rem;
+	}
+	code {
+		font-size: 0.9em;
+		background: var(--sc-surface);
+		padding: 0.1em 0.35em;
+		border-radius: 0.25em;
+	}
+	/* The 4-column table can't shrink below ~40em — scroll it instead of overflowing the page. */
+	.table-scroll {
+		overflow-x: auto;
+	}
+	table {
+		border-collapse: collapse;
+		width: 100%;
+		min-width: 36rem;
+		font-size: var(--text-sm);
+	}
+	th,
+	td {
+		border: 1px solid var(--sc-line);
+		padding: 0.5rem 0.65rem;
+		text-align: left;
+		vertical-align: top;
+	}
+	th {
+		color: var(--sc-ink);
+	}
+</style>
