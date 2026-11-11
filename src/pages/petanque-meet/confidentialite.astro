@@ -18,7 +18,7 @@ import Hero from '../../components/Hero.astro';
 			Cette politique concerne <strong>l'application mobile Pétanque Meet</strong>
 			(<code>com.ludivenstudio.petanquemeet</code>) et la carte des rencontres qu'elle partage avec le site
 			(<a href="/petanque-meet/">ludiven-studio.fr/petanque-meet</a>). Le reste du site a sa
-			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 4 novembre 2026.
+			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 10 novembre 2026.
 		</p>
 
 		<div class="summary">
@@ -238,8 +238,9 @@ import Hero from '../../components/Hero.astro';
 			<p>
 				L'application envoie à <strong>Umami</strong>, un outil de statistiques sans cookie installé sur notre propre serveur, le nom des
 				actions faites (ouvrir l'application, ouvrir une partie, s'inscrire, publier, se connecter, partager,
-				signaler…), avec la plateforme, la version de l'application et du système, la langue, la taille de
-				l'écran et le modèle de téléphone.
+				signaler, voir ou toucher une de nos annonces maison, avec le nom de l'application présentée…), avec
+				la plateforme, la version de l'application et du système, la langue, la taille de l'écran et le modèle
+				de téléphone.
 			</p>
 			<p>
 				<strong>Aucun</strong> prénom, identifiant de compte, adresse mail, position GPS, texte de recherche ni
@@ -264,18 +265,25 @@ import Hero from '../../components/Hero.astro';
 				service, qui reste gratuit, et elle est servie par <strong>Unity LevelPlay</strong> avec les régies
 				<strong>ironSource Ads</strong> et <strong>Unity Ads</strong> (Unity Technologies et sa filiale
 				ironSource). Quand aucune annonce n'est disponible, ou si tu refuses la publicité, la bannière présente
-				à la place Pétanque Scan, notre autre application&nbsp;: la toucher ouvre sa fiche sur le store. Rien
-				d'autre n'est envoyé, sinon le fait que la bannière a été touchée (voir §8).
+				à la place nos autres applications, signées «&nbsp;Ludiven Studio&nbsp;». Elle montre d'abord nos
+				applications de pétanque&nbsp;; sur Android, quand elles sont toutes déjà installées sur ton téléphone,
+				elle peut montrer un de nos jeux. Pour le savoir, l'application regarde lesquelles des nôtres y sont
+				installées, et cette information reste sur ton téléphone. Toucher la bannière ouvre la fiche de
+				l'application montrée sur le store, avec une mention indiquant que tu viens de Pétanque Meet.
+				L'application télécharge la liste de ces applications et leurs images depuis ce site, sans rien
+				envoyer d'autre que la demande elle-même. Rien d'autre n'est envoyé, sinon le fait qu'une de ces applications a été montrée
+				ou touchée (voir §8). Jusqu'à la version 0.1.6, cette bannière ne présente que Pétanque Scan.
 			</p>
 			<p>
 				<strong>Ton accord.</strong> Au premier lancement, l'application te demande si tu acceptes la publicité
 				de ces partenaires, avec deux boutons identiques, «&nbsp;Accepter&nbsp;» et «&nbsp;Refuser&nbsp;». Ton
 				choix reste sur ton téléphone et t'est redemandé au bout de 6 mois. <strong>Si tu refuses, aucun module
-				publicitaire n'est démarré</strong> et rien ne leur est envoyé&nbsp;: seule notre bannière pour Pétanque
-				Scan s'affiche. Tu peux changer d'avis à tout moment&nbsp;: «&nbsp;Compte et aide&nbsp;» →
-				«&nbsp;Choix publicitaires&nbsp;». Sur iPhone, après un «&nbsp;Accepter&nbsp;», l'application te demande
+				publicitaire n'est démarré</strong> et rien ne leur est envoyé&nbsp;: seule notre bannière pour nos
+				autres applications s'affiche. Tu peux changer d'avis à tout moment&nbsp;: «&nbsp;Compte et aide&nbsp;» →
+				«&nbsp;Choix publicitaires&nbsp;». Si tu retires ton accord, la bannière de nos partenaires disparaît aussitôt et
+				l'application signale ce retrait à Unity LevelPlay. Sur iPhone, après un «&nbsp;Accepter&nbsp;», l'application te demande
 				aussi l'autorisation de suivi d'Apple&nbsp;; sans elle, l'identifiant publicitaire de l'iPhone n'est pas
-				utilisé.
+				utilisé et les annonces ne sont pas personnalisées.
 			</p>
 			<p>
 				Avec ton accord, pour afficher les annonces, les choisir selon tes centres d'intérêt, les mesurer et
@@ -338,6 +346,7 @@ import Hero from '../../components/Hero.astro';
 				<li><strong>Fondation OpenStreetMap</strong> — nom d'un nouveau terrain (service Nominatim). Seules les coordonnées du terrain lui sont envoyées, par notre serveur.</li>
 				<li><strong>Resend</strong> — envoi des e-mails de modération et des réponses aux demandes «&nbsp;C'est mon club&nbsp;».</li>
 				<li><strong>Hetzner Online GmbH</strong> (Allemagne) — hébergement de notre serveur de statistiques d'usage (voir §8). Les versions de l'application pas encore mises à jour envoient encore ces statistiques à <strong>Umami Software, Inc.</strong> (Umami Cloud).</li>
+				<li><strong>GitHub</strong> (GitHub Pages) — hébergement de ce site, où l'application vérifie s'il existe une nouvelle version et lit la liste de nos annonces maison (voir §9). Comme pour tout site web, ses serveurs voient l'adresse IP de ton téléphone.</li>
 			</ul>
 			<p>
 				Le bouton «&nbsp;Itinéraire&nbsp;» ouvre Google Maps ou Plans (Apple) avec l'adresse du terrain. Le
