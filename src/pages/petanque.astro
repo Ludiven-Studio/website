@@ -37,7 +37,6 @@ const apps = [
 		play: GAME.copy.fr.badges.play,
 		apple: GAME.copy.fr.badges.apple,
 		href: '/petanque-game/telecharger/',
-		soon: 'Bientôt',
 	},
 ];
 ---
@@ -45,7 +44,7 @@ const apps = [
 <BaseLayout
 	title="Les applis de pétanque | Ludiven Studio"
 	description="Pétanque Meet pour trouver une partie près de chez soi, Pétanque Scan pour savoir qui a le point, Pétanque Game pour jouer aux boules en 3D : les applis de pétanque de Ludiven Studio, gratuites sur Android et iPhone."
-	image="/assets/petanque/og.jpg"
+	image="/assets/petanque/og-apps.jpg"
 >
 	<main class="wrapper">
 		<div class="petanque-apps stack gap-10">
@@ -56,8 +55,8 @@ const apps = [
 
 			<img
 				class="banner"
-				src="/assets/petanque/banner.webp"
-				alt="Pétanque Meet et Pétanque Scan sur deux téléphones"
+				src="/assets/petanque/banner-apps.webp"
+				alt="Pétanque Meet, Pétanque Scan et Pétanque Game sur trois téléphones"
 				width="1640"
 				height="624"
 				fetchpriority="high"
@@ -72,7 +71,7 @@ const apps = [
 						</div>
 						<p class="app-title">{a.title}</p>
 						<p class="app-body">{a.body}</p>
-						<StoreBadges playStore={a.play} appStore={a.apple} lang="fr" soon={a.soon} />
+						<StoreBadges playStore={a.play} appStore={a.apple} lang="fr" />
 						<a class="app-more" href={a.href}>
 							Découvrir l’appli <Icon icon="arrow-right" />
 						</a>
@@ -147,7 +146,7 @@ const apps = [
 		--soon-ink: #0b1224;
 		background:
 			linear-gradient(100deg, #0b1224 35%, rgb(11 18 36 / 0.82) 60%, rgb(11 18 36 / 0.35)),
-			url('/assets/petanque-game/hero.webp') right center / cover no-repeat,
+			url('/assets/petanque/game-card.webp') right center / cover no-repeat,
 			#0b1224;
 	}
 
