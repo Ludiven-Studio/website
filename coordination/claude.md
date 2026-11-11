@@ -2564,3 +2564,317 @@
 - 21:26 : APK remplacé dans la prerelease dragons-gems-beta : le lien sert les octets 8b05c956… (vérifié). Page :
   taille 119544876, SHA-256 8b05c956…, commit 08c25fd ; commitée depuis mon worktree et poussée, mon fichier et cette
   section seulement.. Statut : terminé. Réservations libérées.
+
+## 2026-11-08 — Dragon Gems : bêta 1.0.2 (session DragonsGemsSwipe)
+- Statut : en cours (2026-11-08T18:28+01:00). Demande de l'utilisateur : décision de Raphaël relayée par le Producer :
+  « Oui, bêta 1.0.2 », construire la bêta depuis le tag v1.0.2-android (0bcd0ed), en ARM64 (règle « test en ARM64 »),
+  et la publier à la place de la 1.0.1
+- Réservations actives : `src/pages/dragons-gems/beta-wnkmrlugi7.astro`, dans le worktree
+  website-worktrees/dragons-gems-version.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 18:35 : APK construit depuis le tag v1.0.2-android (0bcd0ed) en ARM64, build_check OK, ajouté à la prerelease
+  dragons-gems-beta (l'asset 1.0.1 reste) ; le lien sert bdc9489c… (téléchargé et vérifié). Page : 1.0.2, 74195759
+  octets, SHA-256 bdc9489c…, commit 0bcd0ed, ligne ARM64 ; poussée depuis mon worktree (53e868b, ma page seulement), en
+  ligne. Cette section reste à committer avec le journal (dd86414 non poussé dans ce dossier n'est pas à moi). Statut :
+  terminé. Réservations libérées.
+
+## 2026-11-08 — Pétanque Game : bêta 1.0.8 (session PetanqueGame)
+- Statut : en cours (2026-11-08T19:36+01:00). Demande de l'utilisateur : (transmis par le Producer, Raphaël : « Ok il
+  faudrait refaire une version bêta de Pétanque Game ») la bêta 1.0.8 depuis main, ARM64, à la place de la 1.0.7 sur la
+  page testeurs ; publication au mot de Raphaël tapé dans la session Pétanque Game
+- Réservations actives : `src/pages/petanque-game/beta-drm50otf.astro`, dans le worktree website-worktrees/pg-beta-108.
+- Ressources : serveur de dev sur le port 4608 ; eslint, `astro check`. Build annoncé ici avant.
+- 19:42 : APK 1.0.8 (main 79da7fa, ARM64, build_check OK) ajouté à la prerelease petanque-game-beta sur le mot de
+  Raphaël tapé dans la session Pétanque Game (l'asset 1.0.7 reste) ; le lien sert 101366181 octets, SHA-256 25d4c180… =
+  local. Page mise à jour dans mon worktree pg-beta-108 : 1.0.8, taille, SHA-256, ligne 64 bits ; eslint OK, astro
+  check 0 erreur, captures relues
+- 19:42 : Lancement du build complet dans mon worktree pg-beta-108 (son dist/, .astro/, public/vendor/ seulement)…
+- 19:44 : build complet OK dans mon worktree pg-beta-108 (sur 53e868b) : 222 pages, astro check 0 erreur, précache 384,
+  liens OK
+- 19:44 : commité et poussé sur le mot de Raphaël tapé dans la session Pétanque Game (« publie la bêta 1.0.8 de
+  Pétanque Game et pousse sa page ») : ma page et cette section seulement. Statut : terminé. Réservations libérées.
+- 19:49 : en ligne : e23acc2 poussé depuis mon worktree (la page seule), déployé en 246 s, la page sert le SHA-256
+  25d4c180… ; cette section reste indexée dans ce dossier, à committer avec le journal (dd86414, non poussé ici, n'est
+  pas à moi). Worktree pg-beta-108 et sa branche retirés
+
+## 2026-11-08 — Dragon Gems : bêta 1.0.2 refaite (session DragonsGemsSwipe)
+- Statut : terminé, remplacé (2026-11-09) : bêta 1.0.2 abandonnée, page bêta masquée (la session website s'en
+  charge). Demande d'origine : décision de Raphaël relayée par le Producer :
+  « Dans la 1.0.2, on refait tout » (les nuages), bêta refaite depuis main c9a2b6a et publiée à la place de la
+  précédente, sous un nom d'asset distinct
+- Réservations : aucune (libérées le 2026-11-09 ; avant : `src/pages/dragons-gems/beta-wnkmrlugi7.astro`, dans le
+  worktree website-worktrees/dragons-gems-version, que la session website retire).
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 19:51 : APK dragonsgems-beta-v1.0.2-c9a2b6a.apk ajouté à la prerelease dragons-gems-beta (les deux autres restent) ;
+  le lien sert 9a7b8795… (vérifié par apk_publish). Page : lien, 74209475 octets, SHA-256 9a7b8795…, commit c9a2b6a,
+  phrase des nuages ; eslint OK, astro check 0 erreur ; commitée dans mon worktree (30546f3), non poussée : le contrôle
+  du mode auto attend le mot de Raphaël tapé dans la session DragonsGemsSwipe
+- 18:56 : abandonnée sur la décision de Raphaël relayée par le Producer (« Oui, l'abandonner », 2026-11-09) : la page
+  30546f3 (branche dragons-gems-beta, worktree dragons-gems-version) n'est pas poussée ; l'APK
+  dragonsgems-beta-v1.0.2-c9a2b6a.apk reste sur la prerelease dragons-gems-beta. Statut : terminé, remplacé.
+  Réservations libérées.
+
+## 2026-11-09 — Dragon Gems 1.1.0 : page produit, captures et clip maison (session website)
+- Statut : en cours (2026-11-09T18:16+01:00). Demande de l'utilisateur : décision de Raphaël relayée par le Producer :
+  « Oui, c'est bon » (clip FR et 5 captures FR) et « Oui, en même temps » (texte de la page) : copier Marketing/Site de
+  DragonsGemsSwipe (c032b2b) sur public/, ajouter les bonus de la 1.1.0 à la page produit dans les 5 langues d'après le
+  listing validé, version.json reste en 1.0.0 ; commit local sans push, le push attend le mot de Raphaël tapé dans
+  cette session
+- Réservations actives : `src/data/dragonsGems.ts`, `public/assets/dragons-gems/{screen,video}-*`,
+  `public/promo/v1/clips/dragon-gems_*.mp4`, dans le worktree website-worktrees/dg-1.1.0-page.
+- Ressources : serveur de dev sur le port 4536 ; eslint, `astro check`. Build annoncé ici avant.
+- 18:21 : 40 fichiers de Marketing/Site (DG c032b2b) copiés sur les mêmes noms, sans nouveau nom ; dragonsGems.ts :
+  bonus de la 1.1.0 dans les 5 langues d'après le listing validé (accroche, histoire, coffres + étoiles, « Trois bonus
+  », « Les coffres mystère » avec la Réserve et la boutique de fragments ; « 21 premiers niveaux » comme le listing, au
+  lieu de 10), version.json inchangé ; eslint OK, astro check 0 erreur ; captures FR clair, sombre, téléphone relues
+- 18:21 : Lancement du build complet dans mon worktree dg-1.1.0-page (son dist/, .astro/, public/vendor/ seulement)…
+- 18:23 : build complet OK dans mon worktree dg-1.1.0-page (sur e23acc2) : 222 pages, astro check 0 erreur, précache
+  384, liens OK ; commité dans le worktree, non poussé : f58dce2 (dragonsGems.ts, 5 captures et la vidéo × 5 langues)
+  et 887220d (clip maison dragon-gems_<lang>.mp4). Le push attend le mot de Raphaël tapé dans cette session ; cette
+  section reste dans le journal du dossier partagé
+- 18:43 : poussé par la session DragonsGemsSwipe sur le mot de Raphaël tapé dans cette session (« pousse la page Dragon
+  Gems 1.1.0 ») : e23acc2..887220d, la branche dg-1.1.0-page telle quelle (f58dce2, 887220d) ; le journal, la branche
+  et le worktree restent à la session website
+- 18:48 : en ligne : 887220d déployé en 322 s, /dragons-gems/ sert « Trois bonus », le clip, les captures et la vidéo
+  servis sont ceux de Marketing/Site (sha256 vérifiés) ; version.json toujours en 1.0.0
+- 18:55 : poussé par la session DragonsGemsSwipe sur le mot de Raphaël tapé dans cette session-là (relayé par le
+  Producer) : ma branche telle quelle, e23acc2..887220d (f58dce2, 887220d) ; en ligne, vérifié : « Trois bonus » et «
+  Les coffres mystère » servis, screen-1-fr et dragon-gems_fr.mp4 identiques à l'octet. Cette section reste dans le
+  journal du dossier partagé. Worktree dg-1.1.0-page et sa branche retirés. Statut : terminé. Réservations libérées.
+
+## 2026-11-09 — Dragon Gems : page bêta cachée jusqu'à la prochaine bêta (session website)
+- Statut : en cours (2026-11-09T18:57+01:00). Demande de l'utilisateur : décision de Raphaël relayée par le Producer :
+  « Cacher la page bêta » (/dragons-gems/beta-wnkmrlugi7/) : retirer la page, ceux qui gardent le lien arrivent sur
+  /dragons-gems/, plus aucun lien vers elle ; les APK de la release GitHub restent ; et, s'il arrive, le poster plus
+  calme de la vidéo (« Oui, une image plus calme ») dans la même branche ; commit local, le push attend le mot de
+  Raphaël tapé dans cette session
+- Réservations actives : `src/pages/dragons-gems/beta-wnkmrlugi7.astro` (la section « bêta 1.0.2 refaite » de la
+  session DragonsGemsSwipe la réservait : abandonnée par Raphaël), `src/data/testerLinks.ts`, `astro.config.mjs`
+  (redirects), `public/assets/dragons-gems/video-*.webp`, dans le worktree website-worktrees/dg-beta-hide.
+- Ressources : serveur de dev sur le port 4536 ; eslint, `astro check`. Build annoncé ici avant.
+- 18:58 : page retirée (git rm src/pages/dragons-gems/beta-wnkmrlugi7.astro), bouton Bêta de Dragon Gems retiré de
+  testerLinks.ts (le Dev reste), redirection /dragons-gems/beta-wnkmrlugi7 → /dragons-gems/ dans astro.config.mjs ;
+  posters plus calmes video-<lang>.webp copiés de DG 4df960d (validés par Raphaël dans le Producer : « Oui, c'est bon
+  ») ; eslint OK. Lancement du build complet dans mon worktree dg-beta-hide (son dist/, .astro/, public/vendor/
+  seulement)…
+- 19:00 : build complet OK dans mon worktree dg-beta-hide (sur 887220d) : 221 pages (la bêta devient une redirection),
+  astro check 0 erreur, précache 384, liens OK ; la redirection mène à /dragons-gems/ (capture), absente du sitemap et
+  de sw.js, plus aucun lien vers elle ; les 5 tapes de /dragons-gems/telecharger/ ne montrent plus que Dev ; les APK de
+  la release GitHub ne sont pas touchés. Commité dans le worktree, non poussé : afe9ee6 (page bêta cachée) et c7d1a40
+  (posters). Le push attend le mot de Raphaël tapé dans cette session
+- 20:55 : ajout (demande de Raphaël tapée dans le Producer : « sur android il faudrait dire au site web de mettre a
+  jour la version a installer a 1.1.0 » ; 1.1.0 servie par Google Play, vérifié) : public/dragons-gems/version.json,
+  latest_android 1.0.0 → 1.1.0 ; latest_ios et min restent à 1.0.0 (Apple examine encore, l'invite reste facultative).
+  Lancement du build complet dans mon worktree dg-beta-hide (son dist/, .astro/, public/vendor/ seulement)…
+- 20:57 : build complet OK (221 pages, astro check 0 erreur, précache 384, liens OK) ; commité 8d5df1a (version.json)
+  dans le worktree, non poussé. La branche porte afe9ee6, c7d1a40, 8d5df1a sur 887220d ; le push attend le mot de
+  Raphaël tapé dans cette session
+- 23:14 : ajout (Raphaël, tapé dans le Producer : « ca y est Apple a validé la version Dragon Gems » ; l'App Store sert
+  1.1.0, publiée le 2026-11-09 22:10 UTC, vérifié par la recherche iTunes fr et us) : version.json, latest_ios 1.0.0 →
+  1.1.0 ; min reste à 1.0.0. Lancement du build complet dans mon worktree dg-beta-hide (son dist/, .astro/,
+  public/vendor/ seulement)…
+- 23:16 : build complet OK (221 pages, astro check 0 erreur, précache 384, liens OK) ; commité de616d8 (latest_ios)
+  dans le worktree, non poussé. La branche porte afe9ee6, c7d1a40, 8d5df1a, de616d8 sur 887220d ; le push attend le mot
+  de Raphaël tapé dans cette session
+- 23:22 : poussé sur le mot de Raphaël tapé dans cette session (« pousse la page bêta cachée, le poster et la version
+  1.1.0 de Dragon Gems ») : 887220d..de616d8 depuis mon worktree (afe9ee6, c7d1a40, 8d5df1a, de616d8). Attente du
+  déploiement…
+- 23:28 : en ligne : de616d8 déployé en 5 min 55 s ; version.json sert latest_android et latest_ios 1.1.0, min 1.0.0 ;
+  /dragons-gems/beta-wnkmrlugi7/ redirige vers /dragons-gems/ ; les 5 posters servis sont identiques à l'octet ; rien
+  dans le sitemap ni sw.js ; les 5 tapes de /dragons-gems/telecharger/ ne montrent que Dev. Commité et poussé à la
+  demande de l'utilisateur : mes 4 commits seulement ; cette section reste dans le journal du dossier partagé. Worktree
+  dg-beta-hide et sa branche retirés. Statut : terminé. Réservations libérées.
+- 23:30 : correction : le worktree dg-beta-hide et sa branche ne sont PAS retirés (le contrôle de sécurité a refusé la
+  suppression forcée, à cause du README.md marqué modifié par ses fins de ligne) ; leur contenu est en ligne (de616d8),
+  rien à garder, retrait laissé à Raphaël
+
+## 2026-11-09 — Ménage des worktrees du site (session website)
+- Statut : en cours (2026-11-09T23:54+01:00). Demande de l'utilisateur : Raphaël, tapé dans cette session : « retire
+  les worktrees du site déjà en ligne et celui de la bêta 1.0.2 de Dragon Gems »
+- Réservations actives : aucune (website-worktrees/ seulement).
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 23:54 : vérifiés d'abord (têtes inchangées depuis l'inventaire, node_modules réels, seul README.md marqué modifié par
+  ses fins de ligne, commits hors main déjà en ligne sous d'autres SHA, remplacés ou abandonnés), puis retirés avec
+  leur branche locale : ad-partners, catalog-ios, dg-1.0.0-policy, dg-1.0.1 (download-links), dragons-gems-consent,
+  nino-rush-privacy, home-carousel, house-ads, banner-texts, home-scene, ios-release, nino-rush-site (nino-rush-demo),
+  dragons-gems-version (branche dragons-gems-beta seulement : le tag du même nom, qui porte la release GitHub, reste),
+  dg-beta-hide. Restent en attente : meet-partner-search, meet-privacy-house-ads, scan-privacy-att,
+  scan-privacy-houseads. node_modules du dossier partagé intact. Statut : terminé. Réservations libérées.
+
+## 2026-11-10 — Dragon Gems : classements du mode infini et du sommet, un meilleur score par joueur (serveur) (session website)
+- Statut : en cours (2026-11-10T00:09+01:00). Demande de l'utilisateur : décision de Raphaël relayée par le Producer :
+  « Oui, corriger le serveur » (« Jejau » 10 fois dans le classement) ; Raphaël dans cette session : « on parle de
+  Classements de Dragon's Gems ». submit-score garde une ligne par joueur sur eclats-inf et eclats-sommet (la
+  meilleure), migration ponctuelle : copie datée de la table puis suppression des doublons, contrainte d'unicité ;
+  testé sur une base locale, commit local ; rien en prod sans le mot de Raphaël tapé dans cette session
+- Réservations actives : `supabase/functions/submit-score/index.ts`,
+  `supabase/migrations/20261110120000_dragon_gems_free_play_best.sql` (nouveau), dans le worktree
+  website-worktrees/dg-scores-best.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 00:16 : commité dans le worktree, non poussé, non déployé : d776e56 (submit-score : games.free_play_best → une ligne
+  par joueur, la meilleure, attempts compte les parties ; les autres tableaux libres, dont les événements pétanque,
+  gardent chaque partie ; migration 20261110120000 : colonne free_play_best (eclats-inf, eclats-sommet), copie
+  game_scores_backup_20261110, regroupement des parties, index unique partiel, comptes vérifiés sinon annulation). deno
+  check OK. Testé sur un PostgreSQL 16 local jetable (schéma des migrations du dépôt, 967 lignes publiques du jeu libre
+  avec un player_id inventé par pseudo, plus des cas limites) : eclats-inf 57 → 9 lignes, eclats-sommet 4 → 2, Coruña
+  913 et les défis du jour inchangés ; la vraie fonction lancée en local contre cette base : 12 cas OK, y compris avant
+  la migration (elle ajoute comme aujourd'hui). Rien en prod sans le mot de Raphaël tapé dans cette session
+- 00:20 : déployé en prod sur le mot de Raphaël tapé dans cette session (« déploie la correction des classements de
+  Dragon Gems en prod et pousse-la ») : migration list (seule 20261110120000 en attente), submit-score déployé, db push
+  --dry-run puis db push (20261110120000 appliquée, ses contrôles passés). Vérifié en lecture publique : eclats-inf 52
+  lignes → 5 (une par installation, aucun pseudo répété, 52 parties comptées ; « Dragon6377 » et « Jéjay » étaient la
+  même installation : Jéjay 120 220, 40 parties), eclats-sommet 1, petanque-coruna-2026-t 913 inchangé,
+  game_scores_backup_20261110 fermé à anon (401), free_play_best vrai pour eclats-inf et eclats-sommet seulement.
+  Poussé : de616d8..d776e56 depuis mon worktree (ne touche que supabase/)
+- 00:26 : en ligne : d776e56 déployé (site inchangé), fonction et migration actives en prod. Cette section reste dans
+  le journal du dossier partagé. Le worktree dg-scores-best reste à retirer (README.md marqué modifié par ses fins de
+  ligne : retrait forcé refusé par le contrôle de sécurité). Statut : terminé. Réservations libérées.
+- 00:26 : correction : le worktree dg-scores-best était propre ; retiré sans forcer, avec sa branche
+
+## 2026-11-10 — Pétanque Scan 1.2.13 et Pétanque Meet 1.0.2 : politiques recalées pour la sortie (session website)
+- Statut : en cours (2026-11-10T08:53+01:00). Demande de l'utilisateur : décision de Raphaël relayée par le Producer :
+  « mettre a jour les 3 applis de pétanque avec la nouvelle icone et les dernieres améliorations » ; Scan : « 1.2.13
+  aujourd'hui, puis 1.2.14 ». Recaler scan-privacy-att (avec Scan 1.2.13) et meet-privacy-house-ads (avec Meet 1.0.2)
+  sur origin/main, relire, vérifier, commit local sans push ; scan-privacy-houseads attend la 1.2.14
+- Réservations actives : `src/pages{,/en,/es,/de,/it}/petanque-scanner/confidentialite.astro` (worktree
+  scan-privacy-att), `src/pages/petanque-meet/confidentialite.astro` (worktree meet-privacy-house-ads).
+- Ressources : serveur de dev sur le port 4536 ; eslint, `astro check`. Build annoncé ici avant.
+- 08:56 : Scan : scan-privacy-att recalée sur origin/main d776e56 sans conflit (5c4453e, c9aec12), date de mise à jour
+  au 10 novembre 2026 dans les 5 langues (2ccfb13). Meet : meet-privacy-house-ads recalée sans conflit (6fec3e7,
+  d1cab2c, c6aff07, 8b95f78), « jusqu'à la version 0.1.7 » corrigé en 0.1.6 (la 0.1.7 n'est jamais sortie) et date au
+  10 novembre (9d87d62), plus le retrait de l'accord signalé à Unity LevelPlay, vrai en 1.0.2 d'après docs/store.md de
+  Meet (ad213ce, à part). Lancement du build complet dans mon worktree scan-privacy-att (son dist/, .astro/,
+  public/vendor/ seulement)…
+- 09:02 : builds complets OK dans les deux worktrees (sur d776e56 : 221 pages, astro check 0 erreur, précache 384,
+  liens OK) ; eslint OK ; pages construites relues : Scan, la date du 10 novembre dans les 5 langues ; Meet, la date, «
+  jusqu'à la version 0.1.6 » et la phrase du retrait ; captures FR (bureau, téléphone), DE pour Scan, sans erreur
+  console. Commits locaux, non poussés : Scan 5c4453e, c9aec12, 2ccfb13 ; Meet 6fec3e7, d1cab2c, c6aff07, 8b95f78,
+  9d87d62, ad213ce. Chaque push attend le mot de Raphaël tapé dans cette session, Scan d'abord
+- 09:04 : la session Meet confirme, d'après son code (AdBanner.OnConsent(false), AdSdkGate) : la phrase du retrait
+  (ad213ce) est vraie sur Android et iOS, et « jusqu'à la version 0.1.6 » est juste. Rien à changer ; les pushes
+  attendent les lignes de Raphaël
+- 10:08 : Scan (message de la session petanque-ar-ba : Raphaël a décidé dans le Producer « Tout dans la 1.2.14 ») : la
+  1.2.13 ne partira jamais aux stores ; scan-privacy-att (5c4453e, c9aec12, 2ccfb13 après recalage) ne se pousse pas
+  seule, la ligne « pousse la politique de Pétanque Scan 1.2.13 » est annulée. Le texte part avec scan-privacy-houseads
+  (279db3b, qui contient a3772a4 et 4a746a0), avec la 1.2.14, quand le Producer le dira. À revoir à ce moment-là : la
+  page en ligne et la branche nomment la 1.2.13 (6 fois par langue en ligne, 10 dans la branche), dont « version 1.2.13
+  : la publicité passe de Google AdMob à Unity LevelPlay » dans la ligne de date. Meet 1.0.2 et Pétanque Game 1.0.8
+  inchangés
+
+## 2026-11-10 — Pétanque Game 1.0.8 : politique et CGU (nos propres publicités) (session website)
+- Statut : en cours (2026-11-10T09:35+01:00). Demande de l'utilisateur : décisions de Raphaël relayées par le Producer
+  : §10 option B (« Ta phrase + la précision »), déclarations « Oui, les recommandations » ; appliquer les brouillons
+  de la session PetanqueGame (docs/policy-1.0.8-drafts.md, 7dc3b12) : politique (essentiel, §2, §5, §6, §7, §10, §12,
+  §13), CGU §8, date du jour de sortie, 5 langues ; commit local, push au mot de Raphaël tapé dans cette session
+- Réservations actives : `src/pages{,/en,/es,/de,/it}/petanque-game/{confidentialite,cgu}.astro`, dans le worktree
+  website-worktrees/pg-privacy-108.
+- Ressources : serveur de dev sur le port 4536 ; eslint, `astro check`. Build annoncé ici avant.
+- 09:38 : brouillons appliqués (P0 à P9, T et date des CGU, option B au §10), lus par numéro de ligne dans
+  docs/policy-1.0.8-drafts.md : les 105 lignes visées correspondaient aux textes « avant » des brouillons dans les 5
+  langues, rien d'écarté ; 10 fichiers ; eslint OK. Lancement du build complet dans mon worktree pg-privacy-108 (son
+  dist/, .astro/, public/vendor/ seulement)…
+- 09:43 : build complet OK (221 pages, astro check 0 erreur, précache 384, liens OK) ; pages construites :
+  house_ads_ask, le lien vers /publicite/societes/ et « 182 » dans les 5 politiques, la date du 10 novembre dans les 5
+  CGU ; captures FR (politique bureau et téléphone sombre, CGU) relues, sans erreur console. Commité dans le worktree,
+  non poussé : c480311 a30af89 (politique, CGU). Le push attend le mot de Raphaël tapé dans cette session
+- 09:45 : « qu'Unity Ads » → « que Unity Ads » (P5a, la seule occurrence des pages FR de la branche et du site), replié
+  dans le commit de la politique : d6bef64 (politique), c06a14a (CGU), non poussés ; eslint OK
+
+## 2026-11-10 — Pétanque Scan 1.2.14 : politique (pubs maison, versions 1.2.13 → 1.2.14) (session website)
+- Statut : en cours (2026-11-10T10:09+01:00). Demande de l'utilisateur : décision de Raphaël relayée par la session
+  Scan : « Tout dans la 1.2.14 » (la 1.2.13 ne sort pas) ; recaler scan-privacy-houseads sur main, renommer en 1.2.14
+  ce que la page présente comme arrivé en 1.2.13, ajouter l'événement frame_jump_offered ; diff relu par la session
+  Scan avant le push, push au mot de Raphaël tapé dans cette session, avec la 1.2.14
+- Réservations actives : `src/pages{,/en,/es,/de,/it}/petanque-scanner/confidentialite.astro`, dans le worktree
+  website-worktrees/scan-privacy-houseads.
+- Ressources : serveur de dev sur le port 4536 ; eslint, `astro check`. Build annoncé ici avant.
+- 10:12 : scan-privacy-houseads recalée sur origin/main d776e56 sans conflit (55070a7, b38a896, de5a351) ; 392ede2 :
+  1.2.13 → 1.2.14 pour ce qui arrivait en 1.2.13 (ligne de date fusionnée, « depuis la version » ×3, « antérieures à »
+  ×2), « jusqu'à la 1.2.13 » → 1.2.12 (anciens événements ×3, ancienne vidéo de Meet) : 10 mentions par langue, aucune
+  restante ; frame_jump_offered introuvable dans le code de Scan (aucun appel ni commit) : pas ajouté, demandé à la
+  session Scan ; date laissée au 5 novembre, à mettre au jour de sortie. eslint OK. Lancement du build complet dans mon
+  worktree scan-privacy-houseads (son dist/, .astro/, public/vendor/ seulement)…
+- 10:14 : build complet OK (221 pages, astro check 0 erreur, précache 384, liens OK) ; pages construites : 0 mention de
+  1.2.13 dans les 5 langues. Diff envoyé à la session Scan pour vérification. Commits locaux non poussés : 55070a7,
+  b38a896, de5a351, 392ede2 ; date à mettre au jour de sortie ; push au mot de Raphaël tapé dans cette session («
+  pousse la politique de Pétanque Scan 1.2.14 »)
+- 10:15 : la session Scan confirme 392ede2 : les points 1 à 3 suivent sa règle, et « jusqu'à la 1.2.12 » est juste
+  (meet_promo_*, meet_store_opened et game_store_opened sont dans le code de v1.2.13, Analytics.cs:37-41, et absents de
+  la 1.2.14). frame_jump_offered pas encore écrit dans Scan : je l'ajoute à réception de son SHA sur opencv3, avec la
+  formulation convenue (clé frame_jump) ; elle relira le diff complet ensuite, en une fois
+- 10:41 : frame_jump_offered ajouté (Scan b51c32c sur opencv3 : Analytics.cs:33, envoyé à FrameEpoch.cs:202), après
+  scan_blocked_quota, dans les 5 langues, avec le titre de la carte (clé frame_jump) sans « de N cm » : e27cfd1 ;
+  eslint OK. Lancement du build complet dans mon worktree scan-privacy-houseads (son dist/, .astro/, public/vendor/
+  seulement)…
+- 10:45 : la session Scan a vérifié e27cfd1 contre l'appli (opencv3 382565f) : tous les événements envoyés par la
+  1.2.14 sont listés, les anciens bornés à la 1.2.12, 0 mention de 1.2.13, catalogue des annonces maison nommé (table,
+  §8, GitHub) ; rien à changer. En attente du Producer pour la sortie : date du jour, puis la ligne de Raphaël « pousse
+  la politique de Pétanque Scan 1.2.14 »
+- 15:02 : frame_jump_offered remplacé par frame_jump_seen (Scan e26238a sur opencv3 : la carte « Le suivi AR a bougé »
+  est retirée, Analytics.cs:33, envoyé à FrameEpoch.cs:206), dans les 5 langues, sans nommer ARCore (ARKit sur iPhone)
+  ; replié dans le commit de l'événement ; build complet OK ; branche recalée sur origin/main 4361554 : 164a465,
+  2389742, 2c958d6, 1669737, 78f49db ; diff renvoyé à la session Scan
+- 15:02 : la session Scan valide 78f49db : frame_jump_seen une fois par page, ni frame_jump_offered ni 1.2.13,
+  formulation neutre (sans ARCore) gardée. Prêt ; push au moment du Producer, date du jour de sortie, ligne de Raphaël
+  « pousse la politique de Pétanque Scan 1.2.14 »
+- 15:57 : floor_off_seen ajouté (Scan 47fb9ae sur opencv3 : carte « Le sol semble mal détecté » retirée,
+  Analytics.cs:33, envoyé par FloorSanity.cs:53), après frame_jump_seen, 5 langues : e998e03 ; build complet OK ; diff
+  renvoyé à la session Scan
+- 15:57 : la session Scan valide e998e03 : floor_off_seen et frame_jump_seen une fois par page, ni frame_jump_offered
+  ni 1.2.13. Prêt ; push au moment du Producer, avec la date du jour de sortie
+
+## 2026-11-10 — Pubs maison : espace admin /admin/pubs/ (option A) (session website)
+- Statut : en cours (2026-11-10T11:30+01:00). Demande de l'utilisateur : décision de Raphaël relayée par le Producer :
+  « Oui, option A » : page /admin/pubs/ (noindex, hors sitemap et hors cache), module de règles partagé (check-promo le
+  réutilise), fonction promo-admin (compte de Raphaël seul, commits par l'API GitHub sans force, écrit seulement sous
+  public/promo/v1/), aperçus par langue, Publier, désactiver = poids 0, fichiers d'une pub supprimée gardés 30 jours,
+  historique « Revenir à cette version » ; test local d'abord ; déploiement et push sur les lignes de Raphaël
+- Réservations actives : `supabase/functions/_shared/promoRules.mjs`, `supabase/functions/promo-admin/`,
+  `scripts/check-promo.mjs`, `src/pages/admin/`, `src/components/admin/`, `src/lib/promoAdmin.ts`, `astro.config.mjs`
+  (filtre du sitemap et globIgnores), dans le worktree website-worktrees/promo-admin.
+- Ressources : serveur de dev sur le port 4536 ; eslint, `astro check`. Build annoncé ici avant.
+- 11:44 : écrit dans le worktree promo-admin : module de règles partagé (supabase/functions/_shared/promoRules.mjs et
+  .d.mts, check-promo.mjs le réutilise), fonction promo-admin, page /admin/pubs/ (PromoAdmin.tsx, promoAdmin.ts),
+  astro.config.mjs (/admin/ hors sitemap et hors sw.js). Testé en local : la fonction lancée par Deno contre un faux
+  GitHub (dépôt git nu) et un faux Supabase Auth, 31 cas OK (accès, envois refusés, publication, 30 jours, conflit,
+  main qui bouge, règles, store, historique, retour en arrière) ; la page en dev contre cette fonction, 12 cas OK
+  (liste, aperçus, nouvelle pub à poids 0 avec icône, désactiver, historique et retour en arrière, aucune erreur) ;
+  eslint OK, deno check OK, astro check 0 erreur. Lancement du build complet dans mon worktree promo-admin (son dist/,
+  .astro/, public/vendor/ seulement)…
+- 11:46 : build complet OK (222 pages, astro check 0 erreur, précache 386, liens OK) : /admin/pubs/ en noindex, absent
+  du sitemap, sa page hors sw.js (seul son chunk JS y est, comme tous les JS du site et CoursesAdmin). Commité dans le
+  worktree, non poussé, non déployé : ace7d86 (règles partagées), 02cf2b7 (fonction promo-admin), 4361554 (page).
+  Serveurs de test locaux arrêtés. Reste, au mot de Raphaël : jeton GitHub, secrets et déploiement de la fonction, push
+  de la page, aller-retour réel avec une pub de test à poids 0
+- 11:49 : sur les mots de Raphaël tapés dans cette session (« déploie la fonction promo-admin en prod », « pousse la
+  page admin des pubs ») : identifiant de son compte Google lu en prod (lecture seule, auth.users), secret
+  PROMO_ADMIN_USER_ID posé, promo-admin déployée (sans jeton : 401 sans connexion, 503 « not configured » avec la clé
+  publique, préflight 204) ; redirections de connexion : rien à changer (même domaine que l'adresse du site) ; poussé
+  d776e56..4361554 depuis mon worktree. En attente : le jeton GitHub (fichier C:\Users\raph_\promo-admin.env), puis
+  l'aller-retour réel avec une pub de test à poids 0
+
+## 2026-11-11 — Nino Rush : page de téléchargement 1.0.13 (après coup) (session NinoRush)
+- Statut : en cours (2026-11-11T09:50+01:00). Demande de l'utilisateur : publier l'APK de test 1.0.13 sur la page des
+  testeurs (décision de Raphaël relayée par le Producer)
+- Réservations actives : `src/data/ninoRush.ts`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 09:50 : Entrée écrite après coup, à la demande du Producer. APK_VERSION 1.0.13 et APK_SIZE 83,6 Mo modifiés dans un
+  worktree (D:/Work/NinoRush/site-wt, à origin/main 4361554), parce que ce dossier avait 4 commits de retard et un
+  claude.md modifié d'une autre session. Pas d'eslint, d'astro check ni de build complet pour ces 2 constantes.
+- 09:50 : commité et poussé : 4624b2c sur main, mon seul fichier src/data/ninoRush.ts ; déploiement fini en 5 min 19 s,
+  la page sert « Version 1.0.13 » ; worktree supprimé ; ce dossier partagé n'a pas été mis à jour (pas de pull) et
+  cette section reste non commitée. Statut : terminé. Réservations libérées.
+
+## 2026-11-11 — Journal du site poussé et ménage des branches (session website)
+- Statut : en cours (2026-11-11T11:40+01:00). Demande de l'utilisateur : décision de Raphaël relayée par le Producer :
+  « Oui, pousse » (journal), « Oui, les 4 » (suppressions, au mot tapé dans cette session)
+- Réservations actives : aucune.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 11:40 : b75c970 recalé sur origin/main 4624b2c sans toucher au journal non commité (même empreinte), poussé :
+  4624b2c..62393a3 ; main local au niveau. Suppressions de scan-privacy-att, dragons-gems-version,
+  rencontres-app-privacy et origin/rencontres-accounts : en attente de la ligne de Raphaël
+- 11:41 : sur le mot de Raphaël tapé dans cette session : worktree scan-privacy-att retiré (propre, node_modules réel),
+  branches locales scan-privacy-att (2ccfb13), dragons-gems-version (a715cfe), rencontres-app-privacy (1d6459f)
+  supprimées, branche distante rencontres-accounts supprimée sur GitHub. Restent : main, meet-partner-search,
+  meet-privacy-house-ads, pg-privacy-108, promo-admin, scan-privacy-houseads, et origin/main. Statut : terminé.
+  Réservations libérées.
