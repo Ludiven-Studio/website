@@ -1,0 +1,221 @@
+---
+// Every pétanque app of the studio in one place, in French (/petanque/, the shared Facebook Page's link) and in
+// English (/en/petanque/). The taglines are the apps' store subtitles.
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Icon from './Icon.astro';
+import LangSwitch from './LangSwitch.astro';
+import StoreBadges from './StoreBadges.astro';
+import { MEET_STORES } from '../data/petanqueMeet';
+import { copy as scanner } from '../data/petanqueScanner';
+import { GAME, ICON as GAME_ICON } from '../data/petanqueGame';
+
+interface Props {
+	lang: 'fr' | 'en';
+}
+
+const { lang } = Astro.props;
+const other = lang === 'fr' ? '/en/petanque/' : '/petanque/';
+
+const TEXT = {
+	fr: {
+		title: 'Les applis de pétanque | Ludiven Studio',
+		description: 'Pétanque Meet pour trouver une partie près de chez soi, Pétanque Scan pour savoir qui a le point, Pétanque Game pour jouer aux boules en 3D : les applis de pétanque de Ludiven Studio, gratuites sur Android et iPhone.',
+		h1: 'Les applis de pétanque',
+		lead: 'Par Ludiven Studio, gratuites sur Android et iPhone.',
+		bannerAlt: 'Pétanque Meet, Pétanque Scan et Pétanque Game sur trois téléphones',
+		more: 'Découvrir l’appli',
+		meet: ['Trouver une partie près de chez soi', 'Les parties qui cherchent des joueurs et les concours des clubs, sur une carte. On rejoint une partie, ou on propose la sienne quand il manque du monde.'],
+		scanner: ['Savoir qui a le point', 'On vise le cochonnet, on passe au-dessus des boules, et l’appli donne la distance de chaque boule au cochonnet, en réalité augmentée.'],
+		game: ['Jouer aux boules en 3D', 'Une partie sur la place du village, contre l’ordinateur, à deux sur un téléphone ou en ligne, en tête-à-tête, doublette ou triplette. Sur iPhone et Android ; la version web se joue aussi sur ce site.'],
+		paths: { meet: '/petanque-meet/telecharger/', scanner: '/petanque-scanner/telecharger/', game: '/petanque-game/telecharger/' },
+	},
+	en: {
+		title: 'The pétanque apps | Ludiven Studio',
+		description: 'Pétanque Meet to find a game near you, Pétanque Scan to know who has the point, Pétanque Game to play boules in 3D: the pétanque apps by Ludiven Studio, free on Android and iPhone.',
+		h1: 'The pétanque apps',
+		lead: 'By Ludiven Studio, free on Android and iPhone.',
+		bannerAlt: 'Pétanque Meet, Pétanque Scan and Pétanque Game on three phones',
+		more: 'About the app',
+		meet: ['Boules players near you', 'Find a pétanque game near you, join it in one tap, or post your own, anywhere in the world. In France, club tournaments are on the map too.'],
+		scanner: ['Who has the point? Measure it.', 'Aim at the jack once, walk round the game and hold the phone above the boules: the app gives each boule’s distance to the jack, in augmented reality.'],
+		game: ['French boules in 3D', 'A match on the village square, against the computer, two on one phone or online, singles, doubles or triples. On iPhone and Android; the web version also plays on this site.'],
+		paths: { meet: '/en/petanque-meet/download/', scanner: '/en/petanque-scanner/download/', game: '/en/petanque-game/download/' },
+	},
+}[lang];
+
+const apps = [
+	{ id: 'meet', name: 'Pétanque Meet', icon: '/assets/petanque-meet/icon.webp', text: TEXT.meet, play: MEET_STORES[lang].play, apple: MEET_STORES[lang].apple },
+	{ id: 'scanner', name: 'Pétanque Scan', icon: '/assets/petanque/icon-scanner.webp', text: TEXT.scanner, play: scanner[lang].badges.play, apple: scanner[lang].badges.apple },
+	{ id: 'game', name: 'Pétanque Game', icon: GAME_ICON, text: TEXT.game, play: GAME.copy[lang].badges.play, apple: GAME.copy[lang].badges.apple },
+] as const;
+const suffix = lang === 'fr' ? '' : '-en';
+---
+
+<BaseLayout title={TEXT.title} description={TEXT.description} image={`/assets/petanque/og-apps${suffix}.jpg`} lang={lang} altLang={other}>
+	<main class="wrapper">
+		<div class="petanque-apps stack gap-10">
+			<header class="stack gap-2">
+				<div class="lang"><LangSwitch lang={lang} href={other} /></div>
+				<h1>{TEXT.h1}</h1>
+				<p class="lead">{TEXT.lead}</p>
+			</header>
+
+			<img class="banner" src={`/assets/petanque/banner-apps${suffix}.webp`} alt={TEXT.bannerAlt} width="1640" height="624" fetchpriority="high" />
+
+			<div class="apps">
+				{apps.map((a) => (
+					<section class:list={['app', `app--${a.id}`]}>
+						<div class="app-head">
+							<img src={a.icon} alt="" width="72" height="72" />
+							<h2>{a.name}</h2>
+						</div>
+						<p class="app-title">{a.text[0]}</p>
+						<p class="app-body">{a.text[1]}</p>
+						<StoreBadges playStore={a.play} appStore={a.apple} lang={lang} />
+						<a class="app-more" href={TEXT.paths[a.id]}>
+							{TEXT.more} <Icon icon="arrow-right" />
+						</a>
+					</section>
+				))}
+			</div>
+		</div>
+	</main>
+</BaseLayout>
+
+<style>
+	.petanque-apps {
+		max-width: 62rem;
+		margin-inline: auto;
+		padding-bottom: 1rem;
+	}
+
+	h1 {
+		font-size: clamp(2.25rem, 6vw, 3.5rem);
+	}
+
+	.lead {
+		font-size: var(--text-lg);
+		color: var(--sc-muted);
+	}
+
+	.banner {
+		width: 100%;
+		height: auto;
+		border-radius: 1.5rem;
+		box-shadow: 0 30px 60px -32px rgb(9 11 17 / 0.45);
+	}
+
+	.apps {
+		display: grid;
+		gap: 1.25rem;
+	}
+
+	.app {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 0.75rem;
+		padding: 1.75rem;
+		border-radius: 1.5rem;
+		box-shadow: 0 24px 48px -30px rgb(9 11 17 / 0.5);
+	}
+
+	/* Each app keeps its own colours, in both site themes. */
+	.app--meet {
+		--app-ink: #1e2233;
+		--app-soft: #4a4f63;
+		--app-accent: #a8431f;
+		background: linear-gradient(160deg, #fbf7f0 30%, #f6d6aa);
+	}
+
+	.app--scanner {
+		--app-ink: #ffffff;
+		--app-soft: #d6e0f0;
+		--app-accent: #4ecdd6;
+		background: linear-gradient(160deg, #0d1526 30%, #1c2a44);
+	}
+
+	/* Night blue and amber, the square at dusk behind the words. */
+	.app--game {
+		--app-ink: #ffffff;
+		--app-soft: #d5dce8;
+		--app-accent: #f6c45d;
+		background:
+			linear-gradient(100deg, #0b1224 35%, rgb(11 18 36 / 0.82) 60%, rgb(11 18 36 / 0.35)),
+			url('/assets/petanque/game-card.webp') right center / cover no-repeat,
+			#0b1224;
+	}
+
+	.app-head {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+	}
+
+	.app-head img {
+		width: 4rem;
+		height: 4rem;
+		border-radius: 22%;
+		box-shadow: 0 4px 12px rgb(9 11 17 / 0.25);
+	}
+
+	.app h2 {
+		font-size: var(--text-2xl);
+		color: var(--app-ink);
+	}
+
+	.app-title {
+		font-family: var(--font-brand);
+		font-size: var(--text-lg);
+		font-weight: 600;
+		color: var(--app-accent);
+	}
+
+	.app-body {
+		color: var(--app-soft);
+	}
+
+	.app :global(.store-badges) {
+		--badge-h: 2.75rem;
+		justify-content: flex-start;
+		gap: 0.625rem;
+		margin-top: 0.5rem;
+	}
+
+	.app-more {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		margin-top: auto;
+		padding-top: 0.5rem;
+		font-family: var(--font-brand);
+		font-weight: 600;
+		color: var(--app-accent);
+		text-decoration: 1px solid underline transparent;
+		text-underline-offset: 0.25em;
+		transition: text-decoration-color var(--theme-transition);
+	}
+
+	.app-more:hover,
+	.app-more:focus-visible {
+		text-decoration-color: currentColor;
+	}
+
+	@media (min-width: 50em) {
+		.apps {
+			grid-template-columns: 1fr 1fr;
+		}
+
+		.app {
+			padding: 2.25rem;
+		}
+
+		.app--game {
+			grid-column: 1 / -1;
+		}
+
+		.app--game .app-body {
+			max-width: 34rem;
+		}
+	}
+</style>
