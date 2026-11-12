@@ -14,6 +14,10 @@ export const BANNER_TEXT_MAX = 40;
 // The icons the apps draw in the banner's square, 256 px today; Texture2D.LoadImage reads PNG and JPEG only.
 export const IMAGE_RULES = { minSide: 128, maxSide: 1024, maxBytes: 300_000 };
 export const CLIP_MAX_BYTES = 3_000_000;
+// The apps fit the clip whole (AspectRatioFitter from its own size): 540×960 for 9:16, 960×960 for a square.
+export const CLIP_MAX_SIDE = 960;
+// About 20 s of the app, plus the 2.5 s end card (ludiventools' visuals script).
+export const CLIP_SECONDS = [20, 30];
 /** Files the admin may write: under promo/v1/, in img/ or clips/, with a plain name. */
 export const UPLOAD_PATH = /^public\/promo\/v1\/(img\/[a-z0-9][a-z0-9._-]*\.(png|jpe?g)|clips\/[a-z0-9][a-z0-9._-]*\.mp4)$/;
 
@@ -205,11 +209,53 @@ export function checkImage(bytes, what = 'image') {
 	return problems;
 }
 
-/** A clip's problems: an MP4 (its « ftyp » box first), not too heavy. */
+/** An MP4's video size and length, read from its tkhd and mvhd boxes (no ffprobe on the build machine), or null. */
+export function mp4Info(bytes) {
+	const b = bytes;
+	const u32 = (i) => ((b[i] << 24) | (b[i + 1] << 16) | (b[i + 2] << 8) | b[i + 3]) >>> 0;
+	const find = (tag, from = 0) => {
+		const t = [...tag].map((c) => c.charCodeAt(0));
+		for (let i = Math.max(4, from); i + 4 <= b.length; i++)
+			if (b[i] === t[0] && b[i + 1] === t[1] && b[i + 2] === t[2] && b[i + 3] === t[3]) return i;
+		return -1;
+	};
+	let width = 0;
+	let height = 0;
+	// Each track has a tkhd; the video's carries the size, in 16.16 fixed point, in its last 8 bytes.
+	for (let i = find('tkhd'); i > 0; i = find('tkhd', i + 4)) {
+		const end = i - 4 + u32(i - 4);
+		if (end > b.length || end < i + 8) break;
+		const w = u32(end - 8) / 65536;
+		const h = u32(end - 4) / 65536;
+		if (w * h > width * height) [width, height] = [w, h];
+	}
+	const m = find('mvhd');
+	if (m < 0 || !width) return null;
+	const v1 = b[m + 4] === 1;
+	const scale = u32(m + (v1 ? 24 : 16));
+	const length = v1 ? u32(m + 28) * 2 ** 32 + u32(m + 32) : u32(m + 20);
+	return { width: Math.round(width), height: Math.round(height), seconds: scale ? length / scale : 0 };
+}
+
+/** A clip's problems: an MP4 (its « ftyp » box first), not too heavy, its long side within CLIP_MAX_SIDE. */
 export function checkClip(bytes, what = 'clip') {
 	const problems = [];
 	const ftyp = bytes.length > 12 && bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70;
 	if (!ftyp) problems.push(`${what}: not an MP4`);
 	if (bytes.length > CLIP_MAX_BYTES) problems.push(`${what}: ${(bytes.length / 1e6).toFixed(1)} MB, ${CLIP_MAX_BYTES / 1e6} MB at most`);
+	const info = ftyp ? mp4Info(bytes) : null;
+	if (info && Math.max(info.width, info.height) > CLIP_MAX_SIDE) problems.push(`${what}: ${info.width}×${info.height}, ${CLIP_MAX_SIDE} px at most on the long side`);
 	return problems;
+}
+
+/** What a complete entry still lacks, as warnings: a clip in each language, and clips of CLIP_SECONDS. */
+export function clipWarnings(entry, lengths = {}) {
+	const warnings = [];
+	const clips = entry?.clips && typeof entry.clips === 'object' ? entry.clips : {};
+	const missing = LANGUAGES.filter((l) => !clips[l]);
+	if (missing.length) warnings.push(`${entry?.id}: no clip in ${missing.join(', ')}`);
+	for (const [lang, seconds] of Object.entries(lengths))
+		if (seconds < CLIP_SECONDS[0] || seconds > CLIP_SECONDS[1])
+			warnings.push(`${entry?.id}: clip ${lang} lasts ${seconds.toFixed(1)} s, ${CLIP_SECONDS[0]} to ${CLIP_SECONDS[1]} s expected`);
+	return warnings;
 }

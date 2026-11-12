@@ -48,4 +48,8 @@ export function checkCatalog(catalog: unknown, options?: { strict?: boolean; bas
 };
 export function imageInfo(bytes: Uint8Array): { type: 'png' | 'jpeg'; width: number; height: number } | null;
 export function checkImage(bytes: Uint8Array, what?: string): string[];
+export const CLIP_MAX_SIDE: number;
+export const CLIP_SECONDS: [number, number];
+export function mp4Info(bytes: Uint8Array): { width: number; height: number; seconds: number } | null;
 export function checkClip(bytes: Uint8Array, what?: string): string[];
+export function clipWarnings(entry: unknown, lengths?: Record<string, number>): string[];
