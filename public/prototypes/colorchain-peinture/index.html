@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ColorChain : couches de peinture</title>
+<title>ColorChain : peinture en dominos</title>
 <meta name="robots" content="noindex">
 <style>
   html, body { margin: 0; height: 100%; background: #1d2033; overflow: hidden; }
@@ -14,6 +14,7 @@
 <canvas id="c" width="1080" height="1920"></canvas>
 <script src="three.min.js"></script>
 <script src="common.js"></script>
+<script src="levels.js"></script>
 <script>
 // A domino tips along its face normal and only hits the dominoes right in front of it.
 // It knocks a domino of its own color hit within 65 degrees of its face; an edge hit
@@ -953,60 +954,78 @@ function canvasLevel(name, teach, layers, _slots, cols = 20, rows = 18) {
     paint: [[rectP(x0 - 1.0, z0 - 0.7, x0 + W + 1.0, z1 + 0.6), 0x6b4a3a], [rectP(x0 - 0.6, z0 - 0.35, x0 + W + 0.6, z1 + 0.3), 0xe9e4d6]] };
 }
 
-const C = { sky: '#7fc4ff', night: '#3b4a8f', sun: '#ffd23f', sea: '#2f6fd6', grass: '#4cc36b', hill: '#2f9b4f', red: '#e8434d',
-  orange: '#ff8a3d', brown: '#8b5a2b', wood: '#c9a36a', pink: '#ff8fb8', violet: '#9b5de5', white: '#ffffff', cream: '#f3e2b3', blue: '#4a63e6' };
-
-function lSun() {
-  return canvasLevel('Soleil', 'Compare chaque pochoir au modèle : la couleur qui passe devant va après', [
-    { name: 'le ciel', color: C.sky, shape: () => true },
-    { name: 'le soleil', color: C.sun, shape: disc(0.5, 0.45, 0.27) }], [1, 0], 16, 14);
+// A shape written as text in levels.js.
+function shapeOf(expr) {
+  const prim = str => {
+    const [k, ...a] = str.trim().split(/\s+/), n = a.map(Number);
+    if (k === 'all') return () => true;
+    if (k === 'd') return disc(...n);
+    if (k === 'e') return ellipse(...n);
+    if (k === 'b') return box(...n);
+    if (k === 't') return tri([n[0], n[1]], [n[2], n[3]], [n[4], n[5]]);
+    if (k === 'lo') return (u, v) => v > n[0] + (n[1] || 0) * Math.sin(u * (n[2] || 0));
+    if (k === 'hi') return (u, v) => v < n[0];
+    if (k === 'ri') return (u, v) => { const q = (u - n[0]) ** 2 + ((v - n[1]) * 0.95) ** 2; return q < n[2] * n[2] && q > n[3] * n[3]; };
+    throw new Error('shape: ' + str);
+  };
+  const and = str => { const fs = str.split(' & ').map(prim); return (u, v) => fs.every(f => f(u, v)); };
+  const or = str => { const fs = str.split('|').map(and); return (u, v) => fs.some(f => f(u, v)); };
+  const [base, ...minus] = expr.split(' - ').map(or);
+  return (u, v) => base(u, v) && !minus.some(f => f(u, v));
 }
-function lSunset() {
-  return canvasLevel('Coucher de soleil', 'Le rond du soleil est coupé : qu’est-ce qui passe devant lui ?', [
-    { name: 'le ciel', color: C.orange, shape: () => true },
-    { name: 'le soleil', color: C.sun, shape: disc(0.5, 0.58, 0.3) },
-    { name: 'la mer', color: C.sea, shape: (u, v) => v > 0.62 + 0.03 * Math.sin(u * 18) }], [1, 2, 0], 18, 16);
+const COLS = 22, ROWS = 20;
+const layersOf = def => def.slice(1).map(l => { const [c, name, sh] = l.split(';'); return { name, color: PAL[c], shape: shapeOf(sh) }; });
+// Colors of the finished picture, cell by cell, for the menu and the checks.
+function targetOf(def, order) {
+  const L = layersOf(def), ks = order || L.map((l, k) => k), out = [];
+  for (let j = 0; j < ROWS; j++) for (let i = 0; i < COLS; i++) {
+    let top = -1;
+    for (const k of ks) if (L[k].shape(i / (COLS - 1), j / (ROWS - 1))) top = k;
+    out.push(top);
+  }
+  return { L, cells: out };
 }
-// In each level every shape hides a bit of the one before it: only one order is right.
-function lBoat() {
-  return canvasLevel('Bateau', 'Chaque forme cache un bout de la précédente', [
-    { name: 'le ciel', color: C.sky, shape: () => true },
-    { name: 'le soleil', color: C.sun, shape: disc(0.62, 0.3, 0.17) },
-    { name: 'la voile', color: C.white, shape: tri([0.5, 0.1], [0.5, 0.62], [0.86, 0.62]) },
-    { name: 'la coque', color: C.brown, shape: tri([0.16, 0.56], [0.84, 0.56], [0.5, 0.94]) },
-    { name: 'la mer', color: C.sea, shape: (u, v) => v > 0.72 + 0.025 * Math.sin(u * 20) }], []);
+// Easy pictures first: sorted by number of colors, in the order they are written.
+const PICS = DEFS.map((d, i) => [d, i]).sort((a, b) => a[0].length - b[0].length || a[1] - b[1]).map(x => x[0]).slice(0, 100);
+const TEACH = { 0: 'Compare chaque pochoir au modèle : la couleur qui passe devant va après', 2: 'Regarde quelle forme est coupée : celle qui la coupe passe après elle' };
+const BUILD = PICS.map((def, i) => () => canvasLevel(def[0], TEACH[i] || '', layersOf(def), [], COLS, ROWS));
+const LEVEL_NAMES = PICS.map(d => d[0]);
+// Checks every picture: one right order only, and every color still seen at the end.
+window.__checkDefs = () => {
+  const perms = a => a.length < 2 ? [a] : a.flatMap((v, i) => perms([...a.slice(0, i), ...a.slice(i + 1)]).map(q => [v, ...q]));
+  return DEFS.map(def => {
+    const { L, cells } = targetOf(def), n = L.length;
+    const seen = L.map((l, k) => cells.filter(c => c === k).length);
+    let ok = 0;
+    for (const q of perms([...Array(n).keys()])) {
+      const t = targetOf(def, q).cells;
+      if (t.every((c, i) => (c < 0 ? '' : L[c].color) === (cells[i] < 0 ? '' : L[cells[i]].color))) ok++;
+    }
+    const bad = [];
+    if (ok !== 1) bad.push(ok + ' ordres');
+    seen.forEach((c, k) => { if (c < 3) bad.push(L[k].name + ' : ' + c + ' cases'); });
+    return bad.length ? def[0] + ' -> ' + bad.join(', ') : null;
+  }).filter(Boolean);
+};
+const thumbs = {};
+function thumbOf(i) {
+  if (thumbs[i]) return thumbs[i];
+  const cv = document.createElement('canvas'); cv.width = COLS; cv.height = ROWS;
+  const g = cv.getContext('2d'), { L, cells } = targetOf(PICS[i]);
+  cells.forEach((c, k) => { g.fillStyle = c < 0 ? FIELD_W : L[c].color; g.fillRect(k % COLS, Math.floor(k / COLS), 1, 1); });
+  return thumbs[i] = cv;
 }
-function lHouse() {
-  return canvasLevel('Maison', 'Le mur cache le bas du toit, l’herbe cache le bas du mur', [
-    { name: 'le ciel', color: C.sky, shape: () => true },
-    { name: 'le soleil', color: C.sun, shape: disc(0.72, 0.24, 0.15) },
-    { name: 'le toit', color: C.red, shape: tri([0.14, 0.46], [0.86, 0.46], [0.5, 0.1]) },
-    { name: 'le mur', color: C.cream, shape: box(0.24, 0.4, 0.76, 0.86) },
-    { name: 'la porte', color: C.brown, shape: any(box(0.44, 0.6, 0.56, 0.86), box(0.28, 0.5, 0.38, 0.64), box(0.64, 0.5, 0.74, 0.64)) },
-    { name: 'l’herbe', color: C.grass, shape: (u, v) => v > 0.8 }], [], 22, 20);
-}
-function lRainbow() {
-  return canvasLevel('Arc-en-ciel', 'Chaque arc cache le milieu du précédent', [
-    { name: 'le ciel', color: C.sky, shape: () => true },
-    { name: 'le rouge', color: C.red, shape: disc(0.5, 0.78, 0.5) },
-    { name: 'le orange', color: C.orange, shape: disc(0.5, 0.78, 0.41) },
-    { name: 'le jaune', color: C.sun, shape: disc(0.5, 0.78, 0.32) },
-    { name: 'le vert', color: C.grass, shape: disc(0.5, 0.78, 0.23) },
-    { name: 'le bleu ciel', color: C.sky, shape: disc(0.5, 0.78, 0.14) },
-    { name: 'la colline', color: C.hill, shape: (u, v) => v > 0.8 - 0.05 * Math.cos((u - 0.5) * 4) }], [2, 5, 0, 6, 3, 1, 4], 22, 18);
-}
-function lFish() {
-  return canvasLevel('Poisson', 'Les algues poussent devant le sable, la queue passe devant les algues', [
-    { name: 'la mer', color: C.sea, shape: () => true },
-    { name: 'le sable', color: C.cream, shape: (u, v) => v > 0.86 + 0.03 * Math.sin(u * 9) },
-    { name: 'les algues', color: C.hill, shape: (u, v) => v > 0.5 && [0.12, 0.3, 0.75, 0.9].some(c => Math.abs(u - c - 0.04 * Math.sin(v * 14)) < 0.035) },
-    { name: 'la queue', color: C.orange, shape: tri([0.62, 0.45], [0.92, 0.25], [0.92, 0.68]) },
-    { name: 'le corps', color: C.sun, shape: ellipse(0.45, 0.46, 0.27, 0.19) },
-    { name: 'l’œil', color: C.white, shape: disc(0.3, 0.42, 0.06) }], [], 22, 20);
-}
-
-const BUILD = [lSun, lSunset, lBoat, lHouse, lRainbow, lFish];
-const LEVEL_NAMES = ['Soleil', 'Coucher de soleil', 'Bateau', 'Maison', 'Arc-en-ciel', 'Poisson'];
+// One sheet with every picture, to look at them all.
+window.__sheet = (from = 0) => {
+  const cv = document.createElement('canvas'), per = 9, w = 118, h = 132; cv.width = per * w + 10; cv.height = Math.ceil((DEFS.length - from) / per) * h + 10;
+  const g = cv.getContext('2d'); g.fillStyle = '#1d2033'; g.fillRect(0, 0, cv.width, cv.height); g.imageSmoothingEnabled = false;
+  DEFS.slice(from).forEach((def, k) => {
+    const x = 10 + (k % per) * w, y = 10 + Math.floor(k / per) * h, { L, cells } = targetOf(def);
+    cells.forEach((c, q) => { g.fillStyle = c < 0 ? FIELD_W : L[c].color; g.fillRect(x + (q % COLS) * 4.8, y + Math.floor(q / COLS) * 4.8, 5, 5); });
+    g.fillStyle = '#fff'; g.font = '13px Arial'; g.fillText((from + k) + ' ' + def[0], x, y + 112);
+  });
+  return cv.toDataURL('image/png');
+};
 const VIDEO = new URLSearchParams(location.search).get('video') || 'tour', LAST = BUILD.length - 1;
 
 // ---- Rendering
@@ -1740,30 +1759,43 @@ function updateMatrices() {
 
 function retryRect() { return [CC.W - 150, 70, 100, 100]; }
 // Level menu: tiles of the ten levels; a level opens once the one before is done.
-const SAVE = 'colorchain-paint-v1';
+const SAVE = 'colorchain-paint-v2';
 let menu = false, prog = { unlocked: 0, stars: {} };
 try { prog = Object.assign(prog, JSON.parse(localStorage.getItem(SAVE) || '{}')); } catch (e) { /* no storage */ }
 function saveProg() { try { localStorage.setItem(SAVE, JSON.stringify(prog)); } catch (e) { /* no storage */ } }
 const levelsRect = [40, 70, 200, 100];
-const tileRect = i => [70 + (i % 2) * 485, 330 + Math.floor(i / 2) * 222, 455, 200];
-const backRect = [CC.W / 2 - 300, 1690, 600, 110];
+const PER = 20;
+let page = 0;
+const tileRect = i => { const j = i - page * PER; return j < 0 || j >= PER ? [-999, -999, 0, 0] : [48 + (j % 4) * 250, 322 + Math.floor(j / 4) * 262, 234, 246]; };
+const backRect = [CC.W / 2 - 240, 1730, 480, 110], prevRect = [40, 1640, 220, 110], nextRect = [CC.W - 260, 1640, 220, 110];
 const inRect = (x, y, [rx, ry, rw, rh]) => x > rx && x < rx + rw && y > ry && y < ry + rh;
+const pages = () => Math.ceil(BUILD.length / PER);
+function openMenu() { menu = true; sel = null; page = Math.min(pages() - 1, Math.floor(Math.max(0, li) / PER)); }
 function drawMenu(ctx) {
-  ctx.fillStyle = 'rgba(16,18,32,0.93)'; ctx.fillRect(0, 0, CC.W, CC.H);
+  ctx.fillStyle = 'rgba(16,18,32,0.96)'; ctx.fillRect(0, 0, CC.W, CC.H);
   ctx.textAlign = 'center';
-  ctx.fillStyle = '#fff'; ctx.font = 'bold 92px Segoe UI, Arial'; ctx.fillText('ColorChain', CC.W / 2, 200);
-  ctx.fillStyle = '#9aa3c7'; ctx.font = '36px Segoe UI, Arial'; ctx.fillText(`Couches de peinture : ${BUILD.length} niveaux`, CC.W / 2, 270);
-  for (let i = 0; i < BUILD.length; i++) {
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 84px Segoe UI, Arial'; ctx.fillText('ColorChain', CC.W / 2, 170);
+  const done = Object.keys(prog.stars).filter(k => prog.stars[k] && k < BUILD.length).length;
+  ctx.fillStyle = '#9aa3c7'; ctx.font = '36px Segoe UI, Arial'; ctx.fillText(`Peinture en dominos : ${done} / ${BUILD.length} dessins`, CC.W / 2, 240);
+  ctx.imageSmoothingEnabled = false;
+  for (let i = page * PER; i < Math.min(BUILD.length, (page + 1) * PER); i++) {
     const [x, y, w, hh] = tileRect(i), open = i <= prog.unlocked, st = prog.stars[i] || 0;
-    ctx.fillStyle = open ? '#2c3354' : '#22263a'; CC.roundRect(ctx, x, y, w, hh, 30); ctx.fill();
-    ctx.fillStyle = open ? '#ffd23f' : '#565c80'; ctx.font = 'bold 34px Segoe UI, Arial'; ctx.fillText(`Niveau ${i + 1}` + (BUILD[i] === clock || BUILD[i] === clover ? '  · nouveau' : BUILD[i] === constellation ? '  · ultra dur' : ''), x + w / 2, y + 55);
-    ctx.fillStyle = open ? '#fff' : '#565c80'; ctx.font = 'bold 40px Segoe UI, Arial'; ctx.fillText(LEVEL_NAMES[i], x + w / 2, y + 105);
-    if (open) for (let k = 0; k < 3; k++) {
-      ctx.save(); ctx.translate(x + w / 2 + (k - 1) * 62, y + 155); CC.star(ctx, 0, 0, 24);
-      ctx.fillStyle = k < st ? '#ffd23f' : '#3a3f5c'; ctx.fill(); ctx.restore();
-    } else { ctx.fillStyle = '#565c80'; ctx.font = '34px Segoe UI, Arial'; ctx.fillText('🔒', x + w / 2, y + 165); }
+    ctx.fillStyle = open ? '#2c3354' : '#22263a'; CC.roundRect(ctx, x, y, w, hh, 24); ctx.fill();
+    if (st) {
+      ctx.drawImage(thumbOf(i), x + 29, y + 14, 176, 160);
+      for (let k = 0; k < 3; k++) { ctx.save(); ctx.translate(x + w / 2 + (k - 1) * 40, y + 196); CC.star(ctx, 0, 0, 15); ctx.fillStyle = k < st ? '#ffd23f' : '#3a3f5c'; ctx.fill(); ctx.restore(); }
+      ctx.fillStyle = '#cfd5f5'; ctx.font = '22px Segoe UI, Arial'; ctx.fillText(LEVEL_NAMES[i], x + w / 2, y + 236);
+    } else {
+      ctx.fillStyle = open ? '#ffd23f' : '#565c80'; ctx.font = 'bold 76px Segoe UI, Arial'; ctx.fillText(i + 1, x + w / 2, y + 128);
+      ctx.fillStyle = open ? '#fff' : '#565c80'; ctx.font = open ? 'bold 26px Segoe UI, Arial' : '30px Segoe UI, Arial';
+      ctx.fillText(open ? 'à peindre' : '🔒', x + w / 2, y + 196);
+    }
   }
-  ctx.fillStyle = '#cfd5f5'; ctx.font = '38px Segoe UI, Arial'; ctx.fillText('‹ Tous les prototypes', CC.W / 2, backRect[1] + 68);
+  ctx.imageSmoothingEnabled = true;
+  ctx.fillStyle = page > 0 ? '#fff' : '#3a3f5c'; ctx.font = 'bold 60px Segoe UI, Arial'; ctx.fillText('‹', prevRect[0] + 110, prevRect[1] + 76);
+  ctx.fillStyle = page < pages() - 1 ? '#fff' : '#3a3f5c'; ctx.fillText('›', nextRect[0] + 110, nextRect[1] + 76);
+  ctx.fillStyle = '#cfd5f5'; ctx.font = '34px Segoe UI, Arial'; ctx.fillText(`Dessins ${page * PER + 1} à ${Math.min(BUILD.length, (page + 1) * PER)}`, CC.W / 2, 1712);
+  ctx.fillStyle = '#9aa3c7'; ctx.font = '32px Segoe UI, Arial'; ctx.fillText('‹ Tous les prototypes', CC.W / 2, backRect[1] + 72);
 }
 
 function wrapText(ctx, text, x, y, maxW, lh) {
@@ -1803,9 +1835,10 @@ function pourSpot(sp) {
   // R: how far the paint has spread over the plate from where it lands.
   const drawPlate = R => {
     g.clearRect(0, 0, cv.width, cv.height);
-    g.fillStyle = 'rgba(38,43,69,0.96)'; g.fillRect(0, 0, cv.width, cv.height);
-    g.fillStyle = l.color;
-    for (const c of cells) if (c.dist < R) g.fillRect(c.x, c.y, q, q);
+    g.fillStyle = 'rgba(38,43,69,0.5)'; g.fillRect(0, 0, cv.width, cv.height);
+    g.fillStyle = l.color; g.globalAlpha = 0.72;
+    for (const c of cells) if (c.dist < R) { g.clearRect(c.x, c.y, q, q); g.fillRect(c.x, c.y, q, q); }
+    g.globalAlpha = 1;
     g.strokeStyle = l.color; g.lineWidth = 8; g.strokeRect(0, 0, cv.width, cv.height);
     for (const c of cells) if (c.hole) g.clearRect(c.x + 2, c.y + 5, q - 4, 6);
   };
@@ -2136,12 +2169,14 @@ canvas.addEventListener('pointerdown', ev => {
   if (CC.auto) return;
   const [x, y] = CC.toCanvas(canvas, ev);
   if (menu) {
+    if (inRect(x, y, prevRect) && page > 0) { page--; return; }
+    if (inRect(x, y, nextRect) && page < pages() - 1) { page++; return; }
     for (let i = 0; i < BUILD.length; i++) if (inRect(x, y, tileRect(i)) && i <= prog.unlocked) { menu = false; loadLevel(i); return; }
     if (inRect(x, y, backRect)) location.href = '/prototypes/';
     return;
   }
-  if (inRect(x, y, levelsRect)) { menu = true; sel = null; return; }
-  if (phase === 'clear' && CC.time >= phaseT) { if (li === BUILD.length - 1) menu = true; else loadLevel(li + 1); return; }
+  if (inRect(x, y, levelsRect)) { openMenu(); return; }
+  if (phase === 'clear' && CC.time >= phaseT) { if (li === BUILD.length - 1) openMenu(); else loadLevel(li + 1); return; }
   if (inRetry(x, y)) { retry(); return; }
   if (sel && CC.time - selT > 0.2) {
     const b = panelButtons().find(b => Math.hypot(b.x - x, PANEL_Y - y) < b.r + 12);
@@ -2291,8 +2326,12 @@ window.__shot = T => {
 window.__debug = () => ({ level: li, phase, pushes, down: doms.filter(d => d.state !== 'up').length, total: doms.length,
   chains: chains.map(c => [c.n, c.block && [c.block.d.i, c.block.o.i, +c.block.t.toFixed(2)]]) });
 const askLevel = new URLSearchParams(location.search).get('level');
+// ?tout opens every picture, to test.
+const openAll = new URLSearchParams(location.search).has('tout');
+if (openAll) prog.unlocked = BUILD.length - 1;
 menu = !CC.auto && askLevel === null;
-loadLevel(CC.auto ? +(new URLSearchParams(location.search).get('from') || 0) : +(askLevel || Math.min(prog.unlocked, BUILD.length - 1)));
+loadLevel(CC.auto ? +(new URLSearchParams(location.search).get('from') || 0) : +(askLevel || (openAll ? 0 : Math.min(prog.unlocked, BUILD.length - 1))));
+page = Math.floor(li / PER);
 CC.run({ canvas, step, draw, autoplay });
 </script>
 </body>

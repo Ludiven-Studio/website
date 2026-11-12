@@ -3021,3 +3021,14 @@
 - 17:09 : Bateau, Maison et Poisson redessinés : un seul ordre valide par niveau (compté sur toutes les permutations) ;
   plaque à fentes, peinture qui s'étale puis passe par les fentes ; 6 niveaux vérifiés ; poussé à la demande de
   l'utilisateur : mon fichier et cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-12 — ColorChain : 100 dessins (session colorchain)
+- Statut : en cours (2026-11-12T17:39+01:00). Demande de l'utilisateur : générer une centaine de dessins et en faire un
+  mini jeu ; plaque semi-transparente ; mises à jour du prototype autorisées
+- Réservations actives : `public/prototypes/colorchain-peinture/` (index.html, levels.js, cover.webp),
+  `src/pages/prototypes/index.astro` (texte de la fiche).
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 17:40 : 100 dessins (levels.js), un seul ordre valide chacun (vérifié sur toutes les permutations), les 100 parties
+  jouées par script jusqu'au bout ; menu en pages avec galerie ; plaque semi-transparente ; eslint OK, astro check 0
+  erreur ; poussé à la demande de l'utilisateur : mes fichiers et cette section seulement. Statut : terminé.
+  Réservations libérées.
