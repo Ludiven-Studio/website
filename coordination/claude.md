@@ -3083,3 +3083,13 @@
 - 22:57 : mode « Chemin infini » dans colorchain-relais (parcours sans fin qui accélère, un arrêt termine la partie,
   record gardé) ; 3 minutes simulées sans blocage, boutons testés par script ; eslint OK, astro check 0 erreur ; poussé
   à la demande de l'utilisateur : mes fichiers et cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-13 — ColorChain : motifs variés du chemin infini (session colorchain)
+- Statut : en cours (2026-11-13T00:59+01:00). Demande de l'utilisateur : c'est monotone : des motifs verticaux,
+  circulaires, de la variété, des angles de 0 à 360° par pas de 15° ; mises à jour du prototype autorisées
+- Réservations actives : `public/prototypes/colorchain-relais/index.html`.
+- Ressources : serveur de dev sur le port 4391 ; eslint, `astro check`. Build annoncé ici avant.
+- 00:59 : chemin infini fait de motifs variés (serpentins à tout angle, dents de scie, doubles spirales rondes et
+  carrées, vagues, virages secs aux trous) ; 9 tirages de 200 à 240 s simulés sans blocage, 3 niveaux à dessin rejoués
+  ; poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé. Réservations
+  libérées.

@@ -1048,46 +1048,170 @@ function relayLevel(pic, layers, idx, cols, rows) {
     dominos: d, h: { start: secs[0].pad, sign: 1 }, hot: [], starts: secs.map(q => q.pad), relay: secs, field, budget: 999, cols, rows, speed: Math.min(1, 0.7 + idx * 0.006),
     paint: [...marks, [rectP(x0 - 1.0, z0 - 0.7, x0 + W + 1.0, z1 + 0.6), 0x6b4a3a], [rectP(x0 - 0.6, z0 - 0.35, x0 + W + 0.6, z1 + 0.3), 0xe9e4d6]] };
 }
-// Endless relay: a pool of rows. A row left far behind the wave is moved ahead of it, with
-// new holes, so the course never ends. One stop ends the run.
+// Endless relay: a pool of dominoes laid along a path that never ends. The path is a chain of
+// patterns; a domino left far behind the wave is laid again ahead of it. One stop ends the run.
 const ENDLESS = -1, UP = () => ({ state: 'up', th: 0, w: 0, u: [0, 0], cap: FLAT, targets: null, hitDone: false, shake: -9, flash: -9, chain: null, leanOn: null, gh: 0, pop: -9, hole: null, holeTold: false, wob: -9 });
-function endlessRow(L, j) {
-  const row = L.rows[j % L.R], sg = j % 2 ? -1 : 1, z = -j * L.g, pitch = 2 * L.xS / 19;
-  row.forEach((o, i) => {
-    Object.assign(o, UP(), { row: j, gone: false });
-    if (i < 20) { o.x = sg * (-L.xS + i * pitch); o.z = z; o.a = sg > 0 ? 0 : Math.PI; }
-    else { const th = (i - 19) * Math.PI / 4; o.x = sg * (L.xS + L.rt * Math.sin(th)); o.z = z - L.rt + L.rt * Math.cos(th); o.a = Math.atan2(-Math.sin(th), sg * Math.cos(th)); }
-    o.va = o.a;
-    if (L.skip > 0) { L.skip--; o.gone = true; return; }
-    if (--L.count <= 0 && i >= 4 && i <= 13 && L.open.doms.length >= 12) {
-      // A hole of two dominoes: the section ends, the next one starts on its pad.
-      L.open.last = L.lastDom; o.gone = true; L.skip = 1;
-      L.count = Math.round((45 + 25 * L.rnd()) * Math.max(0.5, 1 - j * 0.006));
-      L.open = { doms: [], pad: null, last: null, endT: null, missed: false, lockT: -9 }; L.relay.push(L.open);
-      return;
+const PITCH = 0.6, NORTH = -Math.PI / 2, D15 = Math.PI / 12, POOL = 1100, AHEAD = 400, CLEAR = 1.25;
+const oneOf = (r, list) => list[Math.floor(r() * list.length)], rint = (r, a, b) => a + Math.floor(r() * (b - a + 1));
+const turnTo = (a, b) => Math.atan2(Math.sin(b - a), Math.cos(b - a));
+// Lays points along straights and arcs. Headings are multiples of 15 degrees.
+function turtle(x, z, h) {
+  const T = { x, z, h, pts: [] };
+  const drop = (ok, pad) => T.pts.push({ x: T.x, z: T.z, a: Math.atan2(Math.sin(T.h), Math.cos(T.h)), ok, pad });
+  T.line = (dist, ok = true) => {
+    let n = Math.max(1, Math.round(dist / PITCH));
+    if (dist / n > 0.68) n++;
+    for (let i = 0; i < n; i++) { T.x += dist / n * Math.cos(T.h); T.z += dist / n * Math.sin(T.h); drop(ok && i > 0 && i < n - 1); }
+    return T;
+  };
+  T.fwd = (n, ok) => n > 0 ? T.line(n * PITCH, ok) : T;
+  T.turn = (deg, r = 0.7) => {
+    const A = Math.abs(deg) * DEG, sg = Math.sign(deg), h0 = T.h;
+    if (A < 1e-6) return T;
+    // Wide enough for dominoes that are neither crammed nor turned more than 45 degrees each.
+    r = Math.max(r, PITCH / A, Math.ceil(Math.abs(deg) / 45 - 1e-6) * 0.5 / A);
+    const n = Math.max(Math.ceil(Math.abs(deg) / 45 - 1e-6), Math.round(A * r / PITCH));
+    const cx = T.x + r * Math.cos(h0 + sg * Math.PI / 2), cz = T.z + r * Math.sin(h0 + sg * Math.PI / 2);
+    for (let i = 1; i <= n; i++) {
+      const th = sg * A * i / n, b = h0 - sg * Math.PI / 2 + th;
+      T.x = cx + r * Math.cos(b); T.z = cz + r * Math.sin(b); T.h = h0 + th; drop(r >= 1.4 && i > 1 && i < n - 1);
     }
+    return T;
+  };
+  // Turn the short way to heading h.
+  T.face = (h, r) => T.turn(Math.round(turnTo(T.h, h) / D15) * 15, r);
+  // A hole with a corner: the next section leaves its pad towards heading h.
+  T.jump = h => { T.x += 3 * PITCH * Math.cos(T.h); T.z += 3 * PITCH * Math.sin(T.h); T.h = h; drop(false, true); return T; };
+  return T;
+}
+const MOTIFS = [
+  // Rows, columns or slanted passes: a serpentine at any angle.
+  [3, function serp(T, r) {
+    const P = NORTH + D15 * oneOf(r, [0, 0, -6, 6, -6, 6, -2, 2, -3, 3, -4, 4]), sd = r() < 0.5 ? 1 : -1, n = rint(r, 3, 6), len = rint(r, 6, 18);
+    T.face(P - sd * Math.PI / 2, 0.7);
+    for (let i = 0; i < n; i++) { T.fwd(len); if (i < n - 1) T.turn((i % 2 ? -1 : 1) * sd * 180, 0.7); }
+  }],
+  // Sawtooth: straight teeth joined by tight corners.
+  [1.5, function teeth(T, r) {
+    const B = NORTH + D15 * rint(r, -3, 3), k = rint(r, 2, 5), n = rint(r, 4, 8), len = rint(r, 5, 10), sd = r() < 0.5 ? 1 : -1;
+    T.face(B + sd * k * D15, 0.8);
+    for (let i = 0; i < n; i++) { T.fwd(len); if (i < n - 1) T.turn((i % 2 ? 1 : -1) * sd * k * 30, 0.8); }
+  }],
+  // Double spiral, round or square: winds in to the middle, then out between its own rings.
+  [2.2, function spiral(T, r) {
+    const k = rint(r, 2, 4), sd = r() < 0.5 ? 1 : -1, sq = r() < 0.4, r0 = 0.7 + 1.4 * (k - 1);
+    T.face(NORTH + D15 * rint(r, -2, 2), 1).line(r0 + 1.5);
+    const half = (R, sg) => R < 1 || !sq ? T.turn(sg * 180, R) : T.line(R - 0.7).turn(sg * 90, 0.7).line(2 * R - 1.4).turn(sg * 90, 0.7).line(R - 0.7);
+    for (let i = k - 1; i >= 0; i--) half(0.7 + 1.4 * i, sd);
+    for (let i = 0; i < k; i++) half(0.7 + 1.4 * i, -sd);
+  }],
+  // Waves: wide bends, one side then the other.
+  [1.5, function wave(T, r) {
+    const A = 30 * rint(r, 3, 8), R = oneOf(r, [1.4, 2.1, 2.8]), n = rint(r, 3, 6), sd = r() < 0.5 ? 1 : -1;
+    T.face(NORTH + D15 * rint(r, -2, 2), 1).turn(sd * A / 2, R);
+    for (let i = 0; i < n; i++) T.turn((i % 2 ? 1 : -1) * sd * A, R);
+    T.turn((n % 2 ? 1 : -1) * sd * A / 2, R);
+  }],
+  // Lightning: straight runs, each ending on a hole; the next one leaves its pad at a new angle.
+  [1.6, function bolt(T, r, C) {
+    let sd = r() < 0.5 ? 1 : -1;
+    T.fwd(Math.max(3, C.seg - C.since), false);
+    for (let i = rint(r, 3, 5); i > 0; i--, sd = -sd) {
+      let h = T.h;
+      for (let g = 0; g < 40; g++) { h = NORTH + sd * D15 * rint(r, 1, 5); const dv = Math.abs(turnTo(T.h, h)); if (dv > 2.9 * D15 && dv < 9.1 * D15) break; }
+      T.jump(h).fwd(C.seg - 1, false);
+    }
+  }],
+];
+const cellOf = (x, z) => Math.floor(x / CLEAR) * 100003 + Math.floor(z / CLEAR);
+// Is every point of a new pattern clear of the dominoes on the table and of the pattern itself?
+function fits(L, pts) {
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i], cx = Math.floor(p.x / CLEAR), cz = Math.floor(p.z / CLEAR);
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (const o of L.grid.get((cx + a) * 100003 + cz + b) || [])
+      if (L.head + i - o.n > 5 && Math.hypot(o.x - p.x, o.z - p.z) < CLEAR) return false;
+    for (let j = 0; j < i - 5; j++) if (Math.abs(pts[j].x - p.x) < CLEAR && Math.hypot(pts[j].x - p.x, pts[j].z - p.z) < CLEAR) return false;
+  }
+  return true;
+}
+const newSec = () => ({ doms: [], pad: null, last: null, endT: null, missed: false, lockT: -9 });
+const holeGap = L => Math.round((45 + 25 * L.rnd()) * Math.max(0.5, 1 - L.head * 0.00026));
+// Lays the points of a pattern as dominoes, and opens the holes.
+function commit(L, T, M) {
+  const q = T.pts;
+  for (let i = 0; i < q.length; i++) {
+    const p = q[i];
+    const hole = !p.pad && L.count <= 0 && L.open.doms.length >= 12 && i + 3 < q.length && p.ok && q[i + 1].ok && q[i + 2].ok;
+    if (hole || p.pad) {
+      L.open.last = L.lastDom; L.open = newSec(); L.relay.push(L.open); L.count = holeGap(L);
+      if (hole) { i++; continue; }
+    }
+    const n = L.head++, o = L.dominos[n % L.dominos.length];
+    if (o.n != null) { const c = L.grid.get(cellOf(o.x, o.z)); c.splice(c.indexOf(o), 1); }
+    Object.assign(o, UP(), { n, gone: false, kind: M ? M.name : "", x: p.x, z: p.z, a: p.a, va: p.a, color: RAINBOW[(L.relay.length - 1) % RAINBOW.length] });
+    const key = cellOf(o.x, o.z);
+    if (!L.grid.has(key)) L.grid.set(key, []);
+    L.grid.get(key).push(o);
+    L.zTop = Math.min(L.zTop, o.z); L.count--;
     if (!L.open.pad) L.open.pad = o;
-    o.color = RAINBOW[(L.relay.length - 1) % RAINBOW.length]; L.open.doms.push(o); L.lastDom = o;
-  });
+    L.open.doms.push(o); L.lastDom = o;
+  }
+  L.end = { x: T.x, z: T.z, h: T.h }; L.lastM = M;
+  if (M) L.made[M.name] = (L.made[M.name] || 0) + 1; else L.made.none = (L.made.none || 0) + 1;
+}
+// Adds one pattern at the end of the path. It always leaves heading north or nearly, past everything
+// laid so far, so the way ahead stays free.
+function nextMotif(L) {
+  const r = L.rnd, e = L.end, total = MOTIFS.reduce((v, m) => v + m[0], 0);
+  const C = { seg: Math.max(16, Math.min(36, Math.round(34 * Math.max(0.5, 1 - L.head * 0.00026)))), since: L.open.doms.length };
+  for (let t = 0; t < 30; t++) {
+    let v = r() * total, M = MOTIFS[0][1];
+    for (const m of MOTIFS) { v -= m[0]; if (v < 0) { M = m[1]; break; } }
+    if (M === L.lastM && t < 20) continue;
+    const T = turtle(e.x, e.z, e.h);
+    if (M.name !== 'bolt') T.fwd(rint(r, 1, 4));
+    M(T, r, C);
+    T.face(NORTH + D15 * rint(r, -3, 3), oneOf(r, [0.7, 1, 1.4]));
+    let zTop = L.zTop;
+    for (const p of T.pts) zTop = Math.min(zTop, p.z);
+    const need = Math.max(0, Math.ceil((T.z - zTop + 0.3) / (-PITCH * Math.sin(T.h))));
+    if (need > 50) continue;
+    T.fwd(need + rint(r, 1, 3));
+    if (T.pts.length > 250 || !fits(L, T.pts)) continue;
+    return commit(L, T, M);
+  }
+  // Boxed in: straight north, which is free.
+  commit(L, turtle(e.x, e.z, e.h).face(NORTH, 1).fwd(8), null);
 }
 function endlessLevel() {
   const L = { name: 'Chemin infini', teach: 'Touche l’écran quand la vague arrive au trou. Un seul arrêt, et c’est fini', endless: true, sol: [], colors: [...RAINBOW], hot: [], starts: [], budget: 1e9,
-    R: 30, g: 1.4, rt: 0.7, xS: 5.8, rows: [], relay: [], cur: 0, score: 0, minRow: 0, skip: 0, count: 40, rnd: CC.rng(Math.floor(Math.random() * 1e6)), speed: 0.7, paint: [] };
-  L.open = { doms: [], pad: null, last: null, endT: null, missed: false, lockT: -9 }; L.relay.push(L.open);
-  L.dominos = [];
-  for (let j = 0; j < L.R; j++) { const row = [...Array(23)].map(() => ({ x: 0, z: 0, a: 0, color: RAINBOW[0], tag: {}, any: true })); L.rows.push(row); L.dominos.push(...row); endlessRow(L, j); }
+    relay: [], cur: 0, score: 0, head: 0, count: 40, rnd: CC.rng(+(new URLSearchParams(location.search).get('graine') || Math.floor(Math.random() * 1e6))), speed: 0.7, paint: [],
+    grid: new Map(), zTop: 1e9, lastM: null, made: {} };
+  L.open = newSec(); L.relay.push(L.open);
+  L.dominos = [...Array(POOL)].map(() => ({ x: 0, z: 0, a: 0, color: RAINBOW[0], tag: {}, any: true, gone: true, n: null }));
+  commit(L, turtle(0, 0, NORTH).fwd(12), null);
+  while (L.head < AHEAD) nextMotif(L);
   L.h = { start: L.relay[0].pad, sign: 1 };
   return L;
 }
-// Moves the rows left behind ahead of the wave, and speeds the wave up little by little.
+// Lays new patterns ahead of the wave, and speeds the wave up little by little.
 function endlessTick() {
   const f = chains.length ? chains.at(-1).front : null;
   if (!f) return;
-  while (lvl.minRow < f.row - 9) { endlessRow(lvl, lvl.minRow + lvl.R); lvl.minRow++; }
-  lvl.speed = 0.7 + Math.min(0.4, f.row * 0.003);
+  while (lvl.head < f.n + AHEAD) nextMotif(lvl);
+  lvl.speed = 0.7 + Math.min(0.4, f.n * 0.00013);
   if (chains.length > 8) chains.splice(0, chains.length - 8);
   const step = Math.floor(lvl.score / 250);
   if (step > (lvl.said || 0)) { lvl.said = step; say(f, `${step * 250} !`, '#ffffff', true); CC.sfx('combo'); }
+}
+// Where the camera looks: the middle of the path around the wave, mostly ahead of it, with the wave kept in view.
+function pathView(f) {
+  let x = 0, z = 0, c = 0;
+  for (let m = f.n - 15; m <= f.n + 60; m++) { const o = doms[((m % doms.length) + doms.length) % doms.length]; if (o.n === m) { x += o.x; z += o.z; c++; } }
+  x /= c; z /= c;
+  // Keep the next hole in view when it is near, and the wave always.
+  for (const q of [lvl.relay[lvl.cur] && lvl.relay[lvl.cur].pad, f]) if (q) { x = Math.max(q.x - 5.2, Math.min(q.x + 5.2, x)); z = Math.max(q.z - 7, Math.min(q.z + 8, z)); }
+  return { x, z };
 }
 function relayTick(t) {
   const Rl = lvl.relay, k1 = lvl.endless ? Math.min(Rl.length, lvl.cur + 10) : Rl.length;
@@ -1321,6 +1445,7 @@ const turnMat = new THREE.MeshStandardMaterial({ color: 0x55679f, roughness: 0.7
 const bandMat = new THREE.MeshBasicMaterial({ color: 0xffd98a, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
 function loadLevel(i) {
   li = i; lvl = i === ENDLESS ? endlessLevel() : BUILD[i]();
+  table.position.set(0, 0, 0);
   doms = lvl.dominos;
   doms.forEach((d, k) => Object.assign(d, { i: k, va: d.a }));
   if (mesh) { scene.remove(mesh, ghost); mesh.dispose(); ghost.dispose(); }
@@ -1560,7 +1685,7 @@ function fitCamera() {
   base = fitView(lvl.layers ? 400 : 380, lvl.layers ? 1380 : 1720, 50 * DEG);
   if (lvl.relay) {
     // The course is too long for one view: frame the picture, then follow the wave.
-    const all = doms; doms = all.filter(d => lvl.endless ? d.row < 14 : d.pic);
+    const all = doms; doms = lvl.endless ? [{ x: -6.7, z: 0 }, { x: 6.7, z: -19.6 }] : all.filter(d => d.pic);
     endView = fitView(330, 1390, 66 * DEG); base = fitView(380, 1720, 50 * DEG); doms = all;
   }
   placeCam(base.x, base.z, 1);
@@ -1583,7 +1708,7 @@ function updateCam(dt) {
   if (phase === 'clear') { x = endView.x; z = endView.z; k = endView.D / base.D; el = endView.el; rate = 2.2; }
   else if (sel) { x = sel.x; z = sel.z; k = 0.5; rate = 3.5; }
   else if (focus && t < focus.until) { x = focus.x; z = focus.z; k = 0.42; rate = 3.2; yaw = focus.yaw; el = 40 * DEG; }
-  else if (lvl.relay) { const f = chains.length ? chains.at(-1).front : lvl.relay[0].pad; z = f.z - 5; rate = phase === 'intro' ? 1.2 : 2.4; sun.position.set(cam.x - 9, 16, cam.z + 7); sun.target.position.set(cam.x, 0, cam.z); sun.target.updateMatrixWorld(); }
+  else if (lvl.relay) { const f = chains.length ? chains.at(-1).front : lvl.relay[0].pad; if (lvl.endless) { ({ x, z } = pathView(f)); rate = phase === 'intro' ? 1.2 : 6; } else { z = f.z - 5; rate = phase === 'intro' ? 1.2 : 2.4; } table.position.set(Math.round(cam.x / 25) * 25, 0, Math.round(cam.z / 25) * 25); sun.position.set(cam.x - 9, 16, cam.z + 7); sun.target.position.set(cam.x, 0, cam.z); sun.target.updateMatrixWorld(); }
   else if (live.length) {
     const f = live.at(-1).front;
     x = base.x + (f.x - base.x) * 0.4; z = base.z + (f.z - base.z) * 0.4; k = 0.85; rate = 2;
@@ -1826,7 +1951,7 @@ function step(dt) {
     ch.done = true;
     if (focus && !ch.block) focus.until = Math.min(focus.until, t);
     const big = ch.n >= 40;
-    if (!lvl.relay || big) say(ch.first, big ? `+${ch.n}  CHAÎNE !` : `+${ch.n}`, big ? '#ffffff' : '#cfd5f5', true);
+    if (!lvl.relay) say(ch.first, big ? `+${ch.n}  CHAÎNE !` : `+${ch.n}`, big ? '#ffffff' : '#cfd5f5', true);
     if (big) CC.sfx('combo');
   }
   if (focus && t > focus.until) focus = null;
