@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated": "2026-11-06T12:25:00Z",
+  "updated": "2026-11-12T06:00:00Z",
   "rotationSeconds": 30,
   "defaultLanguage": "fr",
   "entries": [
@@ -101,11 +101,11 @@
       },
       "image": "img/petanque-scan.png",
       "clips": {
-        "fr": "clips/petanque-scan_fr.mp4",
-        "en": "clips/petanque-scan_en.mp4",
-        "es": "clips/petanque-scan_es.mp4",
-        "de": "clips/petanque-scan_de.mp4",
-        "it": "clips/petanque-scan_it.mp4"
+        "fr": "clips/petanque-scan_fr-202611120600.mp4",
+        "en": "clips/petanque-scan_en-202611120600.mp4",
+        "es": "clips/petanque-scan_es-202611120600.mp4",
+        "de": "clips/petanque-scan_de-202611120600.mp4",
+        "it": "clips/petanque-scan_it-202611120600.mp4"
       },
       "link": {
         "android": "com.raphbenpro.petanquear",
