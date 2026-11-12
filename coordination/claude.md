@@ -2945,3 +2945,13 @@
 - 13:32 : nouveau prototype /prototypes/colorchain-peinture/ (6 niveaux, vérifiés dans le bon ordre et à l'envers) et
   sa fiche en tête de la page ; eslint OK, astro check 0 erreur ; poussé à la demande de l'utilisateur : mes fichiers
   et cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-12 — ColorChain : pochoirs (session colorchain)
+- Statut : en cours (2026-11-12T14:24+01:00). Demande de l'utilisateur : pochoirs visibles et une seule ligne de
+  dominos (« ok on peut tester ») ; mises à jour du prototype autorisées
+- Réservations actives : `public/prototypes/colorchain-peinture/index.html`, `src/pages/prototypes/index.astro` (texte
+  de la fiche).
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 14:24 : pochoirs visibles, pots posés le long d'une seule ligne de dominos ; 6 niveaux vérifiés (bon ordre, ordre
+  inverse) ; eslint OK ; poussé à la demande de l'utilisateur : mes 2 fichiers et cette section seulement. Statut :
+  terminé. Réservations libérées.
