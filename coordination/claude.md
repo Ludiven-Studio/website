@@ -2928,3 +2928,11 @@
 - 11:34 : niveau 13 Constellation ; les 13 niveaux tombent en entier, un seul départ garde l'ordre des dorés ; eslint
   OK ; poussé à la demande de l'utilisateur (mises à jour du prototype autorisées) : mes 2 fichiers et cette section
   seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-12 — ColorChain : relais arc-en-ciel (session colorchain)
+- Statut : en cours (2026-11-12T12:53+01:00). Demande de l'utilisateur : je ne comprends pas la logique (case qui
+  accepte n'importe quelle couleur) ; mises à jour du prototype autorisées
+- Réservations actives : `public/prototypes/colorchain/index.html`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 12:53 : anneaux des relais en arc-en-ciel, case gauche du pont de Constellation retirée ; 13 niveaux résolus ; poussé
+  à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé. Réservations libérées.

@@ -837,14 +837,14 @@ function constellation() {
   arms.w = bridge;
   const mid = bridge.find(o => o.sw) || bridge[Math.floor(bridge.length / 2)];
   Object.assign(mid, { sw: true, good: Wh, color: Wh, a: 45 * DEG, a0: 45 * DEG, goodA: 0 });
-  const e0 = bridge[0], e1 = bridge.at(-1);
-  Object.assign(e0, { sw: true, good: Rd }); Object.assign(e1, { sw: true, good: Rd, a: 0, a0: 0 });
+  const e1 = bridge.at(-1);
+  Object.assign(e1, { sw: true, good: Rd, a: 0, a0: 0 });
   setGolds(GOLD_PICK.map(([k, i]) => arms[k][i]));
   const tips = [arms.a, arms.b, arms.c, arms.e].map(x => x.at(-1));
   const stars = [[-7.4, -5.6], [-1.2, -4.8], [1.4, -6.2], [6.8, -5.4], [-7.8, 3.6], [0.4, 3.4], [-0.8, 5.6], [7.6, 5.8], [4.6, -2.4], [-5.0, -1.6]];
   return { name: 'Constellation', teach: 'Ultra dur : quatre départs, des cases à remplir et six dorés à faire tomber dans l’ordre', hard: true,
-    sol: [], extra: [Bl, Vi], colors: [Wh, Rd, Vi, Pk, Bl, Gr], dominos: d, golds: GOLD_PICK.length,
-    h: { start: tips[START], sign: -1, arms }, hot: [e0, mid, e1], starts: tips,
+    sol: [], extra: [Rd, Bl], colors: [Wh, Rd, Vi, Pk, Bl, Gr], dominos: d, golds: GOLD_PICK.length,
+    h: { start: tips[START], sign: -1, arms }, hot: [mid, e1], starts: tips,
     paint: [[rectP(-12, -11, 12, 11), 0x1f2a4d], [circP(H1[0], H1[1], 1.1), 0x2c3d6b], [circP(H2[0], H2[1], 1.1), 0x2c3d6b], ...stars.map(([x, z]) => [circP(x, z, 0.14, 12), 0xdfe6f5])] };
 }
 const GOLD_PICK = [["w", 12], ["c", 5], ["c", 9], ["w", 1], ["b", 1], ["a", 5]], START = 3;
@@ -899,8 +899,16 @@ const topM = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 })
 const face = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.35, map: faceTexture() });
 const geom = new THREE.BoxGeometry(WIDE, TALL, THIN);
 geom.translate(0, TALL / 2, 0);
-const ringGeom = new THREE.TorusGeometry(0.42, 0.07, 10, 40); ringGeom.rotateX(Math.PI / 2);
-const ringMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x666666, roughness: 0.3 });
+// Relays accept any color: their ring is a rainbow.
+const ringGeom = new THREE.TorusGeometry(0.42, 0.085, 10, 48); ringGeom.rotateX(Math.PI / 2);
+const ringTex = (() => {
+  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 4;
+  const x = cv.getContext('2d'), g = x.createLinearGradient(0, 0, 256, 0);
+  for (let i = 0; i <= 6; i++) g.addColorStop(i / 6, `hsl(${i * 60}, 90%, 60%)`);
+  x.fillStyle = g; x.fillRect(0, 0, 256, 4);
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t;
+})();
+const ringMat = new THREE.MeshStandardMaterial({ map: ringTex, emissiveMap: ringTex, emissive: 0xffffff, emissiveIntensity: 0.45, roughness: 0.3 });
 const discGeom = new THREE.CylinderGeometry(0.5, 0.55, 0.08, 40);
 const discMat = new THREE.MeshStandardMaterial({ color: 0x9aa3c7, metalness: 0.5, roughness: 0.35 });
 const tickGeom = new THREE.BoxGeometry(0.9, 0.09, 0.06);
