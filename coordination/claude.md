@@ -3044,3 +3044,12 @@
   calcul les ignorait) sur les deux jeux ; cartes de fin avec Réessayer, Rejouer et Continuer ; aperçu « Ton dessin » ;
   100 dessins et parcours tactile vérifiés par script ; poussé à la demande de l'utilisateur : mes fichiers et cette
   section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-12 — ColorChain : aperçu en aide facultative (session colorchain)
+- Statut : en cours (2026-11-12T20:16+01:00). Demande de l'utilisateur : avec le résultat ça devient trop facile ;
+  mises à jour du prototype autorisées
+- Réservations actives : `public/prototypes/colorchain-peinture/index.html`.
+- Ressources : serveur de dev sur le port 4391 ; eslint, `astro check`. Build annoncé ici avant.
+- 20:16 : aperçu « Ton dessin » caché derrière un bouton « ? » (2 étoiles max si on s'en sert) ; vérifié par script (3
+  étoiles sans aide, 2 avec) ; poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut :
+  terminé. Réservations libérées.
