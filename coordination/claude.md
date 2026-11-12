@@ -3003,3 +3003,12 @@
 - 16:38 : rail en épingles autour des pots, 1,5 s entre deux pots, un masque à la fois ; 6 niveaux vérifiés (bon ordre,
   ordre inverse) ; poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé.
   Réservations libérées.
+
+## 2026-11-12 — ColorChain : escalier de départ (session colorchain)
+- Statut : en cours (2026-11-12T16:59+01:00). Demande de l'utilisateur : départ d'en bas, des dominos montent des
+  escaliers pour arriver en haut ; mises à jour du prototype autorisées
+- Réservations actives : `public/prototypes/colorchain-peinture/index.html`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 16:59 : pichenette en bas à gauche, file de dominos sur un escalier jusqu'à la bille ; 6 niveaux vérifiés (bon ordre,
+  ordre inverse) ; poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé.
+  Réservations libérées.

@@ -907,13 +907,13 @@ function canvasLevel(name, teach, layers, _slots, cols = 20, rows = 18) {
   // the top of the picture, past the pots standing above the dominoes, then goes round the
   // picture down to the table and ends on the root.
   const H0 = 3.2, H1 = 2.0, zT = z0 - 1.9, xS = x0 - 0.3, xE = x0 + W + 0.3, xR = xE + 1.1, zB = zR + 1.1;
-  const dx = n > 1 ? (xE - xS - 2.0) / (n - 1) : 2.4, r = Math.min(0.6, dx / 4), zN = zT - r, zF = zN - 1.8;
-  const px = k => xS + 1.0 + k * dx;
+  const dx = n > 1 ? (W - 2.6) / (n - 1) : 2.4, r = Math.min(0.6, dx / 4), zN = zT - r, zF = zN - 1.8;
+  const px = k => x0 + 1.9 + k * dx;
   const arc = (cx, cz, a0, a1) => sample(a => [cx + r * Math.cos(a), cz + r * Math.sin(a)], a0, a1, 40);
   const line = (a, b) => sample(t => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t], 0, 1, Math.max(8, Math.round(Math.hypot(b[0] - a[0], b[1] - a[1]) * 30)));
   // Hairpins: down to a pot, round it, back up, across to the next one.
   const zig = [], apex = [];
-  const startX = px(0) - 2 * r - 0.9;
+  const startX = px(0) - 2 * r - 0.4;
   zig.push(...line([startX, zF - r], [px(0) - 2 * r, zF - r]));
   for (let k = 0; k < n; k++) {
     zig.push(...arc(px(k) - 2 * r, zF, 1.5 * Math.PI, 2 * Math.PI), ...line([px(k) - r, zF], [px(k) - r, zN]));
@@ -926,8 +926,16 @@ function canvasLevel(name, teach, layers, _slots, cols = 20, rows = 18) {
   const cum = [0];
   for (let i = 1; i < zig.length; i++) cum.push(cum[i - 1] + Math.hypot(zig[i][0] - zig[i - 1][0], zig[i][1] - zig[i - 1][1]));
   const top = zig.map((q, i) => [q[0], q[1], H0 + (H1 - H0) * cum[i] / cum.at(-1)]);
-  const starter = place(path().add(sample(x => [x, zF - r], startX - 1.9, startX - 0.55, 200), { color: WH }), d);
-  for (const o of starter) o.y = H0;
+  // The flick is on the table, bottom left: the line climbs a staircase along the picture up
+  // to the marble.
+  const xL = x0 - 1.7, zc = zF - r, zS = z1 + 3.0;
+  const starter = place(path().add(sample(z => [xL, z], zS, zc + 0.9, 1500), { color: WH })
+    .add(bez([xL, zc + 0.9], [xL, zc + 0.4], [xL + 0.4, zc], [xL + 0.9, zc]), { color: WH })
+    .add(sample(x => [x, zc], xL + 0.9, startX - 0.55, 200), { color: WH }), d);
+  if (starter.length > 2 && Math.hypot(starter.at(-1).x - starter.at(-2).x, starter.at(-1).z - starter.at(-2).z) < 0.42) { d.splice(d.indexOf(starter.at(-2)), 1); starter.splice(-2, 1); }
+  // Two dominoes per stair, the first two on the table.
+  const rise = starter.filter(o => o.x < xL + 0.05 && o.z > zc + 1.0).length - 2, nSt = Math.max(1, Math.ceil(rise / 2));
+  starter.forEach((o, i) => { o.stair = Math.min(nSt, Math.max(0, Math.ceil((i - 1) / 2))); o.y = H0 * o.stair / nSt; });
   const L1 = starter.at(-1);
   const seg = (pts, ya, yb) => pts.map((q, i) => [q[0], q[1], ya + (yb - ya) * i / (pts.length - 1)]);
   const rail = [...top,
@@ -936,12 +944,12 @@ function canvasLevel(name, teach, layers, _slots, cols = 20, rows = 18) {
     ...seg(line([xR - 1.0, zB], [0.9, zB]), 0.04, 0),
     ...seg(bez([0.9, zB], [0.3, zB], [0, zB - 0.2], [0, zR + 0.45], 120), 0, 0)];
   const spots = layers.map((l, k) => ({ x: px(k), z: zT + 0.75, y: top[apex[k]][2] - 0.15, k, state: 'up', spot: true, layer: null, s: cum[apex[k]] }));
-  const steps = starter.map(o => ({ x: o.x, z: o.z, a: 0, h: H0 }));
+  const stairs = starter.filter(o => o.y > 0.02).map(o => ({ x: o.x, z: o.z, a: o.a, h: o.y, k: o.stair }));
   const L = layers.map(l => ({ ...l }));
   for (const o of field) { o.want = FIELD_W; o.wantK = -1; L.forEach((l, k) => { if (l.shape(o.fu, o.fv)) { o.want = l.color; o.wantK = k; } }); }
   return { name, teach, sol: [], colors: [FIELD_W, WH, ...L.map(l => l.color)], dominos: d, h: { start: starter[0], sign: 1 },
     hot: [], spots, starts: [starter[0]], layers: L, field, budget: 2, cols, rows, show: shuffled(n, name.length * 7 + n), box: { cz: (z0 + z1) / 2, w: cols * sx, h: rows * sz },
-    marbles: [{ rail, launcher: L1, target: root }], steps, zTop: z0, lastS: spots.at(-1).s,
+    marbles: [{ rail, launcher: L1, target: root }], stairs, zTop: z0, lastS: spots.at(-1).s,
     paint: [[rectP(x0 - 1.0, z0 - 0.7, x0 + W + 1.0, z1 + 0.6), 0x6b4a3a], [rectP(x0 - 0.6, z0 - 0.35, x0 + W + 0.6, z1 + 0.3), 0xe9e4d6]] };
 }
 
@@ -1046,6 +1054,7 @@ const topM = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 })
 const face = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.35, map: faceTexture() });
 const geom = new THREE.BoxGeometry(WIDE, TALL, THIN);
 geom.translate(0, TALL / 2, 0);
+const stairMatA = new THREE.MeshStandardMaterial({ color: 0xb4bbd6, roughness: 0.8 }), stairMatB = new THREE.MeshStandardMaterial({ color: 0x9ea6c6, roughness: 0.8 });
 // Relays accept any color: their ring is a rainbow.
 const ringGeom = new THREE.TorusGeometry(0.42, 0.085, 10, 48); ringGeom.rotateX(Math.PI / 2);
 const ringTex = (() => {
@@ -1166,6 +1175,10 @@ function loadLevel(i) {
     const plate = keep(new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.06, 28), discMat)); plate.position.set(sp.x, sp.y, sp.z); plate.castShadow = true;
   }
   if (lvl.layers) {
+    for (const st of lvl.stairs) {
+      const b = keep(new THREE.Mesh(new THREE.BoxGeometry(0.64, st.h, 1.2), st.k % 2 ? stairMatA : stairMatB));
+      b.position.set(st.x, st.h / 2, st.z); b.rotation.y = -st.a; b.castShadow = true; b.receiveShadow = true;
+    }
     const r = lvl.marbles[0].rail;
     for (let i = 0; i < r.length; i += 75) if (r[i][2] > 0.3) { const post = keep(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, r[i][2], 8), railMat)); post.position.set(r[i][0], r[i][2] / 2, r[i][1]); }
   }
