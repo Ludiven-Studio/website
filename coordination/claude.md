@@ -2896,3 +2896,15 @@
 - 10:12 : commité et poussé à la demande de l'utilisateur (« pousse le site ») : mes fichiers
   (src/pages/prototypes/index.astro, public/prototypes/colorchain/, une phrase de src/pages/about.astro, globIgnores de
   astro.config.mjs) et cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-12 — ColorChain : correctifs du mini-jeu (session colorchain)
+- Statut : en cours (2026-11-12T10:40+01:00). Demande de l'utilisateur : l'image de fond flicke en permanence et
+  l'animation de chute est un peu ralentie
+- Réservations actives : `public/prototypes/colorchain/index.html`, worktree website-worktrees/colorchain-proto
+  (branche colorchain-fix).
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 10:40 : couches du sol dessinées dans l'ordre sans écriture de profondeur (plus de scintillement sur téléphone),
+  plans proche et lointain resserrés, chute à la vitesse réelle (x2) ; les 10 niveaux tombent en entier ; commité sur
+  colorchain-fix, push au mot de Raphaël
+- 11:01 : poussé à la demande de l'utilisateur (« tu peux mettre a jour sur le siteweb dans prototype ») :
+  public/prototypes/colorchain/index.html et cette section seulement. Statut : terminé. Réservations libérées.
