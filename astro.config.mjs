@@ -98,6 +98,8 @@ export default defineConfig({
                     'jeux/petanque/test/**',
                     'jeux/eclats/test/**',
                     'rencontres/test/**',
+                    // Unlisted work-in-progress games: their own three.js copy stays off every visitor's precache.
+                    'prototypes/**',
                 ],
                 navigateFallback: null,
                 cleanupOutdatedCaches: true,

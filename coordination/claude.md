@@ -2878,3 +2878,21 @@
   supprimées, branche distante rencontres-accounts supprimée sur GitHub. Restent : main, meet-partner-search,
   meet-privacy-house-ads, pg-privacy-108, promo-admin, scan-privacy-houseads, et origin/main. Statut : terminé.
   Réservations libérées.
+
+## 2026-11-12 — ColorChain : page des prototypes et mini-jeu de dominos (session colorchain)
+- Statut : en cours (2026-11-12T08:22+01:00). Demande de l'utilisateur : Raphaël, tapé dans cette session : « Est-ce
+  qu'on peut en faire un mini jeux sur le site web de 10 niveaux pour tester le proto ? » ; accès : « lien accessible
+  mais discret, à un endroit où l'on peut lister tous les prototypes en cours » ; langue : français
+- Réservations actives : `src/pages/prototypes/index.astro` (nouveau), `public/prototypes/colorchain/` (nouveau),
+  `src/pages/about.astro` (une phrase), `astro.config.mjs` (globIgnores seulement), worktree colorchain-proto.
+- Ressources : serveur de dev sur le port 4571 ; eslint, `astro check`. Build annoncé ici avant.
+- 08:25 : page /prototypes/ (noindex, hors sitemap, hors précache), jeu dans public/prototypes/colorchain/ (version
+  française de la v12, menu des niveaux, progression locale), phrase vers les prototypes sur /about/ ; eslint OK, astro
+  check 0 erreur, captures clair, sombre et téléphone sans erreur console. Lancement du build complet dans mon worktree
+  colorchain-proto (son dist/, .astro/, public/vendor/ seulement)…
+- 08:27 : build complet OK (224 pages, précache 386 sans /prototypes, liens OK, /prototypes absent du sitemap) ;
+  commité e5abf09 sur la branche colorchain-proto (worktree), pas sur main. Captures envoyées à Raphaël ; push au mot
+  de Raphaël
+- 10:12 : commité et poussé à la demande de l'utilisateur (« pousse le site ») : mes fichiers
+  (src/pages/prototypes/index.astro, public/prototypes/colorchain/, une phrase de src/pages/about.astro, globIgnores de
+  astro.config.mjs) et cette section seulement. Statut : terminé. Réservations libérées.

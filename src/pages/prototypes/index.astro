@@ -1,0 +1,157 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Icon from '../../components/Icon.astro';
+
+// Games still being made, to try before everyone else. Not listed in the menu nor the sitemap.
+const prototypes = [
+	{
+		name: 'ColorChain',
+		tag: 'Dominos',
+		href: '/prototypes/colorchain/',
+		cover: '/prototypes/colorchain/cover.webp',
+		date: '12 novembre 2026',
+		text: 'Dix niveaux de dominos colorés, du plus simple au plus rusé : une pichenette, des lignes qui se séparent, des planches qui lancent tout un arc-en-ciel, des champs qui révèlent une image, des billes et des aiguillages. Le but : tout faire tomber d’une seule pichenette.',
+		tip: 'Sur téléphone, en mode portrait.',
+	},
+];
+---
+
+<BaseLayout
+	title="Prototypes | Ludiven Studio"
+	description="Les jeux en cours de fabrication chez Ludiven Studio, à essayer avant tout le monde."
+	noindex
+>
+	<div class="wrapper protos-page stack gap-8">
+		<header class="protos-head stack gap-2">
+			<a class="back" href="/about/">
+				<Icon icon="arrow-left" size="1em" /> À propos
+			</a>
+			<h1>Prototypes</h1>
+			<p>
+				Des jeux en cours de fabrication, à essayer avant tout le monde. Ils peuvent changer, casser ou disparaître
+				d’un jour à l’autre.
+			</p>
+		</header>
+
+		<ul class="protos-list">
+			{
+				prototypes.map((p) => (
+					<li class="proto-card">
+						<a class="proto-cover" href={p.href}>
+							<img src={p.cover} alt={`${p.name} : capture du jeu`} width="720" height="720" loading="lazy" />
+						</a>
+						<div class="proto-body stack gap-2">
+							<p class="proto-tag">{p.tag} · prototype du {p.date}</p>
+							<h2>{p.name}</h2>
+							<p>{p.text}</p>
+							<p class="proto-tip">{p.tip}</p>
+							<a class="proto-play" href={p.href}>
+								Jouer <Icon icon="arrow-right" size="1em" />
+							</a>
+						</div>
+					</li>
+				))
+			}
+		</ul>
+
+		<p class="protos-more">
+			Pour les démos techniques de rendu 3D, voir le <a href="/labo/">labo</a>.
+		</p>
+	</div>
+</BaseLayout>
+
+<style>
+	.protos-page {
+		align-items: center;
+	}
+	.protos-head {
+		text-align: center;
+		align-items: center;
+		max-width: 60ch;
+	}
+	.back {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		color: var(--sc-muted);
+		text-decoration: none;
+		font-family: var(--font-brand);
+		font-weight: 500;
+		font-size: var(--text-sm);
+	}
+	.back:hover,
+	.back:focus-visible {
+		color: var(--sc-accent);
+	}
+	.protos-head h1 {
+		font-size: var(--text-3xl);
+		margin-top: 0.5rem;
+	}
+	.protos-head p {
+		color: var(--sc-muted);
+	}
+	.protos-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		width: 100%;
+		max-width: 56rem;
+		display: grid;
+		gap: 2rem;
+	}
+	.proto-card {
+		display: grid;
+		gap: 1.5rem;
+		align-items: center;
+		padding: 1.25rem;
+		border-radius: 1.25rem;
+		background: var(--sc-surface);
+		border: 1px solid rgba(127, 127, 127, 0.25);
+	}
+	.proto-cover img {
+		display: block;
+		width: 100%;
+		height: auto;
+		border-radius: 1rem;
+	}
+	.proto-tag {
+		color: var(--sc-muted);
+		font-size: var(--text-sm);
+	}
+	.proto-body h2 {
+		font-size: var(--text-2xl);
+	}
+	.proto-tip {
+		color: var(--sc-muted);
+		font-size: var(--text-sm);
+	}
+	.proto-play {
+		align-self: flex-start;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.7rem 1.4rem;
+		border-radius: 999px;
+		background: var(--sc-accent);
+		color: var(--sc-on-accent, #fff);
+		font-family: var(--font-brand);
+		font-weight: 600;
+		text-decoration: none;
+	}
+	.proto-play:hover,
+	.proto-play:focus-visible {
+		filter: brightness(1.08);
+	}
+	.protos-more {
+		color: var(--sc-muted);
+		text-align: center;
+	}
+	@media (min-width: 50em) {
+		.protos-head h1 {
+			font-size: var(--text-4xl);
+		}
+		.proto-card {
+			grid-template-columns: 18rem 1fr;
+		}
+	}
+</style>
