@@ -967,22 +967,23 @@ function lSunset() {
     { name: 'le soleil', color: C.sun, shape: disc(0.5, 0.58, 0.3) },
     { name: 'la mer', color: C.sea, shape: (u, v) => v > 0.62 + 0.03 * Math.sin(u * 18) }], [1, 2, 0], 18, 16);
 }
+// In each level every shape hides a bit of the one before it: only one order is right.
 function lBoat() {
-  return canvasLevel('Bateau', 'Deux pochoirs qui ne se touchent pas peuvent aller dans n’importe quel ordre', [
+  return canvasLevel('Bateau', 'Chaque forme cache un bout de la précédente', [
     { name: 'le ciel', color: C.sky, shape: () => true },
-    { name: 'le soleil', color: C.sun, shape: disc(0.8, 0.18, 0.15) },
-    { name: 'la mer', color: C.sea, shape: (u, v) => v > 0.66 + 0.025 * Math.sin(u * 20) },
-    { name: 'la coque', color: C.brown, shape: tri([0.18, 0.58], [0.82, 0.58], [0.5, 0.9]) },
-    { name: 'la voile', color: C.white, shape: tri([0.52, 0.08], [0.52, 0.56], [0.88, 0.56]) }], [3, 0, 4, 1, 2]);
+    { name: 'le soleil', color: C.sun, shape: disc(0.62, 0.3, 0.17) },
+    { name: 'la voile', color: C.white, shape: tri([0.5, 0.1], [0.5, 0.62], [0.86, 0.62]) },
+    { name: 'la coque', color: C.brown, shape: tri([0.16, 0.56], [0.84, 0.56], [0.5, 0.94]) },
+    { name: 'la mer', color: C.sea, shape: (u, v) => v > 0.72 + 0.025 * Math.sin(u * 20) }], []);
 }
 function lHouse() {
-  return canvasLevel('Maison', 'Le toit cache le haut du mur', [
+  return canvasLevel('Maison', 'Le mur cache le bas du toit, l’herbe cache le bas du mur', [
     { name: 'le ciel', color: C.sky, shape: () => true },
-    { name: 'l’herbe', color: C.grass, shape: (u, v) => v > 0.78 },
-    { name: 'le mur', color: C.cream, shape: box(0.24, 0.38, 0.76, 0.86) },
-    { name: 'le toit', color: C.red, shape: tri([0.14, 0.44], [0.86, 0.44], [0.5, 0.1]) },
-    { name: 'la porte', color: C.brown, shape: box(0.44, 0.6, 0.58, 0.86) },
-    { name: 'la fenêtre', color: C.blue, shape: any(box(0.3, 0.52, 0.4, 0.66), box(0.62, 0.52, 0.72, 0.66)) }], [4, 1, 5, 0, 3, 2], 22, 20);
+    { name: 'le soleil', color: C.sun, shape: disc(0.72, 0.24, 0.15) },
+    { name: 'le toit', color: C.red, shape: tri([0.14, 0.46], [0.86, 0.46], [0.5, 0.1]) },
+    { name: 'le mur', color: C.cream, shape: box(0.24, 0.4, 0.76, 0.86) },
+    { name: 'la porte', color: C.brown, shape: any(box(0.44, 0.6, 0.56, 0.86), box(0.28, 0.5, 0.38, 0.64), box(0.64, 0.5, 0.74, 0.64)) },
+    { name: 'l’herbe', color: C.grass, shape: (u, v) => v > 0.8 }], [], 22, 20);
 }
 function lRainbow() {
   return canvasLevel('Arc-en-ciel', 'Chaque arc cache le milieu du précédent', [
@@ -995,13 +996,13 @@ function lRainbow() {
     { name: 'la colline', color: C.hill, shape: (u, v) => v > 0.8 - 0.05 * Math.cos((u - 0.5) * 4) }], [2, 5, 0, 6, 3, 1, 4], 22, 18);
 }
 function lFish() {
-  return canvasLevel('Poisson', 'Regarde où la queue touche le corps', [
+  return canvasLevel('Poisson', 'Les algues poussent devant le sable, la queue passe devant les algues', [
     { name: 'la mer', color: C.sea, shape: () => true },
-    { name: 'les algues', color: C.hill, shape: (u, v) => v > 0.55 && [0.12, 0.3, 0.75, 0.9].some(c => Math.abs(u - c - 0.04 * Math.sin(v * 14)) < 0.035) },
+    { name: 'le sable', color: C.cream, shape: (u, v) => v > 0.86 + 0.03 * Math.sin(u * 9) },
+    { name: 'les algues', color: C.hill, shape: (u, v) => v > 0.5 && [0.12, 0.3, 0.75, 0.9].some(c => Math.abs(u - c - 0.04 * Math.sin(v * 14)) < 0.035) },
     { name: 'la queue', color: C.orange, shape: tri([0.62, 0.45], [0.92, 0.25], [0.92, 0.68]) },
     { name: 'le corps', color: C.sun, shape: ellipse(0.45, 0.46, 0.27, 0.19) },
-    { name: 'l’œil', color: C.white, shape: disc(0.3, 0.42, 0.06) },
-    { name: 'le sable', color: C.cream, shape: (u, v) => v > 0.88 + 0.03 * Math.sin(u * 9) }], [3, 0, 5, 2, 4, 1], 22, 20);
+    { name: 'l’œil', color: C.white, shape: disc(0.3, 0.42, 0.06) }], [], 22, 20);
 }
 
 const BUILD = [lSun, lSunset, lBoat, lHouse, lRainbow, lFish];
@@ -1634,7 +1635,8 @@ function step(dt) {
     }
     if (!p.sound && t > p.t0) { p.sound = true; CC.sfx('drip', { p: 0.3 }); }
     if (p.mask) {
-      const down = Math.min(1, Math.max(0, (t - (p.t0 - 0.34)) / 0.26)), up = Math.min(1, Math.max(0, (t - (p.end + 0.12)) / 0.3));
+      if (t > p.t0 - 0.05 && t < p.end + 0.2) { p.drawPlate((t - p.t0) / 0.035); p.tex.needsUpdate = true; }
+      const down = Math.min(1, Math.max(0, (t - (p.t0 - 0.34)) / 0.26)), up = Math.min(1, Math.max(0, (t - (p.end + 0.22)) / 0.3));
       p.mask.visible = down > 0 && up < 1; p.mask.position.y = TALL + 0.16 + 2.8 * (1 - down) * (1 - down) + 2.4 * up * up; p.mask.material.opacity = Math.min(1, down * 1.5) * (1 - up);
     }
     if (p.stream) { p.stream.visible = t > p.t0 - 0.12 && t < p.end + 0.15; p.stream.material.opacity = Math.min(1, Math.max(0, (p.end + 0.15 - t) / 0.3)); }
@@ -1795,15 +1797,24 @@ function pourSpot(sp) {
   const stream = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.2, len, 12), new THREE.MeshStandardMaterial({ color: l.color, roughness: 0.3, transparent: true }));
   stream.position.copy(a).lerp(b, 0.5); stream.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), a.clone().sub(b).normalize()); stream.visible = false;
   scene.add(stream); extras.push(stream);
-  const cv = document.createElement('canvas'), q = 8; cv.width = lvl.cols * q; cv.height = lvl.rows * q;
-  const g = cv.getContext('2d'); g.fillStyle = 'rgba(38,43,69,0.94)'; g.fillRect(0, 0, cv.width, cv.height);
-  g.strokeStyle = l.color; g.lineWidth = 6; g.strokeRect(0, 0, cv.width, cv.height);
-  for (const o of lvl.field) if (l.shape(o.fu, o.fv)) g.clearRect(Math.round(o.fu * (lvl.cols - 1)) * q, Math.round(o.fv * (lvl.rows - 1)) * q, q, q);
+  const cv = document.createElement('canvas'), q = 16; cv.width = lvl.cols * q; cv.height = lvl.rows * q;
+  const g = cv.getContext('2d');
+  const cells = lvl.field.map(o => ({ o, x: Math.round(o.fu * (lvl.cols - 1)) * q, y: Math.round(o.fv * (lvl.rows - 1)) * q, hole: l.shape(o.fu, o.fv), dist: Math.hypot(o.x - sp.x, o.z - lvl.zTop) }));
+  // R: how far the paint has spread over the plate from where it lands.
+  const drawPlate = R => {
+    g.clearRect(0, 0, cv.width, cv.height);
+    g.fillStyle = 'rgba(38,43,69,0.96)'; g.fillRect(0, 0, cv.width, cv.height);
+    g.fillStyle = l.color;
+    for (const c of cells) if (c.dist < R) g.fillRect(c.x, c.y, q, q);
+    g.strokeStyle = l.color; g.lineWidth = 8; g.strokeRect(0, 0, cv.width, cv.height);
+    for (const c of cells) if (c.hole) g.clearRect(c.x + 2, c.y + 5, q - 4, 6);
+  };
+  drawPlate(-1);
   const tex = new THREE.CanvasTexture(cv); tex.magFilter = THREE.NearestFilter; tex.colorSpace = THREE.SRGBColorSpace;
   const mask = new THREE.Mesh(new THREE.PlaneGeometry(lvl.box.w, lvl.box.h), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
   mask.rotation.x = -Math.PI / 2; mask.position.set(0, 4, lvl.box.cz); mask.visible = false; mask.renderOrder = 3;
   scene.add(mask); extras.push(mask);
-  l.poured = true; pours.push({ k: sp.layer, seq: pours.length, t0, x: sp.x, z: lvl.zTop, stream, mask, end: t0 + far * 0.035 }); pots[sp.layer].userData.tipT = CC.time + 0.1;
+  l.poured = true; pours.push({ k: sp.layer, seq: pours.length, t0, x: sp.x, z: lvl.zTop, stream, mask, drawPlate, tex, end: t0 + far * 0.035 }); pots[sp.layer].userData.tipT = CC.time + 0.1;
   holdUntil = t0 + far * 0.035 + 0.35;
 }
 // Tap a stencil: it takes the next free spot. Tap it again: it goes back, the next ones move up.

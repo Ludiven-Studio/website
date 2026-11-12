@@ -3012,3 +3012,12 @@
 - 16:59 : pichenette en bas à gauche, file de dominos sur un escalier jusqu'à la bille ; 6 niveaux vérifiés (bon ordre,
   ordre inverse) ; poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé.
   Réservations libérées.
+
+## 2026-11-12 — ColorChain : un seul ordre et plaque à fentes (session colorchain)
+- Statut : en cours (2026-11-12T17:09+01:00). Demande de l'utilisateur : des fois l'ordre peut être inversé ; pochoirs
+  pas crédibles, voir la peinture couler vers le trou ou par de petites fentes ; mises à jour du prototype autorisées
+- Réservations actives : `public/prototypes/colorchain-peinture/index.html`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 17:09 : Bateau, Maison et Poisson redessinés : un seul ordre valide par niveau (compté sur toutes les permutations) ;
+  plaque à fentes, peinture qui s'étale puis passe par les fentes ; 6 niveaux vérifiés ; poussé à la demande de
+  l'utilisateur : mon fichier et cette section seulement. Statut : terminé. Réservations libérées.
