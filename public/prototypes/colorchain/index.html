@@ -781,8 +781,47 @@ function lake() {
     paint: [[rectP(-8, -10, 8, 0.8), SKY], [[[-7, -6.4], [-3, -6.4], [1.9, -3.6], [6.5, -3.6], [6.5, 0.8], [-7, 0.8]], GRASS], [circP(-1.4, 3.1, 1, 48).map(([x, z]) => [-1.4 + (x + 1.4) * 5.6, 3.1 + (z - 3.1) * 1.7]), 0x2b4a7d]] };
 }
 
-const BUILD = [snail, hills, rainbowSmall, tree, mountains, house, lake, kite, rainbow, sea];
-const LEVEL_NAMES = ['Escargot', 'Collines', 'Arc-en-ciel', 'Arbre', 'Montagnes', 'Maison', 'Lac', 'Cerf-volant', 'Arc-en-ciel et soleil', 'Sous la mer'];
+
+// ---- Gold dominoes: numbered, they must fall in order 1, 2, 3... A gold domino is a
+// domino of its line, only painted gold.
+const pick = (list, ...ks) => ks.map(k => list[Math.min(list.length - 1, Math.round(k))]);
+function setGolds(list) { list.forEach((d, k) => { d.gold = k + 1; }); return list; }
+
+function clock() {
+  const Bl = '#4a9cff', d = [], c = [0, -0.6], R = 4.2;
+  const C = 2 * Math.PI * R, a0 = Math.PI / 2, span = 2 * Math.PI * (1 - SP / C);
+  const all = place(path().add(sample(t => [c[0] + R * Math.cos(a0 + t), c[1] + R * Math.sin(a0 + t)], 0, span, 3000), { color: Bl }), d);
+  const N = all.length;
+  // Numbers go one way round; the 4 sits right next to the pad on the other side, to tempt.
+  setGolds(pick(all, N * 0.3, N * 0.48, N * 0.66, N * 0.86));
+  const hand = (ang, len, w) => { const f = dirOf(ang), q = [-f[1] * w, f[0] * w]; return [add2(c, q), add2(add2(c, f, len), q), add2(add2(c, f, len), q, -1), add2(c, q, -1)]; };
+  return { name: 'Horloge', teach: 'Les dorés doivent tomber dans l’ordre 1, 2, 3, 4 : choisis le sens de la pichenette', sol: [], colors: [Bl], dominos: d,
+    h: { start: all[0], sign: 1 }, hot: [], starts: [all[0]], golds: 4,
+    paint: [[rectP(-9, -9, 9, 6), SKY], [circP(c[0], c[1], R + 0.9, 64), 0x3a4a7a], [circP(c[0], c[1], R - 0.8, 64), 0x44558a],
+      [hand(-FLAT, 2.6, 0.12), 0xf4f1e8], [hand(-0.3, 1.8, 0.16), 0xf4f1e8], [circP(c[0], c[1], 0.3), 0xf4f1e8]] };
+}
+
+// Three arms meet at a small triangle: a chain coming down one arm starts the two others
+// at the same time. The dominoes nearest the crossing fall first.
+function clover() {
+  const Wh = '#f4f1e8', d = [], c = [0, -0.4], r = 0.38;
+  const arms = [[FLAT, 5.2], [FLAT + 120 * DEG, 6.4], [FLAT - 120 * DEG, 4.4]].map(([ang, len]) => {
+    const f = dirOf(ang);
+    return place(path().add(sample(t => add2(c, f, r + t), 0, len, 800), { color: Wh }), d);
+  });
+  const [A, B, Cc] = arms, at = (arm, dist) => arm[Math.round(dist / SP)];
+  // From C's tip: C, then B near the crossing, then A, then B's far end. Any other start breaks the order.
+  setGolds([at(Cc, 3.0), at(B, 1.2), at(A, 2.7), at(B, 5.2)]);
+  const leaf = (ang, len) => sample(t => { const f = dirOf(ang), q = [-f[1], f[0]], k = (1 - Math.cos(t)) / 2; return add2(add2(c, f, 0.6 + len * k), q, 1.35 * Math.sin(t) * Math.sin(Math.PI * k) ** 0.6); }, 0, 2 * Math.PI, 80);
+  const tips = arms.map(a => a.at(-1));
+  return { name: 'Trèfle', teach: 'Trois départs possibles : lequel fait tomber les dorés dans l’ordre ?', sol: [], colors: [Wh], dominos: d,
+    h: { start: Cc.at(-1), sign: -1 }, hot: [], starts: tips, golds: 4,
+    paint: [[rectP(-9, -9, 9, 7), GRASS], [[[0.3, 4.6], [1.4, 6.8], [1.0, 6.9], [-0.1, 4.7]], 0x3d7a4e],
+      ...arms.map((a, k) => [leaf([FLAT, FLAT + 120 * DEG, FLAT - 120 * DEG][k], [5.4, 6.6, 4.6][k]), 0x4f9a62]), [circP(c[0], c[1], 0.9), 0x3d7a4e]] };
+}
+
+const BUILD = [snail, hills, rainbowSmall, tree, mountains, house, lake, kite, rainbow, sea, clock, clover];
+const LEVEL_NAMES = ['Escargot', 'Collines', 'Arc-en-ciel', 'Arbre', 'Montagnes', 'Maison', 'Lac', 'Cerf-volant', 'Arc-en-ciel et soleil', 'Sous la mer', 'Horloge', 'Trèfle'];
 const VIDEO = new URLSearchParams(location.search).get('video') || 'tour', LAST = BUILD.length - 1;
 
 // ---- Rendering
@@ -892,6 +931,7 @@ function flatShape(pts, color) {
 }
 
 // ---- Game state
+let goldNext = 1, goldBad = null;
 let li = -1, lvl, doms, mesh, extras = [], chains, popups, marks, pushes, phase, phaseT, results = [], tries = 0, marbles = [];
 let focus = null, slowT = -9, cam = null, base = null, ghost, halos = [], sel = null, selT = -9, active = new Set();
 
@@ -1042,19 +1082,20 @@ function loadLevel(i) {
 
 function resetDominos() {
   for (const d of doms) Object.assign(d, { state: 'up', th: 0, w: 0, u: [0, 0], cap: FLAT, targets: null, hitDone: false, shake: -9, flash: -9, chain: null, leanOn: null, gh: 0, pop: -9, hole: null, holeTold: false, wob: -9 });
-  chains = []; popups = []; marks = []; pushes = 0; focus = null; slowT = -9; sel = null; active = new Set();
+  chains = []; popups = []; marks = []; pushes = 0; focus = null; slowT = -9; sel = null; active = new Set(); goldNext = 1; goldBad = null;
   for (const m of marbles) { Object.assign(m, { s: 0, v: 0, state: 'rest', chain: null, predicted: false, q: new THREE.Quaternion(), p: m.tracks[0], L: m.tracks[0].L }); placeMarble(m, 0); }
   paint();
   updateMatrices();
 }
 
-const revC = new THREE.Color(), tint = new THREE.Color(), red = new THREE.Color('#ff2020'), grey = new THREE.Color('#a3a9c6');
+const glint = new THREE.Color('#fff6d0'), revC = new THREE.Color(), tint = new THREE.Color(), red = new THREE.Color('#ff2020'), grey = new THREE.Color('#a3a9c6');
 function paint() {
   const t = CC.time;
   doms.forEach((d, k) => {
     tint.set(d.color);
     const e = t - d.flash;
     if (d.rev && d.th > 0.3) tint.lerp(revC.set(d.rev), Math.min(1, (d.th - 0.3) / 0.9));
+    if (d.gold) tint.set('#f0b429').lerp(glint, 0.55 * Math.max(0, Math.sin(t * 2.2 - d.gold * 0.9)) ** 6);
     if (e >= 0 && e < 4) tint.lerp(red, (0.6 + 0.3 * Math.sin(e * Math.PI * 2 * 2)) * Math.min(1, (4 - e) * 2));
     mesh.setColorAt(k, tint);
     ghost.setColorAt(k, tint.lerp(grey, d.gh * 0.75));
@@ -1206,6 +1247,10 @@ function topple(d, u, w, chain) {
   Object.assign(d, { state: 'falling', u, w, th: 0.02, chain, hitDone: false });
   chain.n++; chain.last = CC.time; chain.front = d;
   active.add(d.color);
+  if (d.gold) {
+    if (d.gold === goldNext && !goldBad) { goldNext++; marks.push({ o: d, ok: true, t: CC.time }); CC.sfx('drip', { p: 0.15 + 0.2 * d.gold }); }
+    else if (!goldBad) { goldBad = d; marks.push({ o: d, ok: false, t: CC.time }); say(d, `Le ${goldNext} d’abord !`, '#ff8a7a', false, 0.2); CC.sfx('blocked'); }
+  }
   aim(d);
   if (!chain.block && !focus) {
     const b = blockAhead(d, u, 3);
@@ -1351,7 +1396,7 @@ function step(dt) {
   marks = marks.filter(m => t - m.t < (m.ok ? 1.0 : 2.6));
   if (phase === 'play') {
     const moving = doms.some(d => d.state === 'falling'), settled = chains.every(c => c.done);
-    if (!moving && settled && doms.every(d => d.state !== 'up')) {
+    if (!moving && settled && doms.every(d => d.state !== 'up') && !goldBad) {
       phase = 'clear'; phaseT = t + 1.6; results[li] = lvl.hard ? (pushes === 1 && tries === 0 ? 3 : tries <= 2 ? 2 : 1) : pushes === 1 ? 3 : 2;
     }
   }
@@ -1447,25 +1492,26 @@ function retryRect() { return [CC.W - 150, 70, 100, 100]; }
 const SAVE = 'colorchain-play-v1';
 let menu = false, prog = { unlocked: 0, stars: {} };
 try { prog = Object.assign(prog, JSON.parse(localStorage.getItem(SAVE) || '{}')); } catch (e) { /* no storage */ }
+if (prog.stars[9]) prog.unlocked = Math.max(prog.unlocked, 10);
 function saveProg() { try { localStorage.setItem(SAVE, JSON.stringify(prog)); } catch (e) { /* no storage */ } }
 const levelsRect = [40, 70, 200, 100];
-const tileRect = i => [70 + (i % 2) * 485, 400 + Math.floor(i / 2) * 250, 455, 220];
+const tileRect = i => [70 + (i % 2) * 485, 330 + Math.floor(i / 2) * 222, 455, 200];
 const backRect = [CC.W / 2 - 300, 1690, 600, 110];
 const inRect = (x, y, [rx, ry, rw, rh]) => x > rx && x < rx + rw && y > ry && y < ry + rh;
 function drawMenu(ctx) {
   ctx.fillStyle = 'rgba(16,18,32,0.93)'; ctx.fillRect(0, 0, CC.W, CC.H);
   ctx.textAlign = 'center';
   ctx.fillStyle = '#fff'; ctx.font = 'bold 92px Segoe UI, Arial'; ctx.fillText('ColorChain', CC.W / 2, 200);
-  ctx.fillStyle = '#9aa3c7'; ctx.font = '36px Segoe UI, Arial'; ctx.fillText('Prototype : 10 niveaux de dominos', CC.W / 2, 270);
+  ctx.fillStyle = '#9aa3c7'; ctx.font = '36px Segoe UI, Arial'; ctx.fillText(`Prototype : ${BUILD.length} niveaux de dominos`, CC.W / 2, 270);
   for (let i = 0; i < BUILD.length; i++) {
     const [x, y, w, hh] = tileRect(i), open = i <= prog.unlocked, st = prog.stars[i] || 0;
     ctx.fillStyle = open ? '#2c3354' : '#22263a'; CC.roundRect(ctx, x, y, w, hh, 30); ctx.fill();
-    ctx.fillStyle = open ? '#ffd23f' : '#565c80'; ctx.font = 'bold 34px Segoe UI, Arial'; ctx.fillText(`Niveau ${i + 1}`, x + w / 2, y + 60);
-    ctx.fillStyle = open ? '#fff' : '#565c80'; ctx.font = 'bold 40px Segoe UI, Arial'; ctx.fillText(LEVEL_NAMES[i], x + w / 2, y + 115);
+    ctx.fillStyle = open ? '#ffd23f' : '#565c80'; ctx.font = 'bold 34px Segoe UI, Arial'; ctx.fillText(`Niveau ${i + 1}` + (BUILD[i] === clock || BUILD[i] === clover ? '  · nouveau' : ''), x + w / 2, y + 55);
+    ctx.fillStyle = open ? '#fff' : '#565c80'; ctx.font = 'bold 40px Segoe UI, Arial'; ctx.fillText(LEVEL_NAMES[i], x + w / 2, y + 105);
     if (open) for (let k = 0; k < 3; k++) {
-      ctx.save(); ctx.translate(x + w / 2 + (k - 1) * 62, y + 170); CC.star(ctx, 0, 0, 24);
+      ctx.save(); ctx.translate(x + w / 2 + (k - 1) * 62, y + 155); CC.star(ctx, 0, 0, 24);
       ctx.fillStyle = k < st ? '#ffd23f' : '#3a3f5c'; ctx.fill(); ctx.restore();
-    } else { ctx.fillStyle = '#565c80'; ctx.font = '34px Segoe UI, Arial'; ctx.fillText('🔒', x + w / 2, y + 180); }
+    } else { ctx.fillStyle = '#565c80'; ctx.font = '34px Segoe UI, Arial'; ctx.fillText('🔒', x + w / 2, y + 165); }
   }
   ctx.fillStyle = '#cfd5f5'; ctx.font = '38px Segoe UI, Arial'; ctx.fillText('‹ Tous les prototypes', CC.W / 2, backRect[1] + 68);
 }
@@ -1496,6 +1542,12 @@ function draw(ctx) {
   const t = CC.time;
   renderer.render(scene, camera);
   ctx.drawImage(glCanvas, 0, 0);
+  if (!menu) for (const d of doms) if (d.gold) {
+    const [x, y] = proj(d.x, d.state === 'up' ? TALL * 1.5 : 0.35, d.z);
+    ctx.fillStyle = goldBad === d ? '#ff3b3b' : '#f0b429'; ctx.strokeStyle = 'rgba(20,20,35,0.85)'; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.arc(x, y, 27, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#1d2033'; ctx.font = 'bold 34px Segoe UI, Arial'; ctx.textAlign = 'center'; ctx.fillText(d.gold, x, y + 12);
+  }
   for (const m of marks) {
     const e = t - m.t, [x, y] = proj(m.o.x, TALL * 1.75, m.o.z);
     const s = Math.min(1, e / 0.15) * (1 + 0.3 * Math.max(0, 1 - e / 0.3)), a = Math.min(1, ((m.ok ? 1.0 : 2.6) - e) * 3);
@@ -1511,7 +1563,7 @@ function draw(ctx) {
   ctx.fillText(lvl.name, CC.W / 2, 180);
   const down = doms.filter(d => d.state !== 'up').length;
   ctx.fillStyle = '#cfd5f5'; ctx.font = '32px Segoe UI, Arial';
-  ctx.fillText(`${down} / ${doms.length} tombés   ·   pichenettes ${pushes} / ${BUDGET}   ·   but : 1 seule`, CC.W / 2, 250);
+  ctx.fillText(lvl.golds ? `${down} / ${doms.length} tombés   ·   dorés dans l’ordre ${goldNext - 1} / ${lvl.golds}   ·   pichenettes ${pushes} / ${BUDGET}` : `${down} / ${doms.length} tombés   ·   pichenettes ${pushes} / ${BUDGET}   ·   but : 1 seule`, CC.W / 2, 250);
   if (lvl.teach && phase === 'play') { ctx.fillStyle = '#ffd23f'; ctx.font = '30px Segoe UI, Arial'; wrapText(ctx, lvl.teach, CC.W / 2, 300, 960, 38); }
   ctx.fillStyle = '#cfd5f5'; ctx.font = 'bold 34px Segoe UI, Arial'; ctx.textAlign = 'left'; ctx.fillText('☰ Niveaux', levelsRect[0], levelsRect[1] + 62); ctx.textAlign = 'center';
   const [rx, ry, rw] = retryRect();
@@ -1526,10 +1578,15 @@ function draw(ctx) {
   ctx.fillStyle = '#cfd5f5'; ctx.font = '32px Segoe UI, Arial';
   if (phase === 'clear') { /* the result card takes this place */ }
   else if (!sel) {
-    ctx.fillText('Remplis les cases avec le stock, dans le bon sens.', CC.W / 2, 1810);
-    ctx.fillText('Puis une pichenette sur un socle orange : tout doit tomber.', CC.W / 2, 1858);
+    if (doms.some(d => d.slot)) {
+      ctx.fillText('Remplis les cases avec le stock, dans le bon sens.', CC.W / 2, 1810);
+      ctx.fillText('Puis une pichenette sur un socle orange : tout doit tomber.', CC.W / 2, 1858);
+    } else ctx.fillText(lvl.golds ? 'Une pichenette sur un socle orange, dans un sens ou dans l’autre.' : 'Une pichenette sur un socle orange : tout doit tomber.', CC.W / 2, 1834);
   } else ctx.fillText('Touche une autre case, ou ailleurs pour reculer.', CC.W / 2, 1840);
-  if (phase === 'play' && pushes >= BUDGET && chains.every(c => c.done) && doms.some(d => d.state === 'up')) {
+  if (phase === 'play' && goldBad && chains.length && chains.every(c => c.done) && !doms.some(d => d.state === 'falling')) {
+    ctx.fillStyle = '#ff8a7a'; ctx.font = 'bold 44px Segoe UI, Arial';
+    ctx.fillText('Pas dans l’ordre : recommence avec ↻', CC.W / 2, 1700);
+  } else if (phase === 'play' && pushes >= BUDGET && chains.every(c => c.done) && doms.some(d => d.state === 'up')) {
     ctx.fillStyle = '#ff8a7a'; ctx.font = 'bold 44px Segoe UI, Arial';
     ctx.fillText('Recommence avec ↻', CC.W / 2, 1700);
   }
@@ -1792,11 +1849,11 @@ window.__solve = () => BUILD.map((b, i) => {
   for (const d of doms) { if (d.slot) { d.color = d.good; d.empty = false; d.a = d.va = snap(d.goodA ?? d.a0); } if (d.pivot) d.a = d.va = d.good; }
   for (const m of marbles) if (m.flipper) m.flipper.pos = m.flipper.good;
   phase = 'play';
-  push(lvl.h.start, 1);
+  push(lvl.h.start, lvl.h.sign || 1);
   for (let k = 0; k < 1500; k++) { step(CC.DT); CC.time += CC.DT; }
   const res = [lvl.name, doms.filter(d => d.state !== 'up').length, doms.length,
     doms.filter((o, j) => j > 0 && o.state === 'up' && doms[j - 1].state !== 'up').map(o => { const p = doms[o.i - 1]; return [o.i, o.color, o.pivot ? 'PIVOT' : '', o.gate ? 'GATE' : '', +Math.hypot(o.x - p.x, o.z - p.z).toFixed(2), Math.round(((o.a - p.a) / DEG + 540) % 360 - 180), p.targets && p.targets.map(t => [t.i, t.color, t.state])]; }),
-    chains.map(c => c.block && [c.block.d.i, c.block.o.i])];
+    chains.map(c => c.block && [c.block.d.i, c.block.o.i]), goldBad ? 'GOLD ' + goldBad.gold : 'ok'];
   CC.time = keep[1];
   return res;
 });

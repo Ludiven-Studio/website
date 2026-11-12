@@ -2908,3 +2908,13 @@
   colorchain-fix, push au mot de Raphaël
 - 11:01 : poussé à la demande de l'utilisateur (« tu peux mettre a jour sur le siteweb dans prototype ») :
   public/prototypes/colorchain/index.html et cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-12 — ColorChain : dominos dorés numérotés (session colorchain)
+- Statut : en cours (2026-11-12T11:06+01:00). Demande de l'utilisateur : dominos dorés numérotés à faire tomber dans
+  l'ordre ; « tu peux mettre a jour sur le siteweb dans prototype en ajoutant des niveaux »
+- Réservations actives : `public/prototypes/colorchain/index.html`, `src/pages/prototypes/index.astro` (texte de
+  ColorChain).
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 11:08 : eslint OK, astro check 0 erreur ; les 12 niveaux tombent en entier, dorés dans l'ordre ; poussé à la demande
+  de l'utilisateur (« tu peux mettre a jour sur le siteweb dans prototype ») : mes 2 fichiers et cette section
+  seulement. Statut : terminé. Réservations libérées.
