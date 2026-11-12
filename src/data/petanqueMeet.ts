@@ -100,10 +100,10 @@ export const MEET_DOWNLOAD = {
 		closing: 'Ready to play?',
 		browser: { before: 'Not on your phone? The map is also open ', link: 'in your browser', after: '.', href: '/en/petanque-meet/' },
 		legal: [
-			{ label: 'What is stored', href: '/petanque-meet/confidentialite/' },
-			{ label: 'Terms', href: '/petanque-meet/cgu/' },
+			{ label: 'What is stored', href: '/en/petanque-meet/confidentialite/' },
+			{ label: 'Terms', href: '/en/petanque-meet/cgu/' },
 		],
-		legalNote: '(in French)',
+		legalNote: '',
 	},
 	// es/de/it: the app's own words (AppLocalization) and the store listings'. Club tournaments are
 	// only on the map in France so far, which these say; the map on the web is in English.

@@ -1194,8 +1194,8 @@ export default function RencontresApp({ lang = 'fr' }: { lang?: Lang }) {
 						Base map: <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>.
 						Browsing asks for nothing; posting, joining or reporting happens in{' '}
 						<a href={paths.app}>the Pétanque Meet app</a>.{' '}
-						<a href="/petanque-meet/confidentialite/" hrefLang="fr">What is stored</a> ·{' '}
-						<a href="/petanque-meet/cgu/" hrefLang="fr">Terms</a> (in French).
+						<a href="/en/petanque-meet/confidentialite/">What is stored</a> ·{' '}
+						<a href="/en/petanque-meet/cgu/">Terms</a>.
 					</>,
 				)}
 			</p>
