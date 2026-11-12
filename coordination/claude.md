@@ -2936,3 +2936,12 @@
 - Ressources : eslint, `astro check`. Build annoncé ici avant.
 - 12:53 : anneaux des relais en arc-en-ciel, case gauche du pont de Constellation retirée ; 13 niveaux résolus ; poussé
   à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-12 — ColorChain : couches de peinture (session colorchain)
+- Statut : en cours (2026-11-12T13:31+01:00). Demande de l'utilisateur : nouvelle piste de gameplay (couches de
+  peinture, piste 1 choisie par Raphaël) ; mises à jour du prototype autorisées
+- Réservations actives : `public/prototypes/colorchain-peinture/`, `src/pages/prototypes/index.astro`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 13:32 : nouveau prototype /prototypes/colorchain-peinture/ (6 niveaux, vérifiés dans le bon ordre et à l'envers) et
+  sa fiche en tête de la page ; eslint OK, astro check 0 erreur ; poussé à la demande de l'utilisateur : mes fichiers
+  et cette section seulement. Statut : terminé. Réservations libérées.
