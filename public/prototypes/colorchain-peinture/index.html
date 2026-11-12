@@ -865,6 +865,13 @@ const tri = (a, b, c) => (u, v) => {
 const ellipse = (cu, cv, ru, rv) => (u, v) => ((u - cu) / ru) ** 2 + ((v - cv) / rv) ** 2 < 1;
 const any = (...fs) => (u, v) => fs.some(f => f(u, v));
 
+// Order to show n cards in: shuffled, and never the right order itself.
+function shuffled(n, seed) {
+  const r = CC.rng(seed), a = [...Array(n).keys()];
+  for (let i = n - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  if (a.every((v, i) => v === i)) a.reverse();
+  return a;
+}
 // layers: in the right order, bottom first. A flick launches a marble along a rail that runs
 // past one numbered spot per layer: the player puts the stencil pots on the spots. The marble
 // stops at each pot while it pours, then hits a white domino that splits, again and again,
@@ -918,7 +925,7 @@ function canvasLevel(name, teach, layers, _slots, cols = 20, rows = 18) {
   const L = layers.map(l => ({ ...l }));
   for (const o of field) { o.want = FIELD_W; o.wantK = -1; L.forEach((l, k) => { if (l.shape(o.fu, o.fv)) { o.want = l.color; o.wantK = k; } }); }
   return { name, teach, sol: [], colors: [FIELD_W, WH, ...L.map(l => l.color)], dominos: d, h: { start: starter[0], sign: 1 },
-    hot: [], spots, starts: [starter[0]], layers: L, field, budget: 2, cols, rows,
+    hot: [], spots, starts: [starter[0]], layers: L, field, budget: 2, cols, rows, show: shuffled(n, name.length * 7 + n), box: { cz: (z0 + z1) / 2, w: cols * sx, h: rows * sz },
     marbles: [{ rail, launcher: L1, target: root }], steps, zTop: z0, lastS: spots.at(-1).s,
     paint: [[rectP(x0 - 1.0, z0 - 0.7, x0 + W + 1.0, z1 + 0.6), 0x6b4a3a], [rectP(x0 - 0.6, z0 - 0.35, x0 + W + 0.6, z1 + 0.3), 0xe9e4d6]] };
 }
@@ -1260,8 +1267,8 @@ function loadLevel(i) {
 
 function resetDominos() {
   for (const d of doms) Object.assign(d, { state: 'up', th: 0, w: 0, u: [0, 0], cap: FLAT, targets: null, hitDone: false, shake: -9, flash: -9, chain: null, leanOn: null, gh: 0, pop: -9, hole: null, holeTold: false, wob: -9 });
-  chains = []; popups = []; marks = []; pushes = 0; focus = null; slowT = -9; sel = null; active = new Set(); goldNext = 1; goldBad = null; for (const q of pours) if (q.stream) scene.remove(q.stream); pours = []; layerMsg = '';
-  if (lvl.layers) { for (const o of lvl.field) { o.color = FIELD_W; o.top = -1; for (let k = 0; k < lvl.layers.length; k++) o['p' + k] = false; } for (const l of lvl.layers) l.poured = false; for (const m of pots) m.userData.tipT = -9; holdUntil = -9; waiting = []; for (const o of lvl.spots) o.fired = false; }
+  chains = []; popups = []; marks = []; pushes = 0; focus = null; slowT = -9; sel = null; active = new Set(); goldNext = 1; goldBad = null; for (const q of pours) { if (q.stream) scene.remove(q.stream); if (q.mask) scene.remove(q.mask); } pours = []; layerMsg = '';
+  if (lvl.layers) { for (const o of lvl.field) { o.color = FIELD_W; o.top = -1; o.seq = -1; for (let k = 0; k < lvl.layers.length; k++) o['p' + k] = false; } for (const l of lvl.layers) l.poured = false; for (const m of pots) m.userData.tipT = -9; holdUntil = -9; waiting = []; for (const o of lvl.spots) o.fired = false; }
   for (const m of marbles) { Object.assign(m, { pause: 0, resumed: true, s: 0, v: 0, state: 'rest', chain: null, predicted: false, q: new THREE.Quaternion(), p: m.tracks[0], L: m.tracks[0].L }); placeMarble(m, 0); }
   paint();
   updateMatrices();
@@ -1404,11 +1411,9 @@ function rollMarbles(h) {
     m.v += (m.v > 0 ? -0.25 - 6 * slope : 1.6) * h;
     if (m.v > 0 && m.v < 2.0) m.v = 2.0;
     if (lvl.layers) {
-      if (t < (m.pause || 0)) continue;
-      if (m.pause && !m.resumed) { m.resumed = true; m.v = 3.0; }
-      if (m.s > lvl.lastS + 0.2 && m.v < 5.5) m.v = 5.5;
+      if (m.s > lvl.lastS + 0.2) { if (m.v < 5.5) m.v = 5.5; } else m.v = 1.7;
       const sp = lvl.spots.find(o => !o.fired && m.s >= o.s);
-      if (sp) { sp.fired = true; if (sp.layer != null) { pourSpot(sp); m.pause = holdUntil; m.resumed = false; CC.sfx('tock'); continue; } }
+      if (sp) { sp.fired = true; if (sp.layer != null) { pourSpot(sp); CC.sfx('tock'); } }
     }
     const ds = m.v * h;
     m.s += ds; placeMarble(m, ds);
@@ -1595,10 +1600,15 @@ function step(dt) {
   if (waiting.length && t >= holdUntil) for (const a of waiting.splice(0)) topple(...a);
   for (const p of pours) {
     const l = lvl.layers[p.k];
-    for (const o of lvl.field) if (!o['p' + p.k] && l.shape(o.fu, o.fv) && t > p.t0 + Math.hypot(o.x - p.x, o.z - p.z) * 0.045) {
-      o['p' + p.k] = true; o.color = l.color; o.top = p.k; o.wob = t;
+    for (const o of lvl.field) if (!o['p' + p.k] && l.shape(o.fu, o.fv) && t > p.t0 + Math.hypot(o.x - p.x, o.z - p.z) * 0.035) {
+      o['p' + p.k] = true;
+      if (p.seq > (o.seq ?? -1)) { o.seq = p.seq; o.color = l.color; o.top = p.k; o.wob = t; }
     }
     if (!p.sound && t > p.t0) { p.sound = true; CC.sfx('drip', { p: 0.3 }); }
+    if (p.mask) {
+      const down = Math.min(1, Math.max(0, (t - (p.t0 - 0.34)) / 0.26)), up = Math.min(1, Math.max(0, (t - (p.end + 0.12)) / 0.3));
+      p.mask.visible = down > 0 && up < 1; p.mask.position.y = TALL + 0.16 + 2.8 * (1 - down) * (1 - down) + 2.4 * up * up; p.mask.material.opacity = Math.min(1, down * 1.5) * (1 - up);
+    }
     if (p.stream) { p.stream.visible = t > p.t0 - 0.12 && t < p.end + 0.15; p.stream.material.opacity = Math.min(1, Math.max(0, (p.end + 0.15 - t) / 0.3)); }
   }
   if (phase === 'play') {
@@ -1750,15 +1760,23 @@ function badge(ctx, x, y, ok, s) {
 
 function pourSpot(sp) {
   if (sp.layer == null) return;
-  const l = lvl.layers[sp.layer], t0 = CC.time + 0.35;
+  const l = lvl.layers[sp.layer], t0 = CC.time + 0.42;
   let far = 0;
   for (const o of lvl.field) if (l.shape(o.fu, o.fv)) far = Math.max(far, Math.hypot(o.x - sp.x, o.z - lvl.zTop));
   const a = new THREE.Vector3(sp.x, sp.y + 0.25, sp.z + 0.5), b = new THREE.Vector3(sp.x, 0.9, lvl.zTop + 0.2), len = a.distanceTo(b);
   const stream = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.2, len, 12), new THREE.MeshStandardMaterial({ color: l.color, roughness: 0.3, transparent: true }));
   stream.position.copy(a).lerp(b, 0.5); stream.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), a.clone().sub(b).normalize()); stream.visible = false;
   scene.add(stream); extras.push(stream);
-  l.poured = true; pours.push({ k: sp.layer, t0, x: sp.x, z: lvl.zTop, stream, end: t0 + far * 0.045 }); pots[sp.layer].userData.tipT = CC.time + 0.12;
-  holdUntil = t0 + far * 0.045 + 0.35;
+  const cv = document.createElement('canvas'), q = 8; cv.width = lvl.cols * q; cv.height = lvl.rows * q;
+  const g = cv.getContext('2d'); g.fillStyle = 'rgba(38,43,69,0.94)'; g.fillRect(0, 0, cv.width, cv.height);
+  g.strokeStyle = l.color; g.lineWidth = 6; g.strokeRect(0, 0, cv.width, cv.height);
+  for (const o of lvl.field) if (l.shape(o.fu, o.fv)) g.clearRect(Math.round(o.fu * (lvl.cols - 1)) * q, Math.round(o.fv * (lvl.rows - 1)) * q, q, q);
+  const tex = new THREE.CanvasTexture(cv); tex.magFilter = THREE.NearestFilter; tex.colorSpace = THREE.SRGBColorSpace;
+  const mask = new THREE.Mesh(new THREE.PlaneGeometry(lvl.box.w, lvl.box.h), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
+  mask.rotation.x = -Math.PI / 2; mask.position.set(0, 4, lvl.box.cz); mask.visible = false; mask.renderOrder = 3;
+  scene.add(mask); extras.push(mask);
+  l.poured = true; pours.push({ k: sp.layer, seq: pours.length, t0, x: sp.x, z: lvl.zTop, stream, mask, end: t0 + far * 0.035 }); pots[sp.layer].userData.tipT = CC.time + 0.1;
+  holdUntil = t0 + far * 0.035 + 0.35;
 }
 // Tap a stencil: it takes the next free spot. Tap it again: it goes back, the next ones move up.
 function toggleStencil(k) {
@@ -1805,8 +1823,8 @@ function drawStencil(ctx, l, x, y, size, dim) {
 }
 function cardRects() {
   const n = lvl.layers.length, perRow = n > 4 ? Math.ceil(n / 2) : n, cw = 760 / Math.max(perRow, 3);
-  return lvl.layers.map((l, k) => {
-    const row = Math.floor(k / perRow), col = k % perRow, inRow = Math.min(perRow, n - row * perRow);
+  return lvl.show.map((k, j) => {
+    const row = Math.floor(j / perRow), col = j % perRow, inRow = Math.min(perRow, n - row * perRow);
     const cx = 290 + 380 + (col - (inRow - 1) / 2) * cw, cy = (n > perRow ? 1584 : 1625) + row * 124;
     return { k, cx, cy, r: [cx - cw / 2 + 6, cy - 58, cw - 12, 118] };
   });

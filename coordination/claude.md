@@ -2984,3 +2984,13 @@
 - 15:59 : pots sur piquets au-dessus du tableau, rampe en pente, filet de peinture ; 6 niveaux vérifiés (bon ordre,
   ordre inverse) ; eslint OK ; poussé à la demande de l'utilisateur : mes 2 fichiers et cette section seulement. Statut
   : terminé. Réservations libérées.
+
+## 2026-11-12 — ColorChain : masque et ordre mélangé (session colorchain)
+- Statut : en cours (2026-11-12T16:17+01:00). Demande de l'utilisateur : la bille ne doit plus s'arrêter, un masque qui
+  ne laisse passer la peinture que sur certains dominos, pochoirs en ordre aléatoire ; mises à jour du prototype
+  autorisées
+- Réservations actives : `public/prototypes/colorchain-peinture/index.html`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 16:17 : bille sans arrêt, plaque de pochoir qui descend sur le tableau à chaque pot, cartes mélangées ; 6 niveaux
+  vérifiés (bon ordre, ordre inverse) ; poussé à la demande de l'utilisateur : mon fichier et cette section seulement.
+  Statut : terminé. Réservations libérées.
