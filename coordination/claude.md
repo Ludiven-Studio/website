@@ -2994,3 +2994,12 @@
 - 16:17 : bille sans arrêt, plaque de pochoir qui descend sur le tableau à chaque pot, cartes mélangées ; 6 niveaux
   vérifiés (bon ordre, ordre inverse) ; poussé à la demande de l'utilisateur : mon fichier et cette section seulement.
   Statut : terminé. Réservations libérées.
+
+## 2026-11-12 — ColorChain : rail en lacets (session colorchain)
+- Statut : en cours (2026-11-12T16:38+01:00). Demande de l'utilisateur : allonger la descente de la bille avec
+  plusieurs virages ; mises à jour du prototype autorisées
+- Réservations actives : `public/prototypes/colorchain-peinture/index.html`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 16:38 : rail en épingles autour des pots, 1,5 s entre deux pots, un masque à la fois ; 6 niveaux vérifiés (bon ordre,
+  ordre inverse) ; poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé.
+  Réservations libérées.

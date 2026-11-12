@@ -906,21 +906,36 @@ function canvasLevel(name, teach, layers, _slots, cols = 20, rows = 18) {
   // Flick three dominoes on a raised stand: they launch the marble. Its rail slopes down along
   // the top of the picture, past the pots standing above the dominoes, then goes round the
   // picture down to the table and ends on the root.
-  const H0 = 3.0, H1 = 2.2, zT = z0 - 1.9, xS = x0 - 0.3, xE = x0 + W + 0.3, xR = xE + 1.1, zB = zR + 1.1;
-  const starter = place(path().add(sample(x => [x, zT], xS - 1.9, xS - 0.55, 200), { color: WH }), d);
+  const H0 = 3.2, H1 = 2.0, zT = z0 - 1.9, xS = x0 - 0.3, xE = x0 + W + 0.3, xR = xE + 1.1, zB = zR + 1.1;
+  const dx = n > 1 ? (xE - xS - 2.0) / (n - 1) : 2.4, r = Math.min(0.6, dx / 4), zN = zT - r, zF = zN - 1.8;
+  const px = k => xS + 1.0 + k * dx;
+  const arc = (cx, cz, a0, a1) => sample(a => [cx + r * Math.cos(a), cz + r * Math.sin(a)], a0, a1, 40);
+  const line = (a, b) => sample(t => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t], 0, 1, Math.max(8, Math.round(Math.hypot(b[0] - a[0], b[1] - a[1]) * 30)));
+  // Hairpins: down to a pot, round it, back up, across to the next one.
+  const zig = [], apex = [];
+  const startX = px(0) - 2 * r - 0.9;
+  zig.push(...line([startX, zF - r], [px(0) - 2 * r, zF - r]));
+  for (let k = 0; k < n; k++) {
+    zig.push(...arc(px(k) - 2 * r, zF, 1.5 * Math.PI, 2 * Math.PI), ...line([px(k) - r, zF], [px(k) - r, zN]));
+    const half = arc(px(k), zN, Math.PI, Math.PI / 2);
+    zig.push(...half); apex.push(zig.length - 1);
+    zig.push(...arc(px(k), zN, Math.PI / 2, 0), ...line([px(k) + r, zN], [px(k) + r, zF]), ...arc(px(k) + 2 * r, zF, Math.PI, 1.5 * Math.PI));
+    zig.push(...line([px(k) + 2 * r, zF - r], [k < n - 1 ? px(k + 1) - 2 * r : xR - r, zF - r]));
+  }
+  zig.push(...arc(xR - r, zF, 1.5 * Math.PI, 2 * Math.PI));
+  const cum = [0];
+  for (let i = 1; i < zig.length; i++) cum.push(cum[i - 1] + Math.hypot(zig[i][0] - zig[i - 1][0], zig[i][1] - zig[i - 1][1]));
+  const top = zig.map((q, i) => [q[0], q[1], H0 + (H1 - H0) * cum[i] / cum.at(-1)]);
+  const starter = place(path().add(sample(x => [x, zF - r], startX - 1.9, startX - 0.55, 200), { color: WH }), d);
   for (const o of starter) o.y = H0;
   const L1 = starter.at(-1);
   const seg = (pts, ya, yb) => pts.map((q, i) => [q[0], q[1], ya + (yb - ya) * i / (pts.length - 1)]);
-  const rail = [...seg(sample(x => [x, zT], xS, xE, 900), H0, H1),
-    ...seg(bez([xE, zT], [xE + 0.8, zT], [xR, zT + 0.3], [xR, zT + 1.1], 120), H1, H1 - 0.1),
-    ...seg(sample(z => [xR, z], zT + 1.1, zB - 1.0, 1200), H1 - 0.1, 0.12),
+  const rail = [...top,
+    ...seg(line([xR, zF], [xR, zB - 1.0]), H1, 0.12),
     ...seg(bez([xR, zB - 1.0], [xR, zB - 0.3], [xR - 0.3, zB], [xR - 1.0, zB], 120), 0.12, 0.04),
-    ...seg(sample(x => [x, zB], xR - 1.0, 0.9, 600), 0.04, 0),
+    ...seg(line([xR - 1.0, zB], [0.9, zB]), 0.04, 0),
     ...seg(bez([0.9, zB], [0.3, zB], [0, zB - 0.2], [0, zR + 0.45], 120), 0, 0)];
-  const spots = layers.map((l, k) => {
-    const x = xS + 1.0 + k * (xE - xS - 2.0) / Math.max(1, n - 1);
-    return { x, z: zT + 0.75, y: H0 + (H1 - H0) * (x - xS) / (xE - xS) - 0.15, k, state: 'up', spot: true, layer: null, s: x - xS };
-  });
+  const spots = layers.map((l, k) => ({ x: px(k), z: zT + 0.75, y: top[apex[k]][2] - 0.15, k, state: 'up', spot: true, layer: null, s: cum[apex[k]] }));
   const steps = starter.map(o => ({ x: o.x, z: o.z, a: 0, h: H0 }));
   const L = layers.map(l => ({ ...l }));
   for (const o of field) { o.want = FIELD_W; o.wantK = -1; L.forEach((l, k) => { if (l.shape(o.fu, o.fv)) { o.want = l.color; o.wantK = k; } }); }
@@ -1152,7 +1167,7 @@ function loadLevel(i) {
   }
   if (lvl.layers) {
     const r = lvl.marbles[0].rail;
-    for (let i = 0; i < r.length; i += 110) if (r[i][2] > 0.3) { const post = keep(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, r[i][2], 8), railMat)); post.position.set(r[i][0], r[i][2] / 2, r[i][1]); }
+    for (let i = 0; i < r.length; i += 75) if (r[i][2] > 0.3) { const post = keep(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, r[i][2], 8), railMat)); post.position.set(r[i][0], r[i][2] / 2, r[i][1]); }
   }
   pots = (lvl.layers || []).map(l => {
     const g = new THREE.Group(), mat = new THREE.MeshStandardMaterial({ color: l.color, roughness: 0.5 });
@@ -1186,7 +1201,7 @@ function loadLevel(i) {
     });
     for (const tr of tracks) for (const side of [-1, 1]) {
       const pts = tr.pts.map((q, i) => { const a = tr.pts[Math.max(0, i - 1)], c = tr.pts[Math.min(tr.pts.length - 1, i + 1)], l = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1; const o = add2(q, [-(c[1] - a[1]) / l, (c[0] - a[0]) / l], 0.17 * side); return new THREE.Vector3(o[0], 0.05 + tr.ys[i], o[1]); });
-      const tube = keep(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 300, 0.035, 6), railMat)); tube.castShadow = true;
+      const tube = keep(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), Math.max(300, Math.min(1500, Math.round(tr.L * 14))), 0.035, 6), railMat)); tube.castShadow = true;
     }
     if (m.trunk) for (let i = 0; i < m.trunk.length; i += 60) {
       const [x, z, y] = m.trunk[i];
@@ -1411,7 +1426,7 @@ function rollMarbles(h) {
     m.v += (m.v > 0 ? -0.25 - 6 * slope : 1.6) * h;
     if (m.v > 0 && m.v < 2.0) m.v = 2.0;
     if (lvl.layers) {
-      if (m.s > lvl.lastS + 0.2) { if (m.v < 5.5) m.v = 5.5; } else m.v = 1.7;
+      if (m.s > lvl.lastS + 0.2) { if (m.v < 5.5) m.v = 5.5; } else m.v = 2.2;
       const sp = lvl.spots.find(o => !o.fired && m.s >= o.s);
       if (sp) { sp.fired = true; if (sp.layer != null) { pourSpot(sp); CC.sfx('tock'); } }
     }
