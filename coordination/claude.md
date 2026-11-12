@@ -2955,3 +2955,12 @@
 - 14:24 : pochoirs visibles, pots posés le long d'une seule ligne de dominos ; 6 niveaux vérifiés (bon ordre, ordre
   inverse) ; eslint OK ; poussé à la demande de l'utilisateur : mes 2 fichiers et cette section seulement. Statut :
   terminé. Réservations libérées.
+
+## 2026-11-12 — ColorChain : pochoirs touchés dans l'ordre (session colorchain)
+- Statut : en cours (2026-11-12T14:52+01:00). Demande de l'utilisateur : toucher les pochoirs dans l'ordre, les
+  retoucher pour les retirer ; reset qui marche mal ; mises à jour du prototype autorisées
+- Réservations actives : `public/prototypes/colorchain-peinture/index.html`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 14:52 : pochoirs touchés dans l'ordre, retirés au second toucher ; pots debout après un reset ; 6 niveaux et les
+  parcours échec, retouche et reset vérifiés ; poussé à la demande de l'utilisateur : mon fichier et cette section
+  seulement. Statut : terminé. Réservations libérées.

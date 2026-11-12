@@ -893,7 +893,7 @@ function canvasLevel(name, teach, layers, _slots, cols = 20, rows = 18) {
   const L = layers.map(l => ({ ...l }));
   for (const o of field) { o.want = FIELD_W; o.wantK = -1; L.forEach((l, k) => { if (l.shape(o.fu, o.fv)) { o.want = l.color; o.wantK = k; } }); }
   return { name, teach, sol: [], colors: [FIELD_W, LC, ...L.map(l => l.color)], dominos: d, h: { start: line[0], sign: 1 },
-    hot: spots, spots, starts: [line[0]], layers: L, field, budget: 2, cols, rows,
+    hot: [], spots, starts: [line[0]], layers: L, field, budget: 2, cols, rows,
     paint: [[rectP(x0 - 1.0, z0 - 0.7, x0 + W + 1.0, z1 + 1.0), 0x6b4a3a], [rectP(x0 - 0.6, z0 - 0.35, x0 + W + 0.6, z1 + 0.35), 0xe9e4d6]] };
 }
 
@@ -1611,7 +1611,7 @@ function step(dt) {
     m.position.y = d.state === 'up' ? 0.07 : -1;
   }
   for (const m of marbles) if (m.flipper && m.flipper.mesh) m.flipper.mesh.rotation.y = -m.flipper.dirs[m.flipper.pos];
-  for (const m of pots) { const e = Math.min(1, Math.max(0, (t - m.userData.tipT) / 0.35)); m.rotation.x = -1.9 * e * e; m.position.y = 0.25 * Math.sin(Math.PI * e); }
+  for (const m of pots) { const e = m.userData.tipT < 0 ? 0 : Math.min(1, Math.max(0, (t - m.userData.tipT) / 0.35)); m.rotation.x = -1.9 * e * e; m.position.y = 0.25 * Math.sin(Math.PI * e); }
   updateCam(dt);
   paint();
   updateMatrices();
@@ -1718,6 +1718,18 @@ function pourSpot(sp) {
   l.poured = true; pours.push({ k: sp.layer, t0, x: sp.x, z: sp.z }); pots[sp.layer].userData.tipT = CC.time + 0.12;
   holdUntil = t0 + far * 0.045 + 0.35;
 }
+// Tap a stencil: it takes the next free spot. Tap it again: it goes back, the next ones move up.
+function toggleStencil(k) {
+  if (phase !== 'play' || doms.some(d => d.state === 'falling') || waiting.length) return;
+  if (pushes > 0) retry();
+  const order = lvl.spots.map(o => o.layer).filter(v => v != null);
+  const at = order.indexOf(k);
+  if (at >= 0) order.splice(at, 1); else if (order.length < lvl.spots.length) order.push(k);
+  lvl.spots.forEach((o, j) => { o.layer = order[j] ?? null; });
+  for (const [j, m] of pots.entries()) { const o = lvl.spots.find(q => q.layer === j); m.visible = !!o; if (o) m.position.set(o.x, 0, o.z); m.userData.tipT = -9; m.rotation.x = 0; m.position.y = 0; }
+  if (at < 0) hl = { k, t: CC.time };
+  CC.sfx('select', { p: at >= 0 ? 0.2 : 0.6 });
+}
 function putPot(sp, k) {
   const was = sp.layer;
   for (const o of lvl.spots) if (o.layer === k) o.layer = null;
@@ -1763,7 +1775,7 @@ function drawLayersHud(ctx) {
     ctx.fillStyle = 'rgba(16,18,32,0.85)'; CC.roundRect(ctx, 30, y0 - 80, 1020, h + 110, 26); ctx.fill();
     ctx.fillStyle = '#cfd5f5'; ctx.font = 'bold 28px Segoe UI, Arial'; ctx.fillText('Modèle', 150, y0 - 40);
     lvl.field.forEach((o, k) => { ctx.fillStyle = o.want; ctx.fillRect(x0 + (k % cols) * s, y0 - 20 + Math.floor(k / cols) * s, s + 0.5, s + 0.5); });
-    ctx.fillStyle = '#cfd5f5'; ctx.font = 'bold 26px Segoe UI, Arial'; ctx.fillText('Pochoirs : touche pour voir où ils peignent', 670, y0 - 44);
+    ctx.fillStyle = '#cfd5f5'; ctx.font = 'bold 26px Segoe UI, Arial'; ctx.fillText('Pochoirs : touche-les dans l’ordre', 670, y0 - 44);
     for (const c of cardRects()) {
       const l = lvl.layers[c.k], sp = lvl.spots.find(o => o.layer === c.k);
       drawStencil(ctx, l, c.cx, c.cy - 10, 78, !!sp);
@@ -1847,8 +1859,8 @@ function draw(ctx) {
       ctx.fillText('Remplis les cases avec le stock, dans le bon sens.', CC.W / 2, 1810);
       ctx.fillText('Puis une pichenette sur un socle orange : tout doit tomber.', CC.W / 2, 1858);
     } else if (lvl.layers) {
-      ctx.fillText('Pose un pochoir sur chaque emplacement : la chaîne les verse', CC.W / 2, 1810);
-      ctx.fillText('dans l’ordre 1, 2, 3… Le dernier versé passe devant.', CC.W / 2, 1858);
+      ctx.fillText('Touche les pochoirs dans l’ordre : le dernier versé passe devant.', CC.W / 2, 1810);
+      ctx.fillText('Touche-le encore pour le retirer. Puis une pichenette.', CC.W / 2, 1858);
     } else ctx.fillText(lvl.golds ? 'Une pichenette sur un socle orange, dans un sens ou dans l’autre.' : 'Une pichenette sur un socle orange : tout doit tomber.', CC.W / 2, 1834);
   } else if (!lvl.layers) ctx.fillText('Touche une autre case, ou ailleurs pour reculer.', CC.W / 2, 1840);
   if (phase === 'play' && goldBad && chains.length && chains.every(c => c.done) && !doms.some(d => d.state === 'falling')) {
@@ -2036,7 +2048,11 @@ canvas.addEventListener('pointerdown', ev => {
     const b = panelButtons().find(b => Math.hypot(b.x - x, PANEL_Y - y) < b.r + 12);
     if (b) { press(b); return; }
   }
-  if (lvl.layers && !sel) { const c = cardRects().find(c => inRect(x, y, c.r)); if (c) { hl = { k: c.k, t: CC.time }; CC.sfx('select', { p: 0.6 }); return; } }
+  if (lvl.layers) {
+    const c = cardRects().find(c => inRect(x, y, c.r));
+    const sp = !c && lvl.spots.find(o => o.layer != null && Math.hypot(...proj(o.x, 0, o.z).map((v, i) => v - [x, y][i])) < 70);
+    if (c || sp) { toggleStencil(c ? c.k : sp.layer); return; }
+  }
   const st = canAct() ? nearest(lvl.starts, x, y, 100) : null;
   if (st) { down = { d: st, x, y, t: performance.now() }; return; }
   const d = nearest(lvl.hot, x, y, 90);
