@@ -33,6 +33,8 @@ const DEG = Math.PI / 180;
 const TALL = 1.0, WIDE = 0.55, THIN = 0.13, SP = 0.6, GAP = 0.46;
 const REACH = 0.95, LANE = WIDE * 0.66, FACE_OK = Math.cos(65 * DEG), SHIELD = 0.2;
 const GRAV = 100, LEAN = 1.2, FLAT = Math.PI / 2, BUDGET = 2;
+// Physics clock: x2 gives the pace of real 5 cm dominoes (about 30 per second).
+const SPEED = 2;
 const NAMES = { '#8b5a2b': 'marron', '#9b5de5': 'violet', '#d9b77e': 'bois', '#e6cf98': 'sable', '#ff8a3d': 'orange', '#4a9cff': 'bleu', '#f4f1e8': 'blanc', '#e8434d': 'rouge', '#4cc36b': 'vert', '#ffd23f': 'jaune', '#ff6fa8': 'rose', '#f0b429': 'doré' };
 
 // ---- Dense curve pieces, as arrays of [x, z]
@@ -812,6 +814,7 @@ function feltTexture() {
 }
 const table = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ map: feltTexture(), roughness: 0.95 }));
 table.rotation.x = -Math.PI / 2; table.receiveShadow = true;
+table.material.depthWrite = false; table.renderOrder = -2000;
 scene.add(table);
 function faceTexture() {
   const cv = document.createElement('canvas'); cv.width = 128; cv.height = 256;
@@ -884,7 +887,7 @@ scene.add(alarm);
 function flatShape(pts, color) {
   const s = new THREE.Shape(pts.map(([x, z]) => new THREE.Vector2(x, -z)));
   const m = new THREE.Mesh(new THREE.ShapeGeometry(s), new THREE.MeshStandardMaterial({ color, roughness: 0.8, transparent: true }));
-  m.rotation.x = -Math.PI / 2; m.position.y = 0.01; m.receiveShadow = true;
+  m.rotation.x = -Math.PI / 2; m.position.y = 0.01; m.receiveShadow = true; m.userData.flat = true;
   return m;
 }
 
@@ -1027,6 +1030,9 @@ function loadLevel(i) {
       decal(flatShape([w, add2(add2(q, pp, 1.0 * s), ad, -0.6), add2(add2(q, pp, 1.0 * s), ad, -0.2), add2(w, ad, 0.4)], gold));
     }
   }
+  // Ground layers sit a few thousandths apart: far away the depth buffer mixes them up and they
+  // flicker. Draw them in height order without depth writes instead.
+  for (const m of extras) if (m.userData.flat) { m.material.depthWrite = false; m.renderOrder = -1000 + Math.round(m.position.y * 1e4); }
   fitCamera();
   cam = { x: base.x, z: base.z, k: 1, yaw: 0, el: base.el };
   tries = 0;
@@ -1098,6 +1104,8 @@ function fitCamera() {
   base = fitView(380, 1720, 50 * DEG);
   placeCam(base.x, base.z, 1);
   scene.fog.near = base.D * 1.4; scene.fog.far = base.D * 3;
+  // Tight near/far planes keep depth precision on phones (often a 16-bit depth buffer).
+  camera.near = Math.max(0.5, base.D * 0.08); camera.far = base.D * 4; camera.updateProjectionMatrix();
   let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
   for (const d of doms) { x0 = Math.min(x0, d.x); x1 = Math.max(x1, d.x); z0 = Math.min(z0, d.z); z1 = Math.max(z1, d.z); }
   const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
@@ -1116,7 +1124,7 @@ function updateCam(dt) {
   else if (focus && t < focus.until) { x = focus.x; z = focus.z; k = 0.42; rate = 3.2; yaw = focus.yaw; el = 40 * DEG; }
   else if (live.length) {
     const f = live.at(-1).front;
-    x = base.x + (f.x - base.x) * 0.4; z = base.z + (f.z - base.z) * 0.4; k = 0.85; rate = 1.2;
+    x = base.x + (f.x - base.x) * 0.4; z = base.z + (f.z - base.z) * 0.4; k = 0.85; rate = 2;
   }
   const e = 1 - Math.exp(-rate * dt);
   cam.x += (x - cam.x) * e; cam.z += (z - cam.z) * e; cam.k += (k - cam.k) * e; cam.yaw += (yaw - cam.yaw) * e; cam.el += (el - cam.el) * e;
@@ -1282,7 +1290,7 @@ function step(dt) {
   const t = CC.time;
   if (phase === 'intro' && t - phaseT > 1.6) { phase = 'play'; phaseT = t; }
   for (const d of doms) d.va += (d.a - d.va) * 0.13;
-  const sub = 8, h = dt * slowFactor() / sub;
+  const sub = 16, h = dt * SPEED * slowFactor() / sub;
   for (let s = 0; s < sub; s++) {
     rollMarbles(h);
     for (const d of doms) {
@@ -1754,7 +1762,7 @@ const autoplay = t => {
   tour(t);
   // The video tour plays falls at double speed; settings and slow motion stay as they are.
   const running = doms.some(d => d.state === 'falling') || marbles.some(m => m.state === 'rolling');
-  if (CC.recording && running && !focus && slowFactor() === 1) { step(CC.DT); CC.time += CC.DT; fastT = CC.time; }
+  if (CC.recording && SPEED === 1 && running && !focus && slowFactor() === 1) { step(CC.DT); CC.time += CC.DT; fastT = CC.time; }
   if (phase === 'clear' && t > phaseT + 1.7 && li < LAST) { loadLevel(li + 1); tour = levelScript(CC.time); }
 };
 
