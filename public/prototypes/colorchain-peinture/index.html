@@ -874,11 +874,17 @@ function shuffled(n, seed) {
   if (a.every((v, i) => v === i)) a.reverse();
   return a;
 }
+// Puts the dominoes of a turntable where its angle says.
+function setPlate(P) {
+  const c = Math.cos(P.phi), s = Math.sin(P.phi);
+  for (const o of P.doms) { o.x = P.x + o.lx * c - o.lz * s; o.z = P.z + o.lx * s + o.lz * c; o.a = o.va = o.la + P.phi; }
+  if (P.mesh) P.mesh.rotation.y = -P.phi;
+}
 // layers: in the right order, bottom first. A flick launches a marble along a rail that runs
 // past one numbered spot per layer: the player puts the stencil pots on the spots. The marble
 // stops at each pot while it pours, then hits a white domino that splits, again and again,
 // into one line per column of the picture, and the whole picture falls.
-function canvasLevel(name, teach, layers, _slots, cols = 20, rows = 18) {
+function canvasLevel(name, teach, layers, turned, cols = 20, rows = 18) {
   const d = [], sx = 0.6, sz = 0.55, WH = '#f4f1e8';
   const x0 = -(cols - 1) * sx / 2, z0 = -6.4, z1 = z0 + (rows - 1) * sz, W = (cols - 1) * sx, n = layers.length;
   const field = [];
@@ -887,7 +893,7 @@ function canvasLevel(name, teach, layers, _slots, cols = 20, rows = 18) {
     field.push(o); d.push(o);
   }
   // The splitting tree, from its root up to one leaf under each column.
-  const xs = [...Array(cols).keys()].map(i => x0 + i * sx), zLeaf = z1 + 0.6, zR = zLeaf + 9.2;
+  const xs = [...Array(cols).keys()].map(i => x0 + i * sx), zLeaf = z1 + 0.6, zR = zLeaf + 9.4;
   const root = { x: 0, z: zR, a: -FLAT, color: WH, tag: {}, root: true };
   d.push(root);
   const grow = (node, a, b) => {
@@ -904,7 +910,27 @@ function canvasLevel(name, teach, layers, _slots, cols = 20, rows = 18) {
       if (!leaf) grow(end, lo, hi);
     }
   };
-  grow(root, 0, cols);
+  // Two turntables between the root and the tree. Each carries a bend of three dominoes
+  // that links its two lines in one of its four positions only.
+  const H = 1.5, zP = zR - 1.3, half = Math.ceil(cols / 2), rp = CC.rng(name.length * 13 + n), plates = [], marks = [];
+  for (const [lo, hi, side] of [[0, half, -1], [half, cols, 1]]) {
+    const xc = (xs[lo] + xs[hi - 1]) / 2, br = branchFrom(root, side, 35), xin = xc - side * (H + 0.32);
+    const inn = place(path().add(bez(br.p, add2(br.p, dirOf(br.h), 0.7), [xin - side * 0.8, zP], [xin, zP]), { color: WH }), d);
+    inn[0].a = br.h;
+    const P = { x: xc, z: zP, good: side > 0 ? 0 : 1, lock: !turned, H, doms: [] };
+    for (const th of [11.25, 33.75, 56.25, 78.75]) {
+      const o = { lx: H * (Math.sin(th * DEG) - 1), lz: H * (Math.cos(th * DEG) - 1), la: -th * DEG, y: 0.05, color: WH, tag: {}, plate: P };
+      P.doms.push(o); d.push(o);
+    }
+    P.q = turned ? (P.good + 1 + Math.floor(rp() * 3)) % 4 : P.good; P.phi = P.to = P.q * FLAT;
+    setPlate(P);
+    const out = place(path().add(sample(z => [xc, z], zP - H - 0.32, zP - H - 1.0, 200), { color: WH }), d);
+    out.at(-1).a = -FLAT;
+    grow(out.at(-1), lo, hi);
+    plates.push(P);
+    const xa = xin - side * 0.55, xb = xc - side * (H + 0.12);
+    marks.push([rectP(Math.min(xa, xb), zP - 0.22, Math.max(xa, xb), zP + 0.22), 0xffd98a], [rectP(xc - 0.22, zP - H - 0.75, xc + 0.22, zP - H - 0.12), 0xffd98a]);
+  }
   // Flick three dominoes on a raised stand: they launch the marble. Its rail slopes down along
   // the top of the picture, past the pots standing above the dominoes, then goes round the
   // picture down to the table and ends on the root.
@@ -951,8 +977,8 @@ function canvasLevel(name, teach, layers, _slots, cols = 20, rows = 18) {
   for (const o of field) { o.want = FIELD_W; o.wantK = -1; L.forEach((l, k) => { if (l.shape(o.fu, o.fv)) { o.want = l.color; o.wantK = k; } }); }
   return { name, teach, sol: [], colors: [FIELD_W, WH, ...L.map(l => l.color)], dominos: d, h: { start: starter[0], sign: 1 },
     hot: [], spots, starts: [starter[0]], layers: L, field, budget: 2, cols, rows, show: shuffled(n, name.length * 7 + n), box: { cz: (z0 + z1) / 2, w: cols * sx, h: rows * sz },
-    marbles: [{ rail, launcher: L1, target: root }], stairs, zTop: z0, lastS: spots.at(-1).s,
-    paint: [[rectP(x0 - 1.0, z0 - 0.7, x0 + W + 1.0, z1 + 0.6), 0x6b4a3a], [rectP(x0 - 0.6, z0 - 0.35, x0 + W + 0.6, z1 + 0.3), 0xe9e4d6]] };
+    marbles: [{ rail, launcher: L1, target: root }], stairs, zTop: z0, lastS: spots.at(-1).s, plates,
+    paint: [...marks, [rectP(x0 - 1.0, z0 - 0.7, x0 + W + 1.0, z1 + 0.6), 0x6b4a3a], [rectP(x0 - 0.6, z0 - 0.35, x0 + W + 0.6, z1 + 0.3), 0xe9e4d6]] };
 }
 
 // A shape written as text in levels.js.
@@ -988,8 +1014,8 @@ function targetOf(def, order) {
 }
 // Easy pictures first: sorted by number of colors, in the order they are written.
 const PICS = DEFS.map((d, i) => [d, i]).sort((a, b) => a[0].length - b[0].length || a[1] - b[1]).map(x => x[0]).slice(0, 100);
-const TEACH = { 0: 'Compare chaque pochoir au modèle : la couleur qui passe devant va après', 2: 'Regarde quelle forme est coupée : celle qui la coupe passe après elle' };
-const BUILD = PICS.map((def, i) => () => canvasLevel(def[0], TEACH[i] || '', layersOf(def), [], COLS, ROWS));
+const TEACH = { 0: 'Compare chaque pochoir au modèle : la couleur qui passe devant va après', 3: 'Touche les plateaux ronds pour les tourner : les dominos doivent se suivre', 2: 'Regarde quelle forme est coupée : celle qui la coupe passe après elle' };
+const BUILD = PICS.map((def, i) => () => canvasLevel(def[0], TEACH[i] || '', layersOf(def), i >= 3, COLS, ROWS));
 const LEVEL_NAMES = PICS.map(d => d[0]);
 // Checks every picture: one right order only, and every color still seen at the end.
 window.__checkDefs = () => {
@@ -1145,10 +1171,12 @@ function flatShape(pts, color) {
 }
 
 // ---- Game state
-let goldNext = 1, goldBad = null, pours = [], layerMsg = '', pots = [], holdUntil = -9, waiting = [], hl = { k: -1, t: -9 };
+let goldNext = 1, goldBad = null, pours = [], layerMsg = '', stuck = false, pots = [], holdUntil = -9, waiting = [], hl = { k: -1, t: -9 };
 let li = -1, lvl, doms, mesh, extras = [], chains, popups, marks, pushes, phase, phaseT, results = [], tries = 0, helpOn = false, marbles = [];
 let focus = null, slowT = -9, cam = null, base = null, ghost, halos = [], sel = null, selT = -9, active = new Set();
 
+const turnMat = new THREE.MeshStandardMaterial({ color: 0x55679f, roughness: 0.7 });
+const bandMat = new THREE.MeshBasicMaterial({ color: 0xffd98a, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
 function loadLevel(i) {
   li = i; lvl = BUILD[i]();
   doms = lvl.dominos;
@@ -1190,6 +1218,12 @@ function loadLevel(i) {
     if (d.gate) for (const a of [d.a, d.gb]) {
       const m = keep(new THREE.Mesh(barGeom, plateMat)); m.position.set(d.x, 0.015, d.z); m.rotation.y = -a; m.receiveShadow = true;
     }
+  }
+  for (const P of lvl.plates || []) {
+    const g = keep(new THREE.Group()); g.position.set(P.x, 0, P.z);
+    const disc = new THREE.Mesh(new THREE.CylinderGeometry(P.H + 0.1, P.H + 0.1, 0.05, 56), turnMat); disc.position.y = 0.025; disc.receiveShadow = true;
+    const band = new THREE.Mesh(new THREE.RingGeometry(P.H - 0.22, P.H + 0.22, 40, 1, -Math.PI / 2, Math.PI / 2), bandMat); band.rotation.x = -Math.PI / 2; band.position.set(-P.H, 0.053, -P.H);
+    g.add(disc, band); P.mesh = g; setPlate(P);
   }
   for (const sp of lvl.spots || []) {
     const post = keep(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, sp.y, 10), railMat)); post.position.set(sp.x, sp.y / 2, sp.z); post.castShadow = true;
@@ -1587,6 +1621,7 @@ function step(dt) {
   const t = CC.time;
   if (phase === 'intro' && t - phaseT > 1.6) { phase = 'play'; phaseT = t; }
   for (const d of doms) d.va += (d.a - d.va) * 0.13;
+  for (const P of lvl.plates || []) if (P.phi !== P.to) { P.phi += (P.to - P.phi) * 0.3; if (Math.abs(P.to - P.phi) < 0.01) P.phi = P.to; setPlate(P); }
   const sub = 16, h = dt * SPEED * slowFactor() / sub;
   for (let s = 0; s < sub; s++) {
     rollMarbles(h);
@@ -1664,7 +1699,8 @@ function step(dt) {
   if (phase === 'play') {
     const moving = doms.some(d => d.state === 'falling'), settled = chains.every(c => c.done);
     const painting = lvl.layers && pours.some(p => lvl.field.some(o => !o['p' + p.k] && lvl.layers[p.k].shape(o.fu, o.fv)));
-    if (lvl.layers && !moving && settled && !painting && !layerMsg && doms.every(d => d.state !== 'up')) layerMsg = judgeLayers();
+    if (lvl.layers && !moving && settled && !painting && !layerMsg && doms.every(d => d.state !== 'up')) { layerMsg = judgeLayers(); stuck = false; }
+    if (lvl.layers && pushes > 0 && !moving && settled && !painting && !layerMsg && !marbles.some(m => m.state === 'rolling') && doms.some(d => d.state === 'up')) { layerMsg = 'Des dominos sont restés debout'; stuck = true; }
     if (!moving && settled && !painting && doms.every(d => d.state !== 'up') && !goldBad && !layerMsg) {
       phase = 'clear'; phaseT = t + 1.6; results[li] = lvl.layers ? (tries === 0 && !helpOn ? 3 : tries <= 2 ? 2 : 1) : lvl.hard ? (pushes === 1 && tries === 0 ? 3 : tries <= 2 ? 2 : 1) : pushes === 1 ? 3 : 2;
     }
@@ -1946,6 +1982,13 @@ function drawLayersHud(ctx) {
       if (sp) { ctx.fillStyle = '#ffd23f'; ctx.font = 'bold 34px Segoe UI, Arial'; ctx.fillText(sp.k + 1, c.cx, c.cy + 4); }
     }
   }
+  // A round arrow on each turntable that can be turned.
+  if (phase === 'play' && pushes === 0 && !layerMsg) for (const P of lvl.plates) if (!P.lock) {
+    const c = Math.cos(P.phi), s = Math.sin(P.phi), [x, y] = proj(P.x + 0.55 * (c - s), 0.06, P.z + 0.55 * (s + c));
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(x, y, 18, -0.2 * Math.PI, 1.4 * Math.PI); ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(x + 23, y - 21); ctx.lineTo(x + 23, y - 2); ctx.lineTo(x + 6, y - 10); ctx.fill();
+  }
   // Spots: their number, and the stencil put there.
   if (phase !== 'clear') for (const sp of lvl.spots) {
     const [x, y] = proj(sp.x, sp.y + 1.05, sp.z);
@@ -2034,7 +2077,7 @@ function draw(ctx) {
     ctx.fillStyle = 'rgba(16,18,32,0.94)'; CC.roundRect(ctx, 60, 1430, CC.W - 120, 440, 40); ctx.fill();
     ctx.fillStyle = '#fff'; ctx.font = 'bold 66px Segoe UI, Arial'; ctx.fillText('Presque !', CC.W / 2, 1515);
     ctx.fillStyle = '#ffd23f'; ctx.font = 'bold 40px Segoe UI, Arial'; ctx.fillText(layerMsg, CC.W / 2, 1590);
-    ctx.fillStyle = '#cfd5f5'; ctx.font = '32px Segoe UI, Arial'; ctx.fillText('Change l’ordre des pochoirs pour refaire le modèle.', CC.W / 2, 1650);
+    ctx.fillStyle = '#cfd5f5'; ctx.font = '32px Segoe UI, Arial'; ctx.fillText(stuck ? 'Tourne les plateaux ronds : les dominos doivent se suivre.' : 'Change l’ordre des pochoirs pour refaire le modèle.', CC.W / 2, 1650);
     bigButton(ctx, retryBig, '↻ Réessayer', '#38c172');
   } else if (phase === 'play' && pushes >= budget() && chains.every(c => c.done) && doms.some(d => d.state === 'up')) {
     ctx.fillStyle = '#ff8a7a'; ctx.font = 'bold 44px Segoe UI, Arial';
@@ -2187,6 +2230,10 @@ function turn(d) {
   CC.sfx('select', { p: 0.3 });
 }
 function retry() { tries++; resetDominos(); phase = 'play'; }
+function turnPlate(P) {
+  if (P.lock || phase !== 'play' || pushes > 0) return;
+  P.q = (P.q + 1) % 4; P.to += FLAT; CC.sfx('select', { p: 0.3 });
+}
 function screenDir(d, sg) {
   const n = normal(d), a = proj(d.x, 0.5, d.z), b = proj(d.x + n[0] * sg, 0.5, d.z + n[1] * sg);
   const l = Math.hypot(b[0] - a[0], b[1] - a[1]);
@@ -2229,6 +2276,8 @@ canvas.addEventListener('pointerdown', ev => {
     if (b) { press(b); return; }
   }
   if (lvl.layers) {
+    const P = (lvl.plates || []).find(P => Math.hypot(...proj(P.x, 0, P.z).map((v, i) => v - [x, y][i])) < 100);
+    if (P) { turnPlate(P); return; }
     if (!helpOn && phase === 'play' && !(sel && sel.spot) && inRect(x, y, helpRect)) { helpOn = true; CC.sfx('drip', { p: 0.3 }); return; }
     const c = cardRects().find(c => inRect(x, y, c.r));
     const sp = !c && lvl.spots.find(o => o.layer != null && Math.hypot(...proj(o.x, o.y + 0.3, o.z).map((v, i) => v - [x, y][i])) < 70);
@@ -2321,6 +2370,7 @@ window.__solveLayers = (order) => BUILD.map((b, i) => {
   const ks = order ? order(lvl.layers.length) : lvl.layers.map((l, k) => k);
   const run = n => { for (let k = 0; k < n; k++) { step(CC.DT); CC.time += CC.DT; } };
   ks.forEach((k, j) => putPot(lvl.spots[j], k)); sel = null;
+  for (const P of lvl.plates) { P.q = P.good; P.phi = P.to = P.q * FLAT; setPlate(P); }
   push(lvl.starts[0], 1); run(900);
   return [lvl.name, doms.filter(d => d.state !== 'up').length + '/' + doms.length, phase, layerMsg];
 });

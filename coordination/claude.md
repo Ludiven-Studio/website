@@ -3053,3 +3053,13 @@
 - 20:16 : aperçu « Ton dessin » caché derrière un bouton « ? » (2 étoiles max si on s'en sert) ; vérifié par script (3
   étoiles sans aide, 2 avec) ; poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut :
   terminé. Réservations libérées.
+
+## 2026-11-12 — ColorChain : plateaux tournants (session colorchain)
+- Statut : en cours (2026-11-12T20:25+01:00). Demande de l'utilisateur : en bas cela pourrait être 2 plateaux avec des
+  dominos, 4 positions en tournant à 90° ; mises à jour du prototype autorisées
+- Réservations actives : `public/prototypes/colorchain-peinture/index.html`.
+- Ressources : serveur de dev sur le port 4391 ; eslint, `astro check`. Build annoncé ici avant.
+- 20:25 : deux plateaux tournants entre la bille et le dessin (un coude de 4 dominos, une seule position sur quatre
+  relie les lignes), verrouillés sur les 3 premiers dessins ; 16 combinaisons simulées, 100 dessins rejoués par script
+  ; poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé. Réservations
+  libérées.
