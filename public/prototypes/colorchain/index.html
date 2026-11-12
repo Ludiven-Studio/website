@@ -820,8 +820,37 @@ function clover() {
       ...arms.map((a, k) => [leaf([FLAT, FLAT + 120 * DEG, FLAT - 120 * DEG][k], [5.4, 6.6, 4.6][k]), 0x4f9a62]), [circP(c[0], c[1], 0.9), 0x3d7a4e]] };
 }
 
-const BUILD = [snail, hills, rainbowSmall, tree, mountains, house, lake, kite, rainbow, sea, clock, clover];
-const LEVEL_NAMES = ['Escargot', 'Collines', 'Arc-en-ciel', 'Arbre', 'Montagnes', 'Maison', 'Lac', 'Cerf-volant', 'Arc-en-ciel et soleil', 'Sous la mer', 'Horloge', 'Trèfle'];
+// ---- Ultra hard: two crossings joined by a bridge, four starts, slots and gold order.
+// The bridge is white then red: its middle slot needs the color of the half the chain goes
+// on to, so it depends on the way the chain crosses. Only one start keeps the gold order.
+function constellation() {
+  const Vi = '#9b5de5', Pk = '#ff6fa8', Bl = '#4a9cff', Gr = '#4cc36b', Wh = '#f4f1e8', Rd = '#e8434d', d = [], r = 0.38;
+  const H1 = [-4.2, 0.2], H2 = [4.2, 0.2];
+  const arm = (c, ang, len, color) => {
+    const f = dirOf(ang), a = place(path().add(sample(t => add2(c, f, r + t), 0, len, 900), { color }), d);
+    Object.assign(a[0], { sw: true, fixed: true, good: color });
+    return a;
+  };
+  const arms = { a: arm(H1, 240 * DEG, 8.4, Vi), b: arm(H1, 120 * DEG, 5.6, Pk), c: arm(H2, 300 * DEG, 6.8, Bl), e: arm(H2, 60 * DEG, 9.2, Gr) };
+  const x0 = H1[0] + r, x1 = H2[0] - r, xm = (x0 + x1) / 2;
+  const bridge = place(path().add(sample(x => [x, H1[1]], x0, xm, 600), { color: Wh }).add(sample(x => [x, H1[1]], xm, x1, 600), { color: Rd }), d);
+  arms.w = bridge;
+  const mid = bridge.find(o => o.sw) || bridge[Math.floor(bridge.length / 2)];
+  Object.assign(mid, { sw: true, good: Wh, color: Wh, a: 45 * DEG, a0: 45 * DEG, goodA: 0 });
+  const e0 = bridge[0], e1 = bridge.at(-1);
+  Object.assign(e0, { sw: true, good: Rd }); Object.assign(e1, { sw: true, good: Rd, a: 0, a0: 0 });
+  setGolds(GOLD_PICK.map(([k, i]) => arms[k][i]));
+  const tips = [arms.a, arms.b, arms.c, arms.e].map(x => x.at(-1));
+  const stars = [[-7.4, -5.6], [-1.2, -4.8], [1.4, -6.2], [6.8, -5.4], [-7.8, 3.6], [0.4, 3.4], [-0.8, 5.6], [7.6, 5.8], [4.6, -2.4], [-5.0, -1.6]];
+  return { name: 'Constellation', teach: 'Ultra dur : quatre départs, des cases à remplir et six dorés à faire tomber dans l’ordre', hard: true,
+    sol: [], extra: [Bl, Vi], colors: [Wh, Rd, Vi, Pk, Bl, Gr], dominos: d, golds: GOLD_PICK.length,
+    h: { start: tips[START], sign: -1, arms }, hot: [e0, mid, e1], starts: tips,
+    paint: [[rectP(-12, -11, 12, 11), 0x1f2a4d], [circP(H1[0], H1[1], 1.1), 0x2c3d6b], [circP(H2[0], H2[1], 1.1), 0x2c3d6b], ...stars.map(([x, z]) => [circP(x, z, 0.14, 12), 0xdfe6f5])] };
+}
+const GOLD_PICK = [["w", 12], ["c", 5], ["c", 9], ["w", 1], ["b", 1], ["a", 5]], START = 3;
+
+const BUILD = [snail, hills, rainbowSmall, tree, mountains, house, lake, kite, rainbow, sea, clock, clover, constellation];
+const LEVEL_NAMES = ['Escargot', 'Collines', 'Arc-en-ciel', 'Arbre', 'Montagnes', 'Maison', 'Lac', 'Cerf-volant', 'Arc-en-ciel et soleil', 'Sous la mer', 'Horloge', 'Trèfle', 'Constellation'];
 const VIDEO = new URLSearchParams(location.search).get('video') || 'tour', LAST = BUILD.length - 1;
 
 // ---- Rendering
@@ -1506,7 +1535,7 @@ function drawMenu(ctx) {
   for (let i = 0; i < BUILD.length; i++) {
     const [x, y, w, hh] = tileRect(i), open = i <= prog.unlocked, st = prog.stars[i] || 0;
     ctx.fillStyle = open ? '#2c3354' : '#22263a'; CC.roundRect(ctx, x, y, w, hh, 30); ctx.fill();
-    ctx.fillStyle = open ? '#ffd23f' : '#565c80'; ctx.font = 'bold 34px Segoe UI, Arial'; ctx.fillText(`Niveau ${i + 1}` + (BUILD[i] === clock || BUILD[i] === clover ? '  · nouveau' : ''), x + w / 2, y + 55);
+    ctx.fillStyle = open ? '#ffd23f' : '#565c80'; ctx.font = 'bold 34px Segoe UI, Arial'; ctx.fillText(`Niveau ${i + 1}` + (BUILD[i] === clock || BUILD[i] === clover ? '  · nouveau' : BUILD[i] === constellation ? '  · ultra dur' : ''), x + w / 2, y + 55);
     ctx.fillStyle = open ? '#fff' : '#565c80'; ctx.font = 'bold 40px Segoe UI, Arial'; ctx.fillText(LEVEL_NAMES[i], x + w / 2, y + 105);
     if (open) for (let k = 0; k < 3; k++) {
       ctx.save(); ctx.translate(x + w / 2 + (k - 1) * 62, y + 155); CC.star(ctx, 0, 0, 24);
