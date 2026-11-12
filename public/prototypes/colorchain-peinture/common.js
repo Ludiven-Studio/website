@@ -108,8 +108,10 @@ const CC = (() => {
   };
 
   cc.toCanvas = (canvas, ev) => {
-    const b = canvas.getBoundingClientRect();
-    return [(ev.clientX - b.left) * cc.W / b.width, (ev.clientY - b.top) * cc.H / b.height];
+    // The picture keeps its 9:16 shape inside the element: on a taller screen it sits in
+    // the middle with empty bands, so map from the picture, not from the element.
+    const b = canvas.getBoundingClientRect(), sc = Math.min(b.width / cc.W, b.height / cc.H);
+    return [(ev.clientX - b.left - (b.width - cc.W * sc) / 2) / sc, (ev.clientY - b.top - (b.height - cc.H * sc) / 2) / sc];
   };
 
   cc.run = ({ canvas, step, draw, autoplay }) => {

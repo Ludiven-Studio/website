@@ -3032,3 +3032,15 @@
   jouées par script jusqu'au bout ; menu en pages avec galerie ; plaque semi-transparente ; eslint OK, astro check 0
   erreur ; poussé à la demande de l'utilisateur : mes fichiers et cette section seulement. Statut : terminé.
   Réservations libérées.
+
+## 2026-11-12 — ColorChain : tactile sur mobile et écrans de fin (session colorchain)
+- Statut : en cours (2026-11-12T18:17+01:00). Demande de l'utilisateur : sur mobile les inputs ne marchent pas ;
+  recommencer ou continuer facilement après le résultat ; textes ; aide pour un enfant ; mises à jour du prototype
+  autorisées
+- Réservations actives : `public/prototypes/colorchain-peinture/` (index.html, common.js),
+  `public/prototypes/colorchain/` (index.html, common.js).
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 18:17 : position du doigt corrigée sur les écrans plus hauts que 9:16 (l'image était centrée avec des marges, le
+  calcul les ignorait) sur les deux jeux ; cartes de fin avec Réessayer, Rejouer et Continuer ; aperçu « Ton dessin » ;
+  100 dessins et parcours tactile vérifiés par script ; poussé à la demande de l'utilisateur : mes fichiers et cette
+  section seulement. Statut : terminé. Réservations libérées.

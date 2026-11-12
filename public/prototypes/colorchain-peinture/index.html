@@ -7,7 +7,8 @@
 <meta name="robots" content="noindex">
 <style>
   html, body { margin: 0; height: 100%; background: #1d2033; overflow: hidden; }
-  canvas { display: block; margin: 0 auto; height: 100vh; height: 100dvh; aspect-ratio: 9 / 16; max-width: 100vw; object-fit: contain; touch-action: none; }
+  body { display: flex; align-items: center; justify-content: center; }
+  canvas { display: block; width: min(100vw, calc(100vh * 9 / 16)); width: min(100vw, calc(100dvh * 9 / 16)); height: auto; aspect-ratio: 9 / 16; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 </style>
 </head>
 <body>
@@ -1893,26 +1894,45 @@ function drawStencil(ctx, l, x, y, size, dim) {
   ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 2; ctx.strokeRect(x - w / 2, y - h / 2, w, h);
   if (dim) { ctx.fillStyle = 'rgba(16,18,32,0.6)'; ctx.fillRect(x - w / 2, y - h / 2, w, h); }
 }
+const againRect = [100, 1730, 380, 110], nextRect2 = [520, 1730, 460, 110], retryBig = [290, 1716, 500, 120];
+function bigButton(ctx, [x, y, w, h], text, color) {
+  ctx.fillStyle = color; CC.roundRect(ctx, x, y, w, h, 34); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 46px Segoe UI, Arial'; ctx.textAlign = 'center'; ctx.fillText(text, x + w / 2, y + h / 2 + 16);
+}
 function cardRects() {
-  const n = lvl.layers.length, perRow = n > 4 ? Math.ceil(n / 2) : n, cw = 760 / Math.max(perRow, 3);
+  const n = lvl.layers.length, perRow = n > 4 ? Math.ceil(n / 2) : n, cw = 620 / Math.max(perRow, 3);
   return lvl.show.map((k, j) => {
     const row = Math.floor(j / perRow), col = j % perRow, inRow = Math.min(perRow, n - row * perRow);
-    const cx = 290 + 380 + (col - (inRow - 1) / 2) * cw, cy = (n > perRow ? 1584 : 1625) + row * 124;
-    return { k, cx, cy, r: [cx - cw / 2 + 6, cy - 58, cw - 12, 118] };
+    const cx = 420 + 310 + (col - (inRow - 1) / 2) * cw, cy = (n > perRow ? 1584 : 1625) + row * 124;
+    return { k, cx, cy, cw, r: [cx - cw / 2 + 4, cy - 58, cw - 8, 118] };
   });
 }
+// What the stencils picked so far would paint, in their order.
+function previewCells() {
+  const order = lvl.spots.map(o => o.layer).filter(v => v != null);
+  return lvl.field.map(o => { let c = FIELD_W; for (const k of order) if (lvl.layers[k].shape(o.fu, o.fv)) c = lvl.layers[k].color; return c; });
+}
 function drawLayersHud(ctx) {
-  const cols = lvl.cols, rows = lvl.rows, s = Math.min(200 / cols, 200 / rows), w = cols * s, h = rows * s, x0 = 150 - w / 2, y0 = 1560;
+  const cols = lvl.cols, rows = lvl.rows, s = Math.min(176 / cols, 176 / rows), w = cols * s, h = rows * s, y0 = 1560;
   ctx.textAlign = 'center';
-  if ((!sel || !sel.spot) && phase !== 'clear') {
-    ctx.fillStyle = 'rgba(16,18,32,0.85)'; CC.roundRect(ctx, 30, y0 - 80, 1020, h + 110, 26); ctx.fill();
-    ctx.fillStyle = '#cfd5f5'; ctx.font = 'bold 28px Segoe UI, Arial'; ctx.fillText('Modèle', 150, y0 - 40);
-    lvl.field.forEach((o, k) => { ctx.fillStyle = o.want; ctx.fillRect(x0 + (k % cols) * s, y0 - 20 + Math.floor(k / cols) * s, s + 0.5, s + 0.5); });
-    ctx.fillStyle = '#cfd5f5'; ctx.font = 'bold 26px Segoe UI, Arial'; ctx.fillText('Pochoirs : touche-les dans l’ordre', 670, y0 - 44);
+  if ((!sel || !sel.spot) && phase === 'play' && !layerMsg) {
+    ctx.fillStyle = 'rgba(16,18,32,0.88)'; CC.roundRect(ctx, 24, y0 - 80, 1032, h + 130, 26); ctx.fill();
+    const mine = previewCells(), same = mine.every((c, k) => c === lvl.field[k].want);
+    for (const [title, cx, cells] of [['Modèle', 126, lvl.field.map(o => o.want)], ['Ton dessin', 318, mine]]) {
+      const x0 = cx - w / 2;
+      ctx.fillStyle = '#cfd5f5'; ctx.font = 'bold 26px Segoe UI, Arial'; ctx.fillText(title, cx, y0 - 44);
+      cells.forEach((c, k) => { ctx.fillStyle = c; ctx.fillRect(x0 + (k % cols) * s, y0 - 20 + Math.floor(k / cols) * s, s + 0.5, s + 0.5); });
+      if (cx > 200) { ctx.strokeStyle = same ? '#38c172' : 'rgba(255,255,255,0.35)'; ctx.lineWidth = same ? 8 : 3; ctx.strokeRect(x0 - 2, y0 - 22, w + 4, h + 4); }
+    }
+    if (same) { ctx.fillStyle = '#38c172'; ctx.font = 'bold 26px Segoe UI, Arial'; ctx.fillText('Pareil ! Lance la bille', 222, y0 + h + 22); }
+    else { ctx.fillStyle = '#9aa3c7'; ctx.font = '24px Segoe UI, Arial'; ctx.fillText('Les deux doivent être pareils', 222, y0 + h + 22); }
+    ctx.fillStyle = '#cfd5f5'; ctx.font = 'bold 26px Segoe UI, Arial'; ctx.fillText('Pochoirs : touche-les dans l’ordre', 730, y0 - 44);
     for (const c of cardRects()) {
       const l = lvl.layers[c.k], sp = lvl.spots.find(o => o.layer === c.k);
       drawStencil(ctx, l, c.cx, c.cy - 10, 78, !!sp);
-      ctx.fillStyle = sp ? '#6b7194' : '#fff'; ctx.font = 'bold 22px Segoe UI, Arial'; ctx.fillText(l.name, c.cx, c.cy + 50);
+      ctx.fillStyle = sp ? '#6b7194' : '#fff'; ctx.font = 'bold 22px Segoe UI, Arial';
+      const tw = ctx.measureText(l.name).width, k = Math.min(1, (c.cw - 12) / tw);
+      ctx.save(); ctx.translate(c.cx, c.cy + 50); ctx.scale(k, 1); ctx.fillText(l.name, 0, 0); ctx.restore();
       if (sp) { ctx.fillStyle = '#ffd23f'; ctx.font = 'bold 34px Segoe UI, Arial'; ctx.fillText(sp.k + 1, c.cx, c.cy + 4); }
     }
   }
@@ -1972,7 +1992,7 @@ function draw(ctx) {
   ctx.fillText(lvl.name, CC.W / 2, 180);
   const down = doms.filter(d => d.state !== 'up').length;
   ctx.fillStyle = '#cfd5f5'; ctx.font = '32px Segoe UI, Arial';
-  ctx.fillText(lvl.layers ? `pochoirs posés ${lvl.spots.filter(sp => sp.layer != null).length} / ${lvl.layers.length}   ·   puis une pichenette` : lvl.golds ? `${down} / ${doms.length} tombés   ·   dorés dans l’ordre ${goldNext - 1} / ${lvl.golds}   ·   pichenettes ${pushes} / ${BUDGET}` : `${down} / ${doms.length} tombés   ·   pichenettes ${pushes} / ${BUDGET}   ·   but : 1 seule`, CC.W / 2, 250);
+  ctx.fillText(lvl.layers ? `pochoirs posés ${lvl.spots.filter(sp => sp.layer != null).length} / ${lvl.layers.length}` : lvl.golds ? `${down} / ${doms.length} tombés   ·   dorés dans l’ordre ${goldNext - 1} / ${lvl.golds}   ·   pichenettes ${pushes} / ${BUDGET}` : `${down} / ${doms.length} tombés   ·   pichenettes ${pushes} / ${BUDGET}   ·   but : 1 seule`, CC.W / 2, 250);
   if (lvl.teach && phase === 'play' && !layerMsg) { ctx.fillStyle = '#ffd23f'; ctx.font = '30px Segoe UI, Arial'; wrapText(ctx, lvl.teach, CC.W / 2, 300, 960, 38); }
   ctx.fillStyle = '#cfd5f5'; ctx.font = 'bold 34px Segoe UI, Arial'; ctx.textAlign = 'left'; ctx.fillText('☰ Niveaux', levelsRect[0], levelsRect[1] + 62); ctx.textAlign = 'center';
   const [rx, ry, rw] = retryRect();
@@ -1991,16 +2011,21 @@ function draw(ctx) {
       ctx.fillText('Remplis les cases avec le stock, dans le bon sens.', CC.W / 2, 1810);
       ctx.fillText('Puis une pichenette sur un socle orange : tout doit tomber.', CC.W / 2, 1858);
     } else if (lvl.layers) {
-      ctx.fillText('Touche les pochoirs dans l’ordre : le dernier versé passe devant.', CC.W / 2, 1810);
-      ctx.fillText('Touche-le encore pour le retirer. Puis une pichenette : la bille fait le reste.', CC.W / 2, 1858);
+      if (!layerMsg) {
+        ctx.fillText('Touche les pochoirs pour que ton dessin ressemble au modèle.', CC.W / 2, 1822);
+        ctx.fillText('Puis fais glisser ton doigt sur le socle orange.', CC.W / 2, 1868);
+      }
     } else ctx.fillText(lvl.golds ? 'Une pichenette sur un socle orange, dans un sens ou dans l’autre.' : 'Une pichenette sur un socle orange : tout doit tomber.', CC.W / 2, 1834);
   } else if (!lvl.layers) ctx.fillText('Touche une autre case, ou ailleurs pour reculer.', CC.W / 2, 1840);
   if (phase === 'play' && goldBad && chains.length && chains.every(c => c.done) && !doms.some(d => d.state === 'falling')) {
     ctx.fillStyle = '#ff8a7a'; ctx.font = 'bold 44px Segoe UI, Arial';
     ctx.fillText('Pas dans l’ordre : recommence avec ↻', CC.W / 2, 1700);
   } else if (phase === 'play' && lvl.layers && layerMsg) {
-    ctx.fillStyle = '#ff8a7a'; ctx.font = 'bold 42px Segoe UI, Arial';
-    ctx.fillText(layerMsg, CC.W / 2, 350); ctx.font = 'bold 34px Segoe UI, Arial'; ctx.fillText('Recommence avec ↻', CC.W / 2, 400);
+    ctx.fillStyle = 'rgba(16,18,32,0.94)'; CC.roundRect(ctx, 60, 1430, CC.W - 120, 440, 40); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 66px Segoe UI, Arial'; ctx.fillText('Presque !', CC.W / 2, 1515);
+    ctx.fillStyle = '#ffd23f'; ctx.font = 'bold 40px Segoe UI, Arial'; ctx.fillText(layerMsg, CC.W / 2, 1590);
+    ctx.fillStyle = '#cfd5f5'; ctx.font = '32px Segoe UI, Arial'; ctx.fillText('Change l’ordre des pochoirs pour refaire le modèle.', CC.W / 2, 1650);
+    bigButton(ctx, retryBig, '↻ Réessayer', '#38c172');
   } else if (phase === 'play' && pushes >= budget() && chains.every(c => c.done) && doms.some(d => d.state === 'up')) {
     ctx.fillStyle = '#ff8a7a'; ctx.font = 'bold 44px Segoe UI, Arial';
     ctx.fillText('Recommence avec ↻', CC.W / 2, 1700);
@@ -2044,9 +2069,9 @@ function draw(ctx) {
   if (phase === 'clear' && t >= phaseT) {
     const e = Math.min(1, (t - phaseT) / 0.35), last = li === BUILD.length - 1, st = results[li];
     ctx.save(); ctx.globalAlpha = e; ctx.translate(0, 60 * (1 - e));
-    ctx.fillStyle = 'rgba(16,18,32,0.88)'; CC.roundRect(ctx, 60, 1430, CC.W - 120, 380, 40); ctx.fill();
+    ctx.fillStyle = 'rgba(16,18,32,0.92)'; CC.roundRect(ctx, 60, 1430, CC.W - 120, lvl.layers ? 440 : 380, 40); ctx.fill();
     ctx.fillStyle = '#fff'; ctx.font = 'bold 70px Segoe UI, Arial';
-    ctx.fillText(lvl.hard && tries ? `Réussi à l’essai ${tries + 1}` : pushes === 1 ? 'Une seule pichenette !' : `${lvl.name} : réussi !`, CC.W / 2, 1515);
+    ctx.fillText(lvl.layers ? (tries ? 'Réussi !' : 'Bravo, du premier coup !') : lvl.hard && tries ? `Réussi à l’essai ${tries + 1}` : pushes === 1 ? 'Une seule pichenette !' : `${lvl.name} : réussi !`, CC.W / 2, 1515);
     for (let i = 0; i < 3; i++) {
       const k = Math.min(1, Math.max(0, (t - phaseT - 0.25 - i * 0.2) / 0.25));
       ctx.save(); ctx.translate(CC.W / 2 + (i - 1) * 130, 1605 - (i === 1 ? 18 : 0)); ctx.scale(k, k);
@@ -2054,9 +2079,14 @@ function draw(ctx) {
       ctx.lineWidth = 5; ctx.strokeStyle = i < st ? '#b8860b' : '#565c80'; ctx.stroke(); ctx.restore();
     }
     ctx.fillStyle = '#cfd5f5'; ctx.font = '38px Segoe UI, Arial';
+    if (lvl.layers) {
+      ctx.fillText(`${lvl.name} : ${doms.length} dominos tombés` + (tries ? `, essai ${tries + 1}` : ''), CC.W / 2, 1690);
+      bigButton(ctx, againRect, '↻ Rejouer', '#3b4266'); bigButton(ctx, nextRect2, last ? 'Galerie ›' : 'Continuer ›', '#38c172');
+    } else {
     ctx.fillText(`${doms.length} dominos en ${pushes} pichenette${pushes > 1 ? 's' : ''}` + (lvl.hard ? `, essai ${tries + 1}` : ''), CC.W / 2, 1712);
     ctx.fillStyle = '#9aa3c7'; ctx.font = '34px Segoe UI, Arial';
     if (!CC.auto) ctx.fillText(last ? 'Touche pour revenir aux niveaux' : 'Touche pour le niveau suivant', CC.W / 2, 1772);
+    }
     ctx.restore();
   }
   if (menu) drawMenu(ctx);
@@ -2176,6 +2206,12 @@ canvas.addEventListener('pointerdown', ev => {
     return;
   }
   if (inRect(x, y, levelsRect)) { openMenu(); return; }
+  if (lvl.layers && phase === 'clear' && CC.time >= phaseT) {
+    if (inRect(x, y, againRect)) loadLevel(li);
+    else if (inRect(x, y, nextRect2)) { if (li === BUILD.length - 1) openMenu(); else loadLevel(li + 1); }
+    return;
+  }
+  if (lvl.layers && phase === 'play' && layerMsg) { if (inRect(x, y, retryBig) || inRetry(x, y)) retry(); return; }
   if (phase === 'clear' && CC.time >= phaseT) { if (li === BUILD.length - 1) openMenu(); else loadLevel(li + 1); return; }
   if (inRetry(x, y)) { retry(); return; }
   if (sel && CC.time - selT > 0.2) {
@@ -2196,7 +2232,8 @@ canvas.addEventListener('pointerup', ev => {
   if (CC.auto || !down) return;
   const [x, y] = CC.toCanvas(canvas, ev), d = down.d, sd = screenDir(d, 1);
   const along = (x - down.x) * sd[0] + (y - down.y) * sd[1], quick = performance.now() - down.t < 450;
-  if (Math.abs(along) > 60 && quick) { trail = { from: [down.x, down.y], to: [x, y], t: CC.time }; push(d, Math.sign(along)); }
+  if (lvl.layers && lvl.spots.some(o => o.layer == null)) { d.wob = CC.time; note(d, 'Pose d’abord tous les pochoirs', '#ffb066'); }
+  else if (Math.abs(along) > 60 && quick) { trail = { from: [down.x, down.y], to: [x, y], t: CC.time }; push(d, Math.sign(along)); }
   else { d.wob = CC.time; note(d, 'Une pichenette, plus vite !', '#ffb066'); }
   down = null;
 });
