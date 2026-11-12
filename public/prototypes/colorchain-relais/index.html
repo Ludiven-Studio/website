@@ -1048,6 +1048,62 @@ function relayLevel(pic, layers, idx, cols, rows) {
     dominos: d, h: { start: secs[0].pad, sign: 1 }, hot: [], starts: secs.map(q => q.pad), relay: secs, field, budget: 999, cols, rows, speed: Math.min(1, 0.7 + idx * 0.006),
     paint: [...marks, [rectP(x0 - 1.0, z0 - 0.7, x0 + W + 1.0, z1 + 0.6), 0x6b4a3a], [rectP(x0 - 0.6, z0 - 0.35, x0 + W + 0.6, z1 + 0.3), 0xe9e4d6]] };
 }
+// Endless relay: a pool of rows. A row left far behind the wave is moved ahead of it, with
+// new holes, so the course never ends. One stop ends the run.
+const ENDLESS = -1, UP = () => ({ state: 'up', th: 0, w: 0, u: [0, 0], cap: FLAT, targets: null, hitDone: false, shake: -9, flash: -9, chain: null, leanOn: null, gh: 0, pop: -9, hole: null, holeTold: false, wob: -9 });
+function endlessRow(L, j) {
+  const row = L.rows[j % L.R], sg = j % 2 ? -1 : 1, z = -j * L.g, pitch = 2 * L.xS / 19;
+  row.forEach((o, i) => {
+    Object.assign(o, UP(), { row: j, gone: false });
+    if (i < 20) { o.x = sg * (-L.xS + i * pitch); o.z = z; o.a = sg > 0 ? 0 : Math.PI; }
+    else { const th = (i - 19) * Math.PI / 4; o.x = sg * (L.xS + L.rt * Math.sin(th)); o.z = z - L.rt + L.rt * Math.cos(th); o.a = Math.atan2(-Math.sin(th), sg * Math.cos(th)); }
+    o.va = o.a;
+    if (L.skip > 0) { L.skip--; o.gone = true; return; }
+    if (--L.count <= 0 && i >= 4 && i <= 13 && L.open.doms.length >= 12) {
+      // A hole of two dominoes: the section ends, the next one starts on its pad.
+      L.open.last = L.lastDom; o.gone = true; L.skip = 1;
+      L.count = Math.round((45 + 25 * L.rnd()) * Math.max(0.5, 1 - j * 0.006));
+      L.open = { doms: [], pad: null, last: null, endT: null, missed: false, lockT: -9 }; L.relay.push(L.open);
+      return;
+    }
+    if (!L.open.pad) L.open.pad = o;
+    o.color = RAINBOW[(L.relay.length - 1) % RAINBOW.length]; L.open.doms.push(o); L.lastDom = o;
+  });
+}
+function endlessLevel() {
+  const L = { name: 'Chemin infini', teach: 'Touche l’écran quand la vague arrive au trou. Un seul arrêt, et c’est fini', endless: true, sol: [], colors: [...RAINBOW], hot: [], starts: [], budget: 1e9,
+    R: 30, g: 1.4, rt: 0.7, xS: 5.8, rows: [], relay: [], cur: 0, score: 0, minRow: 0, skip: 0, count: 40, rnd: CC.rng(Math.floor(Math.random() * 1e6)), speed: 0.7, paint: [] };
+  L.open = { doms: [], pad: null, last: null, endT: null, missed: false, lockT: -9 }; L.relay.push(L.open);
+  L.dominos = [];
+  for (let j = 0; j < L.R; j++) { const row = [...Array(23)].map(() => ({ x: 0, z: 0, a: 0, color: RAINBOW[0], tag: {}, any: true })); L.rows.push(row); L.dominos.push(...row); endlessRow(L, j); }
+  L.h = { start: L.relay[0].pad, sign: 1 };
+  return L;
+}
+// Moves the rows left behind ahead of the wave, and speeds the wave up little by little.
+function endlessTick() {
+  const f = chains.length ? chains.at(-1).front : null;
+  if (!f) return;
+  while (lvl.minRow < f.row - 9) { endlessRow(lvl, lvl.minRow + lvl.R); lvl.minRow++; }
+  lvl.speed = 0.7 + Math.min(0.4, f.row * 0.003);
+  if (chains.length > 8) chains.splice(0, chains.length - 8);
+  const step = Math.floor(lvl.score / 250);
+  if (step > (lvl.said || 0)) { lvl.said = step; say(f, `${step * 250} !`, '#ffffff', true); CC.sfx('combo'); }
+}
+function relayTick(t) {
+  const Rl = lvl.relay, k1 = lvl.endless ? Math.min(Rl.length, lvl.cur + 10) : Rl.length;
+  for (let k = lvl.endless ? Math.max(0, lvl.cur - 1) : 0; k < k1; k++) {
+    const sec = Rl[k], prev = Rl[k - 1], on = sec.pad.state === 'up' && padArmed(k);
+    if (sec.endT == null && sec.last && sec.last.state !== 'up' && sec.last.th > 1.2) sec.endT = t;
+    if (prev && !sec.missed && sec.pad.state === 'up' && prev.endT != null && t - prev.endT > 0.7) {
+      sec.missed = true; misses++; combo = 0; say(sec.pad, 'La chaîne s’arrête !', '#ff8a7a'); CC.sfx('blocked');
+      if (lvl.endless) { phase = 'over'; phaseT = t + 0.9; lvl.record = lvl.score > (prog.best || 0); prog.best = Math.max(prog.best || 0, lvl.score); saveProg(); }
+    }
+    const m = lvl.endless ? lvl.pads[k % lvl.pads.length] : sec.pad.padMesh, mat = m.material;
+    if (lvl.endless) { m.visible = true; m.position.set(sec.pad.x, 0.03, sec.pad.z); }
+    mat.color.set(sec.pad.state !== 'up' ? 0x4a5078 : sec.missed ? 0xff5d4a : on ? 0xff9f43 : 0x6b7194);
+    mat.emissive.set(on ? (sec.missed ? 0x7a1500 : 0x7a3a00) : 0x000000);
+  }
+}
 // Is the pad of section k ready for its flick: the wave is on the last dominoes before it.
 function padArmed(k) {
   if (k === 0) return true;
@@ -1061,7 +1117,7 @@ function relayFlick(k) {
   if (!padArmed(k)) { sec.lockT = CC.time + 0.35; combo = 0; d.wob = CC.time; note(d, 'Trop tôt !', '#ffb066'); return; }
   const late = prev && prev.endT != null ? CC.time - prev.endT : -1;
   const grade = !prev ? 'go' : sec.missed ? 'again' : late > 0.3 ? 'ok' : prev.last.state !== 'up' ? 'perfect' : 'good';
-  push(d, 1);
+  push(d, 1); lvl.cur = k + 1;
   if (grade === 'perfect') { combo++; perfects++; say(d, combo > 1 ? `Parfait ×${combo}` : 'Parfait !', '#ffd23f'); CC.sfx('drip', { p: Math.min(1, 0.2 + combo * 0.08) }); }
   else if (grade === 'good') { combo++; say(d, 'Bien !', '#9be37a'); }
   else if (grade === 'ok') { combo = 0; say(d, 'De justesse', '#cfd5f5'); }
@@ -1264,7 +1320,7 @@ let focus = null, slowT = -9, cam = null, base = null, ghost, halos = [], sel = 
 const turnMat = new THREE.MeshStandardMaterial({ color: 0x55679f, roughness: 0.7 });
 const bandMat = new THREE.MeshBasicMaterial({ color: 0xffd98a, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
 function loadLevel(i) {
-  li = i; lvl = BUILD[i]();
+  li = i; lvl = i === ENDLESS ? endlessLevel() : BUILD[i]();
   doms = lvl.dominos;
   doms.forEach((d, k) => Object.assign(d, { i: k, va: d.a }));
   if (mesh) { scene.remove(mesh, ghost); mesh.dispose(); ghost.dispose(); }
@@ -1331,6 +1387,7 @@ function loadLevel(i) {
     g.add(cup, paintTop); g.visible = false; g.userData.tipT = -9;
     return keep(g);
   });
+  if (lvl.endless) lvl.pads = [...Array(12)].map(() => { const m = keep(new THREE.Mesh(padGeom, padMat.clone())); m.visible = false; m.receiveShadow = true; return m; });
   for (const d of lvl.starts) {
     d.starter = true;
     const m = keep(new THREE.Mesh(padGeom, lvl.relay ? padMat.clone() : padMat)); m.position.set(d.x, (d.y || 0) + 0.03, d.z); m.receiveShadow = true; d.padMesh = m;
@@ -1439,7 +1496,7 @@ function resetDominos() {
   chains = []; popups = []; marks = []; pushes = 0; focus = null; slowT = -9; sel = null; active = new Set(); goldNext = 1; goldBad = null; for (const q of pours) { if (q.stream) scene.remove(q.stream); if (q.mask) scene.remove(q.mask); } pours = []; layerMsg = '';
   if (lvl.layers) { for (const o of lvl.field) { o.color = FIELD_W; o.top = -1; o.seq = -1; for (let k = 0; k < lvl.layers.length; k++) o['p' + k] = false; } for (const l of lvl.layers) l.poured = false; for (const m of pots) m.userData.tipT = -9; holdUntil = -9; waiting = []; for (const o of lvl.spots) o.fired = false; }
   for (const m of marbles) { Object.assign(m, { pause: 0, resumed: true, s: 0, v: 0, state: 'rest', chain: null, predicted: false, q: new THREE.Quaternion(), p: m.tracks[0], L: m.tracks[0].L }); placeMarble(m, 0); }
-  if (lvl.relay) { combo = misses = perfects = 0; for (const q of lvl.relay) { q.endT = null; q.missed = false; q.lockT = -9; } }
+  if (lvl.relay) { lvl.cur = 0; combo = misses = perfects = 0; for (const q of lvl.relay) { q.endT = null; q.missed = false; q.lockT = -9; } }
   paint();
   updateMatrices();
 }
@@ -1503,7 +1560,7 @@ function fitCamera() {
   base = fitView(lvl.layers ? 400 : 380, lvl.layers ? 1380 : 1720, 50 * DEG);
   if (lvl.relay) {
     // The course is too long for one view: frame the picture, then follow the wave.
-    const all = doms; doms = all.filter(d => d.pic);
+    const all = doms; doms = all.filter(d => lvl.endless ? d.row < 14 : d.pic);
     endView = fitView(330, 1390, 66 * DEG); base = fitView(380, 1720, 50 * DEG); doms = all;
   }
   placeCam(base.x, base.z, 1);
@@ -1617,6 +1674,7 @@ function topple(d, u, w, chain) {
   if (lvl.layers && d.spotK != null) pourSpot(lvl.spots[d.spotK]);
   Object.assign(d, { state: 'falling', u, w, th: 0.02, chain, hitDone: false });
   chain.n++; chain.last = CC.time; chain.front = d;
+  if (lvl.endless) lvl.score++;
   active.add(d.color);
   if (d.gold) {
     if (d.gold === goldNext && !goldBad) { goldNext++; marks.push({ o: d, ok: true, t: CC.time }); CC.sfx('drip', { p: 0.15 + 0.2 * d.gold }); }
@@ -1634,7 +1692,7 @@ function front(d, u, standing) {
   const found = [];
   let hole = null;
   for (const o of doms) {
-    if (o === d || (standing && o.state !== 'up')) continue;
+    if (o === d || o.gone || (standing && o.state !== 'up')) continue;
     const vx = o.x - d.x, vz = o.z - d.z;
     let f = vx * u[0] + vz * u[1], l = Math.abs(-vx * u[1] + vz * u[0]);
     const wd = d.wide || WIDE, wo = o.wide || WIDE;
@@ -1789,13 +1847,8 @@ function step(dt) {
     }
     if (p.stream) { p.stream.visible = t > p.t0 - 0.12 && t < p.end + 0.15; p.stream.material.opacity = Math.min(1, Math.max(0, (p.end + 0.15 - t) / 0.3)); }
   }
-  if (lvl.relay && phase === 'play') lvl.relay.forEach((sec, k) => {
-    const prev = lvl.relay[k - 1], on = sec.pad.state === 'up' && padArmed(k), mat = sec.pad.padMesh.material;
-    if (sec.endT == null && sec.last.state !== 'up' && sec.last.th > 1.2) sec.endT = t;
-    if (prev && !sec.missed && sec.pad.state === 'up' && prev.endT != null && t - prev.endT > 0.7) { sec.missed = true; misses++; combo = 0; say(sec.pad, 'La chaîne s’arrête !', '#ff8a7a'); CC.sfx('blocked'); }
-    mat.color.set(sec.pad.state !== 'up' ? 0x4a5078 : sec.missed ? 0xff5d4a : on ? 0xff9f43 : 0x6b7194);
-    mat.emissive.set(on ? (sec.missed ? 0x7a1500 : 0x7a3a00) : 0x000000);
-  });
+  if (lvl.endless && phase === 'play') endlessTick();
+  if (lvl.relay && phase === 'play') relayTick(t);
   if (phase === 'play') {
     const moving = doms.some(d => d.state === 'falling'), settled = chains.every(c => c.done);
     const painting = lvl.layers && pours.some(p => lvl.field.some(o => !o['p' + p.k] && lvl.layers[p.k].shape(o.fu, o.fv)));
@@ -1877,7 +1930,7 @@ function updateMatrices() {
     const pe = t - d.pop;
     if (pe >= 0 && pe < 0.5) { const k = 1 + 0.35 * Math.sin(pe / 0.5 * Math.PI); m4.multiply(tmp.makeScale(k, k, k)); }
     const g = d.gh > 0;
-    mesh.setMatrixAt(k, g || d.empty ? zero : m4);
+    mesh.setMatrixAt(k, g || d.empty || d.gone ? zero : m4);
     ghost.setMatrixAt(k, g && !d.empty ? m4 : zero);
     alpha.array[k] = 1 - 0.62 * d.gh;
     if (d.tick) d.tick.rotation.y = -d.va;
@@ -1908,12 +1961,13 @@ const backRect = [CC.W / 2 - 240, 1730, 480, 110], prevRect = [40, 1640, 220, 11
 const inRect = (x, y, [rx, ry, rw, rh]) => x > rx && x < rx + rw && y > ry && y < ry + rh;
 const pages = () => Math.ceil(BUILD.length / PER);
 function openMenu() { menu = true; sel = null; page = Math.min(pages() - 1, Math.floor(Math.max(0, li) / PER)); }
+const endlessRect = [140, 212, 800, 92];
 function drawMenu(ctx) {
   ctx.fillStyle = 'rgba(16,18,32,0.96)'; ctx.fillRect(0, 0, CC.W, CC.H);
   ctx.textAlign = 'center';
   ctx.fillStyle = '#fff'; ctx.font = 'bold 84px Segoe UI, Arial'; ctx.fillText('ColorChain', CC.W / 2, 170);
   const done = Object.keys(prog.stars).filter(k => prog.stars[k] && k < BUILD.length).length;
-  ctx.fillStyle = '#9aa3c7'; ctx.font = '36px Segoe UI, Arial'; ctx.fillText(`Relais de dominos : ${done} / ${BUILD.length} dessins`, CC.W / 2, 240);
+  ctx.fillStyle = '#9aa3c7'; ctx.font = '36px Segoe UI, Arial'; bigButton(ctx, endlessRect, `∞  Chemin infini   ·   record ${prog.best || 0}`, '#7a4fd6');
   ctx.imageSmoothingEnabled = false;
   for (let i = page * PER; i < Math.min(BUILD.length, (page + 1) * PER); i++) {
     const [x, y, w, hh] = tileRect(i), open = i <= prog.unlocked, st = prog.stars[i] || 0;
@@ -1931,7 +1985,7 @@ function drawMenu(ctx) {
   ctx.imageSmoothingEnabled = true;
   ctx.fillStyle = page > 0 ? '#fff' : '#3a3f5c'; ctx.font = 'bold 60px Segoe UI, Arial'; ctx.fillText('‹', prevRect[0] + 110, prevRect[1] + 76);
   ctx.fillStyle = page < pages() - 1 ? '#fff' : '#3a3f5c'; ctx.fillText('›', nextRect[0] + 110, nextRect[1] + 76);
-  ctx.fillStyle = '#cfd5f5'; ctx.font = '34px Segoe UI, Arial'; ctx.fillText(`Dessins ${page * PER + 1} à ${Math.min(BUILD.length, (page + 1) * PER)}`, CC.W / 2, 1712);
+  ctx.fillStyle = '#cfd5f5'; ctx.font = '34px Segoe UI, Arial'; ctx.fillText(`Dessins ${page * PER + 1} à ${Math.min(BUILD.length, (page + 1) * PER)}   ·   ${done} / ${BUILD.length} découverts`, CC.W / 2, 1712);
   ctx.fillStyle = '#9aa3c7'; ctx.font = '32px Segoe UI, Arial'; ctx.fillText('‹ Tous les prototypes', CC.W / 2, backRect[1] + 72);
 }
 
@@ -2100,8 +2154,8 @@ function drawLayersHud(ctx) {
 // Relay: a ring closes on the next pad as the wave comes.
 function drawRelayHud(ctx) {
   if (phase !== 'play') return;
-  const k = lvl.relay.findIndex(q => q.pad.state === 'up');
-  if (k < 0) return;
+  const k = lvl.cur;
+  if (k >= lvl.relay.length) return;
   const sec = lvl.relay[k], prev = lvl.relay[k - 1], left = prev ? prev.doms.filter(o => o.state === 'up').length : 0;
   if (prev && (left === prev.doms.length || left > 30)) return;
   const hot = padArmed(k), [x, y] = proj(sec.pad.x, 0.05, sec.pad.z), pulse = 0.5 + 0.5 * Math.sin(CC.time * 9);
@@ -2153,12 +2207,12 @@ function draw(ctx) {
   ctx.fillStyle = g; ctx.fillRect(0, 0, CC.W, 360);
   ctx.textAlign = 'center';
   ctx.fillStyle = '#9aa3c7'; ctx.font = 'bold 34px Segoe UI, Arial';
-  ctx.fillText(`NIVEAU ${li + 1} / ${BUILD.length}`, CC.W / 2, 100);
+  ctx.fillText(lvl.endless ? `CHEMIN INFINI   ·   RECORD ${prog.best || 0}` : `NIVEAU ${li + 1} / ${BUILD.length}`, CC.W / 2, 100);
   ctx.fillStyle = '#fff'; ctx.font = 'bold 76px Segoe UI, Arial';
-  ctx.fillText(lvl.name, CC.W / 2, 180);
+  ctx.fillText(lvl.endless ? lvl.score : lvl.name, CC.W / 2, 180);
   const down = doms.filter(d => d.state !== 'up').length;
   ctx.fillStyle = '#cfd5f5'; ctx.font = '32px Segoe UI, Arial';
-  ctx.fillText(lvl.relay ? `${down} / ${doms.length} dominos tombés   ·   série ${combo}` : lvl.layers ? `pochoirs posés ${lvl.spots.filter(sp => sp.layer != null).length} / ${lvl.layers.length}` : lvl.golds ? `${down} / ${doms.length} tombés   ·   dorés dans l’ordre ${goldNext - 1} / ${lvl.golds}   ·   pichenettes ${pushes} / ${BUDGET}` : `${down} / ${doms.length} tombés   ·   pichenettes ${pushes} / ${BUDGET}   ·   but : 1 seule`, CC.W / 2, 250);
+  ctx.fillText(lvl.endless ? `dominos tombés   ·   série ${combo}` : lvl.relay ? `${down} / ${doms.length} dominos tombés   ·   série ${combo}` : lvl.layers ? `pochoirs posés ${lvl.spots.filter(sp => sp.layer != null).length} / ${lvl.layers.length}` : lvl.golds ? `${down} / ${doms.length} tombés   ·   dorés dans l’ordre ${goldNext - 1} / ${lvl.golds}   ·   pichenettes ${pushes} / ${BUDGET}` : `${down} / ${doms.length} tombés   ·   pichenettes ${pushes} / ${BUDGET}   ·   but : 1 seule`, CC.W / 2, 250);
   if (lvl.teach && phase === 'play' && !layerMsg) { ctx.fillStyle = '#ffd23f'; ctx.font = '30px Segoe UI, Arial'; wrapText(ctx, lvl.teach, CC.W / 2, 300, 960, 38); }
   ctx.fillStyle = '#cfd5f5'; ctx.font = 'bold 34px Segoe UI, Arial'; ctx.textAlign = 'left'; ctx.fillText('☰ Niveaux', levelsRect[0], levelsRect[1] + 62); ctx.textAlign = 'center';
   const [rx, ry, rw] = retryRect();
@@ -2171,7 +2225,7 @@ function draw(ctx) {
   hg.addColorStop(0, 'rgba(20,22,36,0)'); hg.addColorStop(1, 'rgba(20,22,36,0.92)');
   ctx.fillStyle = hg; ctx.fillRect(0, 1700, CC.W, 220);
   ctx.fillStyle = '#cfd5f5'; ctx.font = '32px Segoe UI, Arial';
-  if (phase === 'clear') { /* the result card takes this place */ }
+  if (phase === 'clear' || phase === 'over') { /* the result card takes this place */ }
   else if (!sel) {
     if (doms.some(d => d.slot)) {
       ctx.fillText('Remplis les cases avec le stock, dans le bon sens.', CC.W / 2, 1810);
@@ -2183,7 +2237,7 @@ function draw(ctx) {
       }
     } else if (lvl.relay) {
       ctx.fillText('Touche l’écran quand la vague arrive au socle orange.', CC.W / 2, 1822);
-      ctx.fillText('La chaîne ne doit pas s’arrêter avant le dessin.', CC.W / 2, 1868);
+      ctx.fillText(lvl.endless ? 'Va le plus loin possible sans que la chaîne s’arrête.' : 'La chaîne ne doit pas s’arrêter avant le dessin.', CC.W / 2, 1868);
     } else ctx.fillText(lvl.golds ? 'Une pichenette sur un socle orange, dans un sens ou dans l’autre.' : 'Une pichenette sur un socle orange : tout doit tomber.', CC.W / 2, 1834);
   } else if (!lvl.layers) ctx.fillText('Touche une autre case, ou ailleurs pour reculer.', CC.W / 2, 1840);
   if (phase === 'play' && goldBad && chains.length && chains.every(c => c.done) && !doms.some(d => d.state === 'falling')) {
@@ -2230,9 +2284,9 @@ function draw(ctx) {
     const e = (t - phaseT) / 1.6, a = e < 0.75 ? 1 : 1 - (e - 0.75) / 0.25;
     ctx.fillStyle = `rgba(14,15,28,${0.7 * a})`; ctx.fillRect(0, 0, CC.W, CC.H);
     ctx.globalAlpha = a; ctx.fillStyle = '#fff'; ctx.font = 'bold 120px Segoe UI, Arial';
-    ctx.fillText(`Niveau ${li + 1}`, CC.W / 2, 860);
+    ctx.fillText(lvl.endless ? '∞' : `Niveau ${li + 1}`, CC.W / 2, 860);
     ctx.fillStyle = '#ffd23f'; ctx.font = 'bold 70px Segoe UI, Arial'; ctx.fillText(lvl.name, CC.W / 2, 960);
-    if (lvl.teach) { ctx.fillStyle = '#cfd5f5'; ctx.font = '40px Segoe UI, Arial'; wrapText(ctx, 'Nouveau : ' + lvl.teach, CC.W / 2, 1060, 900, 52); }
+    if (lvl.teach) { ctx.fillStyle = '#cfd5f5'; ctx.font = '40px Segoe UI, Arial'; wrapText(ctx, (lvl.endless ? '' : 'Nouveau : ') + lvl.teach, CC.W / 2, 1060, 900, 52); }
     ctx.globalAlpha = 1;
   }
   if (phase === 'clear' && t >= phaseT) {
@@ -2256,6 +2310,17 @@ function draw(ctx) {
     ctx.fillStyle = '#9aa3c7'; ctx.font = '34px Segoe UI, Arial';
     if (!CC.auto) ctx.fillText(last ? 'Touche pour revenir aux niveaux' : 'Touche pour le niveau suivant', CC.W / 2, 1772);
     }
+    ctx.restore();
+  }
+  if (phase === 'over' && t >= phaseT) {
+    const e = Math.min(1, (t - phaseT) / 0.35);
+    ctx.save(); ctx.globalAlpha = e; ctx.translate(0, 60 * (1 - e)); ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(16,18,32,0.92)'; CC.roundRect(ctx, 60, 1380, CC.W - 120, 490, 40); ctx.fill();
+    ctx.fillStyle = '#cfd5f5'; ctx.font = 'bold 44px Segoe UI, Arial'; ctx.fillText('La chaîne s’est arrêtée', CC.W / 2, 1450);
+    ctx.fillStyle = '#ffd23f'; ctx.font = 'bold 120px Segoe UI, Arial'; ctx.fillText(lvl.score, CC.W / 2, 1575);
+    ctx.fillStyle = lvl.record ? '#38c172' : '#cfd5f5'; ctx.font = '38px Segoe UI, Arial';
+    ctx.fillText(lvl.record ? `dominos : nouveau record !   ·   ${perfects} parfaits` : `dominos   ·   record ${prog.best}   ·   ${perfects} parfaits`, CC.W / 2, 1650);
+    bigButton(ctx, againRect, '☰ Niveaux', '#3b4266'); bigButton(ctx, nextRect2, '↻ Rejouer', '#38c172');
     ctx.restore();
   }
   if (menu) drawMenu(ctx);
@@ -2345,7 +2410,7 @@ function turn(d) {
   else { d.a += FLAT; d.va = d.a - FLAT * 0.999; note(d, 'Tourné', '#ffffff'); }
   CC.sfx('select', { p: 0.3 });
 }
-function retry() { tries++; resetDominos(); phase = 'play'; }
+function retry() { if (lvl.endless) { loadLevel(ENDLESS); return; } tries++; resetDominos(); phase = 'play'; }
 function turnPlate(P) {
   if (P.lock || phase !== 'play' || pushes > 0) return;
   P.q = (P.q + 1) % 4; P.to += FLAT; CC.sfx('select', { p: 0.3 });
@@ -2372,6 +2437,7 @@ canvas.addEventListener('pointerdown', ev => {
   if (CC.auto) return;
   const [x, y] = CC.toCanvas(canvas, ev);
   if (menu) {
+    if (inRect(x, y, endlessRect)) { menu = false; loadLevel(ENDLESS); return; }
     if (inRect(x, y, prevRect) && page > 0) { page--; return; }
     if (inRect(x, y, nextRect) && page < pages() - 1) { page++; return; }
     for (let i = 0; i < BUILD.length; i++) if (inRect(x, y, tileRect(i)) && i <= prog.unlocked) { menu = false; loadLevel(i); return; }
@@ -2379,6 +2445,10 @@ canvas.addEventListener('pointerdown', ev => {
     return;
   }
   if (inRect(x, y, levelsRect)) { openMenu(); return; }
+  if (phase === 'over') {
+    if (CC.time >= phaseT) { if (inRect(x, y, againRect)) openMenu(); else if (inRect(x, y, nextRect2)) loadLevel(ENDLESS); }
+    return;
+  }
   if ((lvl.layers || lvl.relay) && phase === 'clear' && CC.time >= phaseT) {
     if (inRect(x, y, againRect)) loadLevel(li);
     else if (inRect(x, y, nextRect2)) { if (li === BUILD.length - 1) openMenu(); else loadLevel(li + 1); }
@@ -2388,8 +2458,7 @@ canvas.addEventListener('pointerdown', ev => {
   if (phase === 'clear' && CC.time >= phaseT) { if (li === BUILD.length - 1) openMenu(); else loadLevel(li + 1); return; }
   if (inRetry(x, y)) { retry(); return; }
   if (lvl.relay) {
-    const k = lvl.relay.findIndex(q => q.pad.state === 'up');
-    if (k >= 0) relayFlick(k);
+    if (lvl.cur < lvl.relay.length) relayFlick(lvl.cur);
     return;
   }
   if (sel && CC.time - selT > 0.2) {
@@ -2551,6 +2620,7 @@ if (openAll) prog.unlocked = BUILD.length - 1;
 menu = !CC.auto && askLevel === null;
 loadLevel(CC.auto ? +(new URLSearchParams(location.search).get('from') || 0) : +(askLevel || (openAll ? 0 : Math.min(prog.unlocked, BUILD.length - 1))));
 page = Math.floor(li / PER);
+if (!CC.auto && new URLSearchParams(location.search).has('infini')) { menu = false; loadLevel(ENDLESS); }
 CC.run({ canvas, step, draw, autoplay });
 </script>
 </body>

@@ -3073,3 +3073,13 @@
 - 22:43 : nouveau prototype colorchain-relais (vague à relancer à chaque trou, 100 niveaux joués par script, parcours
   tactile simulé) et sa fiche sur la page prototypes ; eslint OK, astro check 0 erreur ; poussé à la demande de
   l'utilisateur : mes fichiers et cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-12 — ColorChain : chemin infini (session colorchain)
+- Statut : en cours (2026-11-12T22:56+01:00). Demande de l'utilisateur : un chemin de dominos infini, lancer de
+  nouvelles vagues au bon moment ; mises à jour du prototype autorisées
+- Réservations actives : `public/prototypes/colorchain-relais/index.html`, `src/pages/prototypes/index.astro` (texte de
+  la fiche).
+- Ressources : serveur de dev sur le port 4391 ; eslint, `astro check`. Build annoncé ici avant.
+- 22:57 : mode « Chemin infini » dans colorchain-relais (parcours sans fin qui accélère, un arrêt termine la partie,
+  record gardé) ; 3 minutes simulées sans blocage, boutons testés par script ; eslint OK, astro check 0 erreur ; poussé
+  à la demande de l'utilisateur : mes fichiers et cette section seulement. Statut : terminé. Réservations libérées.
