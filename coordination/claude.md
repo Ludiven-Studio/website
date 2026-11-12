@@ -3063,3 +3063,13 @@
   relie les lignes), verrouillés sur les 3 premiers dessins ; 16 combinaisons simulées, 100 dessins rejoués par script
   ; poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé. Réservations
   libérées.
+
+## 2026-11-12 — ColorChain : relais de dominos (session colorchain)
+- Statut : en cours (2026-11-12T22:41+01:00). Demande de l'utilisateur : des pichenettes régulièrement au bon moment
+  pour que la chaîne continue ; mises à jour du prototype autorisées
+- Réservations actives : `public/prototypes/colorchain-relais/`, `src/pages/prototypes/index.astro` (une fiche de
+  plus).
+- Ressources : serveur de dev sur le port 4391 ; eslint, `astro check`. Build annoncé ici avant.
+- 22:43 : nouveau prototype colorchain-relais (vague à relancer à chaque trou, 100 niveaux joués par script, parcours
+  tactile simulé) et sa fiche sur la page prototypes ; eslint OK, astro check 0 erreur ; poussé à la demande de
+  l'utilisateur : mes fichiers et cette section seulement. Statut : terminé. Réservations libérées.
