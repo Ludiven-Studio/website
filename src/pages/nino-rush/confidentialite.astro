@@ -27,12 +27,12 @@ import LangSwitch from '../../components/LangSwitch.astro';
 		</div>
 
 		<p class="updated">
-			Cette politique concerne <strong>le jeu mobile Nino Rush</strong> (<code>com.ludivenstudio.ninorush</code>). Le reste du site a sa <a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 6 novembre 2026.
+			Cette politique concerne <strong>le jeu mobile Nino Rush</strong> (<code>com.ludivenstudio.ninorush</code>). Le reste du site a sa <a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 12 novembre 2026.
 		</p>
 
 		<div class="summary">
 			<p><strong>L'essentiel&nbsp;:</strong></p>
-			<p>Le jeu se joue sans compte et sans réseau&nbsp;: ta progression reste sur ton téléphone. Les seules vidéos sont celles de nos autres jeux et applis, à la fin d'un niveau et seulement si tu le veux. Un compte, facultatif, garde ta progression et tes achats en ligne. Les achats se paient sur Google Play ou l'App Store. Le jeu ne fait ni statistiques d'usage, ni rapports de plantage, et nous ne vendons pas tes données. Le jeu s'adresse aux 13 ans et plus.</p>
+			<p>Le jeu se joue sans compte et sans réseau&nbsp;: ta progression reste sur ton téléphone. Les seules vidéos sont celles de nos autres jeux et applis, à la fin d'un niveau et seulement si tu le veux. Un compte, facultatif, garde ta progression et tes achats en ligne. Les achats se paient sur Google Play ou l'App Store. Depuis la version 1.0.3, le jeu envoie des statistiques d'usage sans identifiant à notre propre serveur, en Allemagne. Il ne fait pas de rapports de plantage, et nous ne vendons pas tes données. Le jeu s'adresse aux 13 ans et plus.</p>
 		</div>
 
 		<section class="stack gap-2">
@@ -76,8 +76,11 @@ import LangSwitch from '../../components/LangSwitch.astro';
 		</section>
 
 		<section class="stack gap-2">
-			<h2>6. Ce que le jeu ne fait pas</h2>
-			<p>Aucune statistique d'usage et aucun rapport de plantage&nbsp;: les outils de mesure de Unity sont coupés dans le jeu. Aucune régie publicitaire, et le jeu n'utilise pas l'identifiant publicitaire de ton téléphone. Ni position précise, ni contacts, ni photos, ni fichiers, ni micro, ni caméra&nbsp;: le jeu ne demande aucune de ces autorisations.</p>
+			<h2>6. Statistiques d'usage, et ce que le jeu ne fait pas</h2>
+			<p>Depuis la version 1.0.3, le jeu envoie à <strong>Umami</strong>, un outil de statistiques sans cookie installé sur notre propre serveur, le nom de certaines actions&nbsp;: le jeu s'ouvre (avec l'aventure complète ou non, et le nombre de niveaux finis)&nbsp;; un niveau commence, puis finit (mode, monde, numéro, terminé, passé, recommencé ou quitté, étoiles, chutes, durée)&nbsp;; la balade du jour est finie&nbsp;; la démo arrive à sa fin&nbsp;; la boutique s'ouvre (depuis où), la question pour les grands est réussie ou non&nbsp;; un achat est commencé, réussi, restauré ou en échec&nbsp;; l'atelier s'ouvre&nbsp;; la vidéo qui double les pièces est proposée, montrée, regardée ou passée. Le nom de tes niveaux, tes niveaux de l'atelier et leurs codes ne partent jamais.</p>
+			<p>Chaque envoi porte aussi la plateforme, le type de version (test ou publique), la version du jeu et du système, le modèle de téléphone, la langue du téléphone et la taille de l'écran. <strong>Aucun</strong> identifiant de joueur, de compte ou d'installation, ni adresse mail, ni identifiant publicitaire n'y figure&nbsp;: ces statistiques ne sont reliées ni à ton compte ni à ton identité.</p>
+			<p>Comme tout service web, notre serveur voit l'adresse IP de ton téléphone. Il ne la conserve pas, mais en déduit le pays, la région et la ville. Pour compter les joueurs, il regroupe les actions faites depuis une même connexion et un même modèle de téléphone, pendant un mois calendaire au plus. Ce serveur est loué à <strong>Hetzner Online GmbH</strong>, qui l'héberge en Allemagne&nbsp;; personne d'autre ne reçoit ces statistiques. Elles nous disent jusqu'où les joueurs vont, où ils bloquent et ce qui leur plaît. Base légale&nbsp;: notre intérêt légitime à améliorer le jeu.</p>
+			<p>Aucun rapport de plantage&nbsp;: les outils de mesure de Unity sont coupés dans le jeu. Aucune régie publicitaire, et le jeu n'utilise pas l'identifiant publicitaire de ton téléphone. Ni position précise, ni contacts, ni photos, ni fichiers, ni micro, ni caméra&nbsp;: le jeu ne demande aucune de ces autorisations.</p>
 		</section>
 
 		<section class="stack gap-2">
@@ -87,10 +90,11 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li><strong>Supabase</strong>&nbsp;: comptes et sauvegardes, hébergés en Irlande&nbsp;;</li>
 				<li><strong>GitHub</strong>&nbsp;: hébergement de notre site, du fichier de version et de nos vidéos&nbsp;;</li>
 				<li><strong>Unity Technologies</strong>&nbsp;: le module d'achat&nbsp;;</li>
+				<li><strong>Hetzner Online GmbH</strong>&nbsp;: hébergement de notre serveur de statistiques d'usage, en Allemagne&nbsp;;</li>
 				<li><strong>Google</strong> et <strong>Apple</strong>&nbsp;: la connexion à ton compte, la distribution du jeu et le paiement des achats.</li>
 			</ul>
 			<p>Supabase, GitHub et Unity sont des sociétés américaines&nbsp;: ces transferts sont encadrés par le chapitre V du RGPD (clauses contractuelles types, ou cadre de protection des données UE–États-Unis).</p>
-			<p>Ton compte et sa sauvegarde sont gardés jusqu'à ce que tu supprimes le compte. L'adresse IP reste quelques jours dans les journaux techniques de Supabase, le temps que fixe GitHub dans les siens, et avec ta session tant qu'elle dure.</p>
+			<p>Ton compte et sa sauvegarde sont gardés jusqu'à ce que tu supprimes le compte. Les statistiques d'usage sont gardées 24 mois sur notre serveur, puis effacées&nbsp;; ses sauvegardes, 14 jours. L'adresse IP reste quelques jours dans les journaux techniques de Supabase, le temps que fixe GitHub dans les siens, et avec ta session tant qu'elle dure.</p>
 		</section>
 
 		<section class="stack gap-2" id="suppression">

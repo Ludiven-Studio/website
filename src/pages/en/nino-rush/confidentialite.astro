@@ -28,7 +28,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 		</div>
 
 		<p class="updated">
-			This policy covers <strong>the Nino Rush mobile game</strong> (<code>com.ludivenstudio.ninorush</code>). The rest of the website has its <a href="/confidentialite/">own policy</a> (in French). Last updated: November 6, 2026.
+			This policy covers <strong>the Nino Rush mobile game</strong> (<code>com.ludivenstudio.ninorush</code>). The rest of the website has its <a href="/confidentialite/">own policy</a> (in French). Last updated: November 12, 2026.
 		</p>
 		<p class="updated">
 			This is a courtesy translation. In case of discrepancy, the <a href="/nino-rush/confidentialite/" hreflang="fr">original French version</a> prevails.
@@ -36,7 +36,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 
 		<div class="summary">
 			<p><strong>In short:</strong></p>
-			<p>The game plays with no account and no network: your progress stays on your phone. The only videos are of our other games and apps, at the end of a level and only if you want one. An account, optional, keeps your progress and purchases online. Purchases are paid on Google Play or the App Store. The game runs no usage analytics and no crash reports, and we do not sell your data. The game is for ages 13 and up.</p>
+			<p>The game plays with no account and no network: your progress stays on your phone. The only videos are of our other games and apps, at the end of a level and only if you want one. An account, optional, keeps your progress and purchases online. Purchases are paid on Google Play or the App Store. Since version 1.0.3, the game sends usage statistics with no ID to our own server, in Germany. It sends no crash reports, and we do not sell your data. The game is for ages 13 and up.</p>
 		</div>
 
 		<section class="stack gap-2">
@@ -80,8 +80,11 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 		</section>
 
 		<section class="stack gap-2">
-			<h2>6. What the game does not do</h2>
-			<p>No usage analytics and no crash reports: Unity's measurement tools are off in the game. No ad network, and the game does not use your phone's advertising ID. No precise location, contacts, photos, files, microphone or camera: the game asks for none of these permissions.</p>
+			<h2>6. Usage statistics, and what the game does not do</h2>
+			<p>Since version 1.0.3, the game sends <strong>Umami</strong>, a cookieless statistics tool installed on our own server, the name of some actions: the game opens (with the full adventure or not, and the number of levels finished); a level starts, then ends (mode, world, number, finished, skipped, restarted or left, stars, falls, time); the daily stroll is done; the demo reaches its end; the shop opens (from where), the grown-up question is passed or not; a purchase is started, completed, restored or failed; the workshop opens; the video that doubles your coins is offered, shown, watched or skipped. Your level names, your workshop levels and their codes never leave.</p>
+			<p>Each event also carries the platform, the build type (test or public), the game and system versions, the phone model, the phone's language and the screen size. <strong>No</strong> player, account or install ID, email address or advertising ID is in it: these statistics are linked neither to your account nor to who you are.</p>
+			<p>Like any web service, our server sees your phone's IP address. It does not keep it, but derives the country, region and city from it. To count players, it groups the actions made from the same connection and the same phone model, for one calendar month at most. This server is rented from <strong>Hetzner Online GmbH</strong>, which hosts it in Germany; no one else receives these statistics. They tell us how far players go, where they get stuck and what they enjoy. Legal basis: our legitimate interest in improving the game.</p>
+			<p>No crash reports: Unity's measurement tools are off in the game. No ad network, and the game does not use your phone's advertising ID. No precise location, contacts, photos, files, microphone or camera: the game asks for none of these permissions.</p>
 		</section>
 
 		<section class="stack gap-2">
@@ -91,10 +94,11 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Supabase</strong>: accounts and saves, hosted in Ireland;</li>
 				<li><strong>GitHub</strong>: hosting of our website, the version file and our videos;</li>
 				<li><strong>Unity Technologies</strong>: the purchase module;</li>
+				<li><strong>Hetzner Online GmbH</strong>: hosting of our usage statistics server, in Germany;</li>
 				<li><strong>Google</strong> and <strong>Apple</strong>: signing in to your account, distributing the game and paying for purchases.</li>
 			</ul>
 			<p>Supabase, GitHub and Unity are US companies: these transfers follow chapter V of the GDPR (standard contractual clauses, or the EU–US Data Privacy Framework).</p>
-			<p>Your account and its save are kept until you delete the account. The IP address stays a few days in Supabase's technical logs, as long as GitHub sets in its own, and with your session while it lasts.</p>
+			<p>Your account and its save are kept until you delete the account. Usage statistics are kept 24 months on our server, then erased; its backups, 14 days. The IP address stays a few days in Supabase's technical logs, as long as GitHub sets in its own, and with your session while it lasts.</p>
 		</section>
 
 		<section class="stack gap-2" id="suppression">

@@ -28,7 +28,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 		</div>
 
 		<p class="updated">
-			Questa informativa riguarda <strong>il gioco mobile Nino Rush</strong> (<code>com.ludivenstudio.ninorush</code>). Il resto del sito ha una <a href="/confidentialite/">propria informativa</a> (in francese). Ultimo aggiornamento: 6 novembre 2026.
+			Questa informativa riguarda <strong>il gioco mobile Nino Rush</strong> (<code>com.ludivenstudio.ninorush</code>). Il resto del sito ha una <a href="/confidentialite/">propria informativa</a> (in francese). Ultimo aggiornamento: 12 novembre 2026.
 		</p>
 		<p class="updated">
 			Questa è una traduzione di cortesia. In caso di discordanza, prevale la
@@ -37,7 +37,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 
 		<div class="summary">
 			<p><strong>L'essenziale:</strong></p>
-			<p>Si gioca senza account e senza connessione: i tuoi progressi restano sul tuo telefono. Gli unici video sono quelli dei nostri altri giochi e app, alla fine di un livello e solo se lo vuoi. Un account, facoltativo, conserva online i tuoi progressi e i tuoi acquisti. Gli acquisti si pagano su Google Play o sull'App Store. Il gioco non raccoglie statistiche d'uso né segnalazioni di arresti anomali, e non vendiamo i tuoi dati. Il gioco è destinato a chi ha almeno 13 anni.</p>
+			<p>Si gioca senza account e senza connessione: i tuoi progressi restano sul tuo telefono. Gli unici video sono quelli dei nostri altri giochi e app, alla fine di un livello e solo se lo vuoi. Un account, facoltativo, conserva online i tuoi progressi e i tuoi acquisti. Gli acquisti si pagano su Google Play o sull'App Store. Dalla versione 1.0.3, il gioco invia statistiche d'uso senza identificativo al nostro server, in Germania. Non invia segnalazioni di arresti anomali, e non vendiamo i tuoi dati. Il gioco è destinato a chi ha almeno 13 anni.</p>
 		</div>
 
 		<section class="stack gap-2">
@@ -81,8 +81,11 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 		</section>
 
 		<section class="stack gap-2">
-			<h2>6. Cosa non fa il gioco</h2>
-			<p>Nessuna statistica d'uso e nessuna segnalazione di arresti anomali: gli strumenti di misurazione di Unity sono disattivati nel gioco. Nessuna rete pubblicitaria, e il gioco non usa l'identificativo pubblicitario del tuo telefono. Né posizione precisa, né contatti, né foto, né file, né microfono, né fotocamera: il gioco non chiede nessuna di queste autorizzazioni.</p>
+			<h2>6. Statistiche d'uso, e cosa non fa il gioco</h2>
+			<p>Dalla versione 1.0.3, il gioco invia a <strong>Umami</strong>, uno strumento di statistiche senza cookie installato sul nostro server, il nome di alcune azioni: il gioco si apre (con l'avventura completa o no, e il numero di livelli finiti); un livello inizia e poi finisce (modalità, mondo, numero, finito, saltato, ricominciato o abbandonato, stelle, cadute, durata); la passeggiata del giorno è completata; la demo arriva alla fine; il negozio si apre (da dove), la domanda per adulti è superata o no; un acquisto è iniziato, completato, ripristinato o fallito; l'atelier si apre; il video che raddoppia le monete è proposto, mostrato, guardato o saltato. I nomi dei tuoi livelli, i tuoi livelli dell'atelier e i loro codici non escono mai.</p>
+			<p>Ogni invio porta anche la piattaforma, il tipo di versione (di prova o pubblica), la versione del gioco e del sistema, il modello del telefono, la lingua del telefono e la dimensione dello schermo. <strong>Nessun</strong> identificativo di giocatore, di account o di installazione, né indirizzo e-mail, né identificativo pubblicitario vi compare: queste statistiche non sono collegate né al tuo account né alla tua identità.</p>
+			<p>Come ogni servizio web, il nostro server vede l'indirizzo IP del tuo telefono. Non lo conserva, ma ne ricava il paese, la regione e la città. Per contare i giocatori, raggruppa le azioni fatte da una stessa connessione e da uno stesso modello di telefono, per un mese di calendario al massimo. Questo server è noleggiato da <strong>Hetzner Online GmbH</strong>, che lo ospita in Germania; nessun altro riceve queste statistiche. Ci dicono fin dove arrivano i giocatori, dove si bloccano e cosa piace loro. Base giuridica: il nostro legittimo interesse a migliorare il gioco.</p>
+			<p>Nessuna segnalazione di arresti anomali: gli strumenti di misurazione di Unity sono disattivati nel gioco. Nessuna rete pubblicitaria, e il gioco non usa l'identificativo pubblicitario del tuo telefono. Né posizione precisa, né contatti, né foto, né file, né microfono, né fotocamera: il gioco non chiede nessuna di queste autorizzazioni.</p>
 		</section>
 
 		<section class="stack gap-2">
@@ -92,10 +95,11 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Supabase</strong>: account e salvataggi online, ospitati in Irlanda;</li>
 				<li><strong>GitHub</strong>: hosting del nostro sito, del file di versione e dei nostri video;</li>
 				<li><strong>Unity Technologies</strong>: il modulo di acquisto;</li>
+				<li><strong>Hetzner Online GmbH</strong>: hosting del nostro server di statistiche d'uso, in Germania;</li>
 				<li><strong>Google</strong> e <strong>Apple</strong>: l'accesso al tuo account, la distribuzione del gioco e il pagamento degli acquisti.</li>
 			</ul>
 			<p>Supabase, GitHub e Unity sono società statunitensi: questi trasferimenti sono disciplinati dal capo V del GDPR (clausole contrattuali tipo, o <em>EU-U.S. Data Privacy Framework</em>).</p>
-			<p>Il tuo account e il suo salvataggio online sono conservati finché non elimini l'account. L'indirizzo IP resta qualche giorno nei registri tecnici di Supabase, in quelli di GitHub per il tempo stabilito da GitHub, e con la tua sessione finché dura.</p>
+			<p>Il tuo account e il suo salvataggio online sono conservati finché non elimini l'account. Le statistiche d'uso sono conservate 24 mesi sul nostro server, poi cancellate; i suoi backup, 14 giorni. L'indirizzo IP resta qualche giorno nei registri tecnici di Supabase, in quelli di GitHub per il tempo stabilito da GitHub, e con la tua sessione finché dura.</p>
 		</section>
 
 		<section class="stack gap-2" id="suppression">

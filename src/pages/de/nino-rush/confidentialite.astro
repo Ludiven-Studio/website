@@ -28,7 +28,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 		</div>
 
 		<p class="updated">
-			Diese Erklärung betrifft <strong>das Handyspiel Nino Rush</strong> (<code>com.ludivenstudio.ninorush</code>). Die übrige Website hat eine <a href="/confidentialite/">eigene Datenschutzerklärung</a> (auf Französisch). Letzte Aktualisierung: 6. November 2026.
+			Diese Erklärung betrifft <strong>das Handyspiel Nino Rush</strong> (<code>com.ludivenstudio.ninorush</code>). Die übrige Website hat eine <a href="/confidentialite/">eigene Datenschutzerklärung</a> (auf Französisch). Letzte Aktualisierung: 12. November 2026.
 		</p>
 		<p class="updated">
 			Dies ist eine Höflichkeitsübersetzung. Bei Abweichungen gilt die
@@ -37,7 +37,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 
 		<div class="summary">
 			<p><strong>Das Wichtigste:</strong></p>
-			<p>Du spielst ohne Konto und ohne Internet: Dein Spielstand bleibt auf deinem Handy. Die einzigen Videos zeigen unsere anderen Spiele und Apps, am Ende eines Levels und nur, wenn du willst. Ein Konto, ebenfalls freiwillig, sichert deinen Spielstand und deine Käufe online. Bezahlt werden Käufe über Google Play oder den App Store. Das Spiel erstellt weder Nutzungsstatistiken noch Absturzberichte, und wir verkaufen deine Daten nicht. Das Spiel richtet sich an Personen ab 13 Jahren.</p>
+			<p>Du spielst ohne Konto und ohne Internet: Dein Spielstand bleibt auf deinem Handy. Die einzigen Videos zeigen unsere anderen Spiele und Apps, am Ende eines Levels und nur, wenn du willst. Ein Konto, ebenfalls freiwillig, sichert deinen Spielstand und deine Käufe online. Bezahlt werden Käufe über Google Play oder den App Store. Seit Version 1.0.3 sendet das Spiel Nutzungsstatistiken ohne Kennung an unseren eigenen Server in Deutschland. Es sendet keine Absturzberichte, und wir verkaufen deine Daten nicht. Das Spiel richtet sich an Personen ab 13 Jahren.</p>
 		</div>
 
 		<section class="stack gap-2">
@@ -81,8 +81,11 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 		</section>
 
 		<section class="stack gap-2">
-			<h2>6. Was das Spiel nicht tut</h2>
-			<p>Keine Nutzungsstatistiken und keine Absturzberichte: Die Messwerkzeuge von Unity sind im Spiel ausgeschaltet. Kein Werbenetzwerk, und das Spiel verwendet die Werbe-ID deines Handys nicht. Kein genauer Standort, keine Kontakte, keine Fotos, keine Dateien, kein Mikrofon, keine Kamera: Das Spiel fragt nach keiner dieser Berechtigungen.</p>
+			<h2>6. Nutzungsstatistiken, und was das Spiel nicht tut</h2>
+			<p>Seit Version 1.0.3 sendet das Spiel an <strong>Umami</strong>, ein Statistikwerkzeug ohne Cookies auf unserem eigenen Server, den Namen bestimmter Aktionen: Das Spiel startet (mit dem kompletten Abenteuer oder nicht, und die Zahl der beendeten Level); ein Level beginnt und endet (Modus, Welt, Nummer, geschafft, übersprungen, neu gestartet oder verlassen, Sterne, Stürze, Dauer); der Ausflug des Tages ist geschafft; die Demo ist zu Ende; der Shop öffnet sich (von wo aus), die Frage für Erwachsene wird richtig beantwortet oder nicht; ein Kauf wird begonnen, abgeschlossen, wiederhergestellt oder schlägt fehl; das Atelier öffnet sich; das Video, das deine Münzen verdoppelt, wird angeboten, gezeigt, angesehen oder übersprungen. Die Namen deiner Level, deine Level aus dem Atelier und ihre Codes verlassen dein Handy nie.</p>
+			<p>Jede Meldung enthält außerdem die Plattform, die Art der Version (Test oder öffentlich), die Version des Spiels und des Systems, das Handymodell, die Sprache des Handys und die Bildschirmgröße. <strong>Keine</strong> Spieler-, Konto- oder Installations-ID, keine E-Mail-Adresse und keine Werbe-ID ist darin: Diese Statistiken sind weder mit deinem Konto noch mit deiner Person verknüpft.</p>
+			<p>Wie jeder Webdienst sieht unser Server die IP-Adresse deines Handys. Er speichert sie nicht, leitet aber Land, Region und Stadt daraus ab. Um die Spieler zu zählen, fasst er die Aktionen derselben Verbindung und desselben Handymodells zusammen, höchstens einen Kalendermonat lang. Dieser Server ist bei der <strong>Hetzner Online GmbH</strong> gemietet, die ihn in Deutschland betreibt; niemand sonst erhält diese Statistiken. Sie zeigen uns, wie weit die Spieler kommen, wo sie hängen bleiben und was ihnen gefällt. Rechtsgrundlage: unser berechtigtes Interesse, das Spiel zu verbessern.</p>
+			<p>Keine Absturzberichte: Die Messwerkzeuge von Unity sind im Spiel ausgeschaltet. Kein Werbenetzwerk, und das Spiel verwendet die Werbe-ID deines Handys nicht. Kein genauer Standort, keine Kontakte, keine Fotos, keine Dateien, kein Mikrofon, keine Kamera: Das Spiel fragt nach keiner dieser Berechtigungen.</p>
 		</section>
 
 		<section class="stack gap-2">
@@ -92,10 +95,11 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Supabase</strong>: Konten und Online-Spielstände, gehostet in Irland;</li>
 				<li><strong>GitHub</strong>: Hosting unserer Website, der Versionsdatei und unserer Videos;</li>
 				<li><strong>Unity Technologies</strong>: das Kaufmodul;</li>
+				<li><strong>Hetzner Online GmbH</strong>: Hosting unseres Servers für Nutzungsstatistiken, in Deutschland;</li>
 				<li><strong>Google</strong> und <strong>Apple</strong>: die Anmeldung bei deinem Konto, der Vertrieb des Spiels und die Zahlung der Käufe.</li>
 			</ul>
 			<p>Supabase, GitHub und Unity sind US-amerikanische Unternehmen: Diese Übermittlungen sind durch Kapitel V der DSGVO abgesichert (Standardvertragsklauseln oder <em>EU-U.S. Data Privacy Framework</em>).</p>
-			<p>Dein Konto und sein Online-Spielstand werden aufbewahrt, bis du das Konto löschst. Die IP-Adresse bleibt einige Tage in den technischen Protokollen von Supabase, in denen von GitHub so lange, wie GitHub es festlegt, und bei deiner Sitzung, solange sie besteht.</p>
+			<p>Dein Konto und sein Online-Spielstand werden aufbewahrt, bis du das Konto löschst. Nutzungsstatistiken bleiben 24 Monate auf unserem Server und werden dann gelöscht; seine Sicherungen 14 Tage. Die IP-Adresse bleibt einige Tage in den technischen Protokollen von Supabase, in denen von GitHub so lange, wie GitHub es festlegt, und bei deiner Sitzung, solange sie besteht.</p>
 		</section>
 
 		<section class="stack gap-2" id="suppression">
