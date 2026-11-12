@@ -2974,3 +2974,13 @@
 - 15:21 : bille qui renverse les pots dans l'ordre, éventail de dominos jusqu'à une ligne par colonne ; 6 niveaux
   vérifiés (bon ordre, ordre inverse) ; eslint OK ; poussé à la demande de l'utilisateur : mes fichiers et cette
   section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-12 — ColorChain : pots en hauteur (session colorchain)
+- Statut : en cours (2026-11-12T15:59+01:00). Demande de l'utilisateur : pots en hauteur au-dessus des dominos, bille
+  qui descend une rampe, phénomène physique cohérent ; mises à jour du prototype autorisées
+- Réservations actives : `public/prototypes/colorchain-peinture/index.html`, `src/pages/prototypes/index.astro` (texte
+  de la fiche).
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 15:59 : pots sur piquets au-dessus du tableau, rampe en pente, filet de peinture ; 6 niveaux vérifiés (bon ordre,
+  ordre inverse) ; eslint OK ; poussé à la demande de l'utilisateur : mes 2 fichiers et cette section seulement. Statut
+  : terminé. Réservations libérées.

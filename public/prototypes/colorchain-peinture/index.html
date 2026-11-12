@@ -896,21 +896,30 @@ function canvasLevel(name, teach, layers, _slots, cols = 20, rows = 18) {
     }
   };
   grow(root, 0, cols);
-  // Flick, three dominoes, then the marble's rail: past the pots, a U-turn, up to the root.
-  const zA = zR + 2.0, zB = zR + 1.1, xS = x0 - 0.2, xE = x0 + W + 0.2;
-  const starter = place(path().add(sample(x => [x, zA], xS - 1.9, xS - 0.55, 200), { color: WH }), d);
+  // Flick three dominoes on a raised stand: they launch the marble. Its rail slopes down along
+  // the top of the picture, past the pots standing above the dominoes, then goes round the
+  // picture down to the table and ends on the root.
+  const H0 = 3.0, H1 = 2.2, zT = z0 - 1.9, xS = x0 - 0.3, xE = x0 + W + 0.3, xR = xE + 1.1, zB = zR + 1.1;
+  const starter = place(path().add(sample(x => [x, zT], xS - 1.9, xS - 0.55, 200), { color: WH }), d);
+  for (const o of starter) o.y = H0;
   const L1 = starter.at(-1);
-  const rail = [...sample(x => [x, zA], xS, xE, 900), ...bez([xE, zA], [xE + 0.6, zA], [xE + 0.6, zB], [xE, zB], 120),
-    ...sample(x => [x, zB], xE, 0.9, 600), ...bez([0.9, zB], [0.3, zB], [0, zB - 0.2], [0, zR + 0.45], 120)];
+  const seg = (pts, ya, yb) => pts.map((q, i) => [q[0], q[1], ya + (yb - ya) * i / (pts.length - 1)]);
+  const rail = [...seg(sample(x => [x, zT], xS, xE, 900), H0, H1),
+    ...seg(bez([xE, zT], [xE + 0.8, zT], [xR, zT + 0.3], [xR, zT + 1.1], 120), H1, H1 - 0.1),
+    ...seg(sample(z => [xR, z], zT + 1.1, zB - 1.0, 1200), H1 - 0.1, 0.12),
+    ...seg(bez([xR, zB - 1.0], [xR, zB - 0.3], [xR - 0.3, zB], [xR - 1.0, zB], 120), 0.12, 0.04),
+    ...seg(sample(x => [x, zB], xR - 1.0, 0.9, 600), 0.04, 0),
+    ...seg(bez([0.9, zB], [0.3, zB], [0, zB - 0.2], [0, zR + 0.45], 120), 0, 0)];
   const spots = layers.map((l, k) => {
-    const x = xS + 0.9 + k * (xE - xS - 1.8) / Math.max(1, n - 1);
-    return { x, z: zA + 0.8, k, state: 'up', spot: true, layer: null, s: x - xS };
+    const x = xS + 1.0 + k * (xE - xS - 2.0) / Math.max(1, n - 1);
+    return { x, z: zT + 0.75, y: H0 + (H1 - H0) * (x - xS) / (xE - xS) - 0.15, k, state: 'up', spot: true, layer: null, s: x - xS };
   });
+  const steps = starter.map(o => ({ x: o.x, z: o.z, a: 0, h: H0 }));
   const L = layers.map(l => ({ ...l }));
   for (const o of field) { o.want = FIELD_W; o.wantK = -1; L.forEach((l, k) => { if (l.shape(o.fu, o.fv)) { o.want = l.color; o.wantK = k; } }); }
   return { name, teach, sol: [], colors: [FIELD_W, WH, ...L.map(l => l.color)], dominos: d, h: { start: starter[0], sign: 1 },
     hot: [], spots, starts: [starter[0]], layers: L, field, budget: 2, cols, rows,
-    marbles: [{ rail, launcher: L1, target: root }],
+    marbles: [{ rail, launcher: L1, target: root }], steps, zTop: z0, lastS: spots.at(-1).s,
     paint: [[rectP(x0 - 1.0, z0 - 0.7, x0 + W + 1.0, z1 + 0.6), 0x6b4a3a], [rectP(x0 - 0.6, z0 - 0.35, x0 + W + 0.6, z1 + 0.3), 0xe9e4d6]] };
 }
 
@@ -1131,8 +1140,12 @@ function loadLevel(i) {
     }
   }
   for (const sp of lvl.spots || []) {
-    const m = keep(new THREE.Mesh(new THREE.RingGeometry(0.46, 0.56, 36), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, depthWrite: false })));
-    m.rotation.x = -Math.PI / 2; m.position.set(sp.x, 0.03, sp.z);
+    const post = keep(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, sp.y, 10), railMat)); post.position.set(sp.x, sp.y / 2, sp.z); post.castShadow = true;
+    const plate = keep(new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.06, 28), discMat)); plate.position.set(sp.x, sp.y, sp.z); plate.castShadow = true;
+  }
+  if (lvl.layers) {
+    const r = lvl.marbles[0].rail;
+    for (let i = 0; i < r.length; i += 110) if (r[i][2] > 0.3) { const post = keep(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, r[i][2], 8), railMat)); post.position.set(r[i][0], r[i][2] / 2, r[i][1]); }
   }
   pots = (lvl.layers || []).map(l => {
     const g = new THREE.Group(), mat = new THREE.MeshStandardMaterial({ color: l.color, roughness: 0.5 });
@@ -1144,10 +1157,10 @@ function loadLevel(i) {
   });
   for (const d of lvl.starts) {
     d.starter = true;
-    const m = keep(new THREE.Mesh(padGeom, padMat)); m.position.set(d.x, 0.03, d.z); m.receiveShadow = true;
+    const m = keep(new THREE.Mesh(padGeom, padMat)); m.position.set(d.x, (d.y || 0) + 0.03, d.z); m.receiveShadow = true;
     for (const sg of [1, -1]) {
       const a = keep(new THREE.Mesh(arrowGeom, new THREE.MeshBasicMaterial({ color: 0xffb066, transparent: true, depthWrite: false })));
-      a.position.set(d.x, 0.07, d.z); a.rotation.y = -d.a + (sg < 0 ? Math.PI : 0); a.userData.start = d; a.userData.back = sg < 0;
+      a.position.set(d.x, (d.y || 0) + 0.07, d.z); a.rotation.y = -d.a + (sg < 0 ? Math.PI : 0); a.userData.start = d; a.userData.back = sg < 0;
     }
   }
   if (lvl.riverBed) {
@@ -1247,7 +1260,7 @@ function loadLevel(i) {
 
 function resetDominos() {
   for (const d of doms) Object.assign(d, { state: 'up', th: 0, w: 0, u: [0, 0], cap: FLAT, targets: null, hitDone: false, shake: -9, flash: -9, chain: null, leanOn: null, gh: 0, pop: -9, hole: null, holeTold: false, wob: -9 });
-  chains = []; popups = []; marks = []; pushes = 0; focus = null; slowT = -9; sel = null; active = new Set(); goldNext = 1; goldBad = null; pours = []; layerMsg = '';
+  chains = []; popups = []; marks = []; pushes = 0; focus = null; slowT = -9; sel = null; active = new Set(); goldNext = 1; goldBad = null; for (const q of pours) if (q.stream) scene.remove(q.stream); pours = []; layerMsg = '';
   if (lvl.layers) { for (const o of lvl.field) { o.color = FIELD_W; o.top = -1; for (let k = 0; k < lvl.layers.length; k++) o['p' + k] = false; } for (const l of lvl.layers) l.poured = false; for (const m of pots) m.userData.tipT = -9; holdUntil = -9; waiting = []; for (const o of lvl.spots) o.fired = false; }
   for (const m of marbles) { Object.assign(m, { pause: 0, resumed: true, s: 0, v: 0, state: 'rest', chain: null, predicted: false, q: new THREE.Quaternion(), p: m.tracks[0], L: m.tracks[0].L }); placeMarble(m, 0); }
   paint();
@@ -1290,7 +1303,7 @@ function fitView(top, bottom, el) {
   }
   for (const d of ext) { x0 = Math.min(x0, d.x); x1 = Math.max(x1, d.x); z0 = Math.min(z0, d.z); z1 = Math.max(z1, d.z); }
   const m = 0.6, pts = [];
-  for (const x of [x0 - m, x1 + m]) for (const z of [z0 - m, z1 + m]) for (const y of [0, TALL]) pts.push([x, y, z]);
+  for (const x of [x0 - m, x1 + m]) for (const z of [z0 - m, z1 + m]) for (const y of [0, lvl.layers ? 4.2 : TALL]) pts.push([x, y, z]);
   const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
   let best = null;
   for (let D = 120; D > 8; D -= 0.25) {
@@ -1393,6 +1406,7 @@ function rollMarbles(h) {
     if (lvl.layers) {
       if (t < (m.pause || 0)) continue;
       if (m.pause && !m.resumed) { m.resumed = true; m.v = 3.0; }
+      if (m.s > lvl.lastS + 0.2 && m.v < 5.5) m.v = 5.5;
       const sp = lvl.spots.find(o => !o.fired && m.s >= o.s);
       if (sp) { sp.fired = true; if (sp.layer != null) { pourSpot(sp); m.pause = holdUntil; m.resumed = false; CC.sfx('tock'); continue; } }
     }
@@ -1585,6 +1599,7 @@ function step(dt) {
       o['p' + p.k] = true; o.color = l.color; o.top = p.k; o.wob = t;
     }
     if (!p.sound && t > p.t0) { p.sound = true; CC.sfx('drip', { p: 0.3 }); }
+    if (p.stream) { p.stream.visible = t > p.t0 - 0.12 && t < p.end + 0.15; p.stream.material.opacity = Math.min(1, Math.max(0, (p.end + 0.15 - t) / 0.3)); }
   }
   if (phase === 'play') {
     const moving = doms.some(d => d.state === 'falling'), settled = chains.every(c => c.done);
@@ -1634,7 +1649,7 @@ function step(dt) {
     m.position.y = d.state === 'up' ? 0.07 : -1;
   }
   for (const m of marbles) if (m.flipper && m.flipper.mesh) m.flipper.mesh.rotation.y = -m.flipper.dirs[m.flipper.pos];
-  for (const m of pots) { const e = m.userData.tipT < 0 ? 0 : Math.min(1, Math.max(0, (t - m.userData.tipT) / 0.35)); m.rotation.x = -1.9 * e * e; m.position.y = 0.25 * Math.sin(Math.PI * e); }
+  for (const m of pots) { const e = m.userData.tipT < 0 ? 0 : Math.min(1, Math.max(0, (t - m.userData.tipT) / 0.35)); m.rotation.x = 1.75 * e * e; m.position.y = (m.userData.y0 || 0) + 0.03 + 0.2 * Math.sin(Math.PI * e); }
   updateCam(dt);
   paint();
   updateMatrices();
@@ -1737,8 +1752,12 @@ function pourSpot(sp) {
   if (sp.layer == null) return;
   const l = lvl.layers[sp.layer], t0 = CC.time + 0.35;
   let far = 0;
-  for (const o of lvl.field) if (l.shape(o.fu, o.fv)) far = Math.max(far, Math.hypot(o.x - sp.x, o.z - sp.z));
-  l.poured = true; pours.push({ k: sp.layer, t0, x: sp.x, z: sp.z }); pots[sp.layer].userData.tipT = CC.time + 0.12;
+  for (const o of lvl.field) if (l.shape(o.fu, o.fv)) far = Math.max(far, Math.hypot(o.x - sp.x, o.z - lvl.zTop));
+  const a = new THREE.Vector3(sp.x, sp.y + 0.25, sp.z + 0.5), b = new THREE.Vector3(sp.x, 0.9, lvl.zTop + 0.2), len = a.distanceTo(b);
+  const stream = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.2, len, 12), new THREE.MeshStandardMaterial({ color: l.color, roughness: 0.3, transparent: true }));
+  stream.position.copy(a).lerp(b, 0.5); stream.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), a.clone().sub(b).normalize()); stream.visible = false;
+  scene.add(stream); extras.push(stream);
+  l.poured = true; pours.push({ k: sp.layer, t0, x: sp.x, z: lvl.zTop, stream, end: t0 + far * 0.045 }); pots[sp.layer].userData.tipT = CC.time + 0.12;
   holdUntil = t0 + far * 0.045 + 0.35;
 }
 // Tap a stencil: it takes the next free spot. Tap it again: it goes back, the next ones move up.
@@ -1749,7 +1768,7 @@ function toggleStencil(k) {
   const at = order.indexOf(k);
   if (at >= 0) order.splice(at, 1); else if (order.length < lvl.spots.length) order.push(k);
   lvl.spots.forEach((o, j) => { o.layer = order[j] ?? null; });
-  for (const [j, m] of pots.entries()) { const o = lvl.spots.find(q => q.layer === j); m.visible = !!o; if (o) m.position.set(o.x, 0, o.z); m.userData.tipT = -9; m.rotation.x = 0; m.position.y = 0; }
+  for (const [j, m] of pots.entries()) { const o = lvl.spots.find(q => q.layer === j); m.visible = !!o; if (o) { m.position.set(o.x, o.y + 0.03, o.z); m.userData.y0 = o.y; } m.userData.tipT = -9; m.rotation.x = 0; }
   for (const mb of marbles) Object.assign(mb, { pause: 0, resumed: true });
   if (at < 0) hl = { k, t: CC.time };
   CC.sfx('select', { p: at >= 0 ? 0.2 : 0.6 });
@@ -1809,7 +1828,7 @@ function drawLayersHud(ctx) {
   }
   // Spots: their number, and the stencil put there.
   if (phase !== 'clear') for (const sp of lvl.spots) {
-    const [x, y] = proj(sp.x, 0, sp.z + 0.62);
+    const [x, y] = proj(sp.x, sp.y + 1.05, sp.z);
     ctx.fillStyle = sel === sp ? '#ffd23f' : '#fff'; ctx.strokeStyle = 'rgba(16,18,32,0.9)'; ctx.lineWidth = 4;
     ctx.beginPath(); ctx.arc(x, y - 6, 20, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.fillStyle = '#1d2033'; ctx.font = 'bold 26px Segoe UI, Arial'; ctx.fillText(sp.k + 1, x, y + 3);
@@ -2049,7 +2068,7 @@ function nearest(list, x, y, r) {
   let best = null, bd = r;
   for (const d of list) {
     if (d.state !== 'up') continue;
-    const [sx, sy] = proj(d.x, 0.4, d.z), e = Math.hypot(sx - x, sy - y);
+    const [sx, sy] = proj(d.x, (d.y || 0) + 0.4, d.z), e = Math.hypot(sx - x, sy - y);
     if (e < bd) { bd = e; best = d; }
   }
   return best;
@@ -2073,7 +2092,7 @@ canvas.addEventListener('pointerdown', ev => {
   }
   if (lvl.layers) {
     const c = cardRects().find(c => inRect(x, y, c.r));
-    const sp = !c && lvl.spots.find(o => o.layer != null && Math.hypot(...proj(o.x, 0, o.z).map((v, i) => v - [x, y][i])) < 70);
+    const sp = !c && lvl.spots.find(o => o.layer != null && Math.hypot(...proj(o.x, o.y + 0.3, o.z).map((v, i) => v - [x, y][i])) < 70);
     if (c || sp) { toggleStencil(c ? c.k : sp.layer); return; }
   }
   const st = canAct() ? nearest(lvl.starts, x, y, 100) : null;
