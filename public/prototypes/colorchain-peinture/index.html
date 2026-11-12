@@ -865,36 +865,53 @@ const tri = (a, b, c) => (u, v) => {
 const ellipse = (cu, cv, ru, rv) => (u, v) => ((u - cu) / ru) ** 2 + ((v - cv) / rv) ** 2 < 1;
 const any = (...fs) => (u, v) => fs.some(f => f(u, v));
 
-// layers: in the right order, bottom first. One line of dominoes runs under the picture past
-// one numbered spot per layer: the player puts a stencil pot on each spot. The line tips the
-// pots in order 1, 2, 3..., waits for each pour, then hits the plank under the picture.
+// layers: in the right order, bottom first. A flick launches a marble along a rail that runs
+// past one numbered spot per layer: the player puts the stencil pots on the spots. The marble
+// stops at each pot while it pours, then hits a white domino that splits, again and again,
+// into one line per column of the picture, and the whole picture falls.
 function canvasLevel(name, teach, layers, _slots, cols = 20, rows = 18) {
-  const d = [], sx = 0.6, sz = 0.55;
+  const d = [], sx = 0.6, sz = 0.55, WH = '#f4f1e8';
   const x0 = -(cols - 1) * sx / 2, z0 = -6.4, z1 = z0 + (rows - 1) * sz, W = (cols - 1) * sx, n = layers.length;
   const field = [];
   for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
     const o = { x: x0 + i * sx, z: z0 + j * sz, a: FLAT, color: FIELD_W, tag: {}, any: true, field: true, fu: i / (cols - 1), fv: j / (rows - 1) };
     field.push(o); d.push(o);
   }
-  d.push({ x: 0, z: z1 + 0.6, a: FLAT, color: '#d9b77e', tag: {}, comb: true, wide: W + 1.4, plank: true });
-  const zL = z1 + 2.7, xS = x0 - 0.4, xE = x0 + W - 1.5, LC = '#f4f1e8';
-  const line = place(path().add(sample(x => [x, zL], xS, xE, 1500), { color: LC })
-    .add(bez([xE, zL], [xE + 0.5, zL], [xE + 0.9, zL - 0.4], [xE + 0.9, zL - 0.9]), { color: LC })
-    .add(sample(z => [xE + 0.9, z], zL - 0.9, z1 + 1.25, 300), { color: LC }), d);
-  const [ya, yb] = line.slice(-2);
-  if (Math.hypot(ya.x - yb.x, ya.z - yb.z) < 0.4) { d.splice(d.indexOf(yb), 1); line.pop(); }
-  for (const o of line) o.line = true;
+  // The splitting tree, from its root up to one leaf under each column.
+  const xs = [...Array(cols).keys()].map(i => x0 + i * sx), zLeaf = z1 + 0.6, zR = zLeaf + 9.2;
+  const root = { x: 0, z: zR, a: -FLAT, color: WH, tag: {}, root: true };
+  d.push(root);
+  const grow = (node, a, b) => {
+    const m = Math.ceil((a + b) / 2);
+    for (const [lo, hi, side] of [[a, m, -1], [m, b, 1]]) {
+      const xc = (xs[lo] + xs[hi - 1]) / 2, leaf = hi - lo === 1;
+      const zc = leaf ? zLeaf : node.z - Math.max(1.3, 1.1 * Math.abs(xc - node.x));
+      const dz = node.z - zc, br = branchFrom(node, side, Math.min(35, Math.max(8, Math.atan2(Math.abs(xc - node.x), dz) / DEG)));
+      const pth = path().add(bez(br.p, add2(br.p, dirOf(br.h), Math.min(1.0, dz * 0.35)), [xc, zc + Math.min(dz * 0.4, 1.4)], [xc, zc]), { color: WH });
+      const pl = place(pth, d);
+      if (pl.length > 2 && Math.hypot(pl.at(-1).x - pl.at(-2).x, pl.at(-1).z - pl.at(-2).z) < 0.42) { d.splice(d.indexOf(pl.at(-2)), 1); pl.splice(-2, 1); }
+      pl[0].a = br.h;
+      const end = pl.at(-1); end.a = -FLAT;
+      if (!leaf) grow(end, lo, hi);
+    }
+  };
+  grow(root, 0, cols);
+  // Flick, three dominoes, then the marble's rail: past the pots, a U-turn, up to the root.
+  const zA = zR + 2.0, zB = zR + 1.1, xS = x0 - 0.2, xE = x0 + W + 0.2;
+  const starter = place(path().add(sample(x => [x, zA], xS - 1.9, xS - 0.55, 200), { color: WH }), d);
+  const L1 = starter.at(-1);
+  const rail = [...sample(x => [x, zA], xS, xE, 900), ...bez([xE, zA], [xE + 0.6, zA], [xE + 0.6, zB], [xE, zB], 120),
+    ...sample(x => [x, zB], xE, 0.9, 600), ...bez([0.9, zB], [0.3, zB], [0, zB - 0.2], [0, zR + 0.45], 120)];
   const spots = layers.map((l, k) => {
-    const x = xS + 1.2 + k * (xE - xS - 1.9) / Math.max(1, n - 1);
-    const trigger = line.reduce((m, o) => Math.abs(o.z - zL) < 0.1 && Math.abs(o.x - x) < Math.abs(m.x - x) ? o : m, line[1]);
-    trigger.spotK = k;
-    return { x, z: zL + 1.1, k, state: 'up', spot: true, layer: null, trigger };
+    const x = xS + 0.9 + k * (xE - xS - 1.8) / Math.max(1, n - 1);
+    return { x, z: zA + 0.8, k, state: 'up', spot: true, layer: null, s: x - xS };
   });
   const L = layers.map(l => ({ ...l }));
   for (const o of field) { o.want = FIELD_W; o.wantK = -1; L.forEach((l, k) => { if (l.shape(o.fu, o.fv)) { o.want = l.color; o.wantK = k; } }); }
-  return { name, teach, sol: [], colors: [FIELD_W, LC, ...L.map(l => l.color)], dominos: d, h: { start: line[0], sign: 1 },
-    hot: [], spots, starts: [line[0]], layers: L, field, budget: 2, cols, rows,
-    paint: [[rectP(x0 - 1.0, z0 - 0.7, x0 + W + 1.0, z1 + 1.0), 0x6b4a3a], [rectP(x0 - 0.6, z0 - 0.35, x0 + W + 0.6, z1 + 0.35), 0xe9e4d6]] };
+  return { name, teach, sol: [], colors: [FIELD_W, WH, ...L.map(l => l.color)], dominos: d, h: { start: starter[0], sign: 1 },
+    hot: [], spots, starts: [starter[0]], layers: L, field, budget: 2, cols, rows,
+    marbles: [{ rail, launcher: L1, target: root }],
+    paint: [[rectP(x0 - 1.0, z0 - 0.7, x0 + W + 1.0, z1 + 0.6), 0x6b4a3a], [rectP(x0 - 0.6, z0 - 0.35, x0 + W + 0.6, z1 + 0.3), 0xe9e4d6]] };
 }
 
 const C = { sky: '#7fc4ff', night: '#3b4a8f', sun: '#ffd23f', sea: '#2f6fd6', grass: '#4cc36b', hill: '#2f9b4f', red: '#e8434d',
@@ -1231,8 +1248,8 @@ function loadLevel(i) {
 function resetDominos() {
   for (const d of doms) Object.assign(d, { state: 'up', th: 0, w: 0, u: [0, 0], cap: FLAT, targets: null, hitDone: false, shake: -9, flash: -9, chain: null, leanOn: null, gh: 0, pop: -9, hole: null, holeTold: false, wob: -9 });
   chains = []; popups = []; marks = []; pushes = 0; focus = null; slowT = -9; sel = null; active = new Set(); goldNext = 1; goldBad = null; pours = []; layerMsg = '';
-  if (lvl.layers) { for (const o of lvl.field) { o.color = FIELD_W; o.top = -1; for (let k = 0; k < lvl.layers.length; k++) o['p' + k] = false; } for (const l of lvl.layers) l.poured = false; for (const m of pots) m.userData.tipT = -9; holdUntil = -9; waiting = []; }
-  for (const m of marbles) { Object.assign(m, { s: 0, v: 0, state: 'rest', chain: null, predicted: false, q: new THREE.Quaternion(), p: m.tracks[0], L: m.tracks[0].L }); placeMarble(m, 0); }
+  if (lvl.layers) { for (const o of lvl.field) { o.color = FIELD_W; o.top = -1; for (let k = 0; k < lvl.layers.length; k++) o['p' + k] = false; } for (const l of lvl.layers) l.poured = false; for (const m of pots) m.userData.tipT = -9; holdUntil = -9; waiting = []; for (const o of lvl.spots) o.fired = false; }
+  for (const m of marbles) { Object.assign(m, { pause: 0, resumed: true, s: 0, v: 0, state: 'rest', chain: null, predicted: false, q: new THREE.Quaternion(), p: m.tracks[0], L: m.tracks[0].L }); placeMarble(m, 0); }
   paint();
   updateMatrices();
 }
@@ -1293,7 +1310,7 @@ function fitView(top, bottom, el) {
 let endView = null;
 function fitCamera() {
   endView = fitView(330, 1390, 66 * DEG);
-  base = fitView(lvl.layers ? 420 : 380, lvl.layers ? 1420 : 1720, 50 * DEG);
+  base = fitView(lvl.layers ? 400 : 380, lvl.layers ? 1380 : 1720, 50 * DEG);
   placeCam(base.x, base.z, 1);
   scene.fog.near = base.D * 1.4; scene.fog.far = base.D * 3;
   // Tight near/far planes keep depth precision on phones (often a 16-bit depth buffer).
@@ -1373,9 +1390,15 @@ function rollMarbles(h) {
     const slope = (yAt(m.p, m.s + 0.05) - yAt(m.p, m.s - 0.05)) / 0.1;
     m.v += (m.v > 0 ? -0.25 - 6 * slope : 1.6) * h;
     if (m.v > 0 && m.v < 2.0) m.v = 2.0;
+    if (lvl.layers) {
+      if (t < (m.pause || 0)) continue;
+      if (m.pause && !m.resumed) { m.resumed = true; m.v = 3.0; }
+      const sp = lvl.spots.find(o => !o.fired && m.s >= o.s);
+      if (sp) { sp.fired = true; if (sp.layer != null) { pourSpot(sp); m.pause = holdUntil; m.resumed = false; CC.sfx('tock'); continue; } }
+    }
     const ds = m.v * h;
     m.s += ds; placeMarble(m, ds);
-    if (!m.predicted && m.v > 0 && m.L - m.s < 2.6) {
+    if (!lvl.layers && !m.predicted && m.v > 0 && m.L - m.s < 2.6) {
       m.predicted = true;
       if (!marblePasses(m) && !focus) { focus = { x: o.x, z: o.z, yaw: 0, until: t + 9 }; slowT = t; }
     }
@@ -1581,7 +1604,7 @@ function step(dt) {
   // Colors that take no part in the running chain fade to grey glass.
   const running = doms.some(d => d.state === 'falling') || marbles.some(m => m.state === 'rolling') || (focus && t < focus.until);
   for (const d of doms) {
-    const g = running && d.state === 'up' && !d.field && !d.line && !d.plank && !active.has(d.color) && !(t - d.flash < 4) ? 1 : 0;
+    const g = running && d.state === 'up' && !d.field && !(lvl.layers && d.color === '#f4f1e8') && !active.has(d.color) && !(t - d.flash < 4) ? 1 : 0;
     d.gh += (g - d.gh) * Math.min(1, dt * 7);
     if (d.gh < 0.01) d.gh = 0;
   }
@@ -1727,6 +1750,7 @@ function toggleStencil(k) {
   if (at >= 0) order.splice(at, 1); else if (order.length < lvl.spots.length) order.push(k);
   lvl.spots.forEach((o, j) => { o.layer = order[j] ?? null; });
   for (const [j, m] of pots.entries()) { const o = lvl.spots.find(q => q.layer === j); m.visible = !!o; if (o) m.position.set(o.x, 0, o.z); m.userData.tipT = -9; m.rotation.x = 0; m.position.y = 0; }
+  for (const mb of marbles) Object.assign(mb, { pause: 0, resumed: true });
   if (at < 0) hl = { k, t: CC.time };
   CC.sfx('select', { p: at >= 0 ? 0.2 : 0.6 });
 }
@@ -1771,7 +1795,7 @@ function cardRects() {
 function drawLayersHud(ctx) {
   const cols = lvl.cols, rows = lvl.rows, s = Math.min(200 / cols, 200 / rows), w = cols * s, h = rows * s, x0 = 150 - w / 2, y0 = 1560;
   ctx.textAlign = 'center';
-  if (!sel || !sel.spot) {
+  if ((!sel || !sel.spot) && phase !== 'clear') {
     ctx.fillStyle = 'rgba(16,18,32,0.85)'; CC.roundRect(ctx, 30, y0 - 80, 1020, h + 110, 26); ctx.fill();
     ctx.fillStyle = '#cfd5f5'; ctx.font = 'bold 28px Segoe UI, Arial'; ctx.fillText('Modèle', 150, y0 - 40);
     lvl.field.forEach((o, k) => { ctx.fillStyle = o.want; ctx.fillRect(x0 + (k % cols) * s, y0 - 20 + Math.floor(k / cols) * s, s + 0.5, s + 0.5); });
@@ -1785,8 +1809,7 @@ function drawLayersHud(ctx) {
   }
   // Spots: their number, and the stencil put there.
   if (phase !== 'clear') for (const sp of lvl.spots) {
-    const [x, y] = proj(sp.x, 0, sp.z + 0.75);
-    if (sp.layer != null) drawStencil(ctx, lvl.layers[sp.layer], x, y + 34, 58, lvl.layers[sp.layer].poured);
+    const [x, y] = proj(sp.x, 0, sp.z + 0.62);
     ctx.fillStyle = sel === sp ? '#ffd23f' : '#fff'; ctx.strokeStyle = 'rgba(16,18,32,0.9)'; ctx.lineWidth = 4;
     ctx.beginPath(); ctx.arc(x, y - 6, 20, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.fillStyle = '#1d2033'; ctx.font = 'bold 26px Segoe UI, Arial'; ctx.fillText(sp.k + 1, x, y + 3);
@@ -1860,7 +1883,7 @@ function draw(ctx) {
       ctx.fillText('Puis une pichenette sur un socle orange : tout doit tomber.', CC.W / 2, 1858);
     } else if (lvl.layers) {
       ctx.fillText('Touche les pochoirs dans l’ordre : le dernier versé passe devant.', CC.W / 2, 1810);
-      ctx.fillText('Touche-le encore pour le retirer. Puis une pichenette.', CC.W / 2, 1858);
+      ctx.fillText('Touche-le encore pour le retirer. Puis une pichenette : la bille fait le reste.', CC.W / 2, 1858);
     } else ctx.fillText(lvl.golds ? 'Une pichenette sur un socle orange, dans un sens ou dans l’autre.' : 'Une pichenette sur un socle orange : tout doit tomber.', CC.W / 2, 1834);
   } else if (!lvl.layers) ctx.fillText('Touche une autre case, ou ailleurs pour reculer.', CC.W / 2, 1840);
   if (phase === 'play' && goldBad && chains.length && chains.every(c => c.done) && !doms.some(d => d.state === 'falling')) {

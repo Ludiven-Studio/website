@@ -2964,3 +2964,13 @@
 - 14:52 : pochoirs touchés dans l'ordre, retirés au second toucher ; pots debout après un reset ; 6 niveaux et les
   parcours échec, retouche et reset vérifiés ; poussé à la demande de l'utilisateur : mon fichier et cette section
   seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-12 — ColorChain : bille et éventail (session colorchain)
+- Statut : en cours (2026-11-12T15:21+01:00). Demande de l'utilisateur : une bille renverse les pots dans l'ordre, puis
+  un domino blanc se divise en une ligne par colonne ; mises à jour du prototype autorisées
+- Réservations actives : `public/prototypes/colorchain-peinture/` (index.html, cover.webp),
+  `src/pages/prototypes/index.astro` (texte de la fiche).
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 15:21 : bille qui renverse les pots dans l'ordre, éventail de dominos jusqu'à une ligne par colonne ; 6 niveaux
+  vérifiés (bon ordre, ordre inverse) ; eslint OK ; poussé à la demande de l'utilisateur : mes fichiers et cette
+  section seulement. Statut : terminé. Réservations libérées.
