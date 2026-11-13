@@ -3093,3 +3093,12 @@
   carrées, vagues, virages secs aux trous) ; 9 tirages de 200 à 240 s simulés sans blocage, 3 niveaux à dessin rejoués
   ; poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé. Réservations
   libérées.
+
+## 2026-11-13 — ColorChain : motifs variés dans les 100 niveaux (session colorchain)
+- Statut : en cours (2026-11-13T01:02+01:00). Demande de l'utilisateur : c'est monotone : de la variété, des motifs
+  verticaux, circulaires ; mises à jour du prototype autorisées
+- Réservations actives : `public/prototypes/colorchain-relais/index.html`.
+- Ressources : serveur de dev sur le port 4391 ; eslint, `astro check`. Build annoncé ici avant.
+- 01:02 : les 100 niveaux à dessin ont un parcours fait des mêmes motifs variés que le chemin infini ; 100 niveaux
+  rejoués par script, tous terminés sans arrêt ; poussé à la demande de l'utilisateur : mon fichier et cette section
+  seulement. Statut : terminé. Réservations libérées.
