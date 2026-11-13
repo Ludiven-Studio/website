@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated": "2026-11-12T06:00:00Z",
+  "updated": "2026-11-13T18:24:48Z",
   "rotationSeconds": 30,
   "defaultLanguage": "fr",
   "entries": [
@@ -99,7 +99,7 @@
         "de": "Wer liegt vorn? Dein Handy misst",
         "it": "Chi ha il punto? Lo misura il telefono"
       },
-      "image": "img/petanque-scan.png",
+      "image": "img/petanque-scan-202611131824.png",
       "clips": {
         "fr": "clips/petanque-scan_fr-202611120600.mp4",
         "en": "clips/petanque-scan_en-202611120600.mp4",
