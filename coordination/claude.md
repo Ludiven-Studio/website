@@ -3111,3 +3111,14 @@
 - 01:13 : les dominos du chemin infini n'étaient plus dessinés une fois sortis de leur zone de départ (limites
   calculées à la première image) ; reproduit puis vérifié par script en dessinant en continu ; poussé à la demande de
   l'utilisateur : mon fichier et cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-13 — ColorChain : couloir et dessins colonne par colonne (session colorchain)
+- Statut : en cours (2026-11-13T01:27+01:00). Demande de l'utilisateur : les 100 images apparaissent au fur et à
+  mesure, remplir l'espace, aller vers le haut, déclencher les dessins colonne par colonne plutôt que la pyramide
+  inversée ; mises à jour du prototype autorisées
+- Réservations actives : `public/prototypes/colorchain-relais/index.html`.
+- Ressources : serveur de dev sur le port 4391 ; eslint, `astro check`. Build annoncé ici avant.
+- 01:27 : parcours en couloir qui remplit la largeur, dessins déclenchés colonne par colonne par une ligne de dominos,
+  les 100 dessins le long du chemin infini ; 100 niveaux rejoués par script, 4 parties infinies de 240 s sans arrêt,
+  images dessinées en continu ; poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut :
+  terminé. Réservations libérées.

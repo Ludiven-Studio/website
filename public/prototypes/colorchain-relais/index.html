@@ -995,58 +995,25 @@ function growTree(d, xs, zLeaf, node, a, b, WH) {
     if (!leaf) growTree(d, xs, zLeaf, end, lo, hi, WH);
   }
 }
-// Relay: one long zigzag course with holes climbs to the splitting tree under a white field. The wave stops at each hole: the pad after it must be flicked as it arrives.
-// The field shows its picture as it falls.
+// Relay: a course of patterns with holes climbs the table. The wave stops at each hole: the pad after it must be
+// flicked as it arrives. A white field shows its picture as it falls: the course runs along its foot, and each
+// domino of that run tips one column.
 const RAINBOW = ['#ff5d5d', '#ff9f43', '#ffd23f', '#5fd068', '#4dabf7', '#9775fa', '#f783ac'];
-function relayLevel(pic, layers, idx, cols, rows) {
-  const d = [], sx = 0.6, sz = 0.55, WH = '#f4f1e8', G = 1.5;
-  const x0 = -(cols - 1) * sx / 2, z0 = -6.4, z1 = z0 + (rows - 1) * sz, W = (cols - 1) * sx;
-  const field = [];
-  for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
-    const o = { x: x0 + i * sx, z: z0 + j * sz, a: FLAT, color: FIELD_W, tag: {}, any: true, field: true, fu: i / (cols - 1), fv: j / (rows - 1) };
-    o.rev = FIELD_W; for (const l of layers) if (l.shape(o.fu, o.fv)) o.rev = l.color;
-    field.push(o); d.push(o);
-  }
-  const xs = [...Array(cols).keys()].map(i => x0 + i * sx), zLeaf = z1 + 0.6, zR = zLeaf + 9.2;
-  const root = { x: 0, z: zR, a: -FLAT, color: WH, tag: {}, any: true };
-  d.push(root);
-  growTree(d, xs, zLeaf, root, 0, cols, WH);
-  for (const o of d) o.pic = true;
-  // The course: a chain of patterns, laid from the start, then moved so that it ends under the root.
-  const N = 23 * Math.min(30, 16 + Math.floor(idx * 0.15)), tight = Math.max(0.6, 1 - idx * 0.006), r = CC.rng(idx * 31 + 7);
-  const C = { rnd: r, relay: [], head: 0, count: 28 + rint(r, 0, 9), grid: new Map(), zTop: 1e9, lastM: null, made: {}, gaps: [], gap: [37, 23], tight: () => tight,
-    allow: idx === 0 ? ['serp', 'wave', 'teeth'] : null, dominos: [...Array(N + 320)].map(() => ({ x: 0, z: 0, a: 0, color: WH, tag: {}, any: true, n: null })) };
-  C.open = newSec(); C.relay.push(C.open);
-  commit(C, turtle(0, 0, NORTH).fwd(10), null);
-  while (C.head < N) nextMotif(C);
-  C.count = 99;
-  commit(C, turtle(C.end.x, C.end.z, C.end.h).face(NORTH, 1).fwd(4, false), null);
-  const course = C.dominos.filter(o => o.n != null), dx = -C.end.x, dz = zR + PITCH - C.end.z, secs = C.relay, marks = [];
-  for (const o of course) { o.x += dx; o.z += dz; d.push(o); }
-  // Outlines on the ground where the dominoes are missing.
-  for (const g of C.gaps) {
-    const u = dirOf(g.a), q = [g.x + dx, g.z + dz];
-    marks.push([[[1, 1], [1, -1], [-1, -1], [-1, 1]].map(([e, f]) => [q[0] + e * 0.09 * u[0] - f * 0.3 * u[1], q[1] + e * 0.09 * u[1] + f * 0.3 * u[0]]), 0x4a5078]);
-  }
-  return { name: 'Dessin mystère', pic, teach: idx === 0 ? 'Touche l’écran quand la vague arrive au trou : la chaîne continue' : '', sol: [], colors: [FIELD_W, WH, ...RAINBOW],
-    dominos: d, h: { start: secs[0].pad, sign: 1 }, hot: [], starts: secs.map(q => q.pad), relay: secs, course, field, budget: 999, cols, rows, speed: Math.min(1, 0.7 + idx * 0.006),
-    paint: [...marks, [rectP(x0 - 1.0, z0 - 0.7, x0 + W + 1.0, z1 + 0.6), 0x6b4a3a], [rectP(x0 - 0.6, z0 - 0.35, x0 + W + 0.6, z1 + 0.3), 0xe9e4d6]] };
-}
-// Endless relay: a pool of dominoes laid along a path that never ends. The path is a chain of
-// patterns; a domino left far behind the wave is laid again ahead of it. One stop ends the run.
 const ENDLESS = -1, UP = () => ({ state: 'up', th: 0, w: 0, u: [0, 0], cap: FLAT, targets: null, hitDone: false, shake: -9, flash: -9, chain: null, leanOn: null, gh: 0, pop: -9, hole: null, holeTold: false, wob: -9 });
-const PITCH = 0.6, NORTH = -Math.PI / 2, D15 = Math.PI / 12, POOL = 1100, AHEAD = 400, CLEAR = 1.25;
+// The course stays in a corridor: |x| <= HW, rows and columns between the walls at WALL.
+const PITCH = 0.6, NORTH = -Math.PI / 2, D15 = Math.PI / 12, POOL = 2400, AHEAD = 400, CLEAR = 1.25, HW = 7.1, WALL = 6.3;
 const oneOf = (r, list) => list[Math.floor(r() * list.length)], rint = (r, a, b) => a + Math.floor(r() * (b - a + 1));
 const turnTo = (a, b) => Math.atan2(Math.sin(b - a), Math.cos(b - a));
 // Lays points along straights and arcs. Headings are multiples of 15 degrees.
 function turtle(x, z, h) {
   const T = { x, z, h, pts: [] };
   const drop = (ok, pad) => T.pts.push({ x: T.x, z: T.z, a: Math.atan2(Math.sin(T.h), Math.cos(T.h)), ok, pad });
+  // n dominoes, s apart.
+  T.step = (n, s, ok = false) => { for (let i = 0; i < n; i++) { T.x += s * Math.cos(T.h); T.z += s * Math.sin(T.h); drop(ok && i > 0 && i < n - 1); } return T; };
   T.line = (dist, ok = true) => {
     let n = Math.max(1, Math.round(dist / PITCH));
     if (dist / n > 0.68) n++;
-    for (let i = 0; i < n; i++) { T.x += dist / n * Math.cos(T.h); T.z += dist / n * Math.sin(T.h); drop(ok && i > 0 && i < n - 1); }
-    return T;
+    return T.step(n, dist / n, ok);
   };
   T.fwd = (n, ok) => n > 0 ? T.line(n * PITCH, ok) : T;
   T.turn = (deg, r = 0.7) => {
@@ -1064,54 +1031,96 @@ function turtle(x, z, h) {
   };
   // Turn the short way to heading h.
   T.face = (h, r) => T.turn(Math.round(turnTo(T.h, h) / D15) * 15, r);
+  // Along a row, east or west, up to x.
+  T.toX = x => { const sd = x > T.x ? 1 : -1; T.face(sd > 0 ? 0 : Math.PI, 0.7); const dist = (x - T.x) * sd; return dist > 0.3 ? T.line(dist) : T; };
   // A hole with a corner: the next section leaves its pad towards heading h.
   T.jump = h => { T.x += 3 * PITCH * Math.cos(T.h); T.z += 3 * PITCH * Math.sin(T.h); T.h = h; drop(false, true); return T; };
   return T;
 }
-const MOTIFS = [
-  // Rows, columns or slanted passes: a serpentine at any angle.
-  [3, function serp(T, r) {
-    const P = NORTH + D15 * oneOf(r, [0, 0, -6, 6, -6, 6, -2, 2, -3, 3, -4, 4]), sd = r() < 0.5 ? 1 : -1, n = rint(r, 3, 6), len = rint(r, 6, 18);
-    T.face(P - sd * Math.PI / 2, 0.7);
-    for (let i = 0; i < n; i++) { T.fwd(len); if (i < n - 1) T.turn((i % 2 ? -1 : 1) * sd * 180, 0.7); }
-  }],
-  // Sawtooth: straight teeth joined by tight corners.
-  [1.5, function teeth(T, r) {
-    const B = NORTH + D15 * rint(r, -3, 3), k = rint(r, 2, 5), n = rint(r, 4, 8), len = rint(r, 5, 10), sd = r() < 0.5 ? 1 : -1;
-    T.face(B + sd * k * D15, 0.8);
-    for (let i = 0; i < n; i++) { T.fwd(len); if (i < n - 1) T.turn((i % 2 ? 1 : -1) * sd * k * 30, 0.8); }
-  }],
-  // Double spiral, round or square: winds in to the middle, then out between its own rings.
-  [2.2, function spiral(T, r) {
-    const k = rint(r, 2, 4), sd = r() < 0.5 ? 1 : -1, sq = r() < 0.4, r0 = 0.7 + 1.4 * (k - 1);
-    T.face(NORTH + D15 * rint(r, -2, 2), 1).line(r0 + 1.5);
-    const half = (R, sg) => R < 1 || !sq ? T.turn(sg * 180, R) : T.line(R - 0.7).turn(sg * 90, 0.7).line(2 * R - 1.4).turn(sg * 90, 0.7).line(R - 0.7);
-    for (let i = k - 1; i >= 0; i--) half(0.7 + 1.4 * i, sd);
-    for (let i = 0; i < k; i++) half(0.7 + 1.4 * i, -sd);
-  }],
-  // Waves: wide bends, one side then the other.
-  [1.5, function wave(T, r) {
-    const A = 30 * rint(r, 3, 8), R = oneOf(r, [1.4, 2.1, 2.8]), n = rint(r, 3, 6), sd = r() < 0.5 ? 1 : -1;
-    T.face(NORTH + D15 * rint(r, -2, 2), 1).turn(sd * A / 2, R);
-    for (let i = 0; i < n; i++) T.turn((i % 2 ? 1 : -1) * sd * A, R);
-    T.turn((n % 2 ? 1 : -1) * sd * A / 2, R);
-  }],
-  // Lightning: straight runs, each ending on a hole; the next one leaves its pad at a new angle.
-  [1.6, function bolt(T, r, C) {
-    let sd = r() < 0.5 ? 1 : -1;
-    T.fwd(Math.max(3, C.seg - C.since), false);
-    for (let i = rint(r, 3, 5); i > 0; i--, sd = -sd) {
-      let h = T.h;
-      for (let g = 0; g < 40; g++) { h = NORTH + sd * D15 * rint(r, 1, 5); const dv = Math.abs(turnTo(T.h, h)); if (dv > 2.9 * D15 && dv < 9.1 * D15) break; }
-      T.jump(h).fwd(C.seg - 1, false);
+// Each pattern starts heading north where the last one stopped, and fills the width of the corridor.
+// Rows from wall to wall, tight or with wide bends, straight or narrowing like a fir tree.
+function rows(T, r) {
+  const R = oneOf(r, [0.7, 0.7, 0.7, 0.7, 1.4]), n = R > 1 ? rint(r, 3, 4) : rint(r, 3, 6), taper = R < 1 && r() < 0.35 ? oneOf(r, [-1, 1]) : 0;
+  let sd = T.x > 0 ? -1 : 1;
+  for (let i = 0; i < n; i++, sd = -sd) {
+    T.toX(sd * (WALL - R - (taper > 0 ? i : taper < 0 ? n - 1 - i : 0)));
+    if (i < n - 1) T.turn(-sd * 180, R);
+  }
+}
+// Columns, up and down, sweeping to the far wall.
+function cols(T, r) {
+  const sd = T.x > 0 ? -1 : 1, most = 1 + 2 * Math.floor((WALL - 0.7 - sd * T.x) / 2.8), len = rint(r, 8, 15);
+  if (most < 5) return false;
+  for (let i = 0, n = Math.min(most, oneOf(r, [7, 9, 9])); i < n; i++) {
+    T.fwd(len + (i ? 0 : 4));
+    if (i < n - 1) T.turn((i % 2 ? -1 : 1) * sd * 180, 0.7);
+  }
+}
+// Zigzag: slanted runs from wall to wall, joined by tight corners.
+function teeth(T, r) {
+  const al = oneOf(r, [5, 5, 5, 4]) * D15;
+  let sd = T.x > 0 ? -1 : 1;
+  for (let i = 0, n = rint(r, 3, 6); i < n; i++, sd = -sd) {
+    T.face(NORTH + sd * al, 0.8);
+    const dist = (sd * 5.5 - T.x) / Math.cos(T.h);
+    if (dist < 1.5) return false;
+    T.line(dist);
+  }
+}
+// Double spiral, round or square: winds in to the middle, then out between its own rings.
+function whirl(T, r) {
+  const k = r() < 0.6 ? 4 : 3, sq = r() < 0.4, r0 = 0.7 + 1.4 * (k - 1), sd = T.x > 0 ? -1 : 1;
+  if (sd * T.x > WALL - 2 * r0 - 1.4) {
+    // Not enough room on this side: first a row to the wall.
+    if (sd * T.x < -3.75) return false;
+    T.toX(-sd * 4.9).face(NORTH, 0.7);
+  }
+  T.line(r0 + 1.5);
+  const half = (R, sg) => R < 1 || !sq ? T.turn(sg * 180, R) : T.line(R - 0.7).turn(sg * 90, 0.7).line(2 * R - 1.4).turn(sg * 90, 0.7).line(R - 0.7);
+  for (let i = k - 1; i >= 0; i--) half(0.7 + 1.4 * i, sd);
+  for (let i = 0; i < k; i++) half(0.7 + 1.4 * i, -sd);
+}
+// Lightning: slanted runs that each end on a hole; the next one leaves its pad at a new angle.
+function bolt(T, r, C) {
+  let sd = T.x > 0 ? -1 : 1;
+  for (let i = 0, n = rint(r, 3, 5); i < n; i++, sd = -sd) {
+    const h = NORTH + sd * oneOf(r, C.tight > 0.75 ? [3, 4] : [3, 4, 5]) * D15;
+    if (i) T.jump(h); else T.face(h, 0.8);
+    const dist = (sd * 4.6 - T.x) / Math.cos(T.h);
+    if (dist < 6 || (!i && C.since + dist / PITCH < 14)) return false;
+    T.line(dist, false);
+  }
+}
+// A picture: a white field. The course runs along its foot, and a slanted domino beside each domino of that
+// run tips one column. Then the course climbs along the side, unless the picture ends a level.
+function picture(T, r, C, L, last) {
+  const sides = [-1, 1].filter(sd => sd * T.x >= -5.15), sp = 0.55, layers = layersOf(PICS[L.picK % PICS.length]);
+  if (!sides.length) return false;
+  const sd = oneOf(r, sides);
+  T.toX(-sd * WALL).turn(sd * 180, 0.7);
+  const f0 = T.pts.length - 1, zf = T.z;
+  T.step(COLS - 1, sp);
+  T.extra = [];
+  T.pts.slice(f0).forEach((q, i) => {
+    T.extra.push({ x: q.x + sd * 0.42, z: zf - 0.3, a: sd > 0 ? -Math.PI / 4 : -3 * Math.PI / 4, color: FIELD_W });
+    for (let j = 0; j < ROWS; j++) {
+      const fu = sd > 0 ? i / (COLS - 1) : 1 - i / (COLS - 1), fv = 1 - j / (ROWS - 1);
+      let rev = FIELD_W;
+      for (const l of layers) if (l.shape(fu, fv)) rev = l.color;
+      T.extra.push({ x: q.x + sd * 0.745, z: zf - 0.625 - j * sp, a: FLAT, color: FIELD_W, rev, field: true });
     }
-  }],
-];
+  });
+  if (!last) T.fwd(1, false).turn(-sd * 90, 1.195).line(ROWS * sp + 0.75);
+  for (let i = f0; i < T.pts.length; i++) T.pts[i].show = zf - 0.625 - (ROWS - 1) * sp / 2;
+  T.pic = L.picK;
+}
+const MOTIFS = [[3, rows], [3, cols], [1.5, teeth], [2, whirl], [0.8, bolt]];
 const cellOf = (x, z) => Math.floor(x / CLEAR) * 100003 + Math.floor(z / CLEAR);
-// Is every point of a new pattern clear of the dominoes on the table and of the pattern itself?
+// Is every point of a new pattern inside the corridor, clear of the dominoes on the table and of the pattern itself?
 function fits(L, pts) {
   for (let i = 0; i < pts.length; i++) {
     const p = pts[i], cx = Math.floor(p.x / CLEAR), cz = Math.floor(p.z / CLEAR);
+    if (Math.abs(p.x) > HW) return false;
     for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (const o of L.grid.get((cx + a) * 100003 + cz + b) || [])
       if (L.head + i - o.n > 5 && Math.hypot(o.x - p.x, o.z - p.z) < CLEAR) return false;
     for (let j = 0; j < i - 5; j++) if (Math.abs(pts[j].x - p.x) < CLEAR && Math.hypot(pts[j].x - p.x, pts[j].z - p.z) < CLEAR) return false;
@@ -1119,7 +1128,19 @@ function fits(L, pts) {
   return true;
 }
 const newSec = () => ({ doms: [], pad: null, last: null, endT: null, missed: false, lockT: -9 });
+const blank = () => ({ x: 0, z: 0, a: 0, color: RAINBOW[0], tag: {}, any: true, gone: true, n: null });
 const holeGap = L => Math.round((L.gap[0] + L.gap[1] * L.rnd()) * L.tight());
+// Takes the next domino of the pool, the oldest one, and stands it at p.
+function lay(L, p, M, path) {
+  const o = L.dominos[L.slot++ % L.dominos.length];
+  if (o.n != null) { const c = L.grid.get(cellOf(o.x, o.z)); c.splice(c.indexOf(o), 1); if (L.wave && o.n > L.wave.n - 200) L.early = (L.early || 0) + 1; }
+  Object.assign(o, UP(), { n: path ? L.head++ : L.head, gone: false, path, kind: M ? M.name : '', x: p.x, z: p.z, a: p.a, va: p.a, show: p.show == null ? null : p.show,
+    color: path ? RAINBOW[(L.relay.length - 1) % RAINBOW.length] : p.color, rev: p.rev || null, field: !!p.field, pic: !path || p.show != null });
+  const key = cellOf(o.x, o.z);
+  if (!L.grid.has(key)) L.grid.set(key, []);
+  L.grid.get(key).push(o);
+  return o;
+}
 // Lays the points of a pattern as dominoes, and opens the holes.
 function commit(L, T, M) {
   const q = T.pts;
@@ -1132,50 +1153,71 @@ function commit(L, T, M) {
       L.open.last = e; L.open = newSec(); L.relay.push(L.open); L.count = holeGap(L);
       if (hole) { i++; continue; }
     }
-    const n = L.head++, o = L.dominos[n % L.dominos.length];
-    if (o.n != null) { const c = L.grid.get(cellOf(o.x, o.z)); c.splice(c.indexOf(o), 1); }
-    Object.assign(o, UP(), { n, gone: false, kind: M ? M.name : "", x: p.x, z: p.z, a: p.a, va: p.a, color: RAINBOW[(L.relay.length - 1) % RAINBOW.length] });
-    const key = cellOf(o.x, o.z);
-    if (!L.grid.has(key)) L.grid.set(key, []);
-    L.grid.get(key).push(o);
+    const o = lay(L, p, M, true);
+    L.ring[o.n % L.ringN] = o;
     L.zTop = Math.min(L.zTop, o.z); L.count--;
     if (!L.open.pad) L.open.pad = o;
     L.open.doms.push(o); L.lastDom = o;
   }
+  for (const p of T.extra || []) lay(L, p, M, false);
   L.end = { x: T.x, z: T.z, h: T.h }; L.lastM = M;
-  if (M) L.made[M.name] = (L.made[M.name] || 0) + 1; else L.made.none = (L.made.none || 0) + 1;
+  const name = M ? M.name : 'none';
+  L.made[name] = (L.made[name] || 0) + 1;
+  if (T.pic != null) { L.pics.push({ n: L.head - 1, k: T.pic }); L.picK++; L.picAt = L.head + L.picGap; }
 }
-// Adds one pattern at the end of the path. It always leaves heading north or nearly, past everything
-// laid so far, so the way ahead stays free.
+// Adds one pattern at the end of the course. It always ends heading north, past everything laid so far,
+// so the way ahead stays free.
 function nextMotif(L) {
-  const r = L.rnd, e = L.end, total = MOTIFS.reduce((v, m) => v + m[0], 0);
-  const C = { seg: Math.max(16, Math.min(36, Math.round(34 * L.tight()))), since: L.open.doms.length };
+  const r = L.rnd, e = L.end, total = MOTIFS.reduce((v, m) => v + m[0], 0), pic = L.picAt != null && L.head >= L.picAt;
+  const C = { tight: L.tight(), since: L.open.doms.length };
   for (let t = 0; t < 40; t++) {
     let v = r() * total, M = MOTIFS[0][1];
     for (const m of MOTIFS) { v -= m[0]; if (v < 0) { M = m[1]; break; } }
-    if ((M === L.lastM && t < 20) || (L.allow && !L.allow.includes(M.name)) || (M.name === 'bolt' && L.head < 40)) continue;
+    if (pic && t < 8) M = picture;
+    else if ((M === L.lastM && t < 20) || (L.allow && !L.allow.includes(M.name)) || (M === bolt && L.head < 40)) continue;
     const T = turtle(e.x, e.z, e.h);
-    if (M.name !== 'bolt') T.fwd(rint(r, 1, 4));
-    M(T, r, C);
-    T.face(NORTH + D15 * rint(r, -3, 3), oneOf(r, [0.7, 1, 1.4]));
+    if (M(T, r, C, L) === false) continue;
+    T.face(NORTH, 0.7);
     let zTop = L.zTop;
     for (const p of T.pts) zTop = Math.min(zTop, p.z);
-    const need = Math.max(0, Math.ceil((T.z - zTop + 0.3) / (-PITCH * Math.sin(T.h))));
-    if (need > 50) continue;
-    T.fwd(need + rint(r, 1, 3));
-    if (T.pts.length > 250 || !fits(L, T.pts)) continue;
+    T.fwd(Math.max(0, Math.ceil((T.z - zTop + 0.3) / PITCH)) + 1);
+    if (T.pts.length > 320 || !fits(L, T.pts)) continue;
     return commit(L, T, M);
   }
   // Boxed in: straight north, which is free.
   commit(L, turtle(e.x, e.z, e.h).face(NORTH, 1).fwd(8), null);
 }
+function relayLevel(pic, layers, idx) {
+  const N = 23 * Math.min(30, 16 + Math.floor(idx * 0.15)), tight = Math.max(0.6, 1 - idx * 0.006), r = CC.rng(idx * 31 + 7);
+  const C = { rnd: r, relay: [], head: 0, slot: 0, count: 28 + rint(r, 0, 9), grid: new Map(), zTop: 1e9, lastM: null, made: {}, gaps: [], gap: [37, 23], tight: () => tight,
+    allow: idx === 0 ? ['rows', 'cols', 'teeth'] : null, picK: idx, pics: [], ring: [], ringN: 1e9, dominos: [...Array(N + 1100)].map(blank) };
+  C.open = newSec(); C.relay.push(C.open);
+  commit(C, turtle(0, 0, NORTH).fwd(10), null);
+  while (C.head < N) nextMotif(C);
+  // The picture ends the course.
+  C.count = 99;
+  const T = turtle(C.end.x, C.end.z, C.end.h);
+  picture(T, r, null, C, true); commit(C, T, picture);
+  const d = C.dominos.filter(o => o.n != null), f = d.filter(o => o.field), marks = [];
+  // Outlines on the ground where the dominoes are missing.
+  for (const g of C.gaps) {
+    const u = dirOf(g.a);
+    marks.push([[[1, 1], [1, -1], [-1, -1], [-1, 1]].map(([a, b]) => [g.x + a * 0.09 * u[0] - b * 0.3 * u[1], g.z + a * 0.09 * u[1] + b * 0.3 * u[0]]), 0x4a5078]);
+  }
+  const x0 = Math.min(...f.map(o => o.x)), x1 = Math.max(...f.map(o => o.x)), z0 = Math.min(...f.map(o => o.z)), z1 = Math.max(...f.map(o => o.z));
+  return { name: 'Dessin mystère', pic, teach: idx === 0 ? 'Touche l’écran quand la vague arrive au trou : la chaîne continue' : '', sol: [], colors: [FIELD_W, ...RAINBOW],
+    dominos: d, h: { start: C.relay[0].pad, sign: 1 }, hot: [], starts: C.relay.map(q => q.pad), relay: C.relay, ring: C.ring, budget: 999, speed: Math.min(1, 0.7 + idx * 0.006),
+    paint: [...marks, [rectP(x0 - 0.55, z0 - 0.7, x1 + 0.55, z1 + 0.2), 0x6b4a3a], [rectP(x0 - 0.38, z0 - 0.5, x1 + 0.38, z1 + 0.1), 0xe9e4d6]] };
+}
+// Endless relay: the course never ends. Its dominoes come from a pool: one left far behind the wave is laid
+// again ahead of it. The pictures come one after the other along the way. One stop ends the run.
 function endlessLevel() {
   const L = { name: 'Chemin infini', teach: 'Touche l’écran quand la vague arrive au trou. Un seul arrêt, et c’est fini', endless: true, sol: [], colors: [...RAINBOW], hot: [], starts: [], budget: 1e9,
-    relay: [], cur: 0, score: 0, head: 0, count: 40, rnd: CC.rng(+(new URLSearchParams(location.search).get('graine') || Math.floor(Math.random() * 1e6))), speed: 0.7, paint: [],
-    grid: new Map(), zTop: 1e9, lastM: null, made: {}, gap: [45, 25] };
+    relay: [], cur: 0, score: 0, head: 0, slot: 0, count: 40, rnd: CC.rng(+(new URLSearchParams(location.search).get('graine') || Math.floor(Math.random() * 1e6))), speed: 0.7, paint: [],
+    grid: new Map(), zTop: 1e9, lastM: null, made: {}, gap: [45, 25], ring: Array(1024), ringN: 1024, picK: prog.pics || 0, picAt: 240, picGap: 620, pics: [], found: 0 };
   L.tight = () => Math.max(0.5, 1 - L.head * 0.00026);
   L.open = newSec(); L.relay.push(L.open);
-  L.dominos = [...Array(POOL)].map(() => ({ x: 0, z: 0, a: 0, color: RAINBOW[0], tag: {}, any: true, gone: true, n: null }));
+  L.dominos = [...Array(POOL)].map(blank);
   commit(L, turtle(0, 0, NORTH).fwd(12), null);
   while (L.head < AHEAD) nextMotif(L);
   L.h = { start: L.relay[0].pad, sign: 1 };
@@ -1183,22 +1225,28 @@ function endlessLevel() {
 }
 // Lays new patterns ahead of the wave, and speeds the wave up little by little.
 function endlessTick() {
-  const f = chains.length ? chains.at(-1).front : null;
+  const f = lvl.wave;
   if (!f) return;
   while (lvl.head < f.n + AHEAD) nextMotif(lvl);
   lvl.speed = 0.7 + Math.min(0.4, f.n * 0.00013);
   if (chains.length > 8) chains.splice(0, chains.length - 8);
   const step = Math.floor(lvl.score / 250);
   if (step > (lvl.said || 0)) { lvl.said = step; say(f, `${step * 250} !`, '#ffffff', true); CC.sfx('combo'); }
+  // A picture is found once the wave has climbed past it.
+  while (lvl.pics.length && f.n >= lvl.pics[0].n) {
+    const k = lvl.pics.shift().k;
+    lvl.found++; prog.pics = Math.max(prog.pics || 0, k + 1); saveProg();
+    say(f, `${LEVEL_NAMES[k % LEVEL_NAMES.length]} !`, '#ffd23f', true, 0.3);
+  }
 }
-// Where the camera looks: the middle of the path around the wave, mostly ahead of it, with the wave kept in view.
+// How far up the table the camera looks: the middle of the course around the wave, mostly ahead of it,
+// or the picture the wave runs along. The wave and the next hole stay in view.
 function pathView(f) {
-  let x = 0, z = 0, c = 0;
-  for (let m = f.n - 15; m <= f.n + 60; m++) { const o = lvl.course ? lvl.course[m] : doms[((m % doms.length) + doms.length) % doms.length]; if (o && o.n === m) { x += o.x; z += o.z; c++; } }
-  x /= c; z /= c;
-  // Keep the next hole in view when it is near, and the wave always.
-  for (const q of [lvl.relay[lvl.cur] && lvl.relay[lvl.cur].pad, f]) if (q) { x = Math.max(q.x - 5.2, Math.min(q.x + 5.2, x)); z = Math.max(q.z - 7, Math.min(q.z + 8, z)); }
-  return { x, z };
+  let z = 0, c = 0;
+  for (let m = Math.max(0, f.n - 15); m <= f.n + 60; m++) { const o = lvl.ring[m % lvl.ringN]; if (o && o.path && o.n === m) { z += o.z; c++; } }
+  z = f.show != null ? f.show : c ? z / c : f.z;
+  for (const q of [lvl.relay[lvl.cur] && lvl.relay[lvl.cur].pad, f]) if (q) z = Math.max(q.z - 7, Math.min(q.z + 8, z));
+  return z;
 }
 function relayTick(t) {
   const Rl = lvl.relay, k1 = lvl.endless ? Math.min(Rl.length, lvl.cur + 10) : Rl.length;
@@ -1610,7 +1658,7 @@ function resetDominos() {
   chains = []; popups = []; marks = []; pushes = 0; focus = null; slowT = -9; sel = null; active = new Set(); goldNext = 1; goldBad = null; for (const q of pours) { if (q.stream) scene.remove(q.stream); if (q.mask) scene.remove(q.mask); } pours = []; layerMsg = '';
   if (lvl.layers) { for (const o of lvl.field) { o.color = FIELD_W; o.top = -1; o.seq = -1; for (let k = 0; k < lvl.layers.length; k++) o['p' + k] = false; } for (const l of lvl.layers) l.poured = false; for (const m of pots) m.userData.tipT = -9; holdUntil = -9; waiting = []; for (const o of lvl.spots) o.fired = false; }
   for (const m of marbles) { Object.assign(m, { pause: 0, resumed: true, s: 0, v: 0, state: 'rest', chain: null, predicted: false, q: new THREE.Quaternion(), p: m.tracks[0], L: m.tracks[0].L }); placeMarble(m, 0); }
-  if (lvl.relay) { lvl.cur = 0; combo = misses = perfects = 0; for (const q of lvl.relay) { q.endT = null; q.missed = false; q.lockT = -9; } }
+  if (lvl.relay) { lvl.cur = 0; lvl.wave = null; combo = misses = perfects = 0; for (const q of lvl.relay) { q.endT = null; q.missed = false; q.lockT = -9; } }
   paint();
   updateMatrices();
 }
@@ -1673,9 +1721,10 @@ function fitCamera() {
   endView = fitView(330, 1390, 66 * DEG);
   base = fitView(lvl.layers ? 400 : 380, lvl.layers ? 1380 : 1720, 50 * DEG);
   if (lvl.relay) {
-    // The course is too long for one view: frame the picture, then follow the wave.
-    const all = doms; doms = lvl.endless ? [{ x: -6.7, z: 0 }, { x: 6.7, z: -19.6 }] : all.filter(d => d.pic);
-    endView = fitView(330, 1390, 66 * DEG); base = fitView(380, 1720, 50 * DEG); doms = all;
+    // The course is too long for one view: frame the width of the corridor, then follow the wave.
+    const all = doms, p = lvl.relay[0].pad;
+    if (!lvl.endless) { doms = all.filter(d => d.pic); endView = fitView(330, 1390, 66 * DEG); }
+    doms = [{ x: -HW, z: p.z + 1.2 }, { x: HW, z: p.z - 18.4 }]; base = fitView(380, 1720, 50 * DEG); doms = all;
   }
   placeCam(base.x, base.z, 1);
   scene.fog.near = base.D * 1.4; scene.fog.far = base.D * 3;
@@ -1697,7 +1746,7 @@ function updateCam(dt) {
   if (phase === 'clear') { x = endView.x; z = endView.z; k = endView.D / base.D; el = endView.el; rate = 2.2; }
   else if (sel) { x = sel.x; z = sel.z; k = 0.5; rate = 3.5; }
   else if (focus && t < focus.until) { x = focus.x; z = focus.z; k = 0.42; rate = 3.2; yaw = focus.yaw; el = 40 * DEG; }
-  else if (lvl.relay) { const f = chains.length ? chains.at(-1).front : lvl.relay[0].pad; if (f.n != null) { ({ x, z } = pathView(f)); rate = phase === 'intro' ? 1.2 : 6; } else { z = f.z - 5; rate = phase === 'intro' ? 1.2 : 2.4; } table.position.set(Math.round(cam.x / 25) * 25, 0, Math.round(cam.z / 25) * 25); sun.position.set(cam.x - 9, 16, cam.z + 7); sun.target.position.set(cam.x, 0, cam.z); sun.target.updateMatrixWorld(); }
+  else if (lvl.relay) { z = pathView(lvl.wave || lvl.relay[0].pad); rate = phase === 'intro' ? 1.2 : 4; table.position.set(Math.round(cam.x / 25) * 25, 0, Math.round(cam.z / 25) * 25); sun.position.set(cam.x - 9, 16, cam.z + 7); sun.target.position.set(cam.x, 0, cam.z); sun.target.updateMatrixWorld(); }
   else if (live.length) {
     const f = live.at(-1).front;
     x = base.x + (f.x - base.x) * 0.4; z = base.z + (f.z - base.z) * 0.4; k = 0.85; rate = 2;
@@ -1789,6 +1838,7 @@ function topple(d, u, w, chain) {
   Object.assign(d, { state: 'falling', u, w, th: 0.02, chain, hitDone: false });
   chain.n++; chain.last = CC.time; chain.front = d;
   if (lvl.endless) lvl.score++;
+  if (d.path && (!lvl.wave || d.n > lvl.wave.n)) lvl.wave = d;
   active.add(d.color);
   if (d.gold) {
     if (d.gold === goldNext && !goldBad) { goldNext++; marks.push({ o: d, ok: true, t: CC.time }); CC.sfx('drip', { p: 0.15 + 0.2 * d.gold }); }
@@ -2081,7 +2131,7 @@ function drawMenu(ctx) {
   ctx.textAlign = 'center';
   ctx.fillStyle = '#fff'; ctx.font = 'bold 84px Segoe UI, Arial'; ctx.fillText('ColorChain', CC.W / 2, 170);
   const done = Object.keys(prog.stars).filter(k => prog.stars[k] && k < BUILD.length).length;
-  ctx.fillStyle = '#9aa3c7'; ctx.font = '36px Segoe UI, Arial'; bigButton(ctx, endlessRect, `∞  Chemin infini   ·   record ${prog.best || 0}`, '#7a4fd6');
+  ctx.fillStyle = '#9aa3c7'; ctx.font = '36px Segoe UI, Arial'; bigButton(ctx, endlessRect, `∞  Chemin infini   ·   record ${prog.best || 0}` + (prog.pics ? `   ·   ${Math.min(prog.pics, PICS.length)} dessins` : ''), '#7a4fd6');
   ctx.imageSmoothingEnabled = false;
   for (let i = page * PER; i < Math.min(BUILD.length, (page + 1) * PER); i++) {
     const [x, y, w, hh] = tileRect(i), open = i <= prog.unlocked, st = prog.stars[i] || 0;
@@ -2326,7 +2376,7 @@ function draw(ctx) {
   ctx.fillText(lvl.endless ? lvl.score : lvl.name, CC.W / 2, 180);
   const down = doms.filter(d => d.state !== 'up').length;
   ctx.fillStyle = '#cfd5f5'; ctx.font = '32px Segoe UI, Arial';
-  ctx.fillText(lvl.endless ? `dominos tombés   ·   série ${combo}` : lvl.relay ? `${down} / ${doms.length} dominos tombés   ·   série ${combo}` : lvl.layers ? `pochoirs posés ${lvl.spots.filter(sp => sp.layer != null).length} / ${lvl.layers.length}` : lvl.golds ? `${down} / ${doms.length} tombés   ·   dorés dans l’ordre ${goldNext - 1} / ${lvl.golds}   ·   pichenettes ${pushes} / ${BUDGET}` : `${down} / ${doms.length} tombés   ·   pichenettes ${pushes} / ${BUDGET}   ·   but : 1 seule`, CC.W / 2, 250);
+  ctx.fillText(lvl.endless ? `dominos tombés   ·   série ${combo}   ·   dessins ${Math.min(prog.pics || 0, PICS.length)} / ${PICS.length}` : lvl.relay ? `${down} / ${doms.length} dominos tombés   ·   série ${combo}` : lvl.layers ? `pochoirs posés ${lvl.spots.filter(sp => sp.layer != null).length} / ${lvl.layers.length}` : lvl.golds ? `${down} / ${doms.length} tombés   ·   dorés dans l’ordre ${goldNext - 1} / ${lvl.golds}   ·   pichenettes ${pushes} / ${BUDGET}` : `${down} / ${doms.length} tombés   ·   pichenettes ${pushes} / ${BUDGET}   ·   but : 1 seule`, CC.W / 2, 250);
   if (lvl.teach && phase === 'play' && !layerMsg) { ctx.fillStyle = '#ffd23f'; ctx.font = '30px Segoe UI, Arial'; wrapText(ctx, lvl.teach, CC.W / 2, 300, 960, 38); }
   ctx.fillStyle = '#cfd5f5'; ctx.font = 'bold 34px Segoe UI, Arial'; ctx.textAlign = 'left'; ctx.fillText('☰ Niveaux', levelsRect[0], levelsRect[1] + 62); ctx.textAlign = 'center';
   const [rx, ry, rw] = retryRect();
