@@ -13,9 +13,10 @@
 </head>
 <body>
 <canvas id="c" width="1080" height="1920"></canvas>
-<script src="common.js"></script>
-<script src="core.js"></script>
-<script src="pictures.js"></script>
+<!-- Bump v when a script changes: browsers keep the old file for ten minutes otherwise. -->
+<script src="common.js?v=1"></script>
+<script src="core.js?v=4"></script>
+<script src="pictures.js?v=1"></script>
 <script>
 // The course is a line of standing dominoes that climbs in rows to a picture. Gaps cut it: each is a row of
 // empty places between two fixed numbers. The player lays tiles of the hand in the places. A tile carries a

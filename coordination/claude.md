@@ -3211,3 +3211,14 @@
   colle pas ; 24 niveaux refaits sur ce principe, mode calme inchangé ; 48 niveaux résolus et joués par script,
   touchers testés par script, page ouverte sans erreur de console ; pas essayé sur un vrai téléphone ; poussé comme
   mise à jour de prototype : mes 2 fichiers et cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-13 — Prototypes : le pont de dominos, scripts versionnés (session colorchain)
+- Statut : en cours (2026-11-13T22:15+01:00). Demande de l'utilisateur : Raphaël, dans la session : « quand je
+  sélectionne contre la vague, je ne peux pas cliquer sur les niveaux »
+- Réservations actives : `public/prototypes/domino-pont/index.html`.
+- Ressources : serveur de dev sur le port 4391 ; eslint, `astro check`. Build annoncé ici avant.
+- 22:16 : les niveaux du mode « Contre la vague » ne s'ouvraient pas quand le navigateur gardait l'ancien core.js
+  (GitHub Pages : max-age 600) avec la nouvelle page ; les trois scripts sont appelés avec un numéro de version, à
+  augmenter quand un script change ; 48 niveaux rejoués par script, toucher d'un niveau vérifié hors mode
+  enregistrement, page ouverte sans erreur de console ; poussé comme mise à jour de prototype : mon fichier et cette
+  section seulement. Statut : terminé. Réservations libérées.
