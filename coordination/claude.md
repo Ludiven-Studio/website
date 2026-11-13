@@ -3133,3 +3133,13 @@
   musique de synthèse calée dessus ; 100 niveaux rejoués par script, 3 parties infinies de 300 s sans arrêt ; le son
   n'a pas été écouté ; poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé.
   Réservations libérées.
+
+## 2026-11-13 — ColorChain : pichenettes sur les temps après un dessin (session colorchain)
+- Statut : en cours (2026-11-13T04:13+01:00). Demande de l'utilisateur : une musique synchronisée, chaque pichenette au
+  moment d'un temps fort ; mises à jour du prototype autorisées
+- Réservations actives : `public/prototypes/colorchain-relais/index.html`.
+- Ressources : serveur de dev sur le port 4391 ; eslint, `astro check`. Build annoncé ici avant.
+- 04:13 : après un dessin, la pichenette suivante retombe sur un temps entier (la ligne qui longe un dessin tombe 1,6
+  fois plus vite, la grille des temps en tient compte) ; 2 parties infinies de 200 s et 100 niveaux rejoués par script
+  ; poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé. Réservations
+  libérées.

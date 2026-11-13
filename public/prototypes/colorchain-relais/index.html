@@ -1137,6 +1137,7 @@ function picture(T, r, C, L, last) {
   T.toX(-sd * WALL).turn(sd * 180, 0.7);
   const f0 = T.pts.length - 1, zf = T.z;
   T.step(COLS - 1, sp);
+  for (let i = f0; i < T.pts.length; i++) T.pts[i].fast = true;
   T.extra = [];
   T.pts.slice(f0).forEach((q, i) => {
     T.extra.push({ x: q.x + sd * 0.42, z: zf - 0.3, a: sd > 0 ? -Math.PI / 4 : -3 * Math.PI / 4, color: FIELD_W, pic: true });
@@ -1195,7 +1196,10 @@ function commit(L, T, M) {
     }
     const o = lay(L, p, M, true);
     L.ring[o.n % L.ringN] = o;
-    L.zTop = Math.min(L.zTop, o.z); L.count--; L.tick++;
+    L.zTop = Math.min(L.zTop, o.z); L.count--;
+    // A domino that tips a column falls on the slanted one first, and sooner: about six tenths of a tick each.
+    if (!p.fast) L.tick++;
+    else if ((L.fast = (L.fast || 0) + 0.61) >= 1) { L.fast -= 1; L.tick++; }
     if (!L.open.pad) L.open.pad = o;
     L.open.doms.push(o); L.lastDom = o;
   }
@@ -1410,6 +1414,14 @@ function melody(vol) {
   const m = TUNE[music.n++ % TUNE.length];
   tone(hz(m), 0, 0.3, 0.42 * vol, 'square'); tone(hz(m + 12), 0, 0.2, 0.16 * vol, 'triangle');
 }
+// Ticks before the wave reaches the pad of s: from the tick of the furthest fallen domino of its feed. A side
+// lane has no ticks of its own: its dominoes are counted.
+function ticksLeft(s) {
+  if (!s.feedLast.path) return feedLeft(s) + 3;
+  let front = s.feed[0].bt - 1;
+  for (const o of s.feed) if (o.state !== 'up' && o.bt > front) front = o.bt;
+  return Math.max(0.1, s.pad.bt - front);
+}
 function musicTick(dt) {
   lvl.sync = 1;
   if (!music.run || menu) return;
@@ -1417,11 +1429,11 @@ function musicTick(dt) {
   music.phi += rate * dt;
   if (s && s.feed) {
     // Beats left for the wave, and beats left before the beat of the hole. A late flick moves every beat that follows.
-    const need = (feedLeft(s) + 3) / BEAT, slack = Math.max(0.3, 0.2 * need);
+    const need = ticksLeft(s) / BEAT, slack = Math.max(0.5, 0.25 * need);
     let early = s.pad.bt / BEAT + music.shift - before - need;
-    // Too far from its beat for a small change of speed: aim at the nearest half beat.
-    if (Math.abs(early) > slack) { music.shift -= 0.5 * Math.round(early / 0.5); early = s.pad.bt / BEAT + music.shift - before - need; }
-    if (need > 0.4) lvl.sync = Math.max(0.8, Math.min(1.25, need / (need + early)));
+    // Too far from its beat for a change of speed: aim at another whole beat, so that a flick stays on a beat.
+    if (Math.abs(early) > slack) { music.shift -= Math.round(early); early = s.pad.bt / BEAT + music.shift - before - need; }
+    if (need > 0.4) lvl.sync = Math.max(0.75, Math.min(1.33, need / (need + early)));
   }
   for (let st = Math.floor(before * 2) + 1; st <= Math.floor(music.phi * 2); st++) backing(st, Math.max(0, (st / 2 - before) / rate));
 }
