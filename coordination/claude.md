@@ -3200,3 +3200,14 @@
   48 niveaux toujours joués jusqu'au dessin, page ouverte sans erreur de console ; pas essayé sur un vrai téléphone ;
   poussé comme mise à jour de prototype : mon fichier et cette section seulement. Statut : terminé. Réservations
   libérées.
+
+## 2026-11-13 — Prototypes : le pont de dominos, une main par pont (session colorchain)
+- Statut : en cours (2026-11-13T22:06+01:00). Demande de l'utilisateur : Raphaël, dans la session : « peut-être
+  proposer des dominos seulement pour le prochain pont ... on peut réussir un pont au début et se retrouver coincé »
+- Réservations actives : `public/prototypes/domino-pont/index.html`, `public/prototypes/domino-pont/core.js`.
+- Ressources : serveur de dev sur le port 4391 ; eslint, `astro check`. Build annoncé ici avant.
+- 22:07 : mode « Contre la vague » : chaque pont a ses propres dominos (ceux qui le bouchent et des pièges, une seule
+  façon de le boucher), la main ne montre que ceux du prochain pont à boucher ; un toucher remplace le domino qui ne
+  colle pas ; 24 niveaux refaits sur ce principe, mode calme inchangé ; 48 niveaux résolus et joués par script,
+  touchers testés par script, page ouverte sans erreur de console ; pas essayé sur un vrai téléphone ; poussé comme
+  mise à jour de prototype : mes 2 fichiers et cette section seulement. Statut : terminé. Réservations libérées.

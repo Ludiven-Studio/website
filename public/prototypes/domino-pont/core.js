@@ -38,32 +38,33 @@ const BR = (() => {
     { rows: [[3], [3], [3], [1]], lo: 0, hi: 4, spare: 0, traps: 8 },
   ];
 
-  // Live levels, where the wave runs while the player fills: many short gaps, quick to read.
+  // Live levels, where the wave runs while the player fills: many short gaps, each with its own tiles.
+  // extra: the tiles offered for a gap that do not go in it (a gap is offered five tiles at most).
   const LIVE = [
-    { rows: [[], [1]], lo: 1, hi: 3, spare: 1, traps: 0 },
-    { rows: [[1], [1]], lo: 1, hi: 4, spare: 1, traps: 0 },
-    { rows: [[1], [1, 1]], lo: 1, hi: 4, spare: 1, traps: 0 },
-    { rows: [[1, 1], [1, 1]], lo: 1, hi: 4, spare: 1, traps: 0 },
-    { rows: [[1], [2]], lo: 1, hi: 4, spare: 1, traps: 1 },
-    { rows: [[1, 1], [2]], lo: 1, hi: 5, spare: 1, traps: 1 },
-    { rows: [[1, 1], [1, 1], [1]], lo: 1, hi: 5, spare: 1, traps: 0 },
-    { rows: [[2], [1, 1], [1]], lo: 1, hi: 5, spare: 2, traps: 1 },
-    { rows: [[1, 1], [2], [1, 1]], lo: 1, hi: 5, spare: 1, traps: 1 },
-    { rows: [[2], [2], [1, 1]], lo: 0, hi: 5, spare: 2, traps: 2 },
-    { rows: [[1, 1], [1, 1], [1, 1]], lo: 0, hi: 5, spare: 2, traps: 0 },
-    { rows: [[2], [1, 1], [2]], lo: 0, hi: 5, spare: 2, traps: 2 },
-    { rows: [[1, 1], [2], [2]], lo: 0, hi: 5, spare: 2, traps: 2 },
-    { rows: [[2], [2], [2]], lo: 0, hi: 5, spare: 2, traps: 3 },
-    { rows: [[1, 1], [1, 1], [2], [1]], lo: 0, hi: 6, spare: 2, traps: 1 },
-    { rows: [[2], [1, 1], [2], [1, 1]], lo: 0, hi: 6, spare: 2, traps: 2 },
-    { rows: [[1, 1], [2], [1, 1], [2]], lo: 0, hi: 6, spare: 2, traps: 2 },
-    { rows: [[3], [1, 1], [2]], lo: 0, hi: 6, spare: 2, traps: 2 },
-    { rows: [[2], [2], [2], [1, 1]], lo: 0, hi: 6, spare: 2, traps: 3 },
-    { rows: [[1, 1], [3], [1, 1], [1]], lo: 0, hi: 6, spare: 2, traps: 2 },
-    { rows: [[2], [3], [2], [1]], lo: 0, hi: 5, spare: 2, traps: 3 },
-    { rows: [[1, 1], [2], [3], [1, 1]], lo: 0, hi: 5, spare: 1, traps: 3 },
-    { rows: [[3], [2], [2], [2]], lo: 0, hi: 5, spare: 1, traps: 4 },
-    { rows: [[3], [2], [3], [1, 1]], lo: 0, hi: 5, spare: 0, traps: 4 },
+    { rows: [[], [1]], lo: 1, hi: 3, extra: 1 },
+    { rows: [[1], [1]], lo: 1, hi: 4, extra: 1 },
+    { rows: [[1], [1, 1]], lo: 1, hi: 4, extra: 2 },
+    { rows: [[1, 1], [1, 1]], lo: 1, hi: 4, extra: 2 },
+    { rows: [[1], [2]], lo: 1, hi: 4, extra: 1 },
+    { rows: [[1, 1], [2]], lo: 1, hi: 5, extra: 2 },
+    { rows: [[2], [1, 1], [2]], lo: 1, hi: 5, extra: 2 },
+    { rows: [[1, 1], [2], [1, 1]], lo: 1, hi: 5, extra: 2 },
+    { rows: [[2], [2], [2]], lo: 1, hi: 5, extra: 2 },
+    { rows: [[1, 1], [1, 1], [1, 1]], lo: 0, hi: 5, extra: 3 },
+    { rows: [[2], [3], [1, 1]], lo: 0, hi: 5, extra: 2 },
+    { rows: [[1, 1], [2], [3]], lo: 0, hi: 5, extra: 2 },
+    { rows: [[2], [2], [1, 1], [2]], lo: 0, hi: 5, extra: 2 },
+    { rows: [[3], [1, 1], [3]], lo: 0, hi: 5, extra: 2 },
+    { rows: [[1, 1], [2], [1, 1], [2]], lo: 0, hi: 6, extra: 3 },
+    { rows: [[2], [3], [2], [1, 1]], lo: 0, hi: 6, extra: 3 },
+    { rows: [[1, 1], [1, 1], [1, 1], [1, 1]], lo: 0, hi: 6, extra: 4 },
+    { rows: [[3], [2], [3], [2]], lo: 0, hi: 6, extra: 3 },
+    { rows: [[2], [2], [2], [2]], lo: 0, hi: 6, extra: 3 },
+    { rows: [[1, 1], [3], [1, 1], [3]], lo: 0, hi: 6, extra: 3 },
+    { rows: [[3], [3], [2], [1, 1]], lo: 0, hi: 6, extra: 3 },
+    { rows: [[2], [3], [3], [2]], lo: 0, hi: 6, extra: 3 },
+    { rows: [[3], [3], [3], [1, 1]], lo: 0, hi: 6, extra: 3 },
+    { rows: [[3], [3], [3], [3]], lo: 0, hi: 6, extra: 3 },
   ];
 
   // Every set of hand tiles that fills a gap alone, each as a bit mask of hand places.
@@ -124,11 +125,11 @@ const BR = (() => {
     return picked && picked.map((m, k) => chain(gaps[k], m));
   }
 
-  // Level n (from 0) of the calm or the live set: its gaps, row by row, and the hand. Always the same for a given n.
-  function make(n, live = false) {
-    const spec = (live ? LIVE : SPECS)[n];
+  // Level n (from 0): its gaps, row by row, and the hand. Always the same for a given n.
+  function make(n) {
+    const spec = SPECS[n];
     for (let attempt = 0; attempt < 20000; attempt++) {
-      const rand = rng(7919 * (n + 1 + (live ? 500 : 0)) + attempt * 104729), pick = m => Math.floor(rand() * m);
+      const rand = rng(7919 * (n + 1) + attempt * 104729), pick = m => Math.floor(rand() * m);
       const all = [];
       for (let i = spec.lo; i <= spec.hi; i++) for (let j = i; j <= spec.hi; j++) all.push([i, j]);
       const free = all.map(() => true), hand = [], gaps = [];
@@ -166,6 +167,49 @@ const BR = (() => {
     return null;
   }
 
+  // Live level n (from 0): each gap comes with its own tiles, those that fill it and some that do not, and has
+  // one way to be filled with them. Tiles are told apart within a gap only.
+  function makeLive(n) {
+    const spec = LIVE[n], rand = rng(7919 * (n + 501)), pick = m => Math.floor(rand() * m);
+    const all = [], gaps = [];
+    for (let i = spec.lo; i <= spec.hi; i++) for (let j = i; j <= spec.hi; j++) all.push([i, j]);
+    const keys = all.map((t, k) => k);
+    for (let r = 0; r < spec.rows.length; r++) for (const len of spec.rows[r]) {
+      let done = false;
+      for (let attempt = 0; attempt < 5000 && !done; attempt++) {
+        const gap = { row: r, n: len, a: spec.lo + pick(spec.hi - spec.lo + 1) }, free = all.map(() => true);
+        const tiles = [], seen = new Set([gap.a]);
+        let value = gap.a, ok = true;
+        for (let i = 0; i < len && ok; i++) {
+          const fit = keys.filter(k => free[k] && (all[k][0] === value || all[k][1] === value));
+          if (!fit.length) { ok = false; break; }
+          const k = fit[pick(fit.length)];
+          free[k] = false; tiles.push(all[k]);
+          value = all[k][0] === value ? all[k][1] : all[k][0];
+          seen.add(value);
+        }
+        gap.b = value;
+        const last = gaps[gaps.length - 1];
+        if (!ok || (len === 1 && gap.a === gap.b) || (last && last.n === len && last.a === gap.a && last.b === gap.b)) continue;
+        // The other tiles carry a number of the gap, so that they tempt.
+        for (let e = Math.min(spec.extra, 5 - len); e > 0 && ok; e--) {
+          const left = keys.filter(k => free[k] && (seen.has(all[k][0]) || seen.has(all[k][1])));
+          if (!left.length) { ok = false; break; }
+          const k = left[pick(left.length)];
+          free[k] = false; tiles.push(all[k]);
+        }
+        if (!ok) continue;
+        for (let i = tiles.length - 1; i > 0; i--) { const j = pick(i + 1); [tiles[i], tiles[j]] = [tiles[j], tiles[i]]; }
+        if (fillings(gap, tiles).length !== 1) continue;
+        gap.tiles = tiles;
+        gaps.push(gap);
+        done = true;
+      }
+      if (!done) return null;
+    }
+    return { n, rows: spec.rows.length, gaps };
+  }
+
   // The tiles of a gap as they lie: each placed tile is turned so that the most joints match.
   // tiles: one [x, y] or null for each place. Returns each tile as [left, right] and the state of the
   // n + 1 joints: 'ok', 'bad', or 'open' beside an empty place.
@@ -186,6 +230,6 @@ const BR = (() => {
     return best;
   }
 
-  return { SPECS, LIVE, make, count, solve, lay, fillings, rng };
+  return { SPECS, LIVE, make, makeLive, count, solve, lay, fillings, rng };
 })();
 if (typeof module !== 'undefined') module.exports = BR;

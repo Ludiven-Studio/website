@@ -23,6 +23,7 @@
 // of dominoes. Then a flick on the gold domino: the wave runs as far as the course holds.
 // Two modes. Calm: the player flicks when ready. Live: the wave leaves by itself and the player fills the gaps
 // as it comes; it slows right down before a place that does not hold yet, and runs once the way is clear.
+// Live, each gap has its own tiles: the hand shows those of the first gap that does not hold yet.
 // Ground is drawn from above, x to the right and z up the screen; a height shows as a shift up the screen (K)
 // and a little to the right (AX), so that a standing domino shows a face.
 const canvas = document.getElementById('c');
@@ -88,7 +89,7 @@ const bonk = () => { tone(150, 0.2, 0.25, 'square'); tone(110, 0.15, 0.3, 'squar
 
 // ---- A level: the course, its gaps, the hand
 function load(n) {
-  const def = BR.make(n, live()), R = def.rows, chain = [], ribbon = [];
+  const def = live() ? BR.makeLive(n) : BR.make(n), R = def.rows, chain = [], ribbon = [];
   const gaps = def.gaps.map((g, index) => ({ ...g, index, slots: Array(g.n).fill(-1), since: Array(g.n).fill(-9), first: [] }));
   const arc = (cx, cz, d, f0, f1, count) => {
     for (let j = 0; j <= 12; j++) { const f = f0 + (f1 - f0) * j / 12; ribbon.push([cx + d * Math.cos(f), cz + Math.sin(f)]); }
@@ -144,14 +145,18 @@ function load(n) {
   }
   // Rows from the south, so that a fallen domino covers the one it fell on.
   cells.sort((p, q) => p.z - q.z);
-  const count = def.hand.length, lines = Math.ceil(count / 5);
-  const home = def.hand.map((t, k) => {
-    const line = Math.floor(k / 5), inLine = Math.min(5, count - line * 5);
-    return [W / 2 + (k % 5 - (inLine - 1) / 2) * 206, lines === 1 ? 1766 : 1704 + line * 116];
+  // owner: the gap a tile is offered for (live), or -1 for a hand shared by the whole course (calm).
+  const hand = [], owner = [];
+  if (live()) for (const g of gaps) { g.k0 = hand.length; for (const tile of g.tiles) { hand.push(tile); owner.push(g.index); } }
+  else for (const tile of def.hand) { hand.push(tile); owner.push(-1); }
+  const home = hand.map((tile, k) => {
+    const at = live() ? k - gaps[owner[k]].k0 : k, count = live() ? gaps[owner[k]].tiles.length : hand.length;
+    const lines = Math.ceil(count / 5), line = Math.floor(at / 5), inLine = Math.min(5, count - line * 5);
+    return [W / 2 + (at % 5 - (inLine - 1) / 2) * 206, lines === 1 ? 1766 : 1704 + line * 116];
   });
   const rand = BR.rng(n + 1), tune = [];
   for (let k = 0, at = 3; k < 32; k++) { at = Math.max(0, Math.min(8, at + Math.floor(rand() * 5) - 2)); tune.push(at); }
-  L = { n, R, gaps, chain, ribbon, feed, pic, cells, c, zs, zf, dir, hand: def.hand, where: def.hand.map(() => null), home, tune,
+  L = { n, R, gaps, chain, ribbon, feed, pic, cells, c, zs, zf, dir, hand, owner, where: hand.map(() => null), home, tune,
     order: chain.map(it => it.i).sort((p, q) => chain[q].z - chain[p].z || q - p) };
   state = 'play'; mistakes = 0; drag = null; stop = null; near = null; slowK = 0; clock = 0;
   startAt = CC.time + WAIT;
@@ -179,14 +184,22 @@ function put(k, g, i) {
 }
 // The wave has passed over a place: its tile stays.
 const locked = (g, i) => L.chain[g.first[i]].at != null;
-// The first empty place on the wave's way: a tile tapped in the hand goes there.
+// Live: the gap whose turn it is, the first that does not hold yet. Its tiles are the hand.
+const active = () => L.gaps.findIndex(g => g.lay.joints.some(s => s !== 'ok'));
+const shown = k => !live() || L.owner[k] === active();
+// A place the player can no longer change: the wave has passed, or it is not its gap's turn.
+const fixed = (g, i) => locked(g, i) || (live() && g.index !== active());
+// Where a tile tapped in the hand goes: the first empty place on the wave's way. Live, a joint that fails
+// comes first: the tile takes the place of the one that does not match.
 function nextFree() {
-  for (const g of L.gaps) for (let i = 0; i < g.n; i++) if (g.slots[i] < 0 && !locked(g, i)) return { g, i };
+  const g = live() && L.gaps[active()], bad = g ? g.lay.joints.indexOf('bad') : -1;
+  if (bad >= 0) { const i = Math.min(g.n - 1, bad); return locked(g, i) ? null : { g, i }; }
+  for (const g of L.gaps) for (let i = 0; i < g.n; i++) if (g.slots[i] < 0 && !fixed(g, i)) return { g, i };
   return null;
 }
 function takeBack(k) {
   const at = L.where[k];
-  if (!at || locked(L.gaps[at[0]], at[1])) return;
+  if (!at || fixed(L.gaps[at[0]], at[1])) return;
   L.gaps[at[0]].slots[at[1]] = -1; L.where[k] = null;
   relay();
 }
@@ -484,6 +497,7 @@ function drawGap(ctx, g) {
 function drawHand(ctx, t) {
   if (state === 'won') return;
   L.hand.forEach((tile, k) => {
+    if (!shown(k)) return;
     const [x, y] = L.home[k];
     if (L.where[k] || (drag && drag.k === k && drag.moved)) {
       ctx.fillStyle = 'rgba(0,0,0,0.14)'; CC.roundRect(ctx, x - 88, y - 44, 176, 88, 14); ctx.fill();
@@ -510,7 +524,7 @@ function wonButtons() {
     ...(more ? [{ label: 'Suivant', main: true, rect: [590, 1796, 380, 76], act: () => load(L.n + 1) }] : [])];
 }
 const tileRect = i => [50 + (i % 4) * 250, 372 + Math.floor(i / 4) * 250, 230, 230];
-const MODES = [{ mode: 'live', label: 'Contre la vague', rect: [110, 150, 420, 84], tip: 'La vague part toute seule : bouche les trous avant qu’elle arrive.' },
+const MODES = [{ mode: 'live', label: 'Contre la vague', rect: [110, 150, 420, 84], tip: 'La vague part toute seule : bouche chaque trou avec ses dominos avant qu’elle arrive.' },
   { mode: 'calm', label: 'Calme', rect: [550, 150, 420, 84], tip: 'Bouche chaque trou avec les bons dominos, puis une pichenette.' }];
 function drawMenu(ctx) {
   table(ctx);
@@ -545,7 +559,7 @@ function placeAt(x, y, pad) {
   let best = null;
   for (const g of L.gaps) for (let i = 0; i < g.n; i++) {
     const r = slotRect(g, i);
-    if (locked(g, i) || !inRect(x, y, r, pad)) continue;
+    if (fixed(g, i) || !inRect(x, y, r, pad)) continue;
     const d = Math.hypot(x - r[0] - r[2] / 2, y - r[1] - r[3] / 2);
     if (!best || d < best.d) best = { g, i, d };
   }
@@ -565,7 +579,7 @@ function down(x, y) {
   const at = placeAt(x, y, 0);
   if (at && at.g.slots[at.i] >= 0) { drag = { k: at.g.slots[at.i], x, y, x0: x, y0: y, moved: false, from: [at.g.index, at.i] }; return; }
   for (let k = 0; k < L.hand.length; k++) {
-    if (!L.where[k] && inRect(x, y, [L.home[k][0] - 88, L.home[k][1] - 44, 176, 88], 12)) { drag = { k, x, y, x0: x, y0: y, moved: false, from: null }; return; }
+    if (!L.where[k] && shown(k) && inRect(x, y, [L.home[k][0] - 88, L.home[k][1] - 44, 176, 88], 12)) { drag = { k, x, y, x0: x, y0: y, moved: false, from: null }; return; }
   }
   const s0 = L.chain[0];
   if (Math.hypot(x - px(s0.x), y - py(s0.z + 0.25)) < 90) flick();
@@ -573,7 +587,7 @@ function down(x, y) {
 function move(x, y) {
   if (!drag) return;
   drag.x = x; drag.y = y;
-  if (drag.from && !drag.moved && locked(L.gaps[drag.from[0]], drag.from[1])) { drag = null; return; }
+  if (drag.from && !drag.moved && fixed(L.gaps[drag.from[0]], drag.from[1])) { drag = null; return; }
   if (!drag.moved && Math.hypot(x - drag.x0, y - drag.y0) > 22) {
     drag.moved = true;
     if (drag.from) takeBack(drag.k);
@@ -587,7 +601,7 @@ function up() {
   drag = null;
   if (!d.moved) {
     // A tap: a tile of the course goes back to the hand, a tile of the hand goes to the first empty place.
-    if (d.from) { if (!locked(L.gaps[d.from[0]], d.from[1])) { takeBack(d.k); if (!live()) mistakes++; tock(0); } } else { const free = nextFree(); if (free) put(d.k, free.g, free.i); else bonk(); }
+    if (d.from) { if (!fixed(L.gaps[d.from[0]], d.from[1])) { takeBack(d.k); if (!live()) mistakes++; tock(0); } } else { const free = nextFree(); if (free) put(d.k, free.g, free.i); else bonk(); }
     return;
   }
   const at = placeAt(d.x, d.y - 130, 30);
@@ -602,8 +616,10 @@ canvas.addEventListener('pointercancel', () => { if (!live() && drag && drag.fro
 
 // ---- Test hooks
 window.__level = n => { load(n); return L.hand.length; };
+// The tiles that fill each gap, in order.
+const answer = () => live() ? L.gaps.map(g => BR.solve([g], g.tiles)[0].map(tile => ({ ...tile, k: tile.k + g.k0 }))) : BR.solve(L.gaps, L.hand);
 window.__solve = () => {
-  const def = { gaps: L.gaps, hand: L.hand }, ways = BR.solve(def.gaps, def.hand);
+  const ways = answer();
   ways.forEach((tiles, g) => tiles.forEach((tile, i) => put(tile.k, L.gaps[g], i)));
   return L.gaps.every(g => g.lay.joints.every(s => s === 'ok'));
 };
@@ -631,7 +647,7 @@ window.__check = () => ['calm', 'live'].flatMap(mode => BR.SPECS.map((spec, n) =
     until(() => state === 'play');
     mistakes = 0;
     // Each gap is filled only when the wave has slowed in front of it.
-    const ways = BR.solve(L.gaps, L.hand);
+    const ways = answer();
     let slowed = 0;
     out.seconds = until(() => {
       if (state === 'run' && near && pace < 0.06) {
