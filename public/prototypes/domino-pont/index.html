@@ -21,15 +21,23 @@
 // empty places between two fixed numbers. The player lays tiles of the hand in the places. A tile carries a
 // piece of the line and passes the wave on when it touches its neighbours by the same number, as in the game
 // of dominoes. Then a flick on the gold domino: the wave runs as far as the course holds.
+// Two modes. Calm: the player flicks when ready. Live: the wave leaves by itself and the player fills the gaps
+// as it comes; it slows right down before a place that does not hold yet, and runs once the way is clear.
 // Ground is drawn from above, x to the right and z up the screen; a height shows as a shift up the screen (K)
 // and a little to the right (AX), so that a standing domino shows a face.
 const canvas = document.getElementById('c');
 const W = CC.W, H = CC.H, S = 96, K = 0.45, AX = 0.22;
 const X1 = 1.375, X2 = 9.875, PITCH = 2, Z0 = 4.6, ZTOP = 17.9, ROW = 8.5;
 const TALL = 0.9, WIDE = 0.5, THIN = 0.12, PLATE = 0.08, RATE = 16, REST = 76 * Math.PI / 180, FALL = 0.24;
+// Live wave: dominoes a second, how far ahead it sees trouble, its speed in slow motion, seconds before it leaves.
+const LIVE = 6, NEAR = 4, SLOW = 0.8, WAIT = 3;
 const OPEN_ALL = true, SAVE = 'cc-bridge-v1';
 const PIP = ['#000000', '#2f7fe0', '#2aa24d', '#e23d3d', '#8b46d8', '#ee8a1c', '#12a3a3'];
 const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+const LIVE_HINTS = {
+  0: 'La vague part toute seule. Bouche le trou avant qu’elle arrive : elle ralentit juste devant.',
+  4: 'Deux dominos à la suite : ils se touchent par le même nombre.',
+};
 const HINTS = {
   0: 'Pose le domino qui porte les deux nombres du trou, puis touche le domino doré.',
   1: 'Chaque trou a son domino. Il en reste un en trop.',
@@ -40,12 +48,18 @@ const HINTS = {
 const px = x => x * S, py = z => H - z * S;
 const smooth = k => { k = Math.max(0, Math.min(1, k)); return k * k * (3 - 2 * k); };
 
-let prog = { stars: {} };
+let prog = { stars: {}, live: {}, mode: 'live' };
 try { prog = Object.assign(prog, JSON.parse(localStorage.getItem(SAVE) || '{}')); } catch (e) { /* no storage */ }
 function saveProg() { try { localStorage.setItem(SAVE, JSON.stringify(prog)); } catch (e) { /* no storage */ } }
+const live = () => prog.mode === 'live';
+const won = () => live() ? prog.live : prog.stars;
+// Calm: taking a tile back or a failed flick costs. Live: only a broken wave does.
+const starsNow = () => mistakes === 0 ? 3 : mistakes <= (live() ? 1 : 2) ? 2 : 1;
 
 // state: menu, play (laying tiles), run (the wave), fail (it stopped), rise (dominoes stand up again), won.
 let state = 'menu', L = null, mistakes = 0, selected = -1, drag = null, stop = null, since = 0, next = 0, endAt = 0;
+// The wave has its own clock: `pace` is how fast it runs against real time. near: the trouble that slows it.
+let clock = 0, pace = 1, startAt = 0, near = null, slowK = 0, clear = false;
 
 // ---- Sound: mallet notes on a five-note scale, a tock for each domino
 const SCALE = [72, 74, 76, 79, 81, 84, 86, 88, 91].map(m => 440 * Math.pow(2, (m - 69) / 12));
@@ -74,8 +88,8 @@ const bonk = () => { tone(150, 0.2, 0.25, 'square'); tone(110, 0.15, 0.3, 'squar
 
 // ---- A level: the course, its gaps, the hand
 function load(n) {
-  const def = BR.make(n), R = def.rows, chain = [], ribbon = [];
-  const gaps = def.gaps.map((g, index) => ({ ...g, index, slots: Array(g.n).fill(-1), since: Array(g.n).fill(-9) }));
+  const def = BR.make(n, live()), R = def.rows, chain = [], ribbon = [];
+  const gaps = def.gaps.map((g, index) => ({ ...g, index, slots: Array(g.n).fill(-1), since: Array(g.n).fill(-9), first: [] }));
   const arc = (cx, cz, d, f0, f1, count) => {
     for (let j = 0; j <= 12; j++) { const f = f0 + (f1 - f0) * j / 12; ribbon.push([cx + d * Math.cos(f), cz + Math.sin(f)]); }
     for (let j = 0; j < count; j++) {
@@ -101,7 +115,11 @@ function load(n) {
         if (u < 0 || u > 2 * g.n + 2) continue;
         it.y0 = PLATE;
         if (u > 2 * g.n + 1) { if (u < 2 * g.n + 1.5) it.joint = [g.index, g.n]; }
-        else if (u > 1) { const i = Math.floor((u - 1) / 2); it.slot = [g.index, i]; if (u - 1 - 2 * i < 0.5) it.joint = [g.index, i]; }
+        else if (u > 1) {
+          const i = Math.floor((u - 1) / 2);
+          it.slot = [g.index, i];
+          if (u - 1 - 2 * i < 0.5) { it.joint = [g.index, i]; g.first[i] = chain.length; }
+        }
       }
       chain.push(it);
     }
@@ -135,7 +153,8 @@ function load(n) {
   for (let k = 0, at = 3; k < 32; k++) { at = Math.max(0, Math.min(8, at + Math.floor(rand() * 5) - 2)); tune.push(at); }
   L = { n, R, gaps, chain, ribbon, feed, pic, cells, c, zs, zf, dir, hand: def.hand, where: def.hand.map(() => null), home, tune,
     order: chain.map(it => it.i).sort((p, q) => chain[q].z - chain[p].z || q - p) };
-  state = 'play'; mistakes = 0; selected = -1; drag = null; stop = null;
+  state = 'play'; mistakes = 0; selected = -1; drag = null; stop = null; near = null; slowK = 0; clock = 0;
+  startAt = CC.time + WAIT;
   relay();
 }
 function hue(h) {
@@ -158,61 +177,83 @@ function put(k, g, i) {
   const near = [g.lay.joints[i], g.lay.joints[i + 1]];
   if (near.includes('bad')) bonk(); else if (near.includes('ok')) { mallet(4, 0.16); mallet(6, 0.16, 0.09); } else tock(0.2);
 }
+// The wave has passed over a place: its tile stays.
+const locked = (g, i) => L.chain[g.first[i]].at != null;
 function takeBack(k) {
   const at = L.where[k];
-  if (!at) return;
+  if (!at || locked(L.gaps[at[0]], at[1])) return;
   L.gaps[at[0]].slots[at[1]] = -1; L.where[k] = null;
   relay();
 }
 
 // ---- The wave
+// What stops the wave at a domino: an empty place under it, or a joint that does not match.
+const trouble = it => it.slot && L.gaps[it.slot[0]].slots[it.slot[1]] < 0 ? 'hole'
+  : it.joint && L.gaps[it.joint[0]].lay.joints[it.joint[1]] !== 'ok' ? 'wall' : null;
+function ahead(count) {
+  for (let i = next; i < Math.min(L.chain.length, next + count); i++) if (trouble(L.chain[i])) return L.chain[i];
+  return null;
+}
 function flick() {
   if (state !== 'play') return;
-  let t = CC.time + 0.1;
-  stop = null;
-  for (const it of L.chain) {
-    it.rest = REST;
-    if (it.slot && L.gaps[it.slot[0]].slots[it.slot[1]] < 0) { stop = { i: it.i, hole: true }; break; }
-    if (it.joint && L.gaps[it.joint[0]].lay.joints[it.joint[1]] !== 'ok') { stop = { i: it.i, hole: false }; break; }
-    it.at = t; t += 1 / RATE;
-  }
-  // The last domino to fall lies flat in a hole, or leans on the block of a bad joint.
-  const last = L.chain[stop ? stop.i - 1 : L.chain.length - 1];
-  last.rest = stop && !stop.hole ? 0.7 : Math.PI / 2;
-  endAt = last.at + 0.7;
-  if (!stop) {
-    const first = L.chain[L.feed];
-    for (const cell of L.cells) cell.at = first.at + Math.abs(cell.x - first.x) / 0.5 / RATE + 0.08 + cell.r / 40;
-    endAt = Math.max(endAt, ...L.cells.map(cell => cell.at)) + 1;
-  }
-  state = 'run'; next = 0; selected = -1; drag = null;
+  for (const it of L.chain) { it.rest = REST; it.at = null; }
+  stop = null; near = null; next = 0; clock = 0; endAt = Infinity; clear = false;
+  pace = live() ? LIVE / RATE : 1;
+  state = 'run';
+  if (!live()) { selected = -1; drag = null; }
   tone(900, 0.2, 0.08, 'triangle');
 }
 function step() {
   const t = CC.time;
+  if (state === 'play' && live() && t >= startAt) flick();
   if (state === 'run') {
-    for (; next < L.chain.length && L.chain[next].at != null && L.chain[next].at <= t; next++) {
+    let target = 1;
+    if (live() && !stop && next < L.chain.length) {
+      near = ahead(NEAR);
+      const free = !near && !ahead(L.chain.length);
+      if (free && !clear) [2, 4, 6].forEach((n, k) => mallet(n, 0.14, k * 0.06));
+      clear = free;
+      target = near ? SLOW / RATE : free ? 1 : LIVE / RATE;
+    } else near = null;
+    pace += (target - pace) * Math.min(1, CC.DT * (target < pace ? 10 : 4));
+    clock += CC.DT * pace;
+    while (!stop && next < L.chain.length && clock >= 0.1 + next / RATE) {
+      const it = L.chain[next], why = trouble(it);
+      if (why) {
+        // The last domino to fall lies flat in a hole, or leans on the block of a bad joint.
+        stop = { i: next, hole: why === 'hole' };
+        L.chain[next - 1].rest = stop.hole ? Math.PI / 2 : 0.7;
+        endAt = clock + 0.7; pace = 1; selected = -1; drag = null; near = null;
+        break;
+      }
+      it.at = 0.1 + next / RATE;
       tock(next % 7 / 7);
       if (next % 4 === 0) mallet(L.tune[next / 4 % L.tune.length]);
+      if (next === L.feed) for (const cell of L.cells) cell.at = it.at + Math.abs(cell.x - it.x) / 0.5 / RATE + 0.08 + cell.r / 40;
+      if (next === L.chain.length - 1) { it.rest = Math.PI / 2; endAt = Math.max(it.at + 0.7, ...L.cells.map(cell => cell.at)) + 1; }
+      next++;
     }
-    if (t >= endAt) {
+    if (clock >= endAt) {
       since = t;
       if (stop) { state = 'fail'; mistakes++; bonk(); }
       else {
         state = 'won';
-        const stars = mistakes === 0 ? 3 : mistakes <= 2 ? 2 : 1;
-        prog.stars[L.n] = Math.max(prog.stars[L.n] || 0, stars);
+        won()[L.n] = Math.max(won()[L.n] || 0, starsNow());
         saveProg();
-        [0, 2, 4, 7].forEach((s, k) => mallet(s, 0.16, k * 0.09));
+        [0, 2, 4, 7].forEach((n, k) => mallet(n, 0.16, k * 0.09));
       }
     }
   } else if (state === 'fail' && t - since > 1.5) { state = 'rise'; since = t; }
-  else if (state === 'rise' && t - since > 0.4) { for (const it of L.chain) it.at = null; state = 'play'; stop = null; }
+  else if (state === 'rise' && t - since > 0.4) {
+    for (const it of L.chain) it.at = null;
+    state = 'play'; stop = null; startAt = t + WAIT;
+  }
+  slowK += ((state === 'run' && near ? 1 : 0) - slowK) * Math.min(1, CC.DT * 8);
 }
-function lean(it, t) {
-  if (it.at == null || t < it.at) return 0;
-  const p = (t - it.at) / FALL, f = p < 1 ? p * p : 1 - 0.05 * Math.sin(Math.min(1, (p - 1) / 0.5) * Math.PI);
-  return it.rest * f * (state === 'rise' ? 1 - smooth((t - since) / 0.4) : 1);
+function lean(it) {
+  if (it.at == null || clock < it.at) return 0;
+  const p = (clock - it.at) / FALL, f = p < 1 ? p * p : 1 - 0.05 * Math.sin(Math.min(1, (p - 1) / 0.5) * Math.PI);
+  return it.rest * f * (state === 'rise' ? 1 - smooth((CC.time - since) / 0.4) : 1);
 }
 
 // ---- Drawing
@@ -312,7 +353,7 @@ function draw(ctx) {
       grow = Math.min(1, 0.2 + (t - g.since[it.slot[1]]) / 0.18);
     }
     const first = i === 0;
-    box(ctx, it.x, it.z, it.a, it.y0, first ? 0.15 : THIN, first ? 0.6 : WIDE, (first ? 1.05 : TALL) * grow, lean(it, t), it.rgb);
+    box(ctx, it.x, it.z, it.a, it.y0, first ? 0.15 : THIN, first ? 0.6 : WIDE, (first ? 1.05 : TALL) * grow, lean(it), it.rgb);
   }
   // A bad joint: a red block across the line, and a cross between the two numbers.
   for (const g of L.gaps) g.lay.joints.forEach((s, j) => {
@@ -328,14 +369,38 @@ function draw(ctx) {
     }
   });
   // The bell at the end of the line.
-  const end = L.chain.at(-1), rung = end.at != null && t > end.at + 0.12 ? Math.max(0, 1 - (t - end.at - 0.12) * 2) : 0;
+  const end = L.chain.at(-1), rung = end.at != null && clock > end.at + 0.12 ? Math.max(0, 1 - (clock - end.at - 0.12) * 2) : 0;
   ctx.fillStyle = '#ffd23f'; ctx.strokeStyle = 'rgba(90,60,0,0.6)'; ctx.lineWidth = 4;
   ctx.beginPath(); ctx.arc(px(end.x - L.dir * 0.75), py(end.z + 0.15), 26 + 14 * rung, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
   if (state === 'play') {
     // The gold domino calls for the flick.
     const s0 = L.chain[0], beat = 0.5 + 0.5 * Math.sin(t * 5), ready = L.gaps.every(g => g.slots.every(k => k >= 0));
-    ctx.strokeStyle = `rgba(255,220,80,${ready ? 0.95 : 0.45})`; ctx.lineWidth = ready ? 9 : 6;
-    ctx.beginPath(); ctx.arc(px(s0.x + 0.1), py(s0.z + 0.25), 62 + (ready ? 16 : 8) * beat, 0, Math.PI * 2); ctx.stroke();
+    if (live()) {
+      // The ring empties as the start comes.
+      const left = Math.max(0, (startAt - t) / WAIT);
+      ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 12;
+      ctx.beginPath(); ctx.arc(px(s0.x + 0.1), py(s0.z + 0.25), 70, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = '#ffd23f'; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(px(s0.x + 0.1), py(s0.z + 0.25), 70, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * left); ctx.stroke();
+    } else {
+      ctx.strokeStyle = `rgba(255,220,80,${ready ? 0.95 : 0.45})`; ctx.lineWidth = ready ? 9 : 6;
+      ctx.beginPath(); ctx.arc(px(s0.x + 0.1), py(s0.z + 0.25), 62 + (ready ? 16 : 8) * beat, 0, Math.PI * 2); ctx.stroke();
+    }
+  }
+  if (slowK > 0.02) {
+    // Slow motion: the table darkens around the middle, the place in danger beats.
+    const dim = ctx.createRadialGradient(W / 2, H / 2, 300, W / 2, H / 2, 1150);
+    dim.addColorStop(0, 'rgba(12,14,36,0)'); dim.addColorStop(1, `rgba(12,14,36,${0.75 * slowK})`);
+    ctx.fillStyle = dim; ctx.fillRect(0, 0, W, H);
+    if (near) {
+      const beat = 0.5 + 0.5 * Math.sin(t * 9);
+      ctx.strokeStyle = `rgba(255,${near.slot && trouble(near) === 'hole' ? 210 : 90},60,${slowK * (0.55 + 0.45 * beat)})`; ctx.lineWidth = 10 + 6 * beat;
+      if (trouble(near) === 'hole') {
+        const [x, y, w, h] = slotRect(L.gaps[near.slot[0]], near.slot[1]);
+        CC.roundRect(ctx, x - 6, y - 6, w + 12, h + 12, 22); ctx.stroke();
+      } else { ctx.beginPath(); ctx.arc(px(near.x), py(near.z - 0.25), 86 + 10 * beat, 0, Math.PI * 2); ctx.stroke(); }
+    }
+    text(ctx, 'RALENTI', W / 2, 66, 46, `rgba(255,210,63,${slowK})`);
   }
   if (state === 'fail' || state === 'rise') {
     const it = L.chain[stop.i], k = state === 'fail' ? Math.min(1, (t - since) / 0.2) : 1 - smooth((t - since) / 0.4);
@@ -352,11 +417,16 @@ function draw(ctx) {
   // Head: back to the levels, the level, the stars still to win.
   ctx.fillStyle = 'rgba(0,0,0,0.28)'; CC.roundRect(ctx, 24, 24, 150, 84, 42); ctx.fill();
   text(ctx, '‹', 70, 62, 70); text(ctx, String(L.n + 1), 122, 68, 44);
-  stars3(ctx, W - 130, 66, 30, mistakes === 0 ? 3 : mistakes <= 2 ? 2 : 1);
+  stars3(ctx, W - 130, 66, 30, starsNow());
+  const hint = (live() ? LIVE_HINTS : HINTS)[L.n];
   if (state === 'won') drawWon(ctx, t);
-  else if (HINTS[L.n] && L.R <= 2 && state === 'play') {
+  else if (hint && L.R <= 2 && (state === 'play' || (state === 'run' && live() && !stop))) {
     ctx.fillStyle = 'rgba(0,0,0,0.3)'; CC.roundRect(ctx, 60, 140, W - 120, 170, 30); ctx.fill();
-    wrap(ctx, HINTS[L.n], W / 2, 225, 40, W - 190, '#fff');
+    wrap(ctx, hint, W / 2, 225, 40, W - 190, '#fff');
+  } else if (state === 'play' && live()) {
+    const y = py(L.zs + PICS.rows * L.c / 2);
+    ctx.fillStyle = 'rgba(20,24,44,0.8)'; CC.roundRect(ctx, 190, y - 60, W - 380, 120, 60); ctx.fill();
+    text(ctx, 'La vague part dans ' + Math.max(1, Math.ceil(startAt - t)), W / 2, y + 2, 52);
   } else if (state === 'fail') {
     // Over the picture, so that the hand stays in view.
     const y = py(L.zs + PICS.rows * L.c / 2);
@@ -368,7 +438,7 @@ function drawPicture(ctx, t) {
   const c = L.c, x0 = px(W / S / 2 - PICS.cols * c / 2), y0 = py(L.zs + PICS.rows * c), hei = c * 1.15;
   ctx.fillStyle = 'rgba(0,0,0,0.3)'; CC.roundRect(ctx, x0 - 14, y0 - 14 - K * hei * S, PICS.cols * c * S + 28, PICS.rows * c * S + 28 + K * hei * S, 18); ctx.fill();
   for (const cell of L.cells) {
-    const p = cell.at == null ? -1 : (t - cell.at) / 0.2, left = px(cell.x - c * 0.46), wide = c * 0.92 * S;
+    const p = cell.at == null ? -1 : (clock - cell.at) / 0.2, left = px(cell.x - c * 0.46), wide = c * 0.92 * S;
     if (p <= 0) {
       // Standing: the white face toward the player, the top edge above it.
       const base = py(cell.z - 0.06), top = base - K * hei * S, lean = AX * hei * S;
@@ -416,7 +486,7 @@ function drawHand(ctx, t) {
   if (drag && drag.moved) tileFace(ctx, drag.x, drag.y - 130, 100, L.hand[drag.k][0], L.hand[drag.k][1], true, false);
 }
 function drawWon(ctx, t) {
-  const k = smooth((t - since) / 0.35), stars = mistakes === 0 ? 3 : mistakes <= 2 ? 2 : 1;
+  const k = smooth((t - since) / 0.35), stars = starsNow();
   ctx.save();
   ctx.globalAlpha = k;
   ctx.fillStyle = 'rgba(20,24,44,0.86)'; CC.roundRect(ctx, 50, 1610, W - 100, 280, 40); ctx.fill();
@@ -433,13 +503,20 @@ function wonButtons() {
   return [{ label: 'Niveaux', rect: more ? [110, 1796, 380, 76] : [350, 1796, 380, 76], act: () => { state = 'menu'; } },
     ...(more ? [{ label: 'Suivant', main: true, rect: [590, 1796, 380, 76], act: () => load(L.n + 1) }] : [])];
 }
-const tileRect = i => [50 + (i % 4) * 250, 330 + Math.floor(i / 4) * 250, 230, 230];
+const tileRect = i => [50 + (i % 4) * 250, 372 + Math.floor(i / 4) * 250, 230, 230];
+const MODES = [{ mode: 'live', label: 'Contre la vague', rect: [110, 150, 420, 84], tip: 'La vague part toute seule : bouche les trous avant qu’elle arrive.' },
+  { mode: 'calm', label: 'Calme', rect: [550, 150, 420, 84], tip: 'Bouche chaque trou avec les bons dominos, puis une pichenette.' }];
 function drawMenu(ctx) {
   table(ctx);
-  text(ctx, 'Le pont de dominos', W / 2, 110, 76);
-  wrap(ctx, 'Bouche chaque trou avec les bons dominos, puis une pichenette.', W / 2, 225, 38, W - 160, 'rgba(255,255,255,0.85)');
+  text(ctx, 'Le pont de dominos', W / 2, 84, 76);
+  for (const m of MODES) {
+    const on = prog.mode === m.mode;
+    ctx.fillStyle = on ? '#ffd23f' : 'rgba(0,0,0,0.28)'; CC.roundRect(ctx, ...m.rect, 42); ctx.fill();
+    text(ctx, m.label, m.rect[0] + m.rect[2] / 2, m.rect[1] + m.rect[3] / 2 + 2, 40, on ? '#3a2a00' : '#fff');
+    if (on) wrap(ctx, m.tip, W / 2, 302, 36, W - 160, 'rgba(255,255,255,0.85)');
+  }
   for (let i = 0; i < BR.SPECS.length; i++) {
-    const [x, y, w, h] = tileRect(i), st = prog.stars[i] || 0;
+    const [x, y, w, h] = tileRect(i), st = won()[i] || 0;
     ctx.fillStyle = st ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.25)'; CC.roundRect(ctx, x, y, w, h, 28); ctx.fill();
     if (st) {
       // A level done shows its picture.
@@ -462,7 +539,7 @@ function placeAt(x, y, pad) {
   let best = null;
   for (const g of L.gaps) for (let i = 0; i < g.n; i++) {
     const r = slotRect(g, i);
-    if (!inRect(x, y, r, pad)) continue;
+    if (locked(g, i) || !inRect(x, y, r, pad)) continue;
     const d = Math.hypot(x - r[0] - r[2] / 2, y - r[1] - r[3] / 2);
     if (!best || d < best.d) best = { g, i, d };
   }
@@ -471,12 +548,14 @@ function placeAt(x, y, pad) {
 function down(x, y) {
   audio();
   if (state === 'menu') {
-    for (let i = 0; i < BR.SPECS.length; i++) if (inRect(x, y, tileRect(i)) && (OPEN_ALL || i === 0 || prog.stars[i - 1])) { load(i); return; }
+    for (const m of MODES) if (inRect(x, y, m.rect, 8)) { prog.mode = m.mode; saveProg(); tock(0.6); return; }
+    for (let i = 0; i < BR.SPECS.length; i++) if (inRect(x, y, tileRect(i)) && (OPEN_ALL || i === 0 || won()[i - 1])) { load(i); return; }
     return;
   }
   if (inRect(x, y, [24, 24, 150, 84], 16)) { state = 'menu'; return; }
   if (state === 'won') { for (const b of wonButtons()) if (inRect(x, y, b.rect, 8)) { b.act(); return; } return; }
-  if (state !== 'play') return;
+  // Live: the hand stays in play while the wave runs.
+  if (state !== 'play' && !(state === 'run' && live() && !stop)) return;
   const at = placeAt(x, y, 0);
   if (at && at.g.slots[at.i] >= 0) { drag = { k: at.g.slots[at.i], x, y, x0: x, y0: y, moved: false, from: [at.g.index, at.i] }; return; }
   if (at && selected >= 0) { put(selected, at.g, at.i); selected = -1; return; }
@@ -490,6 +569,7 @@ function down(x, y) {
 function move(x, y) {
   if (!drag) return;
   drag.x = x; drag.y = y;
+  if (drag.from && !drag.moved && locked(L.gaps[drag.from[0]], drag.from[1])) { drag = null; return; }
   if (!drag.moved && Math.hypot(x - drag.x0, y - drag.y0) > 22) {
     drag.moved = true; selected = -1;
     if (drag.from) takeBack(drag.k);
@@ -503,18 +583,18 @@ function up() {
   drag = null;
   if (!d.moved) {
     // A tap: a tile of the course goes back to the hand, a tile of the hand is picked for the next place tapped.
-    if (d.from) { takeBack(d.k); mistakes++; tock(0); } else { selected = selected === d.k ? -1 : d.k; tock(0.6); }
+    if (d.from) { if (!locked(L.gaps[d.from[0]], d.from[1])) { takeBack(d.k); if (!live()) mistakes++; tock(0); } } else { selected = selected === d.k ? -1 : d.k; tock(0.6); }
     return;
   }
   const at = placeAt(d.x, d.y - 130, 30);
   if (at) put(d.k, at.g, at.i);
   // Taking a tile out of its place costs, wherever it goes next.
-  if (d.from && !(at && at.g.index === d.from[0] && at.i === d.from[1])) mistakes++;
+  if (!live() && d.from && !(at && at.g.index === d.from[0] && at.i === d.from[1])) mistakes++;
 }
 canvas.addEventListener('pointerdown', ev => { ev.preventDefault(); try { canvas.setPointerCapture(ev.pointerId); } catch (e) { /* not a live pointer */ } down(...CC.toCanvas(canvas, ev)); });
 canvas.addEventListener('pointermove', ev => { move(...CC.toCanvas(canvas, ev)); });
 canvas.addEventListener('pointerup', () => up());
-canvas.addEventListener('pointercancel', () => { if (drag && drag.from && drag.moved) mistakes++; drag = null; });
+canvas.addEventListener('pointercancel', () => { if (!live() && drag && drag.from && drag.moved) mistakes++; drag = null; });
 
 // ---- Test hooks
 window.__level = n => { load(n); return L.hand.length; };
@@ -525,22 +605,47 @@ window.__solve = () => {
 };
 window.__flick = flick;
 window.__skip = n => { for (let k = 0; k < n; k++) { step(); CC.time += CC.DT; } return state; };
-window.__state = () => ({ state, level: L && L.n + 1, mistakes, stop, stars: prog.stars });
+window.__state = () => ({ state, mode: prog.mode, level: L && L.n + 1, mistakes, stop, next, pace: +pace.toFixed(3), slow: !!near, stars: won() });
+window.__mode = m => { prog.mode = m; return m; };
 window.__shot = () => { draw(canvas.getContext('2d')); return canvas.toDataURL('image/png'); };
 window.__input = { down, move, up };
-// Every level, solved then flicked: does the wave reach the picture, and how long does it take?
-window.__check = () => BR.SPECS.map((spec, n) => {
+const until = (test, max = 6000) => { let n = 0; while (!test() && n++ < max) window.__skip(1); return +(n * CC.DT).toFixed(1); };
+// Every level in both modes. Calm: a flick with nothing laid costs one, then solved and flicked. Live: left alone
+// the wave breaks; solved only once it has slowed before each gap, it still reaches the picture.
+window.__check = () => ['calm', 'live'].flatMap(mode => BR.SPECS.map((spec, n) => {
+  prog.mode = mode;
   load(n);
-  const empty = (flick(), window.__skip(900), mistakes);
-  const solved = window.__solve();
-  flick();
-  const from = CC.time;
-  let frames = 0;
-  while (state === 'run' && frames++ < 2000) window.__skip(1);
-  return { level: n + 1, emptyFlickCost: empty, solved, state, seconds: +(CC.time - from).toFixed(1), dominoes: L.chain.length, hand: L.hand.length };
-});
+  const out = { mode, level: n + 1, dominoes: L.chain.length, hand: L.hand.length };
+  if (mode === 'calm') {
+    flick(); window.__skip(900);
+    out.emptyFlickCost = mistakes;
+    out.solved = window.__solve();
+    flick();
+  } else {
+    out.brokeAfter = until(() => state === 'fail');
+    out.broke = state === 'fail' && mistakes === 1;
+    until(() => state === 'play');
+    mistakes = 0;
+    // Each gap is filled only when the wave has slowed in front of it.
+    const ways = BR.solve(L.gaps, L.hand);
+    let slowed = 0;
+    out.seconds = until(() => {
+      if (state === 'run' && near && pace < 0.06) {
+        const g = (near.slot || near.joint)[0];
+        ways[g].forEach((tile, i) => put(tile.k, L.gaps[g], i));
+        slowed++;
+      }
+      return state !== 'run' && state !== 'play';
+    });
+    out.slowed = slowed;
+  }
+  if (mode === 'calm') out.seconds = until(() => state !== 'run');
+  out.state = state; out.stars = starsNow();
+  return out;
+}));
 
-const start = +new URLSearchParams(location.search).get('level');
+const query = new URLSearchParams(location.search), start = +query.get('level');
+if (query.get('mode') === 'calm' || query.get('mode') === 'live') prog.mode = query.get('mode');
 if (start >= 1 && start <= BR.SPECS.length) load(start - 1);
 CC.run({ canvas, step, draw });
 </script>

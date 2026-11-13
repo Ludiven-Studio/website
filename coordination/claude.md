@@ -3178,3 +3178,14 @@
 - 20:40 : build complet propre (226 pages, précache et liens vérifiés) ; 24 niveaux résolus et joués par script côté
   prototype ; le son n'a pas été écouté ; commité et poussé à la demande de l'utilisateur : mes 6 fichiers et cette
   section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-13 — Prototypes : le pont de dominos, mode Contre la vague (session colorchain)
+- Statut : en cours (2026-11-13T21:48+01:00). Demande de l'utilisateur : Raphaël, dans la session : « je trouve qu'il
+  n'y a pas assez d'actions ... avoir le chemin qui avance en même temps ... peut-être faire un ralenti au moment où
+  cela va arriver aux pièces manquantes »
+- Réservations actives : `public/prototypes/domino-pont/index.html`, `public/prototypes/domino-pont/core.js`.
+- Ressources : serveur de dev sur le port 4391 ; eslint, `astro check`. Build annoncé ici avant.
+- 21:49 : mode « Contre la vague » ajouté au prototype (la vague part seule, ralenti devant un trou pas bouché, 24
+  niveaux à trous courts), le mode calme reste ; 48 niveaux résolus et joués par script, pose pendant la vague testée
+  par script, page ouverte sans erreur de console ; le son et un vrai téléphone ne sont pas vérifiés ; poussé comme
+  mise à jour de prototype : mes 2 fichiers et cette section seulement. Statut : terminé. Réservations libérées.

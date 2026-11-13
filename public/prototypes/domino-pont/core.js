@@ -38,6 +38,34 @@ const BR = (() => {
     { rows: [[3], [3], [3], [1]], lo: 0, hi: 4, spare: 0, traps: 8 },
   ];
 
+  // Live levels, where the wave runs while the player fills: many short gaps, quick to read.
+  const LIVE = [
+    { rows: [[], [1]], lo: 1, hi: 3, spare: 1, traps: 0 },
+    { rows: [[1], [1]], lo: 1, hi: 4, spare: 1, traps: 0 },
+    { rows: [[1], [1, 1]], lo: 1, hi: 4, spare: 1, traps: 0 },
+    { rows: [[1, 1], [1, 1]], lo: 1, hi: 4, spare: 1, traps: 0 },
+    { rows: [[1], [2]], lo: 1, hi: 4, spare: 1, traps: 1 },
+    { rows: [[1, 1], [2]], lo: 1, hi: 5, spare: 1, traps: 1 },
+    { rows: [[1, 1], [1, 1], [1]], lo: 1, hi: 5, spare: 1, traps: 0 },
+    { rows: [[2], [1, 1], [1]], lo: 1, hi: 5, spare: 2, traps: 1 },
+    { rows: [[1, 1], [2], [1, 1]], lo: 1, hi: 5, spare: 1, traps: 1 },
+    { rows: [[2], [2], [1, 1]], lo: 0, hi: 5, spare: 2, traps: 2 },
+    { rows: [[1, 1], [1, 1], [1, 1]], lo: 0, hi: 5, spare: 2, traps: 0 },
+    { rows: [[2], [1, 1], [2]], lo: 0, hi: 5, spare: 2, traps: 2 },
+    { rows: [[1, 1], [2], [2]], lo: 0, hi: 5, spare: 2, traps: 2 },
+    { rows: [[2], [2], [2]], lo: 0, hi: 5, spare: 2, traps: 3 },
+    { rows: [[1, 1], [1, 1], [2], [1]], lo: 0, hi: 6, spare: 2, traps: 1 },
+    { rows: [[2], [1, 1], [2], [1, 1]], lo: 0, hi: 6, spare: 2, traps: 2 },
+    { rows: [[1, 1], [2], [1, 1], [2]], lo: 0, hi: 6, spare: 2, traps: 2 },
+    { rows: [[3], [1, 1], [2]], lo: 0, hi: 6, spare: 2, traps: 2 },
+    { rows: [[2], [2], [2], [1, 1]], lo: 0, hi: 6, spare: 2, traps: 3 },
+    { rows: [[1, 1], [3], [1, 1], [1]], lo: 0, hi: 6, spare: 2, traps: 2 },
+    { rows: [[2], [3], [2], [1]], lo: 0, hi: 5, spare: 2, traps: 3 },
+    { rows: [[1, 1], [2], [3], [1, 1]], lo: 0, hi: 5, spare: 1, traps: 3 },
+    { rows: [[3], [2], [2], [2]], lo: 0, hi: 5, spare: 1, traps: 4 },
+    { rows: [[3], [2], [3], [1, 1]], lo: 0, hi: 5, spare: 0, traps: 4 },
+  ];
+
   // Every set of hand tiles that fills a gap alone, each as a bit mask of hand places.
   function fillings(gap, hand) {
     const found = new Set();
@@ -96,11 +124,11 @@ const BR = (() => {
     return picked && picked.map((m, k) => chain(gaps[k], m));
   }
 
-  // Level n (from 0): its gaps, row by row, and the hand. Always the same for a given n.
-  function make(n) {
-    const spec = SPECS[n];
+  // Level n (from 0) of the calm or the live set: its gaps, row by row, and the hand. Always the same for a given n.
+  function make(n, live = false) {
+    const spec = (live ? LIVE : SPECS)[n];
     for (let attempt = 0; attempt < 20000; attempt++) {
-      const rand = rng(7919 * (n + 1) + attempt * 104729), pick = m => Math.floor(rand() * m);
+      const rand = rng(7919 * (n + 1 + (live ? 500 : 0)) + attempt * 104729), pick = m => Math.floor(rand() * m);
       const all = [];
       for (let i = spec.lo; i <= spec.hi; i++) for (let j = i; j <= spec.hi; j++) all.push([i, j]);
       const free = all.map(() => true), hand = [], gaps = [];
@@ -158,6 +186,6 @@ const BR = (() => {
     return best;
   }
 
-  return { SPECS, make, count, solve, lay, fillings, rng };
+  return { SPECS, LIVE, make, count, solve, lay, fillings, rng };
 })();
 if (typeof module !== 'undefined') module.exports = BR;
