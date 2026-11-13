@@ -3155,3 +3155,14 @@
   et les étoiles enregistrées ne changent pas ; vérifié par script sans sauvegarde : un toucher sur la dernière tuile
   lance le dernier niveau (100, 100 et 13) ; poussé sur le relais du Producer citant Raphaël : mes 3 fichiers et cette
   section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-13 — Prototypes : cerf-volant et tente à la place de la carotte et des cerises (session colorchain)
+- Statut : en cours (2026-11-13T08:23+01:00). Demande de l'utilisateur : relais du Producer : Raphaël a choisi « Oui,
+  les remplacer » pour la carotte (niveau 13) et les cerises (niveau 60) des prototypes
+- Réservations actives : `public/prototypes/colorchain-relais/levels.js`,
+  `public/prototypes/colorchain-peinture/levels.js`.
+- Ressources : serveur de dev sur le port 4391 ; eslint, `astro check`. Build annoncé ici avant.
+- 08:23 : dans les prototypes relais et peinture, le dessin 13 (carotte) devient un cerf-volant et le 60 (cerises) une
+  tente, à la même place ; le contrôle des dessins des deux pages est propre et les niveaux 13 et 60 du relais se
+  terminent en jeu automatique ; poussé sur le relais du Producer citant le choix de Raphaël : mes 2 fichiers et cette
+  section seulement. Statut : terminé. Réservations libérées.
