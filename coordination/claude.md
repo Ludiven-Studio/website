@@ -3122,3 +3122,14 @@
   les 100 dessins le long du chemin infini ; 100 niveaux rejoués par script, 4 parties infinies de 240 s sans arrêt,
   images dessinées en continu ; poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut :
   terminé. Réservations libérées.
+
+## 2026-11-13 — ColorChain : chemins parallèles et musique (session colorchain)
+- Statut : en cours (2026-11-13T01:47+01:00). Demande de l'utilisateur : plusieurs chemins en parallèle avec des trous
+  décalés pour les niveaux durs, de grandes lignes droites de temps en temps, une musique synchronisée avec les
+  pichenettes ; mises à jour du prototype autorisées
+- Réservations actives : `public/prototypes/colorchain-relais/index.html`.
+- Ressources : serveur de dev sur le port 4391 ; eslint, `astro check`. Build annoncé ici avant.
+- 01:47 : deux ou trois chemins parallèles aux trous décalés, lignes droites de sprint, trous placés sur les temps et
+  musique de synthèse calée dessus ; 100 niveaux rejoués par script, 3 parties infinies de 300 s sans arrêt ; le son
+  n'a pas été écouté ; poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé.
+  Réservations libérées.

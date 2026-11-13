@@ -1081,15 +1081,52 @@ function whirl(T, r) {
   for (let i = 0; i < k; i++) half(0.7 + 1.4 * i, -sd);
 }
 // Lightning: slanted runs that each end on a hole; the next one leaves its pad at a new angle.
+// Each run lasts a whole number of beats.
 function bolt(T, r, C) {
   let sd = T.x > 0 ? -1 : 1;
   for (let i = 0, n = rint(r, 3, 5); i < n; i++, sd = -sd) {
     const h = NORTH + sd * oneOf(r, C.tight > 0.75 ? [3, 4] : [3, 4, 5]) * D15;
     if (i) T.jump(h); else T.face(h, 0.8);
     const dist = (sd * 4.6 - T.x) / Math.cos(T.h);
-    if (dist < 6 || (!i && C.since + dist / PITCH < 14)) return false;
-    T.line(dist, false);
+    if (!i) {
+      // The first hole waits for a beat.
+      let k = Math.floor(dist / PITCH);
+      while (k >= 8 && (C.tick + T.pts.length + k + 2) % BEAT) k--;
+      if (k < 8 || C.since + k < 14) return false;
+      T.step(k, PITCH);
+    } else if (i === n - 1) T.line(dist, false);
+    else {
+      const ticks = [24, 36, 12].find(v => dist / (v - 3) >= 0.47 && dist / (v - 3) <= 0.68);
+      if (!ticks) return false;
+      T.step(ticks - 3, dist / (ticks - 3));
+    }
   }
+}
+// Sprint: one long straight run, north or nearly.
+function dash(T, r) {
+  const n = rint(r, 30, 50), sd = T.x > 0 ? -1 : 1, k = Math.abs(T.x) > 2 && r() < 0.5 ? 1 : 0;
+  T.face(NORTH + sd * k * D15, 1).fwd(Math.min(n, k ? Math.floor((5.5 - sd * T.x) / (PITCH * Math.sin(D15))) : n));
+}
+// Lanes: the course forks into two or three straight runs side by side. Their holes come in turn, one beat or
+// two apart. The side lanes stop at the top; the first one goes on.
+function lanes(T, r, C, L) {
+  const m = Math.min(L.maxLanes(), Math.abs(T.x) <= 3.5 ? 3 : 2), S = m === 3 ? 36 : C.tight > 0.75 ? 48 : 24, nh = S === 48 ? 2 : 3;
+  if (m < 2) return false;
+  let n0 = (2 * BEAT - (C.tick + 2) % (2 * BEAT)) % (2 * BEAT);
+  while (n0 < Math.max(10, 14 - C.since)) n0 += 2 * BEAT;
+  const x0 = T.x, z0 = T.z, a1 = C.tick + n0 + 2;
+  T.step(n0, PITCH);
+  for (let j = 0; j < nh; j++) T.jump(NORTH).step(S - 3, PITCH);
+  T.lanes = [];
+  [T.x > 0 ? -1 : 1, T.x > 0 ? 1 : -1].slice(0, m - 1).forEach((side, j) => {
+    // A slanted domino beside the first one starts the lane.
+    const B = turtle(x0 + side * 0.3, z0 - PITCH - 0.42, NORTH + side * Math.PI / 4), off = S / m * (j + 1);
+    B.pts.push({ x: B.x, z: B.z, a: B.h });
+    B.line(2.95, false).turn(-side * 45, 1.4);
+    B.step(a1 + off - C.tick - 3 - B.pts.length, PITCH);
+    for (let k = 0; k < nh; k++) { B.jump(NORTH); B.pts.at(-1).tick = a1 + off + k * S; B.step(k < nh - 1 ? S - 3 : S - off - 5, PITCH); }
+    T.lanes.push(B.pts);
+  });
 }
 // A picture: a white field. The course runs along its foot, and a slanted domino beside each domino of that
 // run tips one column. Then the course climbs along the side, unless the picture ends a level.
@@ -1102,19 +1139,19 @@ function picture(T, r, C, L, last) {
   T.step(COLS - 1, sp);
   T.extra = [];
   T.pts.slice(f0).forEach((q, i) => {
-    T.extra.push({ x: q.x + sd * 0.42, z: zf - 0.3, a: sd > 0 ? -Math.PI / 4 : -3 * Math.PI / 4, color: FIELD_W });
+    T.extra.push({ x: q.x + sd * 0.42, z: zf - 0.3, a: sd > 0 ? -Math.PI / 4 : -3 * Math.PI / 4, color: FIELD_W, pic: true });
     for (let j = 0; j < ROWS; j++) {
       const fu = sd > 0 ? i / (COLS - 1) : 1 - i / (COLS - 1), fv = 1 - j / (ROWS - 1);
       let rev = FIELD_W;
       for (const l of layers) if (l.shape(fu, fv)) rev = l.color;
-      T.extra.push({ x: q.x + sd * 0.745, z: zf - 0.625 - j * sp, a: FLAT, color: FIELD_W, rev, field: true });
+      T.extra.push({ x: q.x + sd * 0.745, z: zf - 0.625 - j * sp, a: FLAT, color: FIELD_W, rev, field: true, pic: true });
     }
   });
   if (!last) T.fwd(1, false).turn(-sd * 90, 1.195).line(ROWS * sp + 0.75);
   for (let i = f0; i < T.pts.length; i++) T.pts[i].show = zf - 0.625 - (ROWS - 1) * sp / 2;
   T.pic = L.picK;
 }
-const MOTIFS = [[3, rows], [3, cols], [1.5, teeth], [2, whirl], [0.8, bolt]];
+const MOTIFS = [[3, rows], [3, cols], [1.5, teeth], [2, whirl], [1.2, bolt], [1.3, dash], [1.6, lanes]];
 const cellOf = (x, z) => Math.floor(x / CLEAR) * 100003 + Math.floor(z / CLEAR);
 // Is every point of a new pattern inside the corridor, clear of the dominoes on the table and of the pattern itself?
 function fits(L, pts) {
@@ -1127,15 +1164,17 @@ function fits(L, pts) {
   }
   return true;
 }
-const newSec = () => ({ doms: [], pad: null, last: null, endT: null, missed: false, lockT: -9 });
+// A section: its pad, its dominoes up to the next hole, and the dominoes that lead to its pad.
+const newSec = (feed, feedLast) => ({ doms: [], pad: null, feed, feedLast, inT: null, missed: false, lockT: -9 });
 const blank = () => ({ x: 0, z: 0, a: 0, color: RAINBOW[0], tag: {}, any: true, gone: true, n: null });
-const holeGap = L => Math.round((L.gap[0] + L.gap[1] * L.rnd()) * L.tight());
+// Dominoes between two holes: one, two or three bars of two beats.
+const BEAT = 12, holeGap = L => 2 * BEAT * oneOf(L.rnd, L.tight() >= 0.85 ? [2, 3] : L.tight() >= 0.65 ? [1, 2, 2, 3] : [1, 1, 2]) - 3;
 // Takes the next domino of the pool, the oldest one, and stands it at p.
 function lay(L, p, M, path) {
   const o = L.dominos[L.slot++ % L.dominos.length];
   if (o.n != null) { const c = L.grid.get(cellOf(o.x, o.z)); c.splice(c.indexOf(o), 1); if (L.wave && o.n > L.wave.n - 200) L.early = (L.early || 0) + 1; }
   Object.assign(o, UP(), { n: path ? L.head++ : L.head, gone: false, path, kind: M ? M.name : '', x: p.x, z: p.z, a: p.a, va: p.a, show: p.show == null ? null : p.show,
-    color: path ? RAINBOW[(L.relay.length - 1) % RAINBOW.length] : p.color, rev: p.rev || null, field: !!p.field, pic: !path || p.show != null });
+    color: p.color || RAINBOW[(L.relay.length - 1) % RAINBOW.length], rev: p.rev || null, field: !!p.field, pic: !!p.pic || p.show != null, bt: p.tick == null ? L.tick : p.tick });
   const key = cellOf(o.x, o.z);
   if (!L.grid.has(key)) L.grid.set(key, []);
   L.grid.get(key).push(o);
@@ -1146,18 +1185,33 @@ function commit(L, T, M) {
   const q = T.pts;
   for (let i = 0; i < q.length; i++) {
     const p = q[i];
-    const hole = !p.pad && L.count <= 0 && L.open.doms.length >= 12 && i + 3 < q.length && p.ok && q[i + 1].ok && q[i + 2].ok;
+    // A hole falls on a beat, on a strong one when it can.
+    const hole = !p.pad && L.count <= 0 && (L.tick + 2) % BEAT === 0 && ((L.tick + 2) % (2 * BEAT) === 0 || L.count <= -BEAT) && L.open.doms.length >= 12 && i + 3 < q.length && p.ok && q[i + 1].ok && q[i + 2].ok;
     if (hole || p.pad) {
       const e = L.lastDom, u = dirOf(e.a);
       if (L.gaps) L.gaps.push(...(hole ? [p, q[i + 1]] : [1, 2].map(v => ({ x: e.x + v * PITCH * u[0], z: e.z + v * PITCH * u[1], a: e.a }))));
-      L.open.last = e; L.open = newSec(); L.relay.push(L.open); L.count = holeGap(L);
+      L.open = newSec(L.open.doms, e); L.relay.push(L.open); L.count = holeGap(L); L.tick += 2;
       if (hole) { i++; continue; }
     }
     const o = lay(L, p, M, true);
     L.ring[o.n % L.ringN] = o;
-    L.zTop = Math.min(L.zTop, o.z); L.count--;
+    L.zTop = Math.min(L.zTop, o.z); L.count--; L.tick++;
     if (!L.open.pad) L.open.pad = o;
     L.open.doms.push(o); L.lastDom = o;
+  }
+  // Side lanes: the first run is started by the fork, the next ones by their pads.
+  for (const pts of T.lanes || []) {
+    let run = { doms: [] }, e = null;
+    for (const p of pts) {
+      if (p.pad) {
+        const u = dirOf(e.a);
+        if (L.gaps) L.gaps.push(...[1, 2].map(v => ({ x: e.x + v * PITCH * u[0], z: e.z + v * PITCH * u[1], a: e.a })));
+        run = newSec(run.doms, e); L.relay.push(run);
+      }
+      e = lay(L, p, M, false);
+      if (p.pad) run.pad = e;
+      run.doms.push(e);
+    }
   }
   for (const p of T.extra || []) lay(L, p, M, false);
   L.end = { x: T.x, z: T.z, h: T.h }; L.lastM = M;
@@ -1169,7 +1223,7 @@ function commit(L, T, M) {
 // so the way ahead stays free.
 function nextMotif(L) {
   const r = L.rnd, e = L.end, total = MOTIFS.reduce((v, m) => v + m[0], 0), pic = L.picAt != null && L.head >= L.picAt;
-  const C = { tight: L.tight(), since: L.open.doms.length };
+  const C = { tight: L.tight(), since: L.open.doms.length, tick: L.tick };
   for (let t = 0; t < 40; t++) {
     let v = r() * total, M = MOTIFS[0][1];
     for (const m of MOTIFS) { v -= m[0]; if (v < 0) { M = m[1]; break; } }
@@ -1189,9 +1243,9 @@ function nextMotif(L) {
 }
 function relayLevel(pic, layers, idx) {
   const N = 23 * Math.min(30, 16 + Math.floor(idx * 0.15)), tight = Math.max(0.6, 1 - idx * 0.006), r = CC.rng(idx * 31 + 7);
-  const C = { rnd: r, relay: [], head: 0, slot: 0, count: 28 + rint(r, 0, 9), grid: new Map(), zTop: 1e9, lastM: null, made: {}, gaps: [], gap: [37, 23], tight: () => tight,
-    allow: idx === 0 ? ['rows', 'cols', 'teeth'] : null, picK: idx, pics: [], ring: [], ringN: 1e9, dominos: [...Array(N + 1100)].map(blank) };
-  C.open = newSec(); C.relay.push(C.open);
+  const C = { rnd: r, relay: [], head: 0, slot: 0, tick: 0, count: 2 * BEAT * 2 - 3, maxLanes: () => idx < 35 ? 1 : idx < 70 ? 2 : 3, grid: new Map(), zTop: 1e9, lastM: null, made: {}, gaps: [], gap: [37, 23], tight: () => tight,
+    allow: idx === 0 ? ['rows', 'cols', 'teeth', 'dash'] : null, picK: idx, pics: [], ring: [], ringN: 1e9, dominos: [...Array(N + 1100)].map(blank) };
+  C.open = newSec(null, null); C.relay.push(C.open);
   commit(C, turtle(0, 0, NORTH).fwd(10), null);
   while (C.head < N) nextMotif(C);
   // The picture ends the course.
@@ -1206,17 +1260,18 @@ function relayLevel(pic, layers, idx) {
   }
   const x0 = Math.min(...f.map(o => o.x)), x1 = Math.max(...f.map(o => o.x)), z0 = Math.min(...f.map(o => o.z)), z1 = Math.max(...f.map(o => o.z));
   return { name: 'Dessin mystère', pic, teach: idx === 0 ? 'Touche l’écran quand la vague arrive au trou : la chaîne continue' : '', sol: [], colors: [FIELD_W, ...RAINBOW],
-    dominos: d, h: { start: C.relay[0].pad, sign: 1 }, hot: [], starts: C.relay.map(q => q.pad), relay: C.relay, ring: C.ring, budget: 999, speed: Math.min(1, 0.7 + idx * 0.006),
+    dominos: d, h: { start: C.relay[0].pad, sign: 1 }, hot: [], starts: C.relay.map(q => q.pad), relay: C.relay, lo: 0, ring: C.ring, ringN: C.ringN, budget: 999, speed: Math.min(1, 0.7 + idx * 0.006),
     paint: [...marks, [rectP(x0 - 0.55, z0 - 0.7, x1 + 0.55, z1 + 0.2), 0x6b4a3a], [rectP(x0 - 0.38, z0 - 0.5, x1 + 0.38, z1 + 0.1), 0xe9e4d6]] };
 }
 // Endless relay: the course never ends. Its dominoes come from a pool: one left far behind the wave is laid
 // again ahead of it. The pictures come one after the other along the way. One stop ends the run.
 function endlessLevel() {
   const L = { name: 'Chemin infini', teach: 'Touche l’écran quand la vague arrive au trou. Un seul arrêt, et c’est fini', endless: true, sol: [], colors: [...RAINBOW], hot: [], starts: [], budget: 1e9,
-    relay: [], cur: 0, score: 0, head: 0, slot: 0, count: 40, rnd: CC.rng(+(new URLSearchParams(location.search).get('graine') || Math.floor(Math.random() * 1e6))), speed: 0.7, paint: [],
+    relay: [], lo: 0, score: 0, head: 0, slot: 0, tick: 0, count: 2 * BEAT * 2 - 3, rnd: CC.rng(+(new URLSearchParams(location.search).get('graine') || Math.floor(Math.random() * 1e6))), speed: 0.7, paint: [],
     grid: new Map(), zTop: 1e9, lastM: null, made: {}, gap: [45, 25], ring: Array(1024), ringN: 1024, picK: prog.pics || 0, picAt: 240, picGap: 620, pics: [], found: 0 };
   L.tight = () => Math.max(0.5, 1 - L.head * 0.00026);
-  L.open = newSec(); L.relay.push(L.open);
+  L.maxLanes = () => L.head < 1500 ? 1 : L.head < 4500 ? 2 : 3;
+  L.open = newSec(null, null); L.relay.push(L.open);
   L.dominos = [...Array(POOL)].map(blank);
   commit(L, turtle(0, 0, NORTH).fwd(12), null);
   while (L.head < AHEAD) nextMotif(L);
@@ -1245,15 +1300,41 @@ function pathView(f) {
   let z = 0, c = 0;
   for (let m = Math.max(0, f.n - 15); m <= f.n + 60; m++) { const o = lvl.ring[m % lvl.ringN]; if (o && o.path && o.n === m) { z += o.z; c++; } }
   z = f.show != null ? f.show : c ? z / c : f.z;
-  for (const q of [lvl.relay[lvl.cur] && lvl.relay[lvl.cur].pad, f]) if (q) z = Math.max(q.z - 7, Math.min(q.z + 8, z));
+  const s = urgent();
+  for (const q of [s && s.pad, f]) if (q) z = Math.max(q.z - 7, Math.min(q.z + 8, z));
   return z;
 }
+// The sections around the wave: the first pad not flicked yet, and what follows.
+function relayWindow() {
+  const R = lvl.relay;
+  while (lvl.lo < R.length && R[lvl.lo].pad && R[lvl.lo].pad.state !== 'up') lvl.lo++;
+  return [Math.max(0, lvl.lo - 1), Math.min(R.length, lvl.lo + 16)];
+}
+const feedLeft = sec => sec.feed ? sec.feed.filter(o => o.state === 'up').length : 0;
+// Is the pad of a section ready for its flick: the wave is on the last dominoes before it.
+function padArmed(sec) {
+  if (!sec.feed) return true;
+  const left = feedLeft(sec);
+  return left < sec.feed.length && left <= 8;
+}
+// The pads a wave is coming to, the nearest wave first.
+function coming() {
+  const [a, b] = relayWindow(), out = [];
+  for (let k = a; k < b; k++) {
+    const sec = lvl.relay[k];
+    if (sec.pad && sec.pad.state === 'up' && (!sec.feed || sec.feed.some(o => o.state !== 'up'))) out.push([feedLeft(sec), sec]);
+  }
+  return out.sort((p, q) => p[0] - q[0]).map(p => p[1]);
+}
+const urgent = () => coming()[0] || null;
 function relayTick(t) {
-  const Rl = lvl.relay, k1 = lvl.endless ? Math.min(Rl.length, lvl.cur + 10) : Rl.length;
-  for (let k = lvl.endless ? Math.max(0, lvl.cur - 1) : 0; k < k1; k++) {
-    const sec = Rl[k], prev = Rl[k - 1], on = sec.pad.state === 'up' && padArmed(k);
-    if (sec.endT == null && sec.last && sec.last.state !== 'up' && sec.last.th > 1.2) sec.endT = t;
-    if (prev && !sec.missed && sec.pad.state === 'up' && prev.endT != null && t - prev.endT > 0.7) {
+  const [a, b] = relayWindow();
+  for (let k = a; k < b; k++) {
+    const sec = lvl.relay[k];
+    if (!sec.pad) continue;
+    const on = sec.pad.state === 'up' && padArmed(sec);
+    if (sec.inT == null && sec.feedLast && sec.feedLast.state !== 'up' && sec.feedLast.th > 1.2) sec.inT = t;
+    if (!sec.missed && sec.pad.state === 'up' && sec.inT != null && t - sec.inT > 0.7) {
       sec.missed = true; misses++; combo = 0; say(sec.pad, 'La chaîne s’arrête !', '#ff8a7a'); CC.sfx('blocked');
       if (lvl.endless) { phase = 'over'; phaseT = t + 0.9; lvl.record = lvl.score > (prog.best || 0); prog.best = Math.max(prog.best || 0, lvl.score); saveProg(); }
     }
@@ -1263,24 +1344,86 @@ function relayTick(t) {
     mat.emissive.set(on ? (sec.missed ? 0x7a1500 : 0x7a3a00) : 0x000000);
   }
 }
-// Is the pad of section k ready for its flick: the wave is on the last dominoes before it.
-function padArmed(k) {
-  if (k === 0) return true;
-  const prev = lvl.relay[k - 1], fallen = prev.doms.filter(o => o.state !== 'up').length;
-  return fallen > 0 && prev.doms.length - fallen <= 8;
-}
-function relayFlick(k) {
-  const sec = lvl.relay[k], d = sec.pad, prev = lvl.relay[k - 1];
+function relayFlick(sec) {
+  const d = sec.pad;
   if (d.state !== 'up' || phase !== 'play') return;
   if (CC.time < sec.lockT) return;
-  if (!padArmed(k)) { sec.lockT = CC.time + 0.35; combo = 0; d.wob = CC.time; note(d, 'Trop tôt !', '#ffb066'); return; }
-  const late = prev && prev.endT != null ? CC.time - prev.endT : -1;
-  const grade = !prev ? 'go' : sec.missed ? 'again' : late > 0.3 ? 'ok' : prev.last.state !== 'up' ? 'perfect' : 'good';
-  push(d, 1); lvl.cur = k + 1;
-  if (grade === 'perfect') { combo++; perfects++; say(d, combo > 1 ? `Parfait ×${combo}` : 'Parfait !', '#ffd23f'); CC.sfx('drip', { p: Math.min(1, 0.2 + combo * 0.08) }); }
+  if (!padArmed(sec)) { sec.lockT = CC.time + 0.35; combo = 0; d.wob = CC.time; note(d, 'Trop tôt !', '#ffb066'); return; }
+  const late = sec.inT != null ? CC.time - sec.inT : -1;
+  const grade = !sec.feed ? 'go' : sec.missed ? 'again' : late > 0.3 ? 'ok' : sec.feedLast.state !== 'up' ? 'perfect' : 'good';
+  push(d, 1);
+  if (!music.run) Object.assign(music, { run: true, phi: d.bt / BEAT, shift: 0 });
+  melody(grade === 'perfect' ? 1 : 0.6);
+  if (grade === 'perfect') { combo++; perfects++; say(d, combo > 1 ? `Parfait ×${combo}` : 'Parfait !', '#ffd23f'); }
   else if (grade === 'good') { combo++; say(d, 'Bien !', '#9be37a'); }
   else if (grade === 'ok') { combo = 0; say(d, 'De justesse', '#cfd5f5'); }
   else if (grade === 'again') say(d, 'C’est reparti', '#cfd5f5');
+}
+// ---- Music. Its tempo follows the speed of the wave: BEAT dominoes fall in one beat, and the holes stand
+// on the beats. The wave is sped up or slowed down a little so that it reaches each hole on its beat.
+const RATE = 31.5;   // dominoes a wave topples in a second, at speed 1
+const music = { run: false, phi: 0, shift: 0, n: 0, ctx: null, out: null, noise: null };
+const hz = m => 440 * 2 ** ((m - 69) / 12);
+const CHORDS = [[48, 52, 55], [43, 47, 50], [45, 48, 52], [41, 45, 48]], TUNE = [76, 79, 81, 79, 76, 74, 72, 74, 76, 79, 84, 81, 79, 76, 74, 72];
+function audioOut() {
+  if (CC.recording || CC.auto || prog.music === false) return null;
+  try {
+    if (!music.ctx) {
+      const a = music.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      music.out = a.createGain(); music.out.gain.value = 0.5; music.out.connect(a.destination);
+      music.noise = a.createBuffer(1, a.sampleRate * 0.2, a.sampleRate);
+      const ch = music.noise.getChannelData(0);
+      for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
+    }
+    if (music.ctx.state === 'suspended') music.ctx.resume();
+    return music.ctx;
+  } catch (e) { return null; }
+}
+function tone(f, at, len, vol, type = 'triangle', to = f) {
+  const a = audioOut();
+  if (!a) return;
+  const o = a.createOscillator(), g = a.createGain(), t = a.currentTime + at;
+  o.type = type; o.frequency.setValueAtTime(f, t);
+  if (to !== f) o.frequency.exponentialRampToValueAtTime(to, t + len);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + len);
+  o.connect(g); g.connect(music.out); o.start(t); o.stop(t + len + 0.02);
+}
+function hiss(at, len, vol, cut) {
+  const a = audioOut();
+  if (!a) return;
+  const src = a.createBufferSource(), g = a.createGain(), f = a.createBiquadFilter(), t = a.currentTime + at;
+  src.buffer = music.noise; f.type = 'highpass'; f.frequency.value = cut;
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + len);
+  src.connect(f); f.connect(g); g.connect(music.out); src.start(t); src.stop(t + len + 0.02);
+}
+// One half beat of the backing: drum, bass, and a quiet broken chord.
+function backing(st, at) {
+  const beat = st >> 1, ch = CHORDS[(beat >> 2) % 4];
+  if (st % 2 === 0) {
+    if (beat % 2 === 0) tone(130, at, 0.16, 0.9, 'sine', 45); else { hiss(at, 0.11, 0.35, 1500); tone(190, at, 0.08, 0.25, 'triangle', 120); }
+    tone(hz(ch[0] - 12), at, 0.22, 0.5, 'triangle');
+  } else { hiss(at, 0.035, 0.16, 6000); tone(hz(ch[0]), at, 0.12, 0.22, 'triangle'); }
+  tone(hz(ch[[0, 1, 2, 1][st % 4]] + 12), at, 0.14, 0.1, 'square');
+}
+// The note of a flick: the tune goes on one note at each flick.
+function melody(vol) {
+  const m = TUNE[music.n++ % TUNE.length];
+  tone(hz(m), 0, 0.3, 0.42 * vol, 'square'); tone(hz(m + 12), 0, 0.2, 0.16 * vol, 'triangle');
+}
+function musicTick(dt) {
+  lvl.sync = 1;
+  if (!music.run || menu) return;
+  const rate = RATE * (lvl.speed || 1) * slowFactor() / BEAT, before = music.phi, s = urgent();
+  music.phi += rate * dt;
+  if (s && s.feed) {
+    // Beats left for the wave, and beats left before the beat of the hole. A late flick moves every beat that follows.
+    const need = (feedLeft(s) + 3) / BEAT, slack = Math.max(0.3, 0.2 * need);
+    let early = s.pad.bt / BEAT + music.shift - before - need;
+    // Too far from its beat for a small change of speed: aim at the nearest half beat.
+    if (Math.abs(early) > slack) { music.shift -= 0.5 * Math.round(early / 0.5); early = s.pad.bt / BEAT + music.shift - before - need; }
+    if (need > 0.4) lvl.sync = Math.max(0.8, Math.min(1.25, need / (need + early)));
+  }
+  for (let st = Math.floor(before * 2) + 1; st <= Math.floor(music.phi * 2); st++) backing(st, Math.max(0, (st / 2 - before) / rate));
 }
 // A shape written as text in levels.js.
 function shapeOf(expr) {
@@ -1549,7 +1692,7 @@ function loadLevel(i) {
     g.add(cup, paintTop); g.visible = false; g.userData.tipT = -9;
     return keep(g);
   });
-  if (lvl.endless) lvl.pads = [...Array(12)].map(() => { const m = keep(new THREE.Mesh(padGeom, padMat.clone())); m.visible = false; m.receiveShadow = true; return m; });
+  if (lvl.endless) lvl.pads = [...Array(24)].map(() => { const m = keep(new THREE.Mesh(padGeom, padMat.clone())); m.visible = false; m.receiveShadow = true; return m; });
   for (const d of lvl.starts) {
     d.starter = true;
     const m = keep(new THREE.Mesh(padGeom, lvl.relay ? padMat.clone() : padMat)); m.position.set(d.x, (d.y || 0) + 0.03, d.z); m.receiveShadow = true; d.padMesh = m;
@@ -1658,7 +1801,7 @@ function resetDominos() {
   chains = []; popups = []; marks = []; pushes = 0; focus = null; slowT = -9; sel = null; active = new Set(); goldNext = 1; goldBad = null; for (const q of pours) { if (q.stream) scene.remove(q.stream); if (q.mask) scene.remove(q.mask); } pours = []; layerMsg = '';
   if (lvl.layers) { for (const o of lvl.field) { o.color = FIELD_W; o.top = -1; o.seq = -1; for (let k = 0; k < lvl.layers.length; k++) o['p' + k] = false; } for (const l of lvl.layers) l.poured = false; for (const m of pots) m.userData.tipT = -9; holdUntil = -9; waiting = []; for (const o of lvl.spots) o.fired = false; }
   for (const m of marbles) { Object.assign(m, { pause: 0, resumed: true, s: 0, v: 0, state: 'rest', chain: null, predicted: false, q: new THREE.Quaternion(), p: m.tracks[0], L: m.tracks[0].L }); placeMarble(m, 0); }
-  if (lvl.relay) { lvl.cur = 0; lvl.wave = null; combo = misses = perfects = 0; for (const q of lvl.relay) { q.endT = null; q.missed = false; q.lockT = -9; } }
+  if (lvl.relay) { lvl.lo = 0; lvl.wave = null; lvl.sync = 1; combo = misses = perfects = 0; Object.assign(music, { run: false, phi: 0, shift: 0, n: 0 }); for (const q of lvl.relay) { q.inT = null; q.missed = false; q.lockT = -9; } }
   paint();
   updateMatrices();
 }
@@ -1937,7 +2080,7 @@ function step(dt) {
   if (phase === 'intro' && t - phaseT > 1.6) { phase = 'play'; phaseT = t; }
   for (const d of doms) d.va += (d.a - d.va) * 0.13;
   for (const P of lvl.plates || []) if (P.phi !== P.to) { P.phi += (P.to - P.phi) * 0.3; if (Math.abs(P.to - P.phi) < 0.01) P.phi = P.to; setPlate(P); }
-  const sub = 16, h = dt * SPEED * (lvl.speed || 1) * slowFactor() / sub;
+  const sub = 16, h = dt * SPEED * (lvl.speed || 1) * (lvl.sync || 1) * slowFactor() / sub;
   for (let s = 0; s < sub; s++) {
     rollMarbles(h);
     for (const d of doms) {
@@ -2012,7 +2155,7 @@ function step(dt) {
     if (p.stream) { p.stream.visible = t > p.t0 - 0.12 && t < p.end + 0.15; p.stream.material.opacity = Math.min(1, Math.max(0, (p.end + 0.15 - t) / 0.3)); }
   }
   if (lvl.endless && phase === 'play') endlessTick();
-  if (lvl.relay && phase === 'play') relayTick(t);
+  if (lvl.relay && phase === 'play') { relayTick(t); musicTick(dt); }
   if (phase === 'play') {
     const moving = doms.some(d => d.state === 'falling'), settled = chains.every(c => c.done);
     const painting = lvl.layers && pours.some(p => lvl.field.some(o => !o['p' + p.k] && lvl.layers[p.k].shape(o.fu, o.fv)));
@@ -2125,7 +2268,7 @@ const backRect = [CC.W / 2 - 240, 1730, 480, 110], prevRect = [40, 1640, 220, 11
 const inRect = (x, y, [rx, ry, rw, rh]) => x > rx && x < rx + rw && y > ry && y < ry + rh;
 const pages = () => Math.ceil(BUILD.length / PER);
 function openMenu() { menu = true; sel = null; page = Math.min(pages() - 1, Math.floor(Math.max(0, li) / PER)); }
-const endlessRect = [140, 212, 800, 92];
+const endlessRect = [140, 212, 800, 92], musicRect = [CC.W - 150, 180, 100, 90];
 function drawMenu(ctx) {
   ctx.fillStyle = 'rgba(16,18,32,0.96)'; ctx.fillRect(0, 0, CC.W, CC.H);
   ctx.textAlign = 'center';
@@ -2317,15 +2460,20 @@ function drawLayersHud(ctx) {
 }
 // Relay: a ring closes on the next pad as the wave comes.
 function drawRelayHud(ctx) {
+  // Music on or off.
+  const [mx, my, mw, mh] = musicRect;
+  ctx.fillStyle = prog.music === false ? '#6b7194' : '#cfd5f5'; ctx.font = 'bold 54px Segoe UI, Arial'; ctx.textAlign = 'center';
+  ctx.fillText('♪', mx + mw / 2, my + mh / 2 + 18);
+  if (prog.music === false) { ctx.strokeStyle = '#6b7194'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(mx + 26, my + mh - 14); ctx.lineTo(mx + mw - 26, my + 14); ctx.stroke(); }
   if (phase !== 'play') return;
-  const k = lvl.cur;
-  if (k >= lvl.relay.length) return;
-  const sec = lvl.relay[k], prev = lvl.relay[k - 1], left = prev ? prev.doms.filter(o => o.state === 'up').length : 0;
-  if (prev && (left === prev.doms.length || left > 30)) return;
-  const hot = padArmed(k), [x, y] = proj(sec.pad.x, 0.05, sec.pad.z), pulse = 0.5 + 0.5 * Math.sin(CC.time * 9);
-  ctx.lineWidth = hot ? 10 : 6; ctx.strokeStyle = sec.missed ? `rgba(255,110,90,${0.6 + 0.4 * pulse})` : hot ? '#ffd23f' : 'rgba(255,255,255,0.85)';
-  ctx.beginPath(); ctx.arc(x, y, 50 + (prev && !sec.missed ? left * 4 : 12 * pulse), 0, Math.PI * 2); ctx.stroke();
-  ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(255,159,67,0.9)'; ctx.beginPath(); ctx.arc(x, y, 50, 0, Math.PI * 2); ctx.stroke();
+  for (const sec of coming()) {
+    const left = feedLeft(sec);
+    if (sec.feed && left > 30) continue;
+    const hot = padArmed(sec), [x, y] = proj(sec.pad.x, 0.05, sec.pad.z), pulse = 0.5 + 0.5 * Math.sin(CC.time * 9);
+    ctx.lineWidth = hot ? 10 : 6; ctx.strokeStyle = sec.missed ? `rgba(255,110,90,${0.6 + 0.4 * pulse})` : hot ? '#ffd23f' : 'rgba(255,255,255,0.85)';
+    ctx.beginPath(); ctx.arc(x, y, 50 + (sec.feed && !sec.missed ? left * 4 : 12 * pulse), 0, Math.PI * 2); ctx.stroke();
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(255,159,67,0.9)'; ctx.beginPath(); ctx.arc(x, y, 50, 0, Math.PI * 2); ctx.stroke();
+  }
 }
 function stencilButtons() {
   const list = lvl.layers.map((l, k) => ({ id: 'pot', k, key: 'k' + k, label: l.name }));
@@ -2622,7 +2770,9 @@ canvas.addEventListener('pointerdown', ev => {
   if (phase === 'clear' && CC.time >= phaseT) { if (li === BUILD.length - 1) openMenu(); else loadLevel(li + 1); return; }
   if (inRetry(x, y)) { retry(); return; }
   if (lvl.relay) {
-    if (lvl.cur < lvl.relay.length) relayFlick(lvl.cur);
+    if (inRect(x, y, musicRect)) { prog.music = prog.music === false; saveProg(); return; }
+    const sec = urgent();
+    if (sec) relayFlick(sec);
     return;
   }
   if (sel && CC.time - selT > 0.2) {
