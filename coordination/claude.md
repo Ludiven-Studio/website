@@ -3102,3 +3102,12 @@
 - 01:02 : les 100 niveaux à dessin ont un parcours fait des mêmes motifs variés que le chemin infini ; 100 niveaux
   rejoués par script, tous terminés sans arrêt ; poussé à la demande de l'utilisateur : mon fichier et cette section
   seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-13 — ColorChain : dominos invisibles dans le chemin infini (session colorchain)
+- Statut : en cours (2026-11-13T01:13+01:00). Demande de l'utilisateur : à un moment la chaîne est devenue noire ou
+  invisible ; mises à jour du prototype autorisées
+- Réservations actives : `public/prototypes/colorchain-relais/index.html`.
+- Ressources : serveur de dev sur le port 4391 ; eslint, `astro check`. Build annoncé ici avant.
+- 01:13 : les dominos du chemin infini n'étaient plus dessinés une fois sortis de leur zone de départ (limites
+  calculées à la première image) ; reproduit puis vérifié par script en dessinant en continu ; poussé à la demande de
+  l'utilisateur : mon fichier et cette section seulement. Statut : terminé. Réservations libérées.

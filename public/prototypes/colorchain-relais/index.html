@@ -1444,6 +1444,8 @@ function loadLevel(i) {
   gg.setAttribute('instAlpha', new THREE.InstancedBufferAttribute(new Float32Array(doms.length).fill(1), 1));
   ghost = new THREE.InstancedMesh(gg, ghostMats, doms.length);
   ghost.renderOrder = 2;
+  // The dominoes of an endless course move: the bounds found on the first frame would hide them later.
+  mesh.frustumCulled = ghost.frustumCulled = false;
   scene.add(mesh, ghost);
   const keep = m => { scene.add(m); extras.push(m); return m; };
   for (const d of doms) if (d.sw && !d.fixed) Object.assign(d, { slot: true, empty: true, item: null, dropT: -9, a0: d.a0 ?? d.a });
