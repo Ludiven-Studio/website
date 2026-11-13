@@ -35,11 +35,11 @@ const OPEN_ALL = true, SAVE = 'cc-bridge-v1';
 const PIP = ['#000000', '#2f7fe0', '#2aa24d', '#e23d3d', '#8b46d8', '#ee8a1c', '#12a3a3'];
 const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
 const LIVE_HINTS = {
-  0: 'La vague part toute seule. Bouche le trou avant qu’elle arrive : elle ralentit juste devant.',
+  0: 'La vague part toute seule. Touche le bon domino avant qu’elle arrive au trou : elle ralentit juste devant.',
   4: 'Deux dominos à la suite : ils se touchent par le même nombre.',
 };
 const HINTS = {
-  0: 'Pose le domino qui porte les deux nombres du trou, puis touche le domino doré.',
+  0: 'Touche le domino qui porte les deux nombres du trou, puis touche le domino doré.',
   1: 'Chaque trou a son domino. Il en reste un en trop.',
   2: 'Deux dominos à la suite : ils se touchent par le même nombre.',
   3: 'Un domino peut aller à deux endroits. Un seul choix bouche tout.',
@@ -57,7 +57,7 @@ const won = () => live() ? prog.live : prog.stars;
 const starsNow = () => mistakes === 0 ? 3 : mistakes <= (live() ? 1 : 2) ? 2 : 1;
 
 // state: menu, play (laying tiles), run (the wave), fail (it stopped), rise (dominoes stand up again), won.
-let state = 'menu', L = null, mistakes = 0, selected = -1, drag = null, stop = null, since = 0, next = 0, endAt = 0;
+let state = 'menu', L = null, mistakes = 0, drag = null, stop = null, since = 0, next = 0, endAt = 0;
 // The wave has its own clock: `pace` is how fast it runs against real time. near: the trouble that slows it.
 let clock = 0, pace = 1, startAt = 0, near = null, slowK = 0, clear = false;
 
@@ -153,7 +153,7 @@ function load(n) {
   for (let k = 0, at = 3; k < 32; k++) { at = Math.max(0, Math.min(8, at + Math.floor(rand() * 5) - 2)); tune.push(at); }
   L = { n, R, gaps, chain, ribbon, feed, pic, cells, c, zs, zf, dir, hand: def.hand, where: def.hand.map(() => null), home, tune,
     order: chain.map(it => it.i).sort((p, q) => chain[q].z - chain[p].z || q - p) };
-  state = 'play'; mistakes = 0; selected = -1; drag = null; stop = null; near = null; slowK = 0; clock = 0;
+  state = 'play'; mistakes = 0; drag = null; stop = null; near = null; slowK = 0; clock = 0;
   startAt = CC.time + WAIT;
   relay();
 }
@@ -179,6 +179,11 @@ function put(k, g, i) {
 }
 // The wave has passed over a place: its tile stays.
 const locked = (g, i) => L.chain[g.first[i]].at != null;
+// The first empty place on the wave's way: a tile tapped in the hand goes there.
+function nextFree() {
+  for (const g of L.gaps) for (let i = 0; i < g.n; i++) if (g.slots[i] < 0 && !locked(g, i)) return { g, i };
+  return null;
+}
 function takeBack(k) {
   const at = L.where[k];
   if (!at || locked(L.gaps[at[0]], at[1])) return;
@@ -200,7 +205,7 @@ function flick() {
   stop = null; near = null; next = 0; clock = 0; endAt = Infinity; clear = false;
   pace = live() ? LIVE / RATE : 1;
   state = 'run';
-  if (!live()) { selected = -1; drag = null; }
+  if (!live()) drag = null;
   tone(900, 0.2, 0.08, 'triangle');
 }
 function step() {
@@ -223,7 +228,7 @@ function step() {
         // The last domino to fall lies flat in a hole, or leans on the block of a bad joint.
         stop = { i: next, hole: why === 'hole' };
         L.chain[next - 1].rest = stop.hole ? Math.PI / 2 : 0.7;
-        endAt = clock + 0.7; pace = 1; selected = -1; drag = null; near = null;
+        endAt = clock + 0.7; pace = 1; drag = null; near = null;
         break;
       }
       it.at = 0.1 + next / RATE;
@@ -464,10 +469,11 @@ function drawGap(ctx, g) {
     if (k < 0) {
       // An empty place: the line is cut, a dashed outline waits for a tile.
       const over = drag && drag.moved && drag.over && drag.over[0] === g.index && drag.over[1] === i;
+      const free = nextFree(), aim = free && free.g === g && free.i === i && (state === 'play' || state === 'run');
       ctx.fillStyle = dark; CC.roundRect(ctx, x + 2, y, w - 4, 0.6 * S, 10); ctx.fill();
-      ctx.fillStyle = over ? 'rgba(255,220,80,0.35)' : selected >= 0 ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.08)';
+      ctx.fillStyle = over ? 'rgba(255,220,80,0.35)' : aim ? 'rgba(255,255,255,0.24)' : 'rgba(255,255,255,0.08)';
       CC.roundRect(ctx, x + 6, y + 0.62 * S, w - 12, S - 12, 14); ctx.fill();
-      ctx.setLineDash([16, 12]); ctx.strokeStyle = over ? '#ffd23f' : 'rgba(255,255,255,0.75)'; ctx.lineWidth = 4; ctx.stroke(); ctx.setLineDash([]);
+      ctx.setLineDash([16, 12]); ctx.strokeStyle = over ? '#ffd23f' : aim ? '#fff' : 'rgba(255,255,255,0.6)'; ctx.lineWidth = aim ? 6 : 4; ctx.stroke(); ctx.setLineDash([]);
     } else {
       const v = g.lay.vals[i], l = g.dir > 0 ? v[0] : v[1], r = g.dir > 0 ? v[1] : v[0];
       ctx.fillStyle = '#b98a52'; CC.roundRect(ctx, x + 3, y, w - 6, 0.7 * S, 12); ctx.fill();
@@ -481,7 +487,7 @@ function drawHand(ctx, t) {
     const [x, y] = L.home[k];
     if (L.where[k] || (drag && drag.k === k && drag.moved)) {
       ctx.fillStyle = 'rgba(0,0,0,0.14)'; CC.roundRect(ctx, x - 88, y - 44, 176, 88, 14); ctx.fill();
-    } else tileFace(ctx, x, y - (selected === k ? 14 : 0), 88, tile[0], tile[1], selected === k, selected === k);
+    } else tileFace(ctx, x, y, 88, tile[0], tile[1], false, false);
   });
   if (drag && drag.moved) tileFace(ctx, drag.x, drag.y - 130, 100, L.hand[drag.k][0], L.hand[drag.k][1], true, false);
 }
@@ -558,20 +564,18 @@ function down(x, y) {
   if (state !== 'play' && !(state === 'run' && live() && !stop)) return;
   const at = placeAt(x, y, 0);
   if (at && at.g.slots[at.i] >= 0) { drag = { k: at.g.slots[at.i], x, y, x0: x, y0: y, moved: false, from: [at.g.index, at.i] }; return; }
-  if (at && selected >= 0) { put(selected, at.g, at.i); selected = -1; return; }
   for (let k = 0; k < L.hand.length; k++) {
     if (!L.where[k] && inRect(x, y, [L.home[k][0] - 88, L.home[k][1] - 44, 176, 88], 12)) { drag = { k, x, y, x0: x, y0: y, moved: false, from: null }; return; }
   }
   const s0 = L.chain[0];
-  if (Math.hypot(x - px(s0.x), y - py(s0.z + 0.25)) < 90) { flick(); return; }
-  selected = -1;
+  if (Math.hypot(x - px(s0.x), y - py(s0.z + 0.25)) < 90) flick();
 }
 function move(x, y) {
   if (!drag) return;
   drag.x = x; drag.y = y;
   if (drag.from && !drag.moved && locked(L.gaps[drag.from[0]], drag.from[1])) { drag = null; return; }
   if (!drag.moved && Math.hypot(x - drag.x0, y - drag.y0) > 22) {
-    drag.moved = true; selected = -1;
+    drag.moved = true;
     if (drag.from) takeBack(drag.k);
   }
   const at = drag.moved && placeAt(x, y - 130, 30);
@@ -582,8 +586,8 @@ function up() {
   const d = drag;
   drag = null;
   if (!d.moved) {
-    // A tap: a tile of the course goes back to the hand, a tile of the hand is picked for the next place tapped.
-    if (d.from) { if (!locked(L.gaps[d.from[0]], d.from[1])) { takeBack(d.k); if (!live()) mistakes++; tock(0); } } else { selected = selected === d.k ? -1 : d.k; tock(0.6); }
+    // A tap: a tile of the course goes back to the hand, a tile of the hand goes to the first empty place.
+    if (d.from) { if (!locked(L.gaps[d.from[0]], d.from[1])) { takeBack(d.k); if (!live()) mistakes++; tock(0); } } else { const free = nextFree(); if (free) put(d.k, free.g, free.i); else bonk(); }
     return;
   }
   const at = placeAt(d.x, d.y - 130, 30);

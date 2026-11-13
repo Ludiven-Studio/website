@@ -3189,3 +3189,14 @@
   niveaux à trous courts), le mode calme reste ; 48 niveaux résolus et joués par script, pose pendant la vague testée
   par script, page ouverte sans erreur de console ; le son et un vrai téléphone ne sont pas vérifiés ; poussé comme
   mise à jour de prototype : mes 2 fichiers et cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-13 — Prototypes : le pont de dominos, toucher un domino le pose (session colorchain)
+- Statut : en cours (2026-11-13T22:02+01:00). Demande de l'utilisateur : Raphaël, dans la session : « ce serait plus
+  intéressant qu'en cliquant sur un domino il remplisse directement la prochaine case libre »
+- Réservations actives : `public/prototypes/domino-pont/index.html`.
+- Ressources : serveur de dev sur le port 4391 ; eslint, `astro check`. Build annoncé ici avant.
+- 22:02 : un domino touché dans la main va droit à la première place libre sur le chemin de la vague (cette place est
+  éclairée), dans les deux modes ; le glisser reste ; testé par script (pose, reprise, niveau fini aux seuls touchers),
+  48 niveaux toujours joués jusqu'au dessin, page ouverte sans erreur de console ; pas essayé sur un vrai téléphone ;
+  poussé comme mise à jour de prototype : mon fichier et cette section seulement. Statut : terminé. Réservations
+  libérées.
