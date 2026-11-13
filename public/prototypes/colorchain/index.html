@@ -1528,6 +1528,8 @@ function updateMatrices() {
 function retryRect() { return [CC.W - 150, 70, 100, 100]; }
 // Level menu: tiles of the ten levels; a level opens once the one before is done.
 const SAVE = 'colorchain-play-v1';
+// A test page: every level is open from the start, to try the last ones; progress and stars are kept as they are.
+const OPEN_ALL = true;
 let menu = false, prog = { unlocked: 0, stars: {} };
 try { prog = Object.assign(prog, JSON.parse(localStorage.getItem(SAVE) || '{}')); } catch (e) { /* no storage */ }
 if (prog.stars[9]) prog.unlocked = Math.max(prog.unlocked, 10);
@@ -1542,7 +1544,7 @@ function drawMenu(ctx) {
   ctx.fillStyle = '#fff'; ctx.font = 'bold 92px Segoe UI, Arial'; ctx.fillText('ColorChain', CC.W / 2, 200);
   ctx.fillStyle = '#9aa3c7'; ctx.font = '36px Segoe UI, Arial'; ctx.fillText(`Prototype : ${BUILD.length} niveaux de dominos`, CC.W / 2, 270);
   for (let i = 0; i < BUILD.length; i++) {
-    const [x, y, w, hh] = tileRect(i), open = i <= prog.unlocked, st = prog.stars[i] || 0;
+    const [x, y, w, hh] = tileRect(i), open = OPEN_ALL || i <= prog.unlocked, st = prog.stars[i] || 0;
     ctx.fillStyle = open ? '#2c3354' : '#22263a'; CC.roundRect(ctx, x, y, w, hh, 30); ctx.fill();
     ctx.fillStyle = open ? '#ffd23f' : '#565c80'; ctx.font = 'bold 34px Segoe UI, Arial'; ctx.fillText(`Niveau ${i + 1}` + (BUILD[i] === clock || BUILD[i] === clover ? '  · nouveau' : BUILD[i] === constellation ? '  · ultra dur' : ''), x + w / 2, y + 55);
     ctx.fillStyle = open ? '#fff' : '#565c80'; ctx.font = 'bold 40px Segoe UI, Arial'; ctx.fillText(LEVEL_NAMES[i], x + w / 2, y + 105);
@@ -1789,7 +1791,7 @@ canvas.addEventListener('pointerdown', ev => {
   if (CC.auto) return;
   const [x, y] = CC.toCanvas(canvas, ev);
   if (menu) {
-    for (let i = 0; i < BUILD.length; i++) if (inRect(x, y, tileRect(i)) && i <= prog.unlocked) { menu = false; loadLevel(i); return; }
+    for (let i = 0; i < BUILD.length; i++) if (inRect(x, y, tileRect(i)) && (OPEN_ALL || i <= prog.unlocked)) { menu = false; loadLevel(i); return; }
     if (inRect(x, y, backRect)) location.href = '/prototypes/';
     return;
   }

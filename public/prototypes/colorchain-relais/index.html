@@ -2269,6 +2269,8 @@ function updateMatrices() {
 function retryRect() { return [CC.W - 150, 70, 100, 100]; }
 // Level menu: tiles of the ten levels; a level opens once the one before is done.
 const SAVE = 'colorchain-relay-v1';
+// A test page: every level is open from the start, to try the last ones; progress and stars are kept as they are.
+const OPEN_ALL = true;
 let menu = false, prog = { unlocked: 0, stars: {} };
 try { prog = Object.assign(prog, JSON.parse(localStorage.getItem(SAVE) || '{}')); } catch (e) { /* no storage */ }
 function saveProg() { try { localStorage.setItem(SAVE, JSON.stringify(prog)); } catch (e) { /* no storage */ } }
@@ -2289,7 +2291,7 @@ function drawMenu(ctx) {
   ctx.fillStyle = '#9aa3c7'; ctx.font = '36px Segoe UI, Arial'; bigButton(ctx, endlessRect, `∞  Chemin infini   ·   record ${prog.best || 0}` + (prog.pics ? `   ·   ${Math.min(prog.pics, PICS.length)} dessins` : ''), '#7a4fd6');
   ctx.imageSmoothingEnabled = false;
   for (let i = page * PER; i < Math.min(BUILD.length, (page + 1) * PER); i++) {
-    const [x, y, w, hh] = tileRect(i), open = i <= prog.unlocked, st = prog.stars[i] || 0;
+    const [x, y, w, hh] = tileRect(i), open = OPEN_ALL || i <= prog.unlocked, st = prog.stars[i] || 0;
     ctx.fillStyle = open ? '#2c3354' : '#22263a'; CC.roundRect(ctx, x, y, w, hh, 24); ctx.fill();
     if (st) {
       ctx.drawImage(thumbOf(i), x + 29, y + 14, 176, 160);
@@ -2764,7 +2766,7 @@ canvas.addEventListener('pointerdown', ev => {
     if (inRect(x, y, endlessRect)) { menu = false; loadLevel(ENDLESS); return; }
     if (inRect(x, y, prevRect) && page > 0) { page--; return; }
     if (inRect(x, y, nextRect) && page < pages() - 1) { page++; return; }
-    for (let i = 0; i < BUILD.length; i++) if (inRect(x, y, tileRect(i)) && i <= prog.unlocked) { menu = false; loadLevel(i); return; }
+    for (let i = 0; i < BUILD.length; i++) if (inRect(x, y, tileRect(i)) && (OPEN_ALL || i <= prog.unlocked)) { menu = false; loadLevel(i); return; }
     if (inRect(x, y, backRect)) location.href = '/prototypes/';
     return;
   }
@@ -2942,7 +2944,6 @@ window.__debug = () => ({ level: li, phase, pushes, down: doms.filter(d => d.sta
 const askLevel = new URLSearchParams(location.search).get('level');
 // ?tout opens every picture, to test.
 const openAll = new URLSearchParams(location.search).has('tout');
-if (openAll) prog.unlocked = BUILD.length - 1;
 menu = !CC.auto && askLevel === null;
 loadLevel(CC.auto ? +(new URLSearchParams(location.search).get('from') || 0) : +(askLevel || (openAll ? 0 : Math.min(prog.unlocked, BUILD.length - 1))));
 page = Math.floor(li / PER);

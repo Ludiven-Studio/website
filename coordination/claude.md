@@ -3143,3 +3143,15 @@
   fois plus vite, la grille des temps en tient compte) ; 2 parties infinies de 200 s et 100 niveaux rejoués par script
   ; poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé. Réservations
   libérées.
+
+## 2026-11-13 — Prototypes : tous les niveaux ouverts (session colorchain)
+- Statut : en cours (2026-11-13T08:15+01:00). Demande de l'utilisateur : relais du Producer, mots de Raphaël : « pour
+  les prototypes du siteweb, est-ce qu'on peut débloquer tous les niveaux de base pour tester la difficulté des
+  derniers ? »
+- Réservations actives : `public/prototypes/colorchain/index.html`, `public/prototypes/colorchain-peinture/index.html`,
+  `public/prototypes/colorchain-relais/index.html`.
+- Ressources : serveur de dev sur le port 4391 ; eslint, `astro check`. Build annoncé ici avant.
+- 08:16 : les trois prototypes (ColorChain, peinture, relais) ouvrent tous leurs niveaux dès le départ, la progression
+  et les étoiles enregistrées ne changent pas ; vérifié par script sans sauvegarde : un toucher sur la dernière tuile
+  lance le dernier niveau (100, 100 et 13) ; poussé sur le relais du Producer citant Raphaël : mes 3 fichiers et cette
+  section seulement. Statut : terminé. Réservations libérées.
