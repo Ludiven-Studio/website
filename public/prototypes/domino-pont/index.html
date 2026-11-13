@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Le pont de dominos</title>
+<meta name="robots" content="noindex">
+<style>
+  html, body { margin: 0; height: 100%; background: #1d2033; overflow: hidden; }
+  body { display: flex; align-items: center; justify-content: center; }
+  canvas { display: block; width: min(100vw, calc(100vh * 9 / 16)); width: min(100vw, calc(100dvh * 9 / 16)); height: auto; aspect-ratio: 9 / 16; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+</style>
+</head>
+<body>
+<canvas id="c" width="1080" height="1920"></canvas>
+<script src="common.js"></script>
+<script src="core.js"></script>
+<script src="pictures.js"></script>
+<script>
+// The course is a line of standing dominoes that climbs in rows to a picture. Gaps cut it: each is a row of
+// empty places between two fixed numbers. The player lays tiles of the hand in the places. A tile carries a
+// piece of the line and passes the wave on when it touches its neighbours by the same number, as in the game
+// of dominoes. Then a flick on the gold domino: the wave runs as far as the course holds.
+// Ground is drawn from above, x to the right and z up the screen; a height shows as a shift up the screen (K)
+// and a little to the right (AX), so that a standing domino shows a face.
+const canvas = document.getElementById('c');
+const W = CC.W, H = CC.H, S = 96, K = 0.45, AX = 0.22;
+const X1 = 1.375, X2 = 9.875, PITCH = 2, Z0 = 4.6, ZTOP = 17.9, ROW = 8.5;
+const TALL = 0.9, WIDE = 0.5, THIN = 0.12, PLATE = 0.08, RATE = 16, REST = 76 * Math.PI / 180, FALL = 0.24;
+const OPEN_ALL = true, SAVE = 'cc-bridge-v1';
+const PIP = ['#000000', '#2f7fe0', '#2aa24d', '#e23d3d', '#8b46d8', '#ee8a1c', '#12a3a3'];
+const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+const HINTS = {
+  0: 'Pose le domino qui porte les deux nombres du trou, puis touche le domino doré.',
+  1: 'Chaque trou a son domino. Il en reste un en trop.',
+  2: 'Deux dominos à la suite : ils se touchent par le même nombre.',
+  3: 'Un domino peut aller à deux endroits. Un seul choix bouche tout.',
+  6: 'Trois dominos à la suite, et deux en trop.',
+};
+const px = x => x * S, py = z => H - z * S;
+const smooth = k => { k = Math.max(0, Math.min(1, k)); return k * k * (3 - 2 * k); };
+
+let prog = { stars: {} };
+try { prog = Object.assign(prog, JSON.parse(localStorage.getItem(SAVE) || '{}')); } catch (e) { /* no storage */ }
+function saveProg() { try { localStorage.setItem(SAVE, JSON.stringify(prog)); } catch (e) { /* no storage */ } }
+
+// state: menu, play (laying tiles), run (the wave), fail (it stopped), rise (dominoes stand up again), won.
+let state = 'menu', L = null, mistakes = 0, selected = -1, drag = null, stop = null, since = 0, next = 0, endAt = 0;
+
+// ---- Sound: mallet notes on a five-note scale, a tock for each domino
+const SCALE = [72, 74, 76, 79, 81, 84, 86, 88, 91].map(m => 440 * Math.pow(2, (m - 69) / 12));
+let actx = null;
+function audio() {
+  if (CC.recording) return;
+  try {
+    if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === 'suspended') actx.resume();
+  } catch (e) { actx = null; }
+}
+function tone(freq, vol, len, type = 'sine', when = 0) {
+  if (!actx || CC.recording) return;
+  const t0 = actx.currentTime + when, g = actx.createGain(), o = actx.createOscillator();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, t0);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(vol, t0 + 0.005);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + len);
+  o.connect(g); g.connect(actx.destination);
+  o.start(t0); o.stop(t0 + len + 0.02);
+}
+const mallet = (step, vol = 0.2, when = 0) => { tone(SCALE[step], vol, 0.55, 'sine', when); tone(SCALE[step] * 4, vol * 0.22, 0.1, 'sine', when); };
+const tock = p => tone(1400 + 900 * p, 0.03, 0.03, 'triangle');
+const bonk = () => { tone(150, 0.2, 0.25, 'square'); tone(110, 0.15, 0.3, 'square', 0.08); };
+
+// ---- A level: the course, its gaps, the hand
+function load(n) {
+  const def = BR.make(n), R = def.rows, chain = [], ribbon = [];
+  const gaps = def.gaps.map((g, index) => ({ ...g, index, slots: Array(g.n).fill(-1), since: Array(g.n).fill(-9) }));
+  const arc = (cx, cz, d, f0, f1, count) => {
+    for (let j = 0; j <= 12; j++) { const f = f0 + (f1 - f0) * j / 12; ribbon.push([cx + d * Math.cos(f), cz + Math.sin(f)]); }
+    for (let j = 0; j < count; j++) {
+      const f = f0 + (f1 - f0) * (j + 0.5) / count;
+      chain.push({ x: cx + d * Math.cos(f), z: cz + Math.sin(f), a: d > 0 ? f + Math.PI / 2 : Math.PI / 2 - f, y0: 0 });
+    }
+  };
+  let dir = 1, z = Z0;
+  for (let r = 0; r < R; r++) {
+    z = Z0 + r * PITCH; dir = r % 2 ? -1 : 1;
+    // Gaps share the room left in the row, in half units so that dominoes keep their step.
+    const mine = gaps.filter(g => g.row === r), pads = Array(mine.length + 1).fill(0);
+    const room = Math.round((ROW - mine.reduce((s, g) => s + 2 * g.n + 2, 0)) * 2);
+    const turn = [...pads.keys()].sort((p, q) => Math.abs(p - mine.length / 2) - Math.abs(q - mine.length / 2));
+    for (let k = 0; k < room; k++) pads[turn[k % turn.length]] += 0.5;
+    let s = 0;
+    mine.forEach((g, k) => { s += pads[k]; g.s0 = s; g.z = z; g.dir = dir; s += 2 * g.n + 2; });
+    ribbon.push([dir > 0 ? X1 : X2, z], [dir > 0 ? X2 : X1, z]);
+    for (let j = 0; j < ROW * 2; j++) {
+      const at = 0.25 + 0.5 * j, it = { x: dir > 0 ? X1 + at : X2 - at, z, a: dir > 0 ? 0 : Math.PI, y0: 0 };
+      for (const g of mine) {
+        const u = at - g.s0;
+        if (u < 0 || u > 2 * g.n + 2) continue;
+        it.y0 = PLATE;
+        if (u > 2 * g.n + 1) { if (u < 2 * g.n + 1.5) it.joint = [g.index, g.n]; }
+        else if (u > 1) { const i = Math.floor((u - 1) / 2); it.slot = [g.index, i]; if (u - 1 - 2 * i < 0.5) it.joint = [g.index, i]; }
+      }
+      chain.push(it);
+    }
+    if (r < R - 1) arc(dir > 0 ? X2 : X1, z + 1, dir, -Math.PI / 2, Math.PI / 2, 6);
+  }
+  // The picture stands above the last row. The line climbs beside it, then runs along its top: each column
+  // falls toward the player as the wave passes over it.
+  const pic = PICS.list[n % PICS.list.length], zs = z + 1, c = Math.min(0.38, (ZTOP - 0.7 - zs) / PICS.rows);
+  const zf = zs + PICS.rows * c + 0.7, xe = dir > 0 ? X2 : X1, climb = Math.max(1, Math.round((zf - z - 2) / 0.5));
+  arc(xe, z + 1, dir, -Math.PI / 2, 0, 3);
+  ribbon.push([xe + dir, z + 1], [xe + dir, zf - 1]);
+  for (let j = 0; j < climb; j++) chain.push({ x: xe + dir, z: z + 1 + (j + 0.5) * (zf - z - 2) / climb, a: Math.PI / 2, y0: 0 });
+  arc(xe, zf - 1, dir, 0, Math.PI / 2, 3);
+  ribbon.push([xe, zf], [dir > 0 ? X1 : X2, zf]);
+  const feed = chain.length;
+  for (let j = 0; j < ROW * 2; j++) chain.push({ x: xe - dir * (0.25 + 0.5 * j), z: zf, a: dir > 0 ? Math.PI : 0, y0: 0 });
+  chain.forEach((it, i) => { it.i = i; it.rgb = hue((i * 3.4 + n * 47) % 360); it.rest = REST; it.at = null; });
+  chain[0].rgb = [255, 200, 40];
+  const cells = [];
+  for (let r = 0; r < PICS.rows; r++) for (let j = 0; j < PICS.cols; j++) {
+    cells.push({ j, r, x: W / S / 2 + (j + 0.5 - PICS.cols / 2) * c, z: zs + (PICS.rows - r) * c - 0.04, rgb: CC.rgb(PICS.palette[parseInt(pic.cells[r * PICS.cols + j], 36)]), at: null });
+  }
+  // Rows from the south, so that a fallen domino covers the one it fell on.
+  cells.sort((p, q) => p.z - q.z);
+  const count = def.hand.length, lines = Math.ceil(count / 5);
+  const home = def.hand.map((t, k) => {
+    const line = Math.floor(k / 5), inLine = Math.min(5, count - line * 5);
+    return [W / 2 + (k % 5 - (inLine - 1) / 2) * 206, lines === 1 ? 1766 : 1704 + line * 116];
+  });
+  const rand = BR.rng(n + 1), tune = [];
+  for (let k = 0, at = 3; k < 32; k++) { at = Math.max(0, Math.min(8, at + Math.floor(rand() * 5) - 2)); tune.push(at); }
+  L = { n, R, gaps, chain, ribbon, feed, pic, cells, c, zs, zf, dir, hand: def.hand, where: def.hand.map(() => null), home, tune,
+    order: chain.map(it => it.i).sort((p, q) => chain[q].z - chain[p].z || q - p) };
+  state = 'play'; mistakes = 0; selected = -1; drag = null; stop = null;
+  relay();
+}
+function hue(h) {
+  const f = k => { const m = (k + h / 30) % 12; return Math.round(255 * (0.6 - 0.34 * Math.max(-1, Math.min(m - 3, 9 - m, 1)))); };
+  return [f(0), f(8), f(4)];
+}
+function relay() { for (const g of L.gaps) g.lay = BR.lay(g, g.slots.map(k => k < 0 ? null : L.hand[k])); }
+const xAt = (g, s) => g.dir > 0 ? X1 + s : X2 - s;
+// The ground a place takes, in pixels: [left, top, width, height], pips at the bottom, the line on top.
+function slotRect(g, i) {
+  const a = xAt(g, g.s0 + 1 + 2 * i), b = xAt(g, g.s0 + 3 + 2 * i);
+  return [px(Math.min(a, b)), py(g.z + 0.3), 2 * S, 1.55 * S];
+}
+function put(k, g, i) {
+  const other = g.slots[i];
+  if (other >= 0 && other !== k) L.where[other] = null;
+  if (L.where[k]) L.gaps[L.where[k][0]].slots[L.where[k][1]] = -1;
+  g.slots[i] = k; g.since[i] = CC.time; L.where[k] = [g.index, i];
+  relay();
+  const near = [g.lay.joints[i], g.lay.joints[i + 1]];
+  if (near.includes('bad')) bonk(); else if (near.includes('ok')) { mallet(4, 0.16); mallet(6, 0.16, 0.09); } else tock(0.2);
+}
+function takeBack(k) {
+  const at = L.where[k];
+  if (!at) return;
+  L.gaps[at[0]].slots[at[1]] = -1; L.where[k] = null;
+  relay();
+}
+
+// ---- The wave
+function flick() {
+  if (state !== 'play') return;
+  let t = CC.time + 0.1;
+  stop = null;
+  for (const it of L.chain) {
+    it.rest = REST;
+    if (it.slot && L.gaps[it.slot[0]].slots[it.slot[1]] < 0) { stop = { i: it.i, hole: true }; break; }
+    if (it.joint && L.gaps[it.joint[0]].lay.joints[it.joint[1]] !== 'ok') { stop = { i: it.i, hole: false }; break; }
+    it.at = t; t += 1 / RATE;
+  }
+  // The last domino to fall lies flat in a hole, or leans on the block of a bad joint.
+  const last = L.chain[stop ? stop.i - 1 : L.chain.length - 1];
+  last.rest = stop && !stop.hole ? 0.7 : Math.PI / 2;
+  endAt = last.at + 0.7;
+  if (!stop) {
+    const first = L.chain[L.feed];
+    for (const cell of L.cells) cell.at = first.at + Math.abs(cell.x - first.x) / 0.5 / RATE + 0.08 + cell.r / 40;
+    endAt = Math.max(endAt, ...L.cells.map(cell => cell.at)) + 1;
+  }
+  state = 'run'; next = 0; selected = -1; drag = null;
+  tone(900, 0.2, 0.08, 'triangle');
+}
+function step() {
+  const t = CC.time;
+  if (state === 'run') {
+    for (; next < L.chain.length && L.chain[next].at != null && L.chain[next].at <= t; next++) {
+      tock(next % 7 / 7);
+      if (next % 4 === 0) mallet(L.tune[next / 4 % L.tune.length]);
+    }
+    if (t >= endAt) {
+      since = t;
+      if (stop) { state = 'fail'; mistakes++; bonk(); }
+      else {
+        state = 'won';
+        const stars = mistakes === 0 ? 3 : mistakes <= 2 ? 2 : 1;
+        prog.stars[L.n] = Math.max(prog.stars[L.n] || 0, stars);
+        saveProg();
+        [0, 2, 4, 7].forEach((s, k) => mallet(s, 0.16, k * 0.09));
+      }
+    }
+  } else if (state === 'fail' && t - since > 1.5) { state = 'rise'; since = t; }
+  else if (state === 'rise' && t - since > 0.4) { for (const it of L.chain) it.at = null; state = 'play'; stop = null; }
+}
+function lean(it, t) {
+  if (it.at == null || t < it.at) return 0;
+  const p = (t - it.at) / FALL, f = p < 1 ? p * p : 1 - 0.05 * Math.sin(Math.min(1, (p - 1) / 0.5) * Math.PI);
+  return it.rest * f * (state === 'rise' ? 1 - smooth((t - since) / 0.4) : 1);
+}
+
+// ---- Drawing
+const shades = new Map();
+function shade(rgb, b) {
+  const q = Math.round(b * 16), key = (rgb[0] << 16 | rgb[1] << 8 | rgb[2]) * 32 + q;
+  let s = shades.get(key);
+  if (!s) { s = `rgb(${rgb.map(v => Math.min(255, Math.round(v * q / 16))).join(',')})`; shades.set(key, s); }
+  return s;
+}
+const FACES = [[4, 6, 7, 5, 1, 0, 0], [0, 2, 3, 1, -1, 0, 0], [2, 6, 7, 3, 0, 1, 0], [0, 4, 5, 1, 0, -1, 0], [1, 5, 7, 3, 0, 0, 1]];
+const LIGHT = [-0.35, 0.85, 0.4];
+const corners = new Float32Array(16);
+// A box standing at (x, z), thin along its heading a, tipped forward by `tilt` about its front bottom edge.
+// back: the colour of the face that ends on top once it has fallen.
+function box(ctx, x, z, a, y0, len, wid, hei, tilt, rgb, back) {
+  const ca = Math.cos(a), sa = Math.sin(a), ct = Math.cos(tilt), st = Math.sin(tilt);
+  for (let k = 0; k < 8; k++) {
+    const u = (k & 4 ? len : 0) - len, v = (k & 2 ? wid : 0) - wid / 2, y = k & 1 ? hei : 0;
+    const u2 = len / 2 + u * ct + y * st, y2 = y0 - u * st + y * ct;
+    corners[k * 2] = px(x + u2 * ca - v * sa + AX * y2);
+    corners[k * 2 + 1] = py(z + u2 * sa + v * ca + K * y2);
+  }
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+  for (const f of FACES) {
+    const nu = f[4] * ct + f[6] * st, ny = -f[4] * st + f[6] * ct, nx = nu * ca - f[5] * sa, nz = nu * sa + f[5] * ca;
+    if (ny - K * nz - AX * nx <= 0.001) continue;
+    ctx.fillStyle = shade(back && f[4] < 0 ? back : rgb, 0.6 + 0.4 * Math.max(0, nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2]));
+    ctx.beginPath();
+    for (let k = 0; k < 4; k++) ctx.lineTo(corners[f[k] * 2], corners[f[k] * 2 + 1]);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+}
+function pips(ctx, cx, cy, h, n) {
+  const d = h * 0.27, at = [[], [[0, 0]], [[-1, -1], [1, 1]], [[-1, -1], [0, 0], [1, 1]], [[-1, -1], [1, -1], [-1, 1], [1, 1]],
+    [[-1, -1], [1, -1], [0, 0], [-1, 1], [1, 1]], [[-1, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [1, 1]]][n];
+  ctx.fillStyle = PIP[n];
+  for (const [x, y] of at) { ctx.beginPath(); ctx.arc(cx + x * d, cy + y * d, h * 0.115, 0, Math.PI * 2); ctx.fill(); }
+}
+// A tile seen from above, h the side of a half; l and r as they show on screen.
+function tileFace(ctx, cx, cy, h, l, r, lift, glow) {
+  ctx.save();
+  ctx.shadowColor = glow ? 'rgba(255,220,80,0.95)' : 'rgba(0,0,0,0.4)'; ctx.shadowBlur = lift ? 30 : 10; ctx.shadowOffsetY = glow ? 0 : lift ? 16 : 4;
+  ctx.fillStyle = '#fbf6e8';
+  CC.roundRect(ctx, cx - h, cy - h / 2, 2 * h, h, h * 0.16); ctx.fill();
+  ctx.restore();
+  ctx.strokeStyle = glow ? '#e0a400' : 'rgba(70,50,30,0.6)'; ctx.lineWidth = glow ? 6 : 3;
+  CC.roundRect(ctx, cx - h, cy - h / 2, 2 * h, h, h * 0.16); ctx.stroke();
+  ctx.strokeStyle = 'rgba(70,50,30,0.6)'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(cx, cy - h * 0.36); ctx.lineTo(cx, cy + h * 0.36); ctx.stroke();
+  pips(ctx, cx - h / 2, cy, h, l); pips(ctx, cx + h / 2, cy, h, r);
+}
+function text(ctx, s, x, y, size, color = '#fff', align = 'center', weight = 800) {
+  ctx.font = `${weight} ${size}px ${FONT}`; ctx.textAlign = align; ctx.textBaseline = 'middle'; ctx.fillStyle = color;
+  ctx.fillText(s, x, y);
+}
+function wrap(ctx, s, x, y, size, width, color) {
+  ctx.font = `700 ${size}px ${FONT}`;
+  const lines = [''];
+  for (const word of s.split(' ')) {
+    const tryLine = lines.at(-1) ? lines.at(-1) + ' ' + word : word;
+    if (ctx.measureText(tryLine).width > width && lines.at(-1)) lines.push(word); else lines[lines.length - 1] = tryLine;
+  }
+  lines.forEach((l, k) => text(ctx, l, x, y + (k - (lines.length - 1) / 2) * size * 1.25, size, color, 'center', 700));
+}
+function stars3(ctx, x, y, r, n, gap = 2.3) {
+  for (let k = 0; k < 3; k++) {
+    CC.star(ctx, x + (k - 1) * r * gap, y, r);
+    ctx.fillStyle = k < n ? '#ffd23f' : 'rgba(255,255,255,0.22)'; ctx.fill();
+  }
+}
+function table(ctx) {
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#2f8f73'); g.addColorStop(1, '#236b5a');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+}
+
+function draw(ctx) {
+  if (state === 'menu') { drawMenu(ctx); return; }
+  const t = CC.time;
+  table(ctx);
+  // The track under the line.
+  ctx.strokeStyle = 'rgba(255,255,255,0.13)'; ctx.lineWidth = 0.66 * S; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  ctx.beginPath();
+  for (const [x, z] of L.ribbon) ctx.lineTo(px(x), py(z));
+  ctx.stroke();
+  drawPicture(ctx, t);
+  for (const g of L.gaps) drawGap(ctx, g);
+  // Dominoes, the far ones first; in a row, the one a domino falls on before it.
+  for (const i of L.order) {
+    const it = L.chain[i];
+    let grow = 1;
+    if (it.slot) {
+      const g = L.gaps[it.slot[0]];
+      if (g.slots[it.slot[1]] < 0) continue;
+      grow = Math.min(1, 0.2 + (t - g.since[it.slot[1]]) / 0.18);
+    }
+    const first = i === 0;
+    box(ctx, it.x, it.z, it.a, it.y0, first ? 0.15 : THIN, first ? 0.6 : WIDE, (first ? 1.05 : TALL) * grow, lean(it, t), it.rgb);
+  }
+  // A bad joint: a red block across the line, and a cross between the two numbers.
+  for (const g of L.gaps) g.lay.joints.forEach((s, j) => {
+    const x = xAt(g, g.s0 + 1 + 2 * j), cy = py(g.z - 0.8);
+    if (s === 'bad') {
+      box(ctx, x - 0.05, g.z, 0, PLATE, 0.1, 0.56, 0.5, 0, [226, 61, 61]);
+      ctx.fillStyle = '#e23d3d'; ctx.beginPath(); ctx.arc(px(x), cy, 26, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 7; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(px(x) - 11, cy - 11); ctx.lineTo(px(x) + 11, cy + 11); ctx.moveTo(px(x) + 11, cy - 11); ctx.lineTo(px(x) - 11, cy + 11); ctx.stroke();
+    } else if (s === 'ok') {
+      ctx.fillStyle = '#2aa24d'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 4;
+      CC.roundRect(ctx, px(x) - 24, cy - 11, 48, 22, 11); ctx.fill(); ctx.stroke();
+    }
+  });
+  // The bell at the end of the line.
+  const end = L.chain.at(-1), rung = end.at != null && t > end.at + 0.12 ? Math.max(0, 1 - (t - end.at - 0.12) * 2) : 0;
+  ctx.fillStyle = '#ffd23f'; ctx.strokeStyle = 'rgba(90,60,0,0.6)'; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.arc(px(end.x - L.dir * 0.75), py(end.z + 0.15), 26 + 14 * rung, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  if (state === 'play') {
+    // The gold domino calls for the flick.
+    const s0 = L.chain[0], beat = 0.5 + 0.5 * Math.sin(t * 5), ready = L.gaps.every(g => g.slots.every(k => k >= 0));
+    ctx.strokeStyle = `rgba(255,220,80,${ready ? 0.95 : 0.45})`; ctx.lineWidth = ready ? 9 : 6;
+    ctx.beginPath(); ctx.arc(px(s0.x + 0.1), py(s0.z + 0.25), 62 + (ready ? 16 : 8) * beat, 0, Math.PI * 2); ctx.stroke();
+  }
+  if (state === 'fail' || state === 'rise') {
+    const it = L.chain[stop.i], k = state === 'fail' ? Math.min(1, (t - since) / 0.2) : 1 - smooth((t - since) / 0.4);
+    ctx.save();
+    ctx.globalAlpha = k; ctx.strokeStyle = '#fff'; ctx.lineWidth = 34; ctx.lineCap = 'round';
+    for (const [color, width] of [['#fff', 34], ['#e23d3d', 20]]) {
+      ctx.strokeStyle = color; ctx.lineWidth = width;
+      ctx.beginPath(); ctx.moveTo(px(it.x) - 50, py(it.z + 0.2) - 50); ctx.lineTo(px(it.x) + 50, py(it.z + 0.2) + 50);
+      ctx.moveTo(px(it.x) + 50, py(it.z + 0.2) - 50); ctx.lineTo(px(it.x) - 50, py(it.z + 0.2) + 50); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  drawHand(ctx, t);
+  // Head: back to the levels, the level, the stars still to win.
+  ctx.fillStyle = 'rgba(0,0,0,0.28)'; CC.roundRect(ctx, 24, 24, 150, 84, 42); ctx.fill();
+  text(ctx, '‹', 70, 62, 70); text(ctx, String(L.n + 1), 122, 68, 44);
+  stars3(ctx, W - 130, 66, 30, mistakes === 0 ? 3 : mistakes <= 2 ? 2 : 1);
+  if (state === 'won') drawWon(ctx, t);
+  else if (HINTS[L.n] && L.R <= 2 && state === 'play') {
+    ctx.fillStyle = 'rgba(0,0,0,0.3)'; CC.roundRect(ctx, 60, 140, W - 120, 170, 30); ctx.fill();
+    wrap(ctx, HINTS[L.n], W / 2, 225, 40, W - 190, '#fff');
+  } else if (state === 'fail') {
+    // Over the picture, so that the hand stays in view.
+    const y = py(L.zs + PICS.rows * L.c / 2);
+    ctx.fillStyle = 'rgba(20,24,44,0.8)'; CC.roundRect(ctx, 190, y - 60, W - 380, 120, 60); ctx.fill();
+    text(ctx, 'Le chemin est cassé', W / 2, y + 2, 52);
+  }
+}
+function drawPicture(ctx, t) {
+  const c = L.c, x0 = px(W / S / 2 - PICS.cols * c / 2), y0 = py(L.zs + PICS.rows * c), hei = c * 1.15;
+  ctx.fillStyle = 'rgba(0,0,0,0.3)'; CC.roundRect(ctx, x0 - 14, y0 - 14 - K * hei * S, PICS.cols * c * S + 28, PICS.rows * c * S + 28 + K * hei * S, 18); ctx.fill();
+  for (const cell of L.cells) {
+    const p = cell.at == null ? -1 : (t - cell.at) / 0.2, left = px(cell.x - c * 0.46), wide = c * 0.92 * S;
+    if (p <= 0) {
+      // Standing: the white face toward the player, the top edge above it.
+      const base = py(cell.z - 0.06), top = base - K * hei * S, lean = AX * hei * S;
+      ctx.fillStyle = '#d9dde4';
+      ctx.beginPath(); ctx.moveTo(left, base); ctx.lineTo(left + wide, base); ctx.lineTo(left + wide + lean, top); ctx.lineTo(left + lean, top); ctx.fill();
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(left + lean, top - 0.06 * S, wide, 0.06 * S);
+    } else if (p >= 1) {
+      ctx.fillStyle = shade(cell.rgb, 1); ctx.fillRect(left, py(cell.z - 0.03), wide, c * S * 0.97);
+    } else box(ctx, cell.x, cell.z - 0.03, -Math.PI / 2, 0, 0.06, c * 0.92, hei, p * p * 1.45, [236, 238, 242], cell.rgb);
+  }
+}
+function drawGap(ctx, g) {
+  const line = py(g.z), dark = 'rgba(0,0,0,0.34)';
+  for (const end of [0, 1]) {
+    // A fixed end: a slate plate, its number on a pale square.
+    const a = xAt(g, end ? g.s0 + 1 + 2 * g.n : g.s0), b = xAt(g, end ? g.s0 + 2 + 2 * g.n : g.s0 + 1), left = px(Math.min(a, b));
+    ctx.fillStyle = '#33415c'; CC.roundRect(ctx, left + 3, line - 0.3 * S, S - 6, 1.55 * S, 14); ctx.fill();
+    ctx.fillStyle = '#e4ebf7'; CC.roundRect(ctx, left + 10, line + 0.32 * S, S - 20, S - 20, 12); ctx.fill();
+    pips(ctx, left + S / 2, line + 0.32 * S + (S - 20) / 2, S * 0.9, end ? g.b : g.a);
+  }
+  for (let i = 0; i < g.n; i++) {
+    const [x, y, w, h] = slotRect(g, i), k = g.slots[i];
+    if (k < 0) {
+      // An empty place: the line is cut, a dashed outline waits for a tile.
+      const over = drag && drag.moved && drag.over && drag.over[0] === g.index && drag.over[1] === i;
+      ctx.fillStyle = dark; CC.roundRect(ctx, x + 2, y, w - 4, 0.6 * S, 10); ctx.fill();
+      ctx.fillStyle = over ? 'rgba(255,220,80,0.35)' : selected >= 0 ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.08)';
+      CC.roundRect(ctx, x + 6, y + 0.62 * S, w - 12, S - 12, 14); ctx.fill();
+      ctx.setLineDash([16, 12]); ctx.strokeStyle = over ? '#ffd23f' : 'rgba(255,255,255,0.75)'; ctx.lineWidth = 4; ctx.stroke(); ctx.setLineDash([]);
+    } else {
+      const v = g.lay.vals[i], l = g.dir > 0 ? v[0] : v[1], r = g.dir > 0 ? v[1] : v[0];
+      ctx.fillStyle = '#b98a52'; CC.roundRect(ctx, x + 3, y, w - 6, 0.7 * S, 12); ctx.fill();
+      tileFace(ctx, x + w / 2, y + 0.62 * S + (S - 12) / 2, S - 8, l, r, false, false);
+    }
+  }
+}
+function drawHand(ctx, t) {
+  if (state === 'won') return;
+  L.hand.forEach((tile, k) => {
+    const [x, y] = L.home[k];
+    if (L.where[k] || (drag && drag.k === k && drag.moved)) {
+      ctx.fillStyle = 'rgba(0,0,0,0.14)'; CC.roundRect(ctx, x - 88, y - 44, 176, 88, 14); ctx.fill();
+    } else tileFace(ctx, x, y - (selected === k ? 14 : 0), 88, tile[0], tile[1], selected === k, selected === k);
+  });
+  if (drag && drag.moved) tileFace(ctx, drag.x, drag.y - 130, 100, L.hand[drag.k][0], L.hand[drag.k][1], true, false);
+}
+function drawWon(ctx, t) {
+  const k = smooth((t - since) / 0.35), stars = mistakes === 0 ? 3 : mistakes <= 2 ? 2 : 1;
+  ctx.save();
+  ctx.globalAlpha = k;
+  ctx.fillStyle = 'rgba(20,24,44,0.86)'; CC.roundRect(ctx, 50, 1610, W - 100, 280, 40); ctx.fill();
+  text(ctx, L.pic.name, W / 2, 1668, 54);
+  stars3(ctx, W / 2, 1746, 34, stars, 2.5);
+  for (const b of wonButtons()) {
+    ctx.fillStyle = b.main ? '#ffd23f' : 'rgba(255,255,255,0.18)'; CC.roundRect(ctx, ...b.rect, 38); ctx.fill();
+    text(ctx, b.label, b.rect[0] + b.rect[2] / 2, b.rect[1] + b.rect[3] / 2 + 2, 38, b.main ? '#3a2a00' : '#fff');
+  }
+  ctx.restore();
+}
+function wonButtons() {
+  const more = L.n + 1 < BR.SPECS.length;
+  return [{ label: 'Niveaux', rect: more ? [110, 1796, 380, 76] : [350, 1796, 380, 76], act: () => { state = 'menu'; } },
+    ...(more ? [{ label: 'Suivant', main: true, rect: [590, 1796, 380, 76], act: () => load(L.n + 1) }] : [])];
+}
+const tileRect = i => [50 + (i % 4) * 250, 330 + Math.floor(i / 4) * 250, 230, 230];
+function drawMenu(ctx) {
+  table(ctx);
+  text(ctx, 'Le pont de dominos', W / 2, 110, 76);
+  wrap(ctx, 'Bouche chaque trou avec les bons dominos, puis une pichenette.', W / 2, 225, 38, W - 160, 'rgba(255,255,255,0.85)');
+  for (let i = 0; i < BR.SPECS.length; i++) {
+    const [x, y, w, h] = tileRect(i), st = prog.stars[i] || 0;
+    ctx.fillStyle = st ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.25)'; CC.roundRect(ctx, x, y, w, h, 28); ctx.fill();
+    if (st) {
+      // A level done shows its picture.
+      const pic = PICS.list[i % PICS.list.length], c = 7, left = x + (w - PICS.cols * c) / 2;
+      for (let k = 0; k < pic.cells.length; k++) {
+        ctx.fillStyle = PICS.palette[parseInt(pic.cells[k], 36)];
+        ctx.fillRect(left + (k % PICS.cols) * c, y + 18 + Math.floor(k / PICS.cols) * c, c + 0.5, c + 0.5);
+      }
+      ctx.fillStyle = 'rgba(20,24,44,0.75)'; CC.roundRect(ctx, x + 8, y + 8, 62, 50, 18); ctx.fill();
+      text(ctx, String(i + 1), x + 39, y + 35, 32);
+    } else text(ctx, String(i + 1), x + w / 2, y + 96, 84);
+    stars3(ctx, x + w / 2, y + h - 36, 20, st);
+  }
+}
+
+// ---- Input
+const inRect = (x, y, r, pad = 0) => x >= r[0] - pad && x <= r[0] + r[2] + pad && y >= r[1] - pad && y <= r[1] + r[3] + pad;
+// The empty or taken place under a point, the nearest first.
+function placeAt(x, y, pad) {
+  let best = null;
+  for (const g of L.gaps) for (let i = 0; i < g.n; i++) {
+    const r = slotRect(g, i);
+    if (!inRect(x, y, r, pad)) continue;
+    const d = Math.hypot(x - r[0] - r[2] / 2, y - r[1] - r[3] / 2);
+    if (!best || d < best.d) best = { g, i, d };
+  }
+  return best;
+}
+function down(x, y) {
+  audio();
+  if (state === 'menu') {
+    for (let i = 0; i < BR.SPECS.length; i++) if (inRect(x, y, tileRect(i)) && (OPEN_ALL || i === 0 || prog.stars[i - 1])) { load(i); return; }
+    return;
+  }
+  if (inRect(x, y, [24, 24, 150, 84], 16)) { state = 'menu'; return; }
+  if (state === 'won') { for (const b of wonButtons()) if (inRect(x, y, b.rect, 8)) { b.act(); return; } return; }
+  if (state !== 'play') return;
+  const at = placeAt(x, y, 0);
+  if (at && at.g.slots[at.i] >= 0) { drag = { k: at.g.slots[at.i], x, y, x0: x, y0: y, moved: false, from: [at.g.index, at.i] }; return; }
+  if (at && selected >= 0) { put(selected, at.g, at.i); selected = -1; return; }
+  for (let k = 0; k < L.hand.length; k++) {
+    if (!L.where[k] && inRect(x, y, [L.home[k][0] - 88, L.home[k][1] - 44, 176, 88], 12)) { drag = { k, x, y, x0: x, y0: y, moved: false, from: null }; return; }
+  }
+  const s0 = L.chain[0];
+  if (Math.hypot(x - px(s0.x), y - py(s0.z + 0.25)) < 90) { flick(); return; }
+  selected = -1;
+}
+function move(x, y) {
+  if (!drag) return;
+  drag.x = x; drag.y = y;
+  if (!drag.moved && Math.hypot(x - drag.x0, y - drag.y0) > 22) {
+    drag.moved = true; selected = -1;
+    if (drag.from) takeBack(drag.k);
+  }
+  const at = drag.moved && placeAt(x, y - 130, 30);
+  drag.over = at ? [at.g.index, at.i] : null;
+}
+function up() {
+  if (!drag) return;
+  const d = drag;
+  drag = null;
+  if (!d.moved) {
+    // A tap: a tile of the course goes back to the hand, a tile of the hand is picked for the next place tapped.
+    if (d.from) { takeBack(d.k); mistakes++; tock(0); } else { selected = selected === d.k ? -1 : d.k; tock(0.6); }
+    return;
+  }
+  const at = placeAt(d.x, d.y - 130, 30);
+  if (at) put(d.k, at.g, at.i);
+  // Taking a tile out of its place costs, wherever it goes next.
+  if (d.from && !(at && at.g.index === d.from[0] && at.i === d.from[1])) mistakes++;
+}
+canvas.addEventListener('pointerdown', ev => { ev.preventDefault(); try { canvas.setPointerCapture(ev.pointerId); } catch (e) { /* not a live pointer */ } down(...CC.toCanvas(canvas, ev)); });
+canvas.addEventListener('pointermove', ev => { move(...CC.toCanvas(canvas, ev)); });
+canvas.addEventListener('pointerup', () => up());
+canvas.addEventListener('pointercancel', () => { if (drag && drag.from && drag.moved) mistakes++; drag = null; });
+
+// ---- Test hooks
+window.__level = n => { load(n); return L.hand.length; };
+window.__solve = () => {
+  const def = { gaps: L.gaps, hand: L.hand }, ways = BR.solve(def.gaps, def.hand);
+  ways.forEach((tiles, g) => tiles.forEach((tile, i) => put(tile.k, L.gaps[g], i)));
+  return L.gaps.every(g => g.lay.joints.every(s => s === 'ok'));
+};
+window.__flick = flick;
+window.__skip = n => { for (let k = 0; k < n; k++) { step(); CC.time += CC.DT; } return state; };
+window.__state = () => ({ state, level: L && L.n + 1, mistakes, stop, stars: prog.stars });
+window.__shot = () => { draw(canvas.getContext('2d')); return canvas.toDataURL('image/png'); };
+window.__input = { down, move, up };
+// Every level, solved then flicked: does the wave reach the picture, and how long does it take?
+window.__check = () => BR.SPECS.map((spec, n) => {
+  load(n);
+  const empty = (flick(), window.__skip(900), mistakes);
+  const solved = window.__solve();
+  flick();
+  const from = CC.time;
+  let frames = 0;
+  while (state === 'run' && frames++ < 2000) window.__skip(1);
+  return { level: n + 1, emptyFlickCost: empty, solved, state, seconds: +(CC.time - from).toFixed(1), dominoes: L.chain.length, hand: L.hand.length };
+});
+
+const start = +new URLSearchParams(location.search).get('level');
+if (start >= 1 && start <= BR.SPECS.length) load(start - 1);
+CC.run({ canvas, step, draw });
+</script>
+</body>
+</html>

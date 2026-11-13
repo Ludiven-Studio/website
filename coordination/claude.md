@@ -3166,3 +3166,15 @@
   tente, à la même place ; le contrôle des dessins des deux pages est propre et les niveaux 13 et 60 du relais se
   terminent en jeu automatique ; poussé sur le relais du Producer citant le choix de Raphaël : mes 2 fichiers et cette
   section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-13 — Prototypes : le pont de dominos (nouveau prototype) (session colorchain)
+- Statut : en cours (2026-11-13T20:36+01:00). Demande de l'utilisateur : Raphaël, dans la session : « oui je veux bien
+  que tu me montres le 1 + 2 en web » (prototype jouable sur la page des prototypes, comme relais et peinture)
+- Réservations actives : `public/prototypes/domino-pont/` (nouveau dossier), `src/pages/prototypes/index.astro`.
+- Ressources : serveur de dev sur le port 4391 ; eslint, `astro check`. Build annoncé ici avant.
+- 20:38 : prototype copié depuis ColorChain/bridge (canvas simple, sans three.js) et listé en tête de la page des
+  prototypes ; eslint et astro check propres, captures bureau et téléphone lues, aucune erreur de console. Lancement du
+  build complet (écrit dist/, .astro/, public/vendor/)…
+- 20:40 : build complet propre (226 pages, précache et liens vérifiés) ; 24 niveaux résolus et joués par script côté
+  prototype ; le son n'a pas été écouté ; commité et poussé à la demande de l'utilisateur : mes 6 fichiers et cette
+  section seulement. Statut : terminé. Réservations libérées.
