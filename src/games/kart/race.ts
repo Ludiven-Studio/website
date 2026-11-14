@@ -17,7 +17,7 @@ export const SHIPS: Ship[] = [
 	{ id: 'croiseur', name: 'Croiseur Démesuré', pitch: 'Un capot de 40 mètres et un tout petit cockpit. Très rapide, lent à tourner.', stats: { speed: 5, accel: 1, handling: 2, weight: 5 } },
 	{ id: 'taxi', name: 'Taxi Cabossé', pitch: 'Il démarre au quart de tour et ne craint plus une bosse de plus.', stats: { speed: 2, accel: 5, handling: 3, weight: 3 } },
 	{ id: 'conserve', name: 'Boîte de Conserve', pitch: 'Une conserve à réacteur, légère et vive dans les virages.', stats: { speed: 2, accel: 4, handling: 5, weight: 1 } },
-	{ id: 'pizza', name: 'Pizza Roulante', pitch: 'Une pizza géante qui roule sur la tranche, le pilote en side-car. Lancée, plus rien ne l’arrête.', stats: { speed: 4, accel: 2, handling: 3, weight: 3 } },
+	{ id: 'pizza', name: 'Part de Pizza', pitch: 'Une part géante, pointe devant, qui fend l’espace. Le pilote est assis contre la croûte.', stats: { speed: 4, accel: 2, handling: 3, weight: 3 } },
 ];
 
 export const ITEM_NAMES: Record<ItemId, string> = {
