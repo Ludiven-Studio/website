@@ -1,6 +1,7 @@
 {
-  "latest_android": "",
-  "latest_ios": "",
+  "latest_android": "1.0.3",
+  "latest_ios": "1.0.3",
   "min": "",
-  "store_android": "https://play.google.com/store/apps/details?id=com.ludivenstudio.ninorush"
+  "store_android": "https://play.google.com/store/apps/details?id=com.ludivenstudio.ninorush",
+  "store_ios": "https://apps.apple.com/app/id6833866936"
 }

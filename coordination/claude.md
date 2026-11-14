@@ -3222,3 +3222,26 @@
   augmenter quand un script change ; 48 niveaux rejoués par script, toucher d'un niveau vérifié hors mode
   enregistrement, page ouverte sans erreur de console ; poussé comme mise à jour de prototype : mon fichier et cette
   section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-14 — Nino Rush : version.json 1.0.3 (session NinoRush)
+- Statut : en cours (2026-11-14T08:19+01:00). Demande de l'utilisateur : Nino Rush 1.0.3 en ligne sur Google Play et
+  l'App Store (Raphaël, relayé par le Producer : « Nino Rush est live sur google et apple »)
+- Réservations actives : `public/nino-rush/version.json`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 08:19 : latest_android et latest_ios à 1.0.3, min vide (pas de mur). JSON valide. Pas de build complet : un fichier
+  de public/ copié tel quel. store_ios à ajouter quand l'identifiant App Store sera connu.
+- 08:19 : commité et poussé à la demande de Raphaël (relayé par le Producer) : mon fichier et cette section seulement.
+  Statut : terminé. Réservations libérées.
+
+## 2026-11-14 — Nino Rush : boutons des stores (session NinoRush)
+- Statut : en cours (2026-11-14T08:28+01:00). Demande de l'utilisateur : Nino Rush est sorti : remplacer « Bientôt »
+  par les boutons App Store et Google Play (Raphaël, relayé par le Producer, avec les deux liens)
+- Réservations actives : `src/data/ninoRush.ts`, `src/components/NinoRushLanding.astro`, `src/data/homeGames.ts`,
+  `public/nino-rush/version.json`.
+- Ressources : serveur de dev sur le port 4407 ; eslint, `astro check`. Build annoncé ici avant.
+- 08:31 : Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 08:33 : Build complet : 226 pages, 0 erreur, précache et liens OK (un avertissement de la pub maison, pas à moi).
+  eslint et astro check 0 erreur. Captures FR et EN, clair, sombre, téléphone, et l'accueil : badges Google Play et App
+  Store, Nino « Nouveau ».
+- 08:33 : commité et poussé à la demande de Raphaël (relayé) : mes 4 fichiers et cette section seulement. Statut :
+  terminé. Réservations libérées.

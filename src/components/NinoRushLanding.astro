@@ -1,19 +1,19 @@
 ---
-// The Nino Rush product page, in five languages. Not on the stores yet: « coming soon » and no badges.
-// The French page also leads to the Android test build (/nino-rush/telecharger/).
+// The Nino Rush product page, in five languages, with its store badges.
 import Icon from './Icon.astro';
 import AppStage from './AppStage.astro';
 import MoreApps from './MoreApps.astro';
 import ContactCTA from './ContactCTA.astro';
 import ShareButton from './ShareButton.astro';
+import StoreBadges from './StoreBadges.astro';
 import { HOME_GAMES } from '../data/homeGames';
 import {
 	APP_NAME,
 	CONTACT,
 	ICON,
 	PRIVACY,
+	STORES,
 	TERMS,
-	TEST_PAGE,
 	copy,
 	screens,
 	typo,
@@ -29,6 +29,7 @@ const t = copy[lang];
 const ty = (s: string) => typo(lang, s);
 const stage = HOME_GAMES.find((g) => g.id === 'nino-rush')!.art;
 const shots = screens(lang);
+const play = `${STORES.play}&hl=${lang}`;
 
 // No offer: the full adventure has no price yet.
 const jsonLd = [
@@ -56,9 +57,8 @@ const jsonLd = [
 <div class="stack gap-20">
 	<div>
 		<AppStage lang={lang} name={APP_NAME} icon={ICON} kicker={t.kicker} tagline={ty(t.tagline)} lead={ty(t.intro)} art={{ ...stage, src: stage.src[lang] }}>
-			<p class="nr-soon"><Icon icon="rocket-launch" size="1.3em" /> <span>{ty(t.soon)}</span></p>
+			<StoreBadges playStore={play} appStore={STORES.apple} lang={lang} />
 			<div class="as-actions">
-				{t.test && <a class="sc-btn" href={TEST_PAGE}>{t.test} <Icon icon="arrow-right" size="1.1em" /></a>}
 				<ShareButton id="nino-rush" title={APP_NAME} lang={lang} />
 			</div>
 		</AppStage>
@@ -127,12 +127,8 @@ const jsonLd = [
 		</section>
 
 		<section class="stack gap-4 closing">
-			<h2 class="section-title">{ty(t.soon)}</h2>
-			{t.test && (
-				<div class="nr-ctas">
-					<a class="sc-btn" href={TEST_PAGE}>{t.test} <Icon icon="arrow-right" size="1.1em" /></a>
-				</div>
-			)}
+			<h2 class="section-title">{ty(t.stores)}</h2>
+			<StoreBadges playStore={play} appStore={STORES.apple} lang={lang} />
 			<p class="legal" id="support">{ty(t.support)} <a href={CONTACT[lang]}>{t.supportLink}</a> · <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a></p>
 			<p class="legal"><a href={PRIVACY[lang]}>{t.privacy}</a> · <a href={TERMS[lang]}>{t.terms}</a></p>
 		</section>
@@ -154,34 +150,6 @@ const jsonLd = [
 
 	.story {
 		color: var(--sc-ink-2);
-	}
-
-	/* The stores' place until the game is on them: a plain line, no badge to tap. */
-	.nr-soon {
-		display: inline-flex;
-		align-items: center;
-		align-self: flex-start;
-		gap: 0.6rem;
-		padding: 0.6rem 1.1rem;
-		border: 1px solid var(--sc-night-line);
-		border-radius: 999px;
-		background-color: var(--sc-night-surface-2);
-		color: var(--sc-night-ink);
-		font-family: var(--font-brand);
-		font-weight: 500;
-		line-height: 1.3;
-	}
-
-	.nr-soon :global(svg) {
-		flex: none;
-		color: var(--sc-gold);
-	}
-
-	.nr-ctas {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 1rem 1.75rem;
 	}
 
 	.box {
@@ -274,10 +242,6 @@ const jsonLd = [
 	.closing {
 		align-items: center;
 		text-align: center;
-	}
-
-	.closing .nr-ctas {
-		justify-content: center;
 	}
 
 	.legal {

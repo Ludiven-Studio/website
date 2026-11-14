@@ -1,11 +1,17 @@
 // Nino Rush: its product page in five languages and its Android test build.
 // The texts follow the store listings (NinoRush docs/store.md, "Listing copy") and the owner's model of
 // 2026-11-06: a free demo, then one purchase, « L'aventure complète ». No count of levels or worlds and
-// no price: they may change before the release.
+// no price. On both stores since 2026-11-14.
 
 export type Lang = 'fr' | 'en' | 'es' | 'de' | 'it';
 
 export const APP_NAME = 'Nino Rush';
+
+/** App Store link with no country code: Apple picks the visitor's store. */
+export const STORES = {
+	play: 'https://play.google.com/store/apps/details?id=com.ludivenstudio.ninorush',
+	apple: 'https://apps.apple.com/app/id6833866936',
+};
 
 // The Nino Rush test build, published by NinoRush/tools/publish_test_apk.py under a name that never changes.
 // Raise the version and size by hand at each new one.
@@ -82,9 +88,7 @@ export interface Copy {
 	play: Item[];
 	faqTitle: string;
 	faq: { q: string; a: string; link?: { label: string; href: string } }[];
-	soon: string;
-	/** The test build's button: French only, as its page. */
-	test?: string;
+	stores: string;
 	support: string;
 	supportLink: string;
 	privacy: string;
@@ -94,7 +98,7 @@ export interface Copy {
 export const copy: Record<Lang, Copy> = {
 	fr: {
 		title: 'Nino Rush — le jeu de plateforme du petit panda roux',
-		description: 'Roule, saute et rebondis avec Nino, le petit panda roux, à travers des mondes pleins de lumière. Sème le gros rocher et dessine tes propres niveaux. Bientôt sur iPhone, iPad et Android, avec une démo gratuite.',
+		description: 'Roule, saute et rebondis avec Nino, le petit panda roux, à travers des mondes pleins de lumière. Sème le gros rocher et dessine tes propres niveaux. Sur iPhone, iPad et Android, avec une démo gratuite.',
 		kicker: 'Jeu mobile · iPhone, iPad et Android',
 		tagline: 'Le petit panda roux qui fonce',
 		intro: "Un jeu de plateforme où tout passe par l'élan : roule, saute et rebondis à travers des mondes pleins de lumière, sème le gros rocher et dessine tes propres niveaux.",
@@ -132,15 +136,13 @@ export const copy: Record<Lang, Copy> = {
 		],
 		faqTitle: 'Questions',
 		faq: [
-			{ q: 'Quand sort le jeu ?', a: "Bientôt, sur l'App Store pour iPhone et iPad et sur Google Play pour Android. En attendant, tu peux essayer la version de test Android.", link: { label: 'La version de test', href: TEST_PAGE } },
 			{ q: 'Le jeu est-il gratuit ?', a: "La démo, oui : les premiers mondes se jouent gratuitement. Un seul achat, « L'aventure complète », ouvre ensuite tout le jeu. Le seul autre achat, facultatif, est le « grand dressing », qui ouvre tous les looks d'un coup." },
 			{ q: 'Faut-il une connexion ?', a: 'Non, le jeu marche hors ligne. Il en faut une pour les achats, pour les vidéos qui doublent tes pièces et pour garder une copie de ta progression en ligne.' },
 			{ q: 'Comment garder ma progression ?', a: 'Elle reste sur ton téléphone. Si tu veux, connecte-toi à un compte Ludiven Studio dans Réglages › Compte : il en garde une copie, pour la retrouver sur un autre téléphone. Tu peux le supprimer à tout moment, depuis le jeu.' },
 			{ q: 'Comment partager un niveau ?', a: "Dans l'atelier, touche « Partager » : le jeu copie un code, que tu envoies où tu veux. Ton ami le colle dans son atelier avec « Coller un code »." },
 			{ q: 'Sur quels appareils, dans quelles langues ?', a: 'iPhone, iPad et Android, en paysage. En français, anglais, espagnol, allemand et italien.' },
 		],
-		soon: "Bientôt sur l'App Store et Google Play",
-		test: 'Tester sur Android',
+		stores: "Disponible sur l'App Store et Google Play",
 		support: 'Une question, un souci ?',
 		supportLink: 'Écris-nous',
 		privacy: 'Politique de confidentialité',
@@ -148,7 +150,7 @@ export const copy: Record<Lang, Copy> = {
 	},
 	en: {
 		title: "Nino Rush — the little red panda's platformer",
-		description: 'Roll, jump and bounce with Nino, the little red panda, through worlds full of light. Outrun the big boulder and draw your own levels. Coming soon to iPhone, iPad and Android, with a free demo.',
+		description: 'Roll, jump and bounce with Nino, the little red panda, through worlds full of light. Outrun the big boulder and draw your own levels. On iPhone, iPad and Android, with a free demo.',
 		kicker: 'Mobile game · iPhone, iPad and Android',
 		tagline: 'The little red panda on a roll',
 		intro: "A platformer where it's all about momentum: roll, jump and bounce through worlds full of light, outrun the big boulder and draw your own levels.",
@@ -186,14 +188,13 @@ export const copy: Record<Lang, Copy> = {
 		],
 		faqTitle: 'Questions',
 		faq: [
-			{ q: 'When does it come out?', a: 'Soon, on the App Store for iPhone and iPad and on Google Play for Android.' },
 			{ q: 'Is it free?', a: 'The demo is: the first worlds are free to play. A single purchase, "The full adventure", then unlocks the whole game. The only other purchase, optional, is "The big wardrobe", which unlocks every look at once.' },
 			{ q: 'Do I need a connection?', a: 'No, the game works offline. You need one for purchases, for the videos that double your coins and to keep a copy of your progress online.' },
 			{ q: 'How do I keep my progress?', a: 'It stays on your phone. If you like, sign in to a Ludiven Studio account in Settings › Account: it keeps a copy, so you can pick it up on another phone. You can delete it at any time, from the game.' },
 			{ q: 'How do I share a level?', a: 'In the workshop, tap "Share": the game copies a code that you send however you like. Your friend pastes it into their workshop with "Paste a code".' },
 			{ q: 'Which devices, which languages?', a: 'iPhone, iPad and Android, in landscape. In English, French, Spanish, German and Italian.' },
 		],
-		soon: 'Coming soon to the App Store and Google Play',
+		stores: 'Available on the App Store and Google Play',
 		support: 'A question, a problem?',
 		supportLink: 'Write to us',
 		privacy: 'Privacy policy',
@@ -201,7 +202,7 @@ export const copy: Record<Lang, Copy> = {
 	},
 	es: {
 		title: 'Nino Rush — el juego de plataformas del pequeño panda rojo',
-		description: 'Rueda, salta y rebota con Nino, el pequeño panda rojo, por mundos llenos de luz. Escapa de la gran roca y dibuja tus propios niveles. Muy pronto en iPhone, iPad y Android, con una demo gratis.',
+		description: 'Rueda, salta y rebota con Nino, el pequeño panda rojo, por mundos llenos de luz. Escapa de la gran roca y dibuja tus propios niveles. En iPhone, iPad y Android, con una demo gratis.',
 		kicker: 'Juego para móvil · iPhone, iPad y Android',
 		tagline: 'El pequeño panda rojo veloz',
 		intro: 'Un juego de plataformas donde todo es cuestión de impulso: rueda, salta y rebota por mundos llenos de luz, escapa de la gran roca y dibuja tus propios niveles.',
@@ -239,14 +240,13 @@ export const copy: Record<Lang, Copy> = {
 		],
 		faqTitle: 'Preguntas',
 		faq: [
-			{ q: '¿Cuándo sale el juego?', a: 'Muy pronto, en el App Store para iPhone y iPad y en Google Play para Android.' },
 			{ q: '¿El juego es gratis?', a: 'La demo, sí: los primeros mundos se juegan gratis. Una sola compra, «La aventura completa», desbloquea después todo el juego. La única otra compra, opcional, es «El gran armario», que desbloquea todos los looks de una vez.' },
 			{ q: '¿Hace falta conexión?', a: 'No, el juego funciona sin conexión. La necesitas para las compras, para los vídeos que duplican tus monedas y para guardar una copia de tu progreso en línea.' },
 			{ q: '¿Cómo guardo mi progreso?', a: 'Se queda en tu teléfono. Si quieres, inicia sesión con una cuenta Ludiven Studio en Ajustes › Cuenta: guarda una copia para recuperarlo en otro teléfono. Puedes eliminarla cuando quieras, desde el juego.' },
 			{ q: '¿Cómo comparto un nivel?', a: 'En el taller, toca «Compartir»: el juego copia un código que envías por donde quieras. Tu amigo lo pega en su taller con «Pegar un código».' },
 			{ q: '¿En qué dispositivos y en qué idiomas?', a: 'iPhone, iPad y Android, en horizontal. En español, francés, inglés, alemán e italiano.' },
 		],
-		soon: 'Muy pronto en el App Store y Google Play',
+		stores: 'Disponible en el App Store y Google Play',
 		support: '¿Una pregunta, un problema?',
 		supportLink: 'Escríbenos',
 		privacy: 'Política de privacidad',
@@ -254,7 +254,7 @@ export const copy: Record<Lang, Copy> = {
 	},
 	de: {
 		title: 'Nino Rush — der Plattformer mit dem kleinen Roten Panda',
-		description: 'Roll, spring und hüpf mit Nino, dem kleinen Roten Panda, durch Welten voller Licht. Entkomm dem großen Felsen und zeichne eigene Level. Bald für iPhone, iPad und Android, mit kostenloser Demo.',
+		description: 'Roll, spring und hüpf mit Nino, dem kleinen Roten Panda, durch Welten voller Licht. Entkomm dem großen Felsen und zeichne eigene Level. Für iPhone, iPad und Android, mit kostenloser Demo.',
 		kicker: 'Handyspiel · iPhone, iPad und Android',
 		tagline: 'Der kleine Rote Panda saust',
 		intro: 'Ein Plattformer, bei dem alles am Schwung hängt: Roll, spring und hüpf durch Welten voller Licht, entkomm dem großen Felsen und zeichne deine eigenen Level.',
@@ -292,14 +292,13 @@ export const copy: Record<Lang, Copy> = {
 		],
 		faqTitle: 'Fragen',
 		faq: [
-			{ q: 'Wann erscheint das Spiel?', a: 'Bald, im App Store für iPhone und iPad und bei Google Play für Android.' },
 			{ q: 'Ist das Spiel kostenlos?', a: 'Die Demo schon: Die ersten Welten spielst du kostenlos. Ein einziger Kauf, „Das komplette Abenteuer“, schaltet danach das ganze Spiel frei. Der einzige andere Kauf ist optional: „Der große Schrank“ schaltet alle Looks auf einmal frei.' },
 			{ q: 'Brauche ich eine Internetverbindung?', a: 'Nein, das Spiel läuft offline. Du brauchst eine für Käufe, für die Videos, die deine Münzen verdoppeln, und um eine Kopie deines Fortschritts online zu sichern.' },
 			{ q: 'Wie behalte ich meinen Fortschritt?', a: 'Er bleibt auf deinem Handy. Wenn du willst, melde dich unter Einstellungen › Konto mit einem Ludiven-Studio-Konto an: Es bewahrt eine Kopie, damit du ihn auf einem anderen Handy wiederfindest. Du kannst das Konto jederzeit im Spiel löschen.' },
 			{ q: 'Wie teile ich ein Level?', a: 'Tippe im Atelier auf „Teilen“: Das Spiel kopiert einen Code, den du verschickst, wie du willst. Deine Freunde fügen ihn in ihrem Atelier mit „Code einfügen“ ein.' },
 			{ q: 'Welche Geräte, welche Sprachen?', a: 'iPhone, iPad und Android, im Querformat. Auf Deutsch, Französisch, Englisch, Spanisch und Italienisch.' },
 		],
-		soon: 'Bald im App Store und bei Google Play',
+		stores: 'Jetzt im App Store und bei Google Play',
 		support: 'Eine Frage, ein Problem?',
 		supportLink: 'Schreib uns',
 		privacy: 'Datenschutzerklärung',
@@ -307,7 +306,7 @@ export const copy: Record<Lang, Copy> = {
 	},
 	it: {
 		title: 'Nino Rush — il platform del piccolo panda rosso',
-		description: 'Rotola, salta e rimbalza con Nino, il piccolo panda rosso, in mondi pieni di luce. Sfuggi al grosso masso e disegna i tuoi livelli. Presto su iPhone, iPad e Android, con una demo gratuita.',
+		description: 'Rotola, salta e rimbalza con Nino, il piccolo panda rosso, in mondi pieni di luce. Sfuggi al grosso masso e disegna i tuoi livelli. Su iPhone, iPad e Android, con una demo gratuita.',
 		kicker: 'Gioco per cellulare · iPhone, iPad e Android',
 		tagline: 'Il piccolo panda rosso veloce',
 		intro: 'Un platform dove tutto è questione di slancio: rotola, salta e rimbalza in mondi pieni di luce, sfuggi al grosso masso e disegna i tuoi livelli.',
@@ -345,14 +344,13 @@ export const copy: Record<Lang, Copy> = {
 		],
 		faqTitle: 'Domande',
 		faq: [
-			{ q: 'Quando esce il gioco?', a: 'Presto, su App Store per iPhone e iPad e su Google Play per Android.' },
 			{ q: 'Il gioco è gratis?', a: "La demo sì: i primi mondi si giocano gratis. Un solo acquisto, «L'avventura completa», sblocca poi tutto il gioco. L'unico altro acquisto, facoltativo, è «Il grande guardaroba», che sblocca tutti i look in una volta." },
 			{ q: 'Serve una connessione?', a: 'No, il gioco funziona offline. Serve per gli acquisti, per i video che raddoppiano le tue monete e per conservare una copia dei tuoi progressi online.' },
 			{ q: 'Come conservo i miei progressi?', a: 'Restano sul tuo telefono. Se vuoi, accedi con un account Ludiven Studio in Impostazioni › Account: ne conserva una copia, per ritrovarli su un altro telefono. Puoi eliminarlo quando vuoi, dal gioco.' },
 			{ q: 'Come condivido un livello?', a: "Nell'atelier, tocca «Condividi»: il gioco copia un codice che invii dove vuoi. Il tuo amico lo incolla nel suo atelier con «Incolla un codice»." },
 			{ q: 'Su quali dispositivi, in quali lingue?', a: 'iPhone, iPad e Android, in orizzontale. In italiano, francese, inglese, spagnolo e tedesco.' },
 		],
-		soon: 'Presto su App Store e Google Play',
+		stores: 'Disponibile su App Store e Google Play',
 		support: 'Una domanda, un problema?',
 		supportLink: 'Scrivici',
 		privacy: 'Informativa sulla privacy',

@@ -5,7 +5,7 @@ import * as dragonsGems from './dragonsGems';
 import * as petanqueGame from './petanqueGame';
 import { MEET_DOWNLOAD, MEET_STORES } from './petanqueMeet';
 import * as scanner from './petanqueScanner';
-import { ICON as NINO_ICON, LANDING_PATHS as NINO_PATHS, TEST_PAGE as NINO_TEST } from './ninoRush';
+import { ICON as NINO_ICON, LANDING_PATHS as NINO_PATHS, STORES as NINO_STORES } from './ninoRush';
 
 export type Lang = 'fr' | 'en' | 'es' | 'de' | 'it';
 export type PerLang = Record<Lang, string>;
@@ -77,11 +77,11 @@ export const HOME_GAMES: HomeGame[] = [
 	{
 		id: 'nino-rush',
 		name: 'Nino Rush',
-		kind: 'soon',
+		kind: 'new',
 		type: 'game',
 		icon: NINO_ICON,
 		art: { src: same('/assets/home/stage-nino-rush.webp'), w: 1000, h: 1042, desk: '50% 50%', phone: '50% 50%' },
-		kicker: each((l) => `${SOON[l]} · ${MOBILE_GAME[l]}`),
+		kicker: each((l) => `${NEW[l]} · ${MOBILE_GAME[l]}`),
 		pitch: {
 			fr: fr("Jeu de plateforme physique : aide Nino le panda roux à rouler jusqu'au terrier."),
 			en: 'A physics platformer: help Nino the red panda roll all the way home.',
@@ -90,7 +90,8 @@ export const HOME_GAMES: HomeGame[] = [
 			it: 'Un platform con la fisica: aiuta il panda rosso Nino a rotolare fino alla tana.',
 		},
 		href: NINO_PATHS,
-		test: NINO_TEST,
+		play: withHl(NINO_STORES.play),
+		apple: same(NINO_STORES.apple),
 	},
 	{
 		id: 'petanque-game',
