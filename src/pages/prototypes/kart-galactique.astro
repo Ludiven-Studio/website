@@ -1,0 +1,596 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+---
+
+<BaseLayout
+	title="Kart Galactique | Prototypes Ludiven Studio"
+	description="Kart Galactique : une course de karts en 3D dans l'espace, avec des vaisseaux parodiques, des dérapages turbo et des objets farfelus. Prototype à essayer."
+	noindex
+>
+	<div id="kg-root" class="kg-root">
+		<canvas id="kg-view"></canvas>
+
+		<div id="kg-hud" class="kg-hud" hidden>
+			<div class="kg-rankbox"><b id="kg-rank">6</b><sup id="kg-rank-suf">e</sup><small id="kg-rank-of">/6</small></div>
+			<div id="kg-item" class="kg-item" aria-label="Objet"></div>
+			<div class="kg-lapbox"><span id="kg-lap">Tour 1/3</span><span id="kg-time">0:00.0</span></div>
+			<canvas id="kg-map" width="170" height="170"></canvas>
+			<p id="kg-msg"></p>
+			<button id="kg-pause" class="kg-round" aria-label="Pause">❚❚</button>
+		</div>
+
+		<div id="kg-touch" class="kg-touch" hidden>
+			<div class="kg-steer">
+				<button id="kg-left" aria-label="Gauche">◀</button>
+				<button id="kg-right" aria-label="Droite">▶</button>
+			</div>
+			<div class="kg-acts">
+				<button id="kg-use" class="kg-use">Objet</button>
+				<button id="kg-brake" class="kg-brake">Frein</button>
+				<button id="kg-drift" class="kg-drift">Dérapage</button>
+			</div>
+		</div>
+
+		<section id="kg-menu" class="kg-screen">
+			<div class="kg-card kg-menu-card">
+				<a class="kg-back" href="/prototypes/">← Prototypes</a>
+				<p class="kg-kicker">Prototype · course de l'espace</p>
+				<h1>Kart Galactique</h1>
+				<div class="kg-picker">
+					<button id="kg-prev" class="kg-round" aria-label="Vaisseau précédent">◀</button>
+					<div class="kg-ship">
+						<h2 id="kg-ship-name"></h2>
+						<p id="kg-ship-pitch"></p>
+						<ul id="kg-ship-stats" class="kg-stats"></ul>
+						<small id="kg-ship-count"></small>
+					</div>
+					<button id="kg-next" class="kg-round" aria-label="Vaisseau suivant">▶</button>
+				</div>
+				<button id="kg-go" class="kg-cta">Course !</button>
+				<p id="kg-best" class="kg-best"></p>
+				<ul class="kg-keys">
+					<li class="kg-desk">Ça accélère tout seul. <b>← →</b> ou <b>Q D</b> : tourner · <b>↓</b> : freiner</li>
+					<li class="kg-desk"><b>Espace</b> maintenu en tournant : dérapage, relâche pour le turbo · <b>E</b> : objet · <b>P</b> : pause</li>
+					<li class="kg-mob">Ça accélère tout seul. Maintiens « Dérapage » en tournant, relâche pour le turbo.</li>
+				</ul>
+				<button id="kg-fs" class="kg-link">Plein écran</button>
+			</div>
+		</section>
+
+		<section id="kg-pausemenu" class="kg-screen" hidden>
+			<div class="kg-card">
+				<h2>Pause</h2>
+				<div class="kg-col">
+					<button id="kg-resume" class="kg-cta">Reprendre</button>
+					<button id="kg-restart">Recommencer</button>
+					<button id="kg-change2">Changer de vaisseau</button>
+					<button id="kg-sound"></button>
+					<a href="/prototypes/">Quitter</a>
+				</div>
+			</div>
+		</section>
+
+		<section id="kg-results" class="kg-screen" hidden>
+			<div class="kg-card">
+				<h2 id="kg-result-title"></h2>
+				<table class="kg-table"><tbody id="kg-table"></tbody></table>
+				<p id="kg-result-best" class="kg-best"></p>
+				<div class="kg-row">
+					<button id="kg-again" class="kg-cta">Rejouer</button>
+					<button id="kg-change">Changer de vaisseau</button>
+				</div>
+			</div>
+		</section>
+	</div>
+
+	<script>
+		import { start } from '../../games/kart/main';
+		start();
+	</script>
+</BaseLayout>
+
+<style is:global>
+	html:has(#kg-root),
+	body:has(#kg-root) {
+		overflow: hidden;
+		overscroll-behavior: none;
+	}
+	/* The game takes the whole screen: the site's menus would sit on top of it. */
+	body:has(#kg-root) nav.sn,
+	body:has(#kg-root) nav.tb,
+	body:has(#kg-root) footer.sf {
+		display: none !important;
+	}
+	.kg-root h1,
+	.kg-root h2 {
+		color: #f4f1ff;
+	}
+	.kg-root {
+		position: fixed;
+		inset: 0;
+		z-index: 10000;
+		background: #070516;
+		color: #f4f1ff;
+		font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+		user-select: none;
+		-webkit-user-select: none;
+		-webkit-touch-callout: none;
+		touch-action: none;
+		overflow: hidden;
+	}
+	.kg-root [hidden] {
+		display: none !important;
+	}
+	#kg-view {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		display: block;
+	}
+	.kg-root button {
+		font: inherit;
+		color: inherit;
+		cursor: pointer;
+	}
+
+	/* HUD */
+	.kg-hud {
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+	}
+	.kg-hud > * {
+		position: absolute;
+	}
+	.kg-rankbox {
+		left: max(14px, env(safe-area-inset-left));
+		top: max(10px, env(safe-area-inset-top));
+		font-weight: 900;
+		text-shadow: 0 3px 0 #2b1760, 0 0 18px rgba(255, 106, 213, 0.6);
+		line-height: 1;
+	}
+	.kg-rankbox b {
+		font-size: clamp(44px, 9vmin, 76px);
+		color: #ffd23f;
+	}
+	.kg-rankbox sup {
+		font-size: clamp(18px, 3.5vmin, 28px);
+		color: #ffd23f;
+		vertical-align: top;
+		margin-left: 2px;
+	}
+	.kg-rankbox small {
+		font-size: clamp(16px, 3vmin, 24px);
+		opacity: 0.8;
+		margin-left: 4px;
+	}
+	.kg-item {
+		left: 50%;
+		top: max(10px, env(safe-area-inset-top));
+		transform: translateX(-50%);
+		width: clamp(58px, 11vmin, 84px);
+		aspect-ratio: 1;
+		border-radius: 18px;
+		background: rgba(20, 16, 46, 0.6);
+		border: 3px solid rgba(255, 255, 255, 0.55);
+		display: grid;
+		place-items: center;
+		box-shadow: 0 0 0 3px rgba(140, 107, 255, 0.35);
+	}
+	.kg-item.kg-full {
+		border-color: #ffd23f;
+		box-shadow: 0 0 22px rgba(255, 210, 63, 0.55);
+	}
+	.kg-item svg {
+		width: 72%;
+		height: 72%;
+	}
+	.kg-lapbox {
+		right: max(14px, env(safe-area-inset-right));
+		top: max(10px, env(safe-area-inset-top));
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		font-weight: 800;
+		font-size: clamp(16px, 3.2vmin, 24px);
+		text-shadow: 0 2px 0 #2b1760;
+		gap: 2px;
+		margin-right: 52px;
+	}
+	.kg-lapbox span:last-child {
+		font-variant-numeric: tabular-nums;
+		opacity: 0.85;
+		font-size: 0.85em;
+	}
+	#kg-pause {
+		right: max(10px, env(safe-area-inset-right));
+		top: max(10px, env(safe-area-inset-top));
+		pointer-events: auto;
+		font-size: 14px;
+	}
+	#kg-map {
+		left: max(10px, env(safe-area-inset-left));
+		bottom: max(10px, env(safe-area-inset-bottom));
+		width: clamp(96px, 20vmin, 170px);
+		height: auto;
+		opacity: 0.9;
+	}
+	.kg-racing #kg-map {
+		bottom: max(10px, env(safe-area-inset-bottom));
+	}
+	#kg-msg {
+		left: 50%;
+		top: 32%;
+		transform: translate(-50%, -50%);
+		margin: 0;
+		font-weight: 900;
+		font-size: clamp(30px, 7vmin, 60px);
+		color: #fff;
+		text-shadow: 0 4px 0 #2b1760, 0 0 24px rgba(62, 224, 255, 0.8);
+		white-space: nowrap;
+	}
+	#kg-msg.kg-count {
+		font-size: clamp(60px, 16vmin, 140px);
+		color: #ffd23f;
+	}
+	#kg-msg.kg-final {
+		color: #ff6ad5;
+	}
+	#kg-msg.kg-warn {
+		color: #5ad1ff;
+	}
+	#kg-msg.kg-pop {
+		animation: kg-pop 0.35s ease-out;
+	}
+	@keyframes kg-pop {
+		from {
+			transform: translate(-50%, -50%) scale(1.6);
+			opacity: 0;
+		}
+	}
+	.kg-hyper::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+		background: radial-gradient(ellipse at center, transparent 45%, rgba(62, 224, 255, 0.25) 75%, rgba(255, 106, 213, 0.35));
+	}
+
+	/* Touch controls */
+	.kg-touch {
+		position: absolute;
+		inset: auto 0 0 0;
+		display: flex;
+		justify-content: space-between;
+		align-items: flex-end;
+		padding: 0 max(12px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+		pointer-events: none;
+	}
+	.kg-touch button {
+		pointer-events: auto;
+		border: 3px solid rgba(255, 255, 255, 0.5);
+		background: rgba(20, 16, 46, 0.45);
+		border-radius: 999px;
+		font-weight: 800;
+		touch-action: none;
+		-webkit-tap-highlight-color: transparent;
+	}
+	.kg-touch button.kg-down {
+		background: rgba(140, 107, 255, 0.65);
+		border-color: #fff;
+	}
+	.kg-steer {
+		display: flex;
+		gap: 14px;
+		margin-left: clamp(0px, 22vmin, 190px);
+	}
+	.kg-steer button {
+		width: clamp(70px, 17vmin, 96px);
+		height: clamp(70px, 17vmin, 96px);
+		font-size: 28px;
+	}
+	.kg-acts {
+		display: grid;
+		grid-template-columns: auto auto;
+		grid-template-areas: 'use use' 'brake drift';
+		gap: 10px;
+		align-items: end;
+		justify-items: end;
+	}
+	.kg-use {
+		grid-area: use;
+		width: clamp(64px, 14vmin, 84px);
+		height: clamp(64px, 14vmin, 84px);
+		font-size: 13px;
+		opacity: 0.6;
+	}
+	.kg-use.kg-ready {
+		opacity: 1;
+		border-color: #ffd23f !important;
+		box-shadow: 0 0 18px rgba(255, 210, 63, 0.6);
+	}
+	.kg-brake {
+		grid-area: brake;
+		width: 60px;
+		height: 60px;
+		font-size: 12px;
+	}
+	.kg-drift {
+		grid-area: drift;
+		width: clamp(84px, 21vmin, 116px);
+		height: clamp(84px, 21vmin, 116px);
+		font-size: 14px;
+		border-color: rgba(76, 201, 255, 0.8) !important;
+	}
+	@media (orientation: portrait) {
+		.kg-steer {
+			margin-left: 0;
+		}
+		#kg-map {
+			bottom: auto;
+			top: calc(max(10px, env(safe-area-inset-top)) + 96px);
+		}
+	}
+
+	/* Screens */
+	.kg-screen {
+		position: absolute;
+		inset: 0;
+		display: grid;
+		place-items: center;
+		padding: 16px;
+		overflow: auto;
+		background: linear-gradient(180deg, rgba(7, 5, 22, 0.15), rgba(7, 5, 22, 0.55));
+	}
+	#kg-menu {
+		place-items: center start;
+		background: linear-gradient(90deg, rgba(7, 5, 22, 0.85) 0%, rgba(7, 5, 22, 0.5) 45%, transparent 70%);
+	}
+	.kg-card {
+		width: min(440px, 100%);
+		background: rgba(18, 14, 44, 0.82);
+		border: 2px solid rgba(140, 107, 255, 0.5);
+		border-radius: 20px;
+		padding: 20px 22px;
+		backdrop-filter: blur(6px);
+		box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+		text-align: center;
+	}
+	.kg-menu-card {
+		margin-left: max(0px, 4vw);
+	}
+	.kg-card h1 {
+		margin: 0 0 12px;
+		font-size: clamp(32px, 6vmin, 46px);
+		font-weight: 900;
+		letter-spacing: 0.01em;
+		background: linear-gradient(90deg, #ff6ad5, #ffd23f 50%, #3ee0ff);
+		-webkit-background-clip: text;
+		background-clip: text;
+		color: transparent;
+	}
+	.kg-card h2 {
+		margin: 0 0 6px;
+		font-size: 22px;
+	}
+	.kg-kicker {
+		margin: 6px 0 0;
+		font-size: 13px;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: #a99cff;
+	}
+	.kg-back {
+		display: block;
+		text-align: left;
+		color: #a99cff;
+		font-size: 14px;
+		text-decoration: none;
+	}
+	.kg-picker {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+	.kg-ship {
+		flex: 1;
+		min-width: 0;
+	}
+	.kg-ship p {
+		margin: 0 0 10px;
+		font-size: 14px;
+		color: #d6d0ff;
+		min-height: 2.6em;
+	}
+	.kg-ship small {
+		color: #a99cff;
+	}
+	.kg-stats {
+		list-style: none;
+		margin: 0 0 6px;
+		padding: 0;
+		display: grid;
+		gap: 5px;
+	}
+	.kg-stats li {
+		display: grid;
+		grid-template-columns: 7.5em 1fr;
+		align-items: center;
+		font-size: 13px;
+		text-align: left;
+	}
+	.kg-stats i {
+		height: 9px;
+		border-radius: 9px;
+		background: linear-gradient(90deg, #ff6ad5, #ffd23f) 0 0 / calc(var(--v) * 100%) 100% no-repeat, rgba(255, 255, 255, 0.12);
+	}
+	.kg-round {
+		width: 44px;
+		height: 44px;
+		flex: none;
+		border-radius: 999px;
+		border: 2px solid rgba(255, 255, 255, 0.4);
+		background: rgba(255, 255, 255, 0.08);
+	}
+	.kg-cta,
+	.kg-col button,
+	.kg-col a,
+	.kg-row button {
+		display: block;
+		width: 100%;
+		padding: 12px 18px;
+		border-radius: 14px;
+		border: 2px solid rgba(255, 255, 255, 0.3);
+		background: rgba(255, 255, 255, 0.08);
+		font-weight: 700;
+		font-size: 16px;
+		text-decoration: none;
+		color: inherit;
+	}
+	.kg-root .kg-cta {
+		margin-top: 14px;
+		background: linear-gradient(90deg, #ff4d9d, #8c6bff);
+		border-color: transparent;
+		font-size: 20px;
+		font-weight: 900;
+		box-shadow: 0 6px 0 #4a2a99;
+	}
+	.kg-col {
+		display: grid;
+		gap: 10px;
+	}
+	.kg-col .kg-cta {
+		margin: 0;
+	}
+	.kg-row {
+		display: flex;
+		gap: 10px;
+		margin-top: 12px;
+	}
+	.kg-row .kg-cta {
+		margin: 0;
+	}
+	.kg-best {
+		margin: 8px 0 0;
+		color: #ffd23f;
+		font-weight: 700;
+		min-height: 1.2em;
+	}
+	.kg-keys {
+		list-style: none;
+		margin: 8px 0 0;
+		padding: 0;
+		font-size: 13px;
+		color: #c9c2ff;
+		display: grid;
+		gap: 4px;
+	}
+	.kg-mob {
+		display: none;
+	}
+	@media (pointer: coarse) {
+		.kg-desk {
+			display: none;
+		}
+		.kg-mob {
+			display: block;
+		}
+	}
+	.kg-link {
+		margin-top: 8px;
+		background: none;
+		border: 0;
+		color: #a99cff;
+		text-decoration: underline;
+		font-size: 14px;
+	}
+	.kg-table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 14px;
+		text-align: left;
+	}
+	.kg-root .kg-table,
+	.kg-root .kg-table td {
+		border: 0;
+		background: none;
+	}
+	.kg-root .kg-table td {
+		padding: 6px 4px;
+		border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+	}
+	.kg-table td:last-child {
+		text-align: right;
+		font-variant-numeric: tabular-nums;
+	}
+	.kg-table td:nth-child(3) {
+		color: #a99cff;
+		font-size: 12px;
+	}
+	.kg-table i {
+		display: inline-block;
+		width: 10px;
+		height: 10px;
+		border-radius: 50%;
+		margin-right: 6px;
+	}
+	.kg-table .kg-me {
+		color: #ffd23f;
+		font-weight: 800;
+	}
+	@media (max-height: 520px) {
+		.kg-screen {
+			padding: 8px;
+		}
+		.kg-card {
+			padding: 10px 16px;
+		}
+		.kg-card h1 {
+			font-size: 26px;
+			margin-bottom: 4px;
+		}
+		.kg-card h2 {
+			font-size: 18px;
+			margin-bottom: 2px;
+		}
+		.kg-kicker,
+		.kg-ship small,
+		.kg-link {
+			display: none;
+		}
+		.kg-ship p {
+			min-height: 0;
+			margin-bottom: 6px;
+			font-size: 13px;
+		}
+		.kg-stats {
+			grid-template-columns: 1fr 1fr;
+			column-gap: 12px;
+		}
+		.kg-stats li {
+			grid-template-columns: 1fr;
+			font-size: 11px;
+			gap: 2px;
+		}
+		.kg-root .kg-table td {
+			padding: 3px 4px;
+		}
+		.kg-keys {
+			display: none;
+		}
+		.kg-root .kg-cta {
+			margin-top: 8px;
+			padding: 8px;
+		}
+	}
+	@media (max-width: 600px) and (orientation: portrait) {
+		#kg-menu {
+			place-items: end center;
+			background: linear-gradient(0deg, rgba(7, 5, 22, 0.9) 0%, rgba(7, 5, 22, 0.5) 55%, transparent 75%);
+		}
+		.kg-menu-card {
+			margin-left: 0;
+		}
+	}
+</style>
