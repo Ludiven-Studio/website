@@ -9,7 +9,12 @@ export interface ShipMesh {
 	/** Engine glows: scaled and tinted by boost. */
 	flames: THREE.Sprite[];
 	shadow: THREE.Mesh;
+	/** Turns with the speed, for a ship that rolls. */
+	wheel?: THREE.Object3D;
 }
+
+/** Radius of the rolling pizza: the view turns it by distance / radius. */
+export const PIZZA_R = 1.2;
 
 let glowTex: THREE.Texture | null = null;
 export function glowTexture(): THREE.Texture {
@@ -175,13 +180,124 @@ function conserve(color: number, body: THREE.Group, flames: THREE.Sprite[]) {
 	flames.push(flame(0x9d7bff, -1.75, 0.95, 0, 1.1));
 }
 
-const BUILDERS: Record<ShipId, (c: number, b: THREE.Group, f: THREE.Sprite[]) => void> = { caravane, croiseur, taxi, conserve };
+let pizzaTex: THREE.Texture | null = null;
+function pizzaTexture(): THREE.Texture {
+	if (pizzaTex) return pizzaTex;
+	const c = document.createElement('canvas');
+	c.width = c.height = 256;
+	const g = c.getContext('2d')!;
+	const crust = g.createRadialGradient(128, 128, 96, 128, 128, 128);
+	crust.addColorStop(0, '#e9a64c');
+	crust.addColorStop(0.7, '#c97a2c');
+	crust.addColorStop(1, '#8a4a18');
+	g.fillStyle = crust;
+	g.beginPath();
+	g.arc(128, 128, 128, 0, Math.PI * 2);
+	g.fill();
+	g.fillStyle = '#d8402a';
+	g.beginPath();
+	g.arc(128, 128, 104, 0, Math.PI * 2);
+	g.fill();
+	let seed = 9;
+	const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+	const spot = (r: number) => {
+		const a = rnd() * Math.PI * 2, d = Math.sqrt(rnd()) * (96 - r);
+		return [128 + Math.cos(a) * d, 128 + Math.sin(a) * d];
+	};
+	g.fillStyle = '#ffd86b';
+	for (let i = 0; i < 26; i++) {
+		const [x, y] = spot(16);
+		g.beginPath();
+		g.ellipse(x, y, 10 + rnd() * 14, 8 + rnd() * 10, rnd() * 3, 0, Math.PI * 2);
+		g.fill();
+	}
+	for (let i = 0; i < 9; i++) {
+		const [x, y] = spot(15);
+		g.fillStyle = '#a3241c';
+		g.beginPath();
+		g.arc(x, y, 14, 0, Math.PI * 2);
+		g.fill();
+		g.fillStyle = '#7d1a14';
+		for (let k = 0; k < 4; k++) g.fillRect(x - 8 + rnd() * 14, y - 8 + rnd() * 14, 3, 3);
+	}
+	g.strokeStyle = '#1d1a1a';
+	g.lineWidth = 4;
+	for (let i = 0; i < 8; i++) {
+		const [x, y] = spot(6);
+		g.beginPath();
+		g.arc(x, y, 5, 0, Math.PI * 2);
+		g.stroke();
+	}
+	g.fillStyle = '#3f9a3a';
+	for (let i = 0; i < 6; i++) {
+		const [x, y] = spot(10);
+		g.beginPath();
+		g.ellipse(x, y, 9, 4, rnd() * 3, 0, Math.PI * 2);
+		g.fill();
+	}
+	// Slice cuts.
+	g.strokeStyle = 'rgba(120,40,20,0.5)';
+	g.lineWidth = 2;
+	for (let i = 0; i < 4; i++) {
+		const a = (i * Math.PI) / 4;
+		g.beginPath();
+		g.moveTo(128 - Math.cos(a) * 104, 128 - Math.sin(a) * 104);
+		g.lineTo(128 + Math.cos(a) * 104, 128 + Math.sin(a) * 104);
+		g.stroke();
+	}
+	pizzaTex = new THREE.CanvasTexture(c);
+	pizzaTex.colorSpace = THREE.SRGBColorSpace;
+	return pizzaTex;
+}
+
+// A giant pizza rolling on its edge, the pilot in a side-car pod on the axle.
+function pizza(color: number, body: THREE.Group, flames: THREE.Sprite[], parts: { wheel?: THREE.Object3D }) {
+	const hubY = PIZZA_R - 0.3;
+	const wheel = new THREE.Group();
+	wheel.position.set(0, hubY, 0.15);
+	const face = new THREE.MeshStandardMaterial({ map: pizzaTexture(), roughness: 0.8 });
+	const edge = std(0xc97a2c, { roughness: 0.9 });
+	const disc = new THREE.Mesh(new THREE.CylinderGeometry(PIZZA_R, PIZZA_R, 0.32, 28).rotateX(Math.PI / 2), [edge, face, face]);
+	wheel.add(disc);
+	const rim = new THREE.Mesh(new THREE.TorusGeometry(PIZZA_R - 0.04, 0.16, 6, 28), edge);
+	wheel.add(rim);
+	// A string of cheese that flaps as it turns.
+	const cheese = box(0.08, 0.5, 0.05, std(0xffd86b), 0.3, -PIZZA_R - 0.05, 0.12);
+	cheese.rotation.z = 0.4;
+	wheel.add(cheese);
+	body.add(wheel);
+	parts.wheel = wheel;
+	const metal = std(0x9a9aa8, { metalness: 0.7 });
+	const paint = std(color);
+	const axle = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 1.5, 8).rotateX(Math.PI / 2), metal);
+	axle.position.set(0, hubY, 0.15);
+	body.add(axle);
+	// Side-car pod with its pilot on one side, a rocket on the other.
+	const pod = new THREE.Mesh(new THREE.SphereGeometry(0.42, 12, 10), paint);
+	pod.scale.set(1.4, 0.8, 1);
+	pod.position.set(0, hubY - 0.1, 0.95);
+	body.add(pod);
+	const dome = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), std(0x9fe3ff, { transparent: true, opacity: 0.6, metalness: 0.4, roughness: 0.1 }));
+	dome.position.set(0.05, hubY + 0.15, 0.95);
+	body.add(dome);
+	const pilot = new THREE.Mesh(new THREE.SphereGeometry(0.17, 10, 8), std(0x8ef0a0));
+	pilot.position.set(0.05, hubY + 0.2, 0.95);
+	body.add(pilot);
+	const rocket = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.24, 0.9, 10).rotateZ(Math.PI / 2), paint);
+	rocket.position.set(-0.2, hubY, -0.62);
+	body.add(rocket);
+	flames.push(flame(0xffa53c, -0.8, hubY, -0.62, 0.9));
+	flames.push(flame(0x6fd0ff, -0.75, hubY - 0.1, 0.95, 0.6));
+}
+
+const BUILDERS: Record<ShipId, (c: number, b: THREE.Group, f: THREE.Sprite[], parts: { wheel?: THREE.Object3D }) => void> = { caravane, croiseur, taxi, conserve, pizza };
 
 export function buildShip(id: ShipId, color: number): ShipMesh {
 	const root = new THREE.Group();
 	const body = new THREE.Group();
 	const flames: THREE.Sprite[] = [];
-	BUILDERS[id](color, body, flames);
+	const parts: { wheel?: THREE.Object3D } = {};
+	BUILDERS[id](color, body, flames, parts);
 	body.traverse((o) => {
 		const m = o as THREE.Mesh;
 		if (m.isMesh) m.castShadow = false;
@@ -190,7 +306,7 @@ export function buildShip(id: ShipId, color: number): ShipMesh {
 	const shadow = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 2.6).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: shadowTexture(), transparent: true, depthWrite: false }));
 	shadow.position.y = 0.05;
 	root.add(shadow, body);
-	return { root, body, flames, shadow };
+	return { root, body, flames, shadow, wheel: parts.wheel };
 }
 
 export function disposeShip(s: ShipMesh) {

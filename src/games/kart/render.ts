@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { type Track, normalX, normalZ, locate, STEP } from './track';
 import { type Race, type Kart, driftLevel } from './race';
-import { buildShip, disposeShip, glowTexture, type ShipMesh } from './ships';
+import { buildShip, disposeShip, glowTexture, PIZZA_R, type ShipMesh } from './ships';
 import { mulberry32 } from '../prng';
 
 const DRIFT_COLORS = [0xffffff, 0x4cc9ff, 0xff9f1c, 0xd65bff];
@@ -515,6 +515,11 @@ export function createView(canvas: HTMLCanvasElement, track: Track): View {
 					const s = (boosting ? (k.hyper > 0 ? 2.6 : 1.9) : 0.8 + Math.min(1, Math.abs(k.speed) / 30) * 0.5) * (0.9 + Math.random() * 0.2);
 					f.scale.setScalar(s);
 					(f.material as THREE.SpriteMaterial).color.setHex(k.hyper > 0 ? 0xffffff : boosting ? 0xffa53c : 0x6fd0ff);
+				}
+				if (kv.ship.wheel) {
+					kv.ship.wheel.rotation.z -= (k.speed * dt) / PIZZA_R;
+					// The pizza rolls on the road: no hovering bob.
+					body.position.y = k.grounded ? 0.02 : 0.12;
 				}
 				kv.ring.visible = k.slow > 0;
 				if (kv.ring.visible) kv.ring.rotation.y = clock * 4;
