@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated": "2026-11-13T18:24:48Z",
+  "updated": "2026-11-14T07:41:00Z",
   "rotationSeconds": 30,
   "defaultLanguage": "fr",
   "entries": [
@@ -181,10 +181,15 @@
       },
       "image": "img/nino-rush.png",
       "clips": {
-        "fr": "clips/nino-rush.mp4"
+        "fr": "clips/nino-rush_fr.mp4",
+        "en": "clips/nino-rush_en.mp4",
+        "es": "clips/nino-rush_es.mp4",
+        "de": "clips/nino-rush_de.mp4",
+        "it": "clips/nino-rush_it.mp4"
       },
       "link": {
-        "web": "/nino-rush/telecharger/"
+        "android": "com.ludivenstudio.ninorush",
+        "ios": "6833866936"
       },
       "app": [
         "com.ludivenstudio.ninorush"
@@ -196,11 +201,7 @@
         "com.ludivenstudio.ninorush",
         "com.ludivenstudio.petanquemeet",
         "com.raphbenpro.petanquear"
-      ],
-      "platforms": [
-        "android"
-      ],
-      "weight": 0
+      ]
     }
   ]
 }
