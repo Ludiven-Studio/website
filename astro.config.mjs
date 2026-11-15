@@ -23,6 +23,8 @@ export default defineConfig({
         '/outils': '/services/',
         // The legal pages moved from the app's code name to its store name. The old URLs are
         // declared in both store listings and baked into installed apps: keep them for good.
+        // The test page moved from the code name to the app's name (Cap Étoile).
+        '/suivi-familial/test-7o8v154o': '/cap-etoile/test-7o8v154o/',
         '/petanque-ar': '/petanque-scanner/',
         '/petanque-ar/cgu': '/petanque-scanner/cgu/',
         '/petanque-ar/confidentialite': '/petanque-scanner/confidentialite/',
@@ -62,6 +64,7 @@ export default defineConfig({
                 !page.includes('/jeux/petanque/test') &&
                 !page.includes('/jeux/eclats/test') &&
                 !page.includes('/suivi-familial/') &&
+                !page.includes('/cap-etoile/test-') &&
                 !page.includes('/jeux/eclats/nuit') &&
                 !page.includes('/beta-') &&
                 !page.includes('/admin/'),
@@ -100,6 +103,7 @@ export default defineConfig({
                     'jeux/eclats/test/**',
                     'rencontres/test/**',
                     'suivi-familial/**',
+                    'cap-etoile/test-*/**',
                     // Unlisted work-in-progress games: their own three.js copy stays off every visitor's precache.
                     'prototypes/**',
                 ],

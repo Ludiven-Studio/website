@@ -3292,3 +3292,16 @@
   identiques.
 - 18:33 : commité et poussé à la demande de l'utilisateur (« oui ») : mon fichier et cette section seulement. Statut :
   terminé. Réservations libérées.
+
+## 2026-11-15 — Cap Étoile : page de test sous /cap-etoile/ (session SuiviFamilial)
+- Statut : en cours (2026-11-15T18:40+01:00). Demande de l'utilisateur : On voit encore l'ancien nom et dans l'URL
+  aussi ... on ne voit jamais le logo Ludiven Studio ou le nom
+- Réservations actives : `src/pages/cap-etoile/`, `src/pages/suivi-familial/`, `public/cap-etoile/`,
+  `public/suivi-familial/`, `astro.config.mjs` (redirection et exclusions).
+- Ressources : serveur de dev sur le port 4495 ; eslint, `astro check`. Build annoncé ici avant.
+- 18:41 : Page et icône déplacées sous /cap-etoile/, redirection depuis l'ancienne adresse, exclusions sitemap et sw.js
+  ; eslint et astro check 0 erreur. Lancement du build complet (écrit dist/, .astro/, public/vendor/ du worktree
+  cap-etoile-url)…
+- 18:43 : Build complet OK : 228 pages, précache 390, liens OK ; l'ancienne adresse redirige. En attente du feu vert.
+- 18:57 : commité et poussé à la demande de l'utilisateur (« ok ») : mes fichiers et cette section seulement. Statut :
+  terminé. Réservations libérées.
