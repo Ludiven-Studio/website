@@ -3279,3 +3279,16 @@
 - 17:59 : Build complet OK : 228 pages, précache 390, liens OK. En attente du feu vert de l'utilisateur pour le push.
 - 18:10 : commité et poussé à la demande de l'utilisateur (« ok ») : mon fichier et cette section seulement. Statut :
   terminé. Réservations libérées.
+
+## 2026-11-15 — Cap Étoile : nom du fichier d'installation sur la page de test (session SuiviFamilial)
+- Statut : en cours (2026-11-15T18:21+01:00). Demande de l'utilisateur : il faudrait renommer le nom de l'executable
+  non ? et le aussi sur le site web
+- Réservations actives : `src/pages/suivi-familial/test-7o8v154o.astro`.
+- Ressources : serveur de dev sur le port 4494 ; eslint, `astro check`. Build annoncé ici avant.
+- 18:23 : Nom du fichier affiché : CapEtoile-Setup-…exe (étape 1 et dessin SmartScreen) ; eslint et astro check 0
+  erreur. Lancement du build complet (écrit dist/, .astro/, public/vendor/ du worktree cap-etoile-setup-name)…
+- 18:24 : Build complet OK : 228 pages, précache 390, liens OK. En attente du feu vert (0.3.7 + push).
+- 18:33 : Installateur 0.3.7 (CapEtoile-Setup-0.3.7.exe) envoyé sur la préversion suivifamilial-test, octets servis
+  identiques.
+- 18:33 : commité et poussé à la demande de l'utilisateur (« oui ») : mon fichier et cette section seulement. Statut :
+  terminé. Réservations libérées.
