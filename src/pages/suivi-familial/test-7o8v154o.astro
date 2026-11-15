@@ -37,8 +37,30 @@ const LATEST = `${SUPABASE_URL}/storage/v1/object/public/builds/suivifamilial/la
 			<h2>Installer sur Windows 10 ou 11</h2>
 			<ol>
 				<li>Touchez « Télécharger », puis ouvrez le fichier <code>SuiviFamilial-Setup-…exe</code>.</li>
-				<li>Windows affiche « Windows a protégé votre ordinateur » : la version de test n'est pas encore signée. Cliquez sur « Informations complémentaires », puis « Exécuter quand même ».</li>
-				<li>L'installation se fait pour vous seule, sans mot de passe administrateur, et crée un raccourci sur le bureau.</li>
+				<li>
+					Windows peut afficher une fenêtre bleue « Windows a protégé votre ordinateur ». C'est normal : le logiciel est encore peu connu de Windows. Deux clics suffisent :
+					<div class="ss-steps" aria-hidden="true">
+						<figure class="ss">
+							<div class="ss-box">
+								<p class="ss-title">Windows a protégé votre ordinateur</p>
+								<p class="ss-text">Le filtre a empêché le démarrage d'une application non reconnue…</p>
+								<p class="ss-link ss-hot">Informations complémentaires</p>
+								<p class="ss-btns"><span class="ss-btn">Ne pas exécuter</span></p>
+							</div>
+							<figcaption>1. Cliquez sur « Informations complémentaires ».</figcaption>
+						</figure>
+						<figure class="ss">
+							<div class="ss-box">
+								<p class="ss-title">Windows a protégé votre ordinateur</p>
+								<p class="ss-text">Application : SuiviFamilial-Setup-….exe<br />Éditeur : Éditeur inconnu</p>
+								<p class="ss-btns"><span class="ss-btn ss-hot">Exécuter quand même</span><span class="ss-btn">Ne pas exécuter</span></p>
+							</div>
+							<figcaption>2. Cliquez sur « Exécuter quand même ».</figcaption>
+						</figure>
+					</div>
+					<p class="muted small">Dessin simplifié : la fenêtre réelle peut être un peu différente. Vous ne le ferez qu'une fois : les mises à jour s'installent ensuite sans cette fenêtre.</p>
+				</li>
+				<li>L'installation se fait pour votre compte Windows seulement, sans mot de passe administrateur, et crée un raccourci sur le bureau.</li>
 				<li>Au premier lancement, choisissez votre phrase secrète.</li>
 			</ol>
 			<p class="muted">Pour une nouvelle version, refaites la même chose : elle s'installe par-dessus et garde vos dossiers. Désinstaller le logiciel (Paramètres Windows › Applications) ne supprime pas les dossiers.</p>
@@ -96,6 +118,53 @@ const LATEST = `${SUPABASE_URL}/storage/v1/object/public/builds/suivifamilial/la
 	.test-page {
 		max-width: 40rem;
 		margin-inline: auto;
+	}
+	.ss-steps {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+		gap: 1rem;
+		margin-block: 0.8rem;
+	}
+	.ss {
+		margin: 0;
+	}
+	.ss-box {
+		padding: 1rem;
+		border-radius: 0.4rem;
+		background: #1f5fa8;
+		color: #fff;
+		font-size: var(--text-sm);
+		line-height: 1.4;
+	}
+	.ss-box p {
+		margin: 0 0 0.6rem;
+	}
+	.ss-title {
+		font-size: var(--text-base);
+		font-weight: 600;
+	}
+	.ss-link {
+		text-decoration: underline;
+		display: inline-block;
+	}
+	.ss-btns {
+		display: flex;
+		justify-content: flex-end;
+		gap: 0.5rem;
+		flex-wrap: wrap;
+	}
+	.ss-btn {
+		padding: 0.3rem 0.8rem;
+		border: 1px solid #fff;
+	}
+	.ss-hot {
+		outline: 3px solid #ffcf3f;
+		outline-offset: 3px;
+		border-radius: 0.2rem;
+	}
+	.ss figcaption {
+		margin-top: 0.5rem;
+		font-weight: 600;
 	}
 	.test-page [hidden] {
 		display: none !important;
