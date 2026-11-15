@@ -16,6 +16,7 @@
 <!-- Bump v when a script changes: browsers keep the old file for ten minutes otherwise. -->
 <script src="common.js?v=1"></script>
 <script src="pictures.js?v=1"></script>
+<script src="art.js?v=1"></script>
 <script>
 // The player draws lines of dominoes with a finger, from the gold domino to the pieces of a hidden picture
 // scattered on the table. Then a flick: the wave runs along the lines. A piece it touches falls, shows its part
@@ -83,6 +84,14 @@ function saveProg() { try { localStorage.setItem(SAVE, JSON.stringify(prog)); } 
 
 // state: menu, edit (drawing), run (the wave), miss (pieces left standing), rise (all stands up again), won.
 let state = 'menu', L = null, clock = 0, since = 0, endAt = 0, pen = null, erasing = false;
+// While a finger is down the table zooms by `s` about the point (ax, ay) of the unzoomed screen, so a finger
+// move draws a shorter line; near an edge of the view it scrolls that way.
+const ZOOM = 1.75, EDGE = 170, TOP_BAR = 1764, SCROLL = 650;
+const cam = { s: 1, ax: W / 2, ay: H / 2 };
+const toScreen = (x, y) => [(x - cam.ax) * cam.s + cam.ax, (y - cam.ay) * cam.s + cam.ay];
+const fromScreen = (x, y) => [(x - cam.ax) / cam.s + cam.ax, (y - cam.ay) / cam.s + cam.ay];
+// The picture's drawn version comes in at REVEAL after the win, the panel at PANEL.
+const REVEAL = 1.45, PANEL = 2.1;
 
 // ---- Sound
 const SCALE = [72, 74, 76, 79, 81, 84, 86, 88, 91].map(m => 440 * Math.pow(2, (m - 69) / 12));
@@ -299,6 +308,7 @@ const reached = () => L.islands.filter(isl => isFinite(isl.at)).length;
 const starsNow = () => L.used <= L.three ? 3 : L.used <= L.two ? 2 : 1;
 function step() {
   const t = CC.time;
+  stepCamera();
   if (state === 'run') {
     clock += CC.DT;
     for (; L.seqI < L.seq.length && L.seq[L.seqI].at <= clock; L.seqI++) {
@@ -310,14 +320,31 @@ function step() {
     if (clock >= endAt) {
       since = t;
       if (reached() === L.islands.length) {
-        state = 'won';
+        state = 'won'; L.chimed = false;
         prog.stars[L.n] = Math.max(prog.stars[L.n] || 0, starsNow());
         saveProg();
         [0, 2, 4, 7].forEach((s, k) => mallet(s, 0.16, 0.9 + k * 0.09));
       } else { state = 'miss'; tone(330, 0.12, 0.3); }
     }
+  } else if (state === 'won' && !L.chimed && t - since > REVEAL) {
+    L.chimed = true;
+    [7, 8, 6, 8].forEach((s, k) => mallet(s, 0.12, k * 0.08));
   } else if (state === 'miss' && t - since > 2.2) { state = 'rise'; since = t; }
   else if (state === 'rise' && t - since > 0.5) { state = 'edit'; standUp(); }
+}
+function stepCamera() {
+  const want = pen && (pen.moved || CC.time - pen.t0 > 0.1) ? ZOOM : 1;
+  cam.s += (want - cam.s) * (1 - Math.exp(-CC.DT * 9));
+  if (Math.abs(cam.s - 1) < 0.002) cam.s = 1;
+  if (!pen || pen.fx == null) return;
+  const push = (v, hi) => Math.max(-1, Math.min(1, v < EDGE ? (v - EDGE) / EDGE : v > hi - EDGE ? (v - hi + EDGE) / EDGE : 0));
+  const vx = push(pen.fx, W), vy = push(pen.fy, TOP_BAR);
+  if (cam.s > 1.05 && (vx || vy)) {
+    const k = SCROLL * CC.DT / (1 - 1 / cam.s);
+    cam.ax = Math.max(0, Math.min(W, cam.ax + vx * k)); cam.ay = Math.max(0, Math.min(H, cam.ay + vy * k));
+  }
+  // The table moves under a still finger: the line goes on.
+  move(pen.fx, pen.fy, true);
 }
 // How far a piece leans, from standing (0) to its rest; all stand up again during `rise`.
 function lean(p) {
@@ -388,6 +415,8 @@ function draw(ctx) {
   if (state === 'menu') { drawMenu(ctx); return; }
   const t = CC.time, lv = L.lv;
   table(ctx);
+  ctx.save();
+  ctx.translate(cam.ax * (1 - cam.s), cam.ay * (1 - cam.s)); ctx.scale(cam.s, cam.s);
   // Water, bridges, the marble's rail, rocks.
   for (const w of lv.water || []) {
     const [x, y, ww, hh] = rect(w);
@@ -443,13 +472,17 @@ function draw(ctx) {
     const s0 = L.fixed[0], beat = 0.5 + 0.5 * Math.sin(t * 5);
     ctx.strokeStyle = `rgba(255,220,80,${L.doms.length ? 0.4 : 0.9})`; ctx.lineWidth = 6;
     ctx.beginPath(); ctx.arc(px(s0.x + 0.1), py(s0.z + 0.25), 58 + 10 * beat, 0, Math.PI * 2); ctx.stroke();
+    if (pen && pen.fx != null) drawPen(ctx);
   }
+  ctx.restore();
   if (won) {
     ctx.fillStyle = `rgba(20,24,44,${0.72 * k})`; ctx.fillRect(0, 0, W, H);
-    for (const c of L.cells) {
+    const r = smooth((t - since - REVEAL) / 0.5);
+    if (r < 1) for (const c of L.cells) {
       const x = c.x + (c.tx - c.x) * k, z = c.z + (c.tz - c.z) * k, side = CELL + (BIG - CELL) * k;
       ctx.fillStyle = shade(c.rgb, 1); ctx.fillRect(px(x - side / 2), py(z + side / 2), side * S + 0.6, side * S + 0.6);
     }
+    if (r > 0) drawArt(ctx, r, t - since - REVEAL);
   }
   drawBar(ctx, t);
   // Head: back to the levels, the level, its best stars.
@@ -457,8 +490,11 @@ function draw(ctx) {
   text(ctx, '‹', 70, 62, 70); text(ctx, String(L.n + 1), 122, 68, 44);
   stars3(ctx, W - 130, 66, 30, prog.stars[L.n] || 0);
   if (state === 'edit' && lv.hint) {
+    ctx.save();
+    ctx.globalAlpha = 1 - 0.75 * (cam.s - 1) / (ZOOM - 1);
     ctx.fillStyle = 'rgba(0,0,0,0.3)'; CC.roundRect(ctx, 200, 130, W - 260, 150, 30); ctx.fill();
     wrap(ctx, lv.hint, W / 2 + 70, 205, 36, W - 320, '#fff');
+    ctx.restore();
   }
   if (state === 'miss') {
     const left = L.islands.length - reached();
@@ -485,6 +521,41 @@ function drawPiece(ctx, p, t) {
   } else if (tilt >= Math.PI / 2 - 0.001) {
     ctx.fillStyle = shade(p.rgb, 1); ctx.fillRect(left, py(p.z + CELL / 2 - 0.01), wide, CELL * S * 0.97);
   } else box(ctx, p.x, p.z, p.fa, 0, 0.06, CELL * 0.92, hei, tilt, [236, 238, 242], p.rgb);
+}
+// Under the finger: the eraser's reach, or a dotted line to where the next dominoes go.
+function drawPen(ctx) {
+  const [gx, gz] = toGround(pen.fx, pen.fy);
+  ctx.save();
+  if (pen.erase) {
+    ctx.strokeStyle = 'rgba(255,157,181,0.9)'; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.arc(px(gx), py(gz), 0.45 * S, 0, Math.PI * 2); ctx.stroke();
+  } else if (pen.p && !pen.full) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.setLineDash([2, 14]);
+    ctx.beginPath(); ctx.moveTo(px(pen.p[0]), py(pen.p[1])); ctx.lineTo(px(gx), py(gz)); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(px(gx), py(gz), 22, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.restore();
+}
+// The drawn picture over the cells, coming in with a little pop and sparkles.
+function drawArt(ctx, r, t) {
+  const side = BIG * S, w = PICS.cols * side, h = PICS.rows * side, cy = py(11.2), pop = 1 + 0.05 * Math.sin(Math.PI * r);
+  ctx.save();
+  ctx.globalAlpha = r;
+  ctx.translate(W / 2, cy); ctx.scale(pop, pop); ctx.translate(-w / 2, -h / 2);
+  CC.roundRect(ctx, 0, 0, w, h, 24); ctx.clip();
+  ctx.scale(side, side);
+  ART[L.pic.name](ctx, Math.max(0, t));
+  ctx.restore();
+  if (r >= 1) return;
+  ctx.save();
+  ctx.globalAlpha = Math.sin(Math.PI * r);
+  ctx.fillStyle = '#fff6b0';
+  for (let i = 0; i < 16; i++) {
+    const a = i * 2.4, d = (0.55 + 0.5 * r) * (0.85 + 0.25 * Math.sin(i * 1.7));
+    CC.star(ctx, W / 2 + Math.cos(a) * d * w / 2, cy + Math.sin(a) * d * h / 2, 6 + 14 * (1 - r)); ctx.fill();
+  }
+  ctx.restore();
 }
 // The bar: undo, eraser, the box of dominoes with the star marks, and the flick.
 const UNDO = [90, 1832, 54], ERASE = [218, 1832, 54], GAUGE = [300, 1808, 470, 48], PLAY = [800, 1790, 250, 84];
@@ -519,7 +590,7 @@ function drawBar(ctx, t) {
   ctx.restore();
 }
 function drawWon(ctx, t) {
-  const k = smooth((t - since - 1.4) / 0.35);
+  const k = smooth((t - since - PANEL) / 0.35);
   ctx.save();
   ctx.globalAlpha = k;
   text(ctx, L.pic.name, W / 2, 230, 66);
@@ -548,11 +619,12 @@ function drawMenu(ctx) {
     ctx.fillStyle = st ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.25)'; CC.roundRect(ctx, x, y, w, h, 28); ctx.fill();
     if (st) {
       // A level done shows its picture.
-      const pic = PICS.list.find(p => p.name === LEVELS[i].pic), c = 7, left = x + (w - PICS.cols * c) / 2;
-      for (let k = 0; k < pic.cells.length; k++) {
-        ctx.fillStyle = PICS.palette[parseInt(pic.cells[k], 36)];
-        ctx.fillRect(left + (k % PICS.cols) * c, y + 18 + Math.floor(k / PICS.cols) * c, c + 0.5, c + 0.5);
-      }
+      const c = 7, left = x + (w - PICS.cols * c) / 2;
+      ctx.save();
+      CC.roundRect(ctx, left, y + 18, PICS.cols * c, PICS.rows * c, 16); ctx.clip();
+      ctx.translate(left, y + 18); ctx.scale(c, c);
+      ART[LEVELS[i].pic](ctx, CC.time + i * 0.7);
+      ctx.restore();
       ctx.fillStyle = 'rgba(20,24,44,0.75)'; CC.roundRect(ctx, x + 8, y + 8, 62, 50, 18); ctx.fill();
       text(ctx, String(i + 1), x + 39, y + 35, 32);
     } else text(ctx, String(i + 1), x + w / 2, y + 96, 84);
@@ -563,7 +635,8 @@ function drawMenu(ctx) {
 // ---- Input
 const inRect = (x, y, r, pad = 0) => x >= r[0] - pad && x <= r[0] + r[2] + pad && y >= r[1] - pad && y <= r[1] + r[3] + pad;
 const inCircle = (x, y, c, pad = 0) => Math.hypot(x - c[0], y - c[1]) <= c[2] + pad;
-const toGround = (x, y) => [x / S, (H - y) / S];
+// A screen point to the ground, through the zoom.
+const toGround = (x, y) => { const [wx, wy] = fromScreen(x, y); return [wx / S, (H - wy) / S]; };
 function down(x, y) {
   audio();
   if (state === 'menu') {
@@ -571,19 +644,27 @@ function down(x, y) {
     return;
   }
   if (inRect(x, y, [24, 24, 150, 84], 16)) { state = 'menu'; pen = null; return; }
-  if (state === 'won') { if (smooth((CC.time - since - 1.4) / 0.35) > 0.5) for (const b of wonButtons()) if (inRect(x, y, b.rect, 8)) { b.act(); return; } return; }
+  if (state === 'won') { if (smooth((CC.time - since - PANEL) / 0.35) > 0.5) for (const b of wonButtons()) if (inRect(x, y, b.rect, 8)) { b.act(); return; } return; }
   if (state !== 'edit') return;
   if (inCircle(x, y, UNDO, 10)) { undo(); return; }
   if (inCircle(x, y, ERASE, 10)) { erasing = !erasing; tock(0.6); return; }
   if (inRect(x, y, PLAY, 10)) { flick(); return; }
-  if (y > 1764) return;
-  const [gx, gz] = toGround(x, y), s0 = L.fixed[0];
-  if (erasing) { pen = { erase: true }; eraseAt(gx, gz); return; }
+  if (y > TOP_BAR) return;
+  // Zoom about the finger, unless the last zoom has not settled back yet.
+  if (cam.s === 1) { cam.ax = x; cam.ay = y; }
+  const [gx, gz] = toGround(x, y), s0 = L.fixed[0], finger = { fx: x, fy: y, x0: x, y0: y, t0: CC.time, moved: false };
+  if (erasing) { pen = { erase: true, ...finger }; eraseAt(gx, gz); return; }
   penDown(gx, gz);
-  Object.assign(pen, { x0: x, y0: y, onStart: Math.hypot(x - px(s0.x), y - py(s0.z + 0.25)) < 80 });
+  const [sx, sy] = toScreen(px(s0.x), py(s0.z + 0.25));
+  Object.assign(pen, finger, { onStart: Math.hypot(x - sx, y - sy) < 80 * cam.s });
 }
-function move(x, y) {
+// auto: the camera moved under a still finger.
+function move(x, y, auto) {
   if (!pen) return;
+  if (!auto) {
+    pen.fx = x; pen.fy = y;
+    if (Math.hypot(x - pen.x0, y - pen.y0) > 14) pen.moved = true;
+  }
   const [gx, gz] = toGround(x, y);
   if (pen.erase) eraseAt(gx, gz); else penMove(gx, gz);
 }
