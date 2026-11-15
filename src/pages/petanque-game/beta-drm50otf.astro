@@ -2,23 +2,23 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 
 // Unlisted: noindex, out of the sitemap and of the offline precache (astro.config.mjs).
-// The next store version, built from the game's main (79da7fa) under the .beta id, signed with the dev key,
-// ARM64 only, on a prerelease of this repo (the 1.0.7 APK stays there).
+// The next store version, built from the game's main (8c9b51e) under the .beta id, signed with the dev key,
+// ARM64 only, on a prerelease of this repo (the earlier betas' APKs stay there).
 const BETA = {
-	version: '1.0.8',
-	date: '2026-11-08',
-	size: 101366181,
+	version: '1.0.9',
+	date: '2026-11-15',
+	size: 101285231,
 	android: '7.1',
-	sha256: '25d4c1804e2d6a211cd7ff794754ba7c20afc033e8088eb02bce32ba23176f79',
-	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-game-beta/petanque-game-1.0.8-beta.apk',
+	sha256: '010e7eb42d5f29aee6f6370b67662768020696181f7c15ec10bedaa6aea75cf6',
+	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-game-beta/petanque-game-1.0.9-beta.apk',
 };
 const date = new Date(BETA.date).toLocaleDateString('fr-FR', { dateStyle: 'medium' });
 const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 ---
 
 <BaseLayout
-	title="Pétanque Game β — version 1.0.8 | Ludiven Studio"
-	description="Version bêta Android de Pétanque Game 1.0.8, pour les testeurs."
+	title="Pétanque Game β — version 1.0.9 | Ludiven Studio"
+	description="Version bêta Android de Pétanque Game 1.0.9, pour les testeurs."
 	noindex
 >
 	<div class="wrapper beta-page stack gap-6">
@@ -30,13 +30,35 @@ const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 			</p>
 		</header>
 
+		<section class="card stack gap-3">
+			<h2>Quoi de neuf à tester</h2>
+			<ul>
+				<li>
+					<strong>Le premier lancement</strong> : une partie démarre tout de suite contre une pointeuse, sur un terrain lisse ;
+					le choix du joueur et de la main viennent après.
+				</li>
+				<li><strong>Sans compte</strong> : les pièces, le magasin, les défis, le bonus du jour et les ligues marchent aussi.</li>
+				<li>
+					<strong>Reprendre une partie</strong> : ferme le jeu en pleine partie contre l'ordinateur, rouvre-le, il propose de la
+					reprendre là où elle en était.
+				</li>
+				<li>
+					<strong>Pendant la partie</strong> : la ligne du tour dit pourquoi tel camp joue, les boules qui tiennent le point sont
+					entourées, le téléphone vibre quand les boules se touchent (Options › Vibrations).
+				</li>
+				<li>
+					<strong>Après la partie</strong> : un prochain objectif sous le résultat. Les nouvelles parties se jouent en 7 points.
+				</li>
+			</ul>
+		</section>
+
 		<section class="card notice stack gap-3">
 			<h2>À savoir avant d'installer</h2>
 			<ul>
 				<li>
-					<strong>C'est ton vrai compte.</strong> Connecte-toi avec Google comme dans le jeu du store : tu retrouves tes pièces, tes
-					coupes et ton classement. Ce que tu gagnes ou dépenses dans la β compte pour de vrai, et une partie en ligne peut te
-					faire jouer contre un joueur du store.
+					<strong>C'est ton vrai compte.</strong> Si tu te connectes avec Google comme dans le jeu du store, tu retrouves tes
+					pièces, tes coupes et ton classement. Ce que tu gagnes ou dépenses dans la β compte pour de vrai, et une partie en ligne
+					peut te faire jouer contre un joueur du store.
 				</li>
 				<li>
 					<strong>Pas d'achat.</strong> Le Play Store ne connaît pas la β : son magasin ne vend ni pièces ni « Sans publicité ».
@@ -76,8 +98,8 @@ const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 					Play Protect peut aussi prévenir que l'appli lui est inconnue : choisis de l'installer quand même.
 				</li>
 				<li>
-					L'icône « Pétanque Game β » apparaît à côté de celle de Pétanque Game. Au premier lancement, elle pose les questions
-					d'une première installation.
+					L'icône « Pétanque Game β » apparaît à côté de celle de Pétanque Game. Au premier lancement, elle fait comme une
+					première installation : une partie démarre tout de suite.
 				</li>
 			</ol>
 			<p class="muted">Pour l'enlever : appui long sur « Pétanque Game β », puis Désinstaller. Le jeu du store reste tel quel.</p>
