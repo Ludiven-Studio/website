@@ -2,23 +2,23 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 
 // Unlisted: noindex, out of the sitemap and of the offline precache (astro.config.mjs).
-// The next store version, built from the game's main (2c06e61) under the .beta id, signed with the dev key,
+// The next store version, built from the game's main (28f9b3a) under the .beta id, signed with the dev key,
 // ARM64 only, on a prerelease of this repo (the earlier betas' APKs stay there).
 const BETA = {
-	version: '1.0.10',
+	version: '1.0.11',
 	date: '2026-11-15',
-	size: 99771131,
+	size: 99776051,
 	android: '7.1',
-	sha256: '21ae89820749cd70d92dcf2e44e72d986f7f081a041f2104e757b4338d9cf51b',
-	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-game-beta/petanque-game-1.0.10-beta.apk',
+	sha256: '8c28ae5d2f0f3746581d429dac6dcd9deaf0af5382ad47665502a4a6b7085cdf',
+	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-game-beta/petanque-game-1.0.11-beta.apk',
 };
 const date = new Date(BETA.date).toLocaleDateString('fr-FR', { dateStyle: 'medium' });
 const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 ---
 
 <BaseLayout
-	title="Pétanque Game β — version 1.0.10 | Ludiven Studio"
-	description="Version bêta Android de Pétanque Game 1.0.10, pour les testeurs."
+	title="Pétanque Game β — version 1.0.11 | Ludiven Studio"
+	description="Version bêta Android de Pétanque Game 1.0.11, pour les testeurs."
 	noindex
 >
 	<div class="wrapper beta-page stack gap-6">
@@ -50,9 +50,14 @@ const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 					<strong>Après la partie</strong> : un prochain objectif sous le résultat. Les nouvelles parties se jouent en 7 points.
 				</li>
 				<li>
-					<strong>Nouveau dans la 1.0.10</strong> : les images des menus et de la manette prennent quatre fois moins de mémoire.
-					Rien ne doit changer à l'œil ; c'est surtout à essayer sur un téléphone ou une tablette modeste (2 Go de mémoire).
+					<strong>L'aide pour lancer</strong> (au premier lancer, ou Menu › Revoir comment lancer) : le texte est juste au-dessus
+					de la planche, le reste de l'écran s'assombrit, et elle finit par « À toi ! » où tu lances pour de vrai.
 				</li>
+				<li>
+					<strong>Le bouchon placé</strong> : quand tu poses le bouchon, la caméra revient pour regarder l'adversaire jouer
+					sa première boule.
+				</li>
+				<li>Les images des menus et de la planche prennent quatre fois moins de mémoire.</li>
 			</ul>
 		</section>
 
