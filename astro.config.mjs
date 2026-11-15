@@ -61,6 +61,7 @@ export default defineConfig({
                 !page.includes('/prototypes') &&
                 !page.includes('/jeux/petanque/test') &&
                 !page.includes('/jeux/eclats/test') &&
+                !page.includes('/suivi-familial/') &&
                 !page.includes('/jeux/eclats/nuit') &&
                 !page.includes('/beta-') &&
                 !page.includes('/admin/'),
@@ -98,6 +99,7 @@ export default defineConfig({
                     'jeux/petanque/test/**',
                     'jeux/eclats/test/**',
                     'rencontres/test/**',
+                    'suivi-familial/**',
                     // Unlisted work-in-progress games: their own three.js copy stays off every visitor's precache.
                     'prototypes/**',
                 ],
