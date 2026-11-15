@@ -24,7 +24,9 @@
 // of dominoes. Then a flick on the gold domino: the wave runs as far as the course holds.
 // Two modes. Calm: the player flicks when ready. Live: the wave leaves by itself and the player fills the gaps
 // as it comes; it slows right down before a place that does not hold yet, and runs once the way is clear.
-// Live, each gap has its own tiles: the hand shows those of the first gap that does not hold yet.
+// Live, each gap has its own tiles: the hand shows those of the first gap that does not hold yet. They are
+// tried on a bench, a big copy of that gap, where a tap turns a tile; once it all fits, the player slides the
+// whole piece up into the gap.
 // Ground is drawn from above, x to the right and z up the screen; a height shows as a shift up the screen (K)
 // and a little to the right (AX), so that a standing domino shows a face.
 const canvas = document.getElementById('c');
@@ -33,11 +35,13 @@ const X1 = 1.375, X2 = 9.875, PITCH = 2, Z0 = 4.6, ZTOP = 17.9, ROW = 8.5;
 const TALL = 0.9, WIDE = 0.5, THIN = 0.12, PLATE = 0.08, RATE = 16, REST = 76 * Math.PI / 180, FALL = 0.24;
 // Live wave: dominoes a second, how far ahead it sees trouble, its speed in slow motion, seconds before it leaves.
 const LIVE = 6, NEAR = 4, SLOW = 0.8, WAIT = 3;
+// Live bench and hand, in pixels; the course sits higher to make room (LIFT, in ground units).
+const BENCH = { y: 1676, h: 92, step: 204, top: 1584, bottom: 1768 }, HAND = { y: 1846, h: 76, step: 180 }, LIFT = 0.6, FLY = 0.22;
 const OPEN_ALL = true, SAVE = 'cc-bridge-v1';
 const PIP = ['#000000', '#2f7fe0', '#2aa24d', '#e23d3d', '#8b46d8', '#ee8a1c', '#12a3a3'];
 const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
 const LIVE_HINTS = {
-  0: 'La vague part toute seule. Touche le bon domino avant qu’elle arrive au trou : elle ralentit juste devant.',
+  0: 'Pose le domino en bas, touche-le pour le tourner, puis fais-le glisser jusqu’au trou avant la vague.',
   4: 'Deux dominos à la suite : ils se touchent par le même nombre.',
 };
 const HINTS = {
@@ -91,7 +95,8 @@ const bonk = () => { tone(150, 0.2, 0.25, 'square'); tone(110, 0.15, 0.3, 'squar
 // ---- A level: the course, its gaps, the hand
 function load(n) {
   const def = live() ? BR.makeLive(n) : BR.make(n), R = def.rows, chain = [], ribbon = [];
-  const gaps = def.gaps.map((g, index) => ({ ...g, index, slots: Array(g.n).fill(-1), since: Array(g.n).fill(-9), first: [] }));
+  // bench (live): the tile on each seat of the gap's bench, seats from the left of the screen.
+  const gaps = def.gaps.map((g, index) => ({ ...g, index, slots: Array(g.n).fill(-1), since: Array(g.n).fill(-9), first: [], bench: Array(g.n).fill(-1) }));
   const arc = (cx, cz, d, f0, f1, count) => {
     for (let j = 0; j <= 12; j++) { const f = f0 + (f1 - f0) * j / 12; ribbon.push([cx + d * Math.cos(f), cz + Math.sin(f)]); }
     for (let j = 0; j < count; j++) {
@@ -99,9 +104,10 @@ function load(n) {
       chain.push({ x: cx + d * Math.cos(f), z: cz + Math.sin(f), a: d > 0 ? f + Math.PI / 2 : Math.PI / 2 - f, y0: 0 });
     }
   };
-  let dir = 1, z = Z0;
+  const z0 = live() ? Z0 + LIFT : Z0;
+  let dir = 1, z = z0;
   for (let r = 0; r < R; r++) {
-    z = Z0 + r * PITCH; dir = r % 2 ? -1 : 1;
+    z = z0 + r * PITCH; dir = r % 2 ? -1 : 1;
     // Gaps share the room left in the row, in half units so that dominoes keep their step.
     const mine = gaps.filter(g => g.row === r), pads = Array(mine.length + 1).fill(0);
     const room = Math.round((ROW - mine.reduce((s, g) => s + 2 * g.n + 2, 0)) * 2);
@@ -151,13 +157,15 @@ function load(n) {
   if (live()) for (const g of gaps) { g.k0 = hand.length; for (const tile of g.tiles) { hand.push(tile); owner.push(g.index); } }
   else for (const tile of def.hand) { hand.push(tile); owner.push(-1); }
   const home = hand.map((tile, k) => {
-    const at = live() ? k - gaps[owner[k]].k0 : k, count = live() ? gaps[owner[k]].tiles.length : hand.length;
-    const lines = Math.ceil(count / 5), line = Math.floor(at / 5), inLine = Math.min(5, count - line * 5);
-    return [W / 2 + (at % 5 - (inLine - 1) / 2) * 206, lines === 1 ? 1766 : 1704 + line * 116];
+    if (live()) { const g = gaps[owner[k]]; return [W / 2 + (k - g.k0 - (g.tiles.length - 1) / 2) * HAND.step, HAND.y]; }
+    const count = hand.length, lines = Math.ceil(count / 5), line = Math.floor(k / 5), inLine = Math.min(5, count - line * 5);
+    return [W / 2 + (k % 5 - (inLine - 1) / 2) * 206, lines === 1 ? 1766 : 1704 + line * 116];
   });
   const rand = BR.rng(n + 1), tune = [];
   for (let k = 0, at = 3; k < 32; k++) { at = Math.max(0, Math.min(8, at + Math.floor(rand() * 5) - 2)); tune.push(at); }
+  // flip: the tile shows on the bench the other way round. fly: tiles on their way from the bench to the course.
   L = { n, R, gaps, chain, ribbon, feed, pic, cells, c, zs, zf, dir, hand, owner, where: hand.map(() => null), home, tune,
+    flip: hand.map(() => false), flipAt: hand.map(() => -9), fly: null,
     order: chain.map(it => it.i).sort((p, q) => chain[q].z - chain[p].z || q - p) };
   state = 'play'; mistakes = 0; drag = null; stop = null; near = null; slowK = 0; clock = 0;
   startAt = CC.time + WAIT;
@@ -203,6 +211,74 @@ function takeBack(k) {
   if (!at || fixed(L.gaps[at[0]], at[1])) return;
   L.gaps[at[0]].slots[at[1]] = -1; L.where[k] = null;
   relay();
+}
+
+// ---- The bench (live): the active gap drawn big, its fixed numbers at both ends as they show on screen.
+const seatX = (g, p) => W / 2 + (p - (g.n - 1) / 2) * BENCH.step;
+const seatRect = (g, p) => [seatX(g, p) - BENCH.h, BENCH.y - BENCH.h / 2, 2 * BENCH.h, BENCH.h];
+const endX = (g, side) => W / 2 + side * ((g.n - 1) / 2 * BENCH.step + BENCH.h * 1.5 + 20);
+const ends = g => g.dir > 0 ? [g.a, g.b] : [g.b, g.a];
+const face = k => L.flip[k] ? [L.hand[k][1], L.hand[k][0]] : L.hand[k];
+const onBench = k => live() && L.gaps[L.owner[k]].bench.includes(k);
+// Each joint of the bench, from the left end to the right one: 'ok', 'bad' or 'open'.
+function benchJoints(g) {
+  const [left, right] = ends(g), f = g.bench.map(k => k < 0 ? null : face(k)), out = [];
+  for (let j = 0; j <= g.n; j++) {
+    const l = j === 0 ? left : f[j - 1] && f[j - 1][1], r = j === g.n ? right : f[j] && f[j][0];
+    out.push(l == null || r == null ? 'open' : l === r ? 'ok' : 'bad');
+  }
+  return out;
+}
+const fits = g => benchJoints(g).every(s => s === 'ok');
+// Where a tile tapped in the hand sits: the first empty seat, else the one after the first joint that fails.
+function benchFree(g) {
+  const p = g.bench.indexOf(-1);
+  if (p >= 0) return p;
+  const bad = benchJoints(g).indexOf('bad');
+  return bad < 0 ? -1 : Math.min(g.n - 1, bad);
+}
+// A tile onto seat p: the tile there goes back to the hand, or swaps with it when both are on the bench.
+function seat(k, p) {
+  const g = L.gaps[L.owner[k]], other = g.bench[p], from = g.bench.indexOf(k);
+  if (from === p) return;
+  if (from >= 0) g.bench[from] = other; else if (other >= 0) L.flip[other] = false;
+  g.bench[p] = k;
+  const j = benchJoints(g), near = [j[p], j[p + 1]];
+  if (near.includes('bad')) tock(0.1); else if (near.includes('ok')) { mallet(4, 0.14); mallet(6, 0.14, 0.09); } else tock(0.2);
+}
+function unseat(k) {
+  const g = L.gaps[L.owner[k]], p = g.bench.indexOf(k);
+  if (p >= 0) g.bench[p] = -1;
+  L.flip[k] = false;
+}
+function turn(k) {
+  L.flip[k] = !L.flip[k]; L.flipAt[k] = CC.time;
+  const g = L.gaps[L.owner[k]], p = g.bench.indexOf(k), j = benchJoints(g);
+  if (j[p] === 'ok' || j[p + 1] === 'ok') mallet(5, 0.12); else tock(0.5);
+}
+// The bench fits: its tiles fly into the gap, which then holds. dx, dy: how far the player has slid them.
+function send(g, dx = 0, dy = 0) {
+  if (!fits(g) || locked(g, 0)) return false;
+  const t = CC.time, items = [];
+  g.bench.forEach((k, p) => {
+    const i = g.dir > 0 ? p : g.n - 1 - p, r = slotRect(g, i);
+    g.slots[i] = k; g.since[i] = t + FLY; L.where[k] = [g.index, i];
+    items.push({ face: face(k), from: [seatX(g, p) + dx, BENCH.y + dy], to: [r[0] + r[2] / 2, r[1] + 0.62 * S + (S - 12) / 2] });
+  });
+  g.bench.fill(-1);
+  L.fly = { t, items };
+  relay();
+  [2, 4, 6, 7].forEach((n, k) => mallet(n, 0.15, k * 0.05));
+  return true;
+}
+// The seat under a point, the nearest first.
+function seatAt(g, x, y) {
+  let best = -1, bd = Infinity;
+  for (let p = 0; p < g.n; p++) {
+    const r = seatRect(g, p), d = Math.abs(x - seatX(g, p));
+    if (inRect(x, y, r, 50) && d < bd) { best = p; bd = d; }
+  }
+  return best;
 }
 
 // ---- The wave
@@ -368,7 +444,7 @@ function draw(ctx) {
     let grow = 1;
     if (it.slot) {
       const g = L.gaps[it.slot[0]];
-      if (g.slots[it.slot[1]] < 0) continue;
+      if (g.slots[it.slot[1]] < 0 || t < g.since[it.slot[1]]) continue;
       grow = Math.min(1, 0.2 + (t - g.since[it.slot[1]]) / 0.18);
     }
     const first = i === 0;
@@ -432,6 +508,7 @@ function draw(ctx) {
     }
     ctx.restore();
   }
+  if (live()) drawBench(ctx, t);
   drawHand(ctx, t);
   // Head: back to the levels, the level, the stars still to win.
   ctx.fillStyle = 'rgba(0,0,0,0.28)'; CC.roundRect(ctx, 24, 24, 150, 84, 42); ctx.fill();
@@ -480,10 +557,11 @@ function drawGap(ctx, g) {
   }
   for (let i = 0; i < g.n; i++) {
     const [x, y, w, h] = slotRect(g, i), k = g.slots[i];
-    if (k < 0) {
-      // An empty place: the line is cut, a dashed outline waits for a tile.
+    if (k < 0 || CC.time < g.since[i]) {
+      // An empty place: the line is cut, a dashed outline waits for a tile. Live, the whole active gap shows.
       const over = drag && drag.moved && drag.over && drag.over[0] === g.index && drag.over[1] === i;
-      const free = nextFree(), aim = free && free.g === g && free.i === i && (state === 'play' || state === 'run');
+      const free = !live() && nextFree();
+      const aim = (state === 'play' || state === 'run') && (live() ? g.index === active() : free && free.g === g && free.i === i);
       ctx.fillStyle = dark; CC.roundRect(ctx, x + 2, y, w - 4, 0.6 * S, 10); ctx.fill();
       ctx.fillStyle = over ? 'rgba(255,220,80,0.35)' : aim ? 'rgba(255,255,255,0.24)' : 'rgba(255,255,255,0.08)';
       CC.roundRect(ctx, x + 6, y + 0.62 * S, w - 12, S - 12, 14); ctx.fill();
@@ -497,14 +575,77 @@ function drawGap(ctx, g) {
 }
 function drawHand(ctx, t) {
   if (state === 'won') return;
+  const h = handH();
   L.hand.forEach((tile, k) => {
     if (!shown(k)) return;
     const [x, y] = L.home[k];
-    if (L.where[k] || (drag && drag.k === k && drag.moved)) {
-      ctx.fillStyle = 'rgba(0,0,0,0.14)'; CC.roundRect(ctx, x - 88, y - 44, 176, 88, 14); ctx.fill();
-    } else tileFace(ctx, x, y, 88, tile[0], tile[1], false, false);
+    if (L.where[k] || onBench(k) || (drag && drag.k === k && drag.moved)) {
+      ctx.fillStyle = 'rgba(0,0,0,0.14)'; CC.roundRect(ctx, x - h, y - h / 2, 2 * h, h, 14); ctx.fill();
+    } else tileFace(ctx, x, y, h, tile[0], tile[1], false, false);
   });
-  if (drag && drag.moved) tileFace(ctx, drag.x, drag.y - 130, 100, L.hand[drag.k][0], L.hand[drag.k][1], true, false);
+  if (drag && drag.moved && !drag.group) { const f = drag.seat != null ? face(drag.k) : L.hand[drag.k]; tileFace(ctx, drag.x, drag.y - 130, 100, f[0], f[1], true, false); }
+  if (L.fly) {
+    // Tiles from the bench on their way to the gap.
+    const p = smooth((t - L.fly.t) / FLY);
+    if (p >= 1) L.fly = null;
+    else for (const it of L.fly.items) {
+      const x = it.from[0] + (it.to[0] - it.from[0]) * p, y = it.from[1] + (it.to[1] - it.from[1]) * p;
+      tileFace(ctx, x, y, BENCH.h + (S - 8 - BENCH.h) * p, it.face[0], it.face[1], true, false);
+    }
+  }
+}
+const handH = () => live() ? HAND.h : 88;
+function drawBench(ctx, t) {
+  const g = L.gaps[active()];
+  if (!g || state === 'won') return;
+  const ok = fits(g), joints = benchJoints(g), beat = 0.5 + 0.5 * Math.sin(t * 6), h = BENCH.h;
+  const half = (g.n - 1) / 2 * BENCH.step + 2 * h + 44, moving = drag && drag.moved && drag.group;
+  const off = moving ? [drag.x - drag.x0, drag.y - drag.y0] : [0, 0];
+  ctx.fillStyle = 'rgba(0,0,0,0.22)'; CC.roundRect(ctx, W / 2 - half, BENCH.top, 2 * half, BENCH.bottom - BENCH.top, 30); ctx.fill();
+  if (ok) { ctx.strokeStyle = `rgba(255,210,63,${0.6 + 0.4 * beat})`; ctx.lineWidth = 6 + 3 * beat; ctx.stroke(); }
+  ends(g).forEach((v, side) => {
+    // A fixed end of the gap, as on the course.
+    const x = endX(g, side ? 1 : -1);
+    ctx.fillStyle = '#33415c'; CC.roundRect(ctx, x - h / 2 - 6, BENCH.y - h / 2 - 6, h + 12, h + 12, 16); ctx.fill();
+    ctx.fillStyle = '#e4ebf7'; CC.roundRect(ctx, x - h / 2 + 4, BENCH.y - h / 2 + 4, h - 8, h - 8, 12); ctx.fill();
+    pips(ctx, x, BENCH.y, h * 0.95, v);
+  });
+  const free = benchFree(g);
+  for (let p = 0; p < g.n; p++) {
+    const k = g.bench[p], [x, y, w, hh] = seatRect(g, p);
+    if (k < 0 || (drag && drag.moved && !drag.group && drag.k === k)) {
+      const over = drag && drag.moved && !drag.group && drag.over === p, aim = !drag && p === free && g.bench[p] < 0;
+      ctx.fillStyle = over ? 'rgba(255,220,80,0.35)' : aim ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.07)';
+      CC.roundRect(ctx, x + 4, y + 4, w - 8, hh - 8, 16); ctx.fill();
+      ctx.setLineDash([16, 12]); ctx.strokeStyle = over ? '#ffd23f' : aim ? '#fff' : 'rgba(255,255,255,0.55)'; ctx.lineWidth = aim ? 6 : 4; ctx.stroke(); ctx.setLineDash([]);
+      continue;
+    }
+    // A tap turns the tile: it spins half a turn.
+    const f = face(k), spin = (t - L.flipAt[k]) / 0.18;
+    ctx.save(); ctx.translate(seatX(g, p) + off[0], BENCH.y + off[1]);
+    if (spin < 1) ctx.rotate(Math.PI * (1 - smooth(spin)));
+    tileFace(ctx, 0, 0, h, f[0], f[1], moving, ok);
+    ctx.restore();
+  }
+  if (moving) return;
+  joints.forEach((s, j) => {
+    const x = j < g.n ? seatX(g, j) - h - 10 : seatX(g, g.n - 1) + h + 10, y = BENCH.y - h / 2 - 22;
+    if (s === 'ok') {
+      ctx.fillStyle = '#2aa24d'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 4;
+      CC.roundRect(ctx, x - 22, y - 10, 44, 20, 10); ctx.fill(); ctx.stroke();
+    } else if (s === 'bad') {
+      ctx.fillStyle = '#e23d3d'; ctx.beginPath(); ctx.arc(x, y, 20, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(x - 8, y - 8); ctx.lineTo(x + 8, y + 8); ctx.moveTo(x + 8, y - 8); ctx.lineTo(x - 8, y + 8); ctx.stroke();
+    }
+  });
+  if (ok) {
+    // It fits: an arrow calls for the slide up to the gap.
+    const y = BENCH.top - 18 - 12 * beat;
+    ctx.fillStyle = '#ffd23f'; ctx.strokeStyle = 'rgba(90,60,0,0.6)'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(W / 2, y - 34); ctx.lineTo(W / 2 + 34, y); ctx.lineTo(W / 2 + 14, y); ctx.lineTo(W / 2 + 14, y + 22);
+    ctx.lineTo(W / 2 - 14, y + 22); ctx.lineTo(W / 2 - 14, y); ctx.lineTo(W / 2 - 34, y); ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
 }
 function drawWon(ctx, t) {
   const k = smooth((t - since) / 0.35), stars = starsNow();
@@ -525,7 +666,7 @@ function wonButtons() {
     ...(more ? [{ label: 'Suivant', main: true, rect: [590, 1796, 380, 76], act: () => load(L.n + 1) }] : [])];
 }
 const tileRect = i => [50 + (i % 4) * 250, 372 + Math.floor(i / 4) * 250, 230, 230];
-const MODES = [{ mode: 'live', label: 'Contre la vague', rect: [110, 150, 420, 84], tip: 'La vague part toute seule : bouche chaque trou avec ses dominos avant qu’elle arrive.' },
+const MODES = [{ mode: 'live', label: 'Contre la vague', rect: [110, 150, 420, 84], tip: 'La vague part toute seule : assemble chaque morceau de pont en bas, puis glisse-le dans le trou avant elle.' },
   { mode: 'calm', label: 'Calme', rect: [550, 150, 420, 84], tip: 'Bouche chaque trou avec les bons dominos, puis une pichenette.' }];
 function drawMenu(ctx) {
   table(ctx);
@@ -577,10 +718,19 @@ function down(x, y) {
   if (state === 'won') { for (const b of wonButtons()) if (inRect(x, y, b.rect, 8)) { b.act(); return; } return; }
   // Live: the hand stays in play while the wave runs.
   if (state !== 'play' && !(state === 'run' && live() && !stop)) return;
-  const at = placeAt(x, y, 0);
-  if (at && at.g.slots[at.i] >= 0) { drag = { k: at.g.slots[at.i], x, y, x0: x, y0: y, moved: false, from: [at.g.index, at.i] }; return; }
+  const g = live() && L.gaps[active()];
+  if (g) {
+    // A tile of the bench: alone, or the whole piece once it fits.
+    for (let p = 0; p < g.n; p++) {
+      if (g.bench[p] >= 0 && inRect(x, y, seatRect(g, p), 10)) { drag = { k: g.bench[p], x, y, x0: x, y0: y, moved: false, from: null, seat: p, group: fits(g) }; return; }
+    }
+  } else if (!live()) {
+    const at = placeAt(x, y, 0);
+    if (at && at.g.slots[at.i] >= 0) { drag = { k: at.g.slots[at.i], x, y, x0: x, y0: y, moved: false, from: [at.g.index, at.i] }; return; }
+  }
+  const h = handH();
   for (let k = 0; k < L.hand.length; k++) {
-    if (!L.where[k] && shown(k) && inRect(x, y, [L.home[k][0] - 88, L.home[k][1] - 44, 176, 88], 12)) { drag = { k, x, y, x0: x, y0: y, moved: false, from: null }; return; }
+    if (!L.where[k] && !onBench(k) && shown(k) && inRect(x, y, [L.home[k][0] - h, L.home[k][1] - h / 2, 2 * h, h], 12)) { drag = { k, x, y, x0: x, y0: y, moved: false, from: null }; return; }
   }
   const s0 = L.chain[0];
   if (Math.hypot(x - px(s0.x), y - py(s0.z + 0.25)) < 90) flick();
@@ -593,6 +743,11 @@ function move(x, y) {
     drag.moved = true;
     if (drag.from) takeBack(drag.k);
   }
+  if (live()) {
+    const g = L.gaps[active()];
+    drag.over = g && drag.moved && !drag.group ? seatAt(g, x, y - 130) : -1;
+    return;
+  }
   const at = drag.moved && placeAt(x, y - 130, 30);
   drag.over = at ? [at.g.index, at.i] : null;
 }
@@ -600,6 +755,21 @@ function up() {
   if (!drag) return;
   const d = drag;
   drag = null;
+  if (live()) {
+    const g = L.gaps[active()];
+    if (!g) return;
+    if (!d.moved) {
+      // A tap: a tile of the bench turns, a tile of the hand sits on the bench.
+      if (d.seat != null) turn(d.k); else { const p = benchFree(g); if (p >= 0) seat(d.k, p); else bonk(); }
+    } else if (d.group) {
+      // The piece slid up goes into the gap; a short slide puts it back.
+      if (d.y0 - d.y > 90 && !send(g, d.x - d.x0, d.y - d.y0)) bonk();
+    } else {
+      const p = seatAt(g, d.x, d.y - 130);
+      if (p >= 0) seat(d.k, p); else if (d.seat != null) { unseat(d.k); tock(0); }
+    }
+    return;
+  }
   if (!d.moved) {
     // A tap: a tile of the course goes back to the hand, a tile of the hand goes to the first empty place.
     if (d.from) { if (!fixed(L.gaps[d.from[0]], d.from[1])) { takeBack(d.k); if (!live()) mistakes++; tock(0); } } else { const free = nextFree(); if (free) put(d.k, free.g, free.i); else bonk(); }

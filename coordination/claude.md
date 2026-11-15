@@ -3245,3 +3245,13 @@
   Store, Nino « Nouveau ».
 - 08:33 : commité et poussé à la demande de Raphaël (relayé) : mes 4 fichiers et cette section seulement. Statut :
   terminé. Réservations libérées.
+
+## 2026-11-15 — ColorChain : établi du pont de dominos (session colorchain)
+- Statut : en cours (2026-11-15T09:24+01:00). Demande de l'utilisateur : « je pense qu'il faudrait une "aire de jeux"
+  pour les préparer et une fois qu'on a trouvé la solution, déplacer l'ensemble pour former le pont »
+- Réservations actives : `public/prototypes/domino-pont/index.html`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 09:24 : index.html copié de ColorChain 5436ed9 (scripts inchangés, identiques) ; 48 niveaux gagnés par script, 4
+  niveaux live joués par l'établi seul (taper, tourner, glisser), captures vues.
+- 09:24 : commité et poussé (mise à jour de prototype, accord permanent de Raphaël) : mon fichier et cette section
+  seulement. Statut : terminé. Réservations libérées.
