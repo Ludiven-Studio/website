@@ -26,12 +26,7 @@ const LATEST = `${SUPABASE_URL}/storage/v1/object/public/builds/suivifamilial/la
 			<p class="muted" data-state="loading">Chargement de la dernière version…</p>
 			<div class="stack gap-3" data-state="ready" hidden>
 				<a class="download" data-field="url" href="#">Télécharger pour Windows (version <span data-field="version"></span>)</a>
-				<p class="muted"><span data-field="date"></span> · <span data-field="size"></span> · commit <code data-field="commit"></code></p>
-				<p class="muted small">Empreinte SHA-256 : <code data-field="sha256"></code></p>
-				<div>
-					<h2>Nouveautés</h2>
-					<ul data-field="notes"></ul>
-				</div>
+				<p class="muted">Mise en ligne le <span data-field="date"></span> · <span data-field="size"></span></p>
 			</div>
 			<p class="muted" data-state="error" hidden>Aucune version de test n'est publiée pour l'instant.</p>
 		</section>
@@ -78,17 +73,29 @@ const LATEST = `${SUPABASE_URL}/storage/v1/object/public/builds/suivifamilial/la
 				<li>Les mises à jour automatiques arriveront plus tard : revenez sur cette page pour une nouvelle version.</li>
 			</ul>
 		</section>
+
+		<details class="tech" data-state="ready" hidden>
+			<summary>Détails techniques</summary>
+			<div class="stack gap-3">
+				<p class="muted small">Commit <code data-field="commit"></code> · empreinte SHA-256 : <code data-field="sha256"></code></p>
+				<div>
+					<h3>Dernières modifications</h3>
+					<ul class="small" data-field="notes"></ul>
+				</div>
+			</div>
+		</details>
 	</div>
 </BaseLayout>
 
 <script>
 	const box = document.getElementById('build');
+	const page = document.querySelector('.test-page');
 	const show = (state: string) => {
-		box?.querySelectorAll<HTMLElement>('[data-state]').forEach((el) => {
+		page?.querySelectorAll<HTMLElement>('[data-state]').forEach((el) => {
 			el.hidden = el.dataset.state !== state;
 		});
 	};
-	const field = (name: string) => box?.querySelector<HTMLElement>(`[data-field="${name}"]`);
+	const field = (name: string) => page?.querySelector<HTMLElement>(`[data-field="${name}"]`);
 
 	async function load() {
 		try {
@@ -195,6 +202,19 @@ const LATEST = `${SUPABASE_URL}/storage/v1/object/public/builds/suivifamilial/la
 	.small {
 		font-size: var(--text-sm);
 		overflow-wrap: anywhere;
+	}
+	.tech {
+		padding-top: 1rem;
+		margin-bottom: 2rem;
+		border-top: 1px solid var(--gray-800);
+	}
+	.tech summary {
+		cursor: pointer;
+		color: var(--gray-300);
+	}
+	.tech h3 {
+		margin-top: 1rem;
+		font-size: var(--text-base);
 	}
 	.card {
 		padding: 1.5rem;

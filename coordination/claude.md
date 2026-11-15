@@ -3267,3 +3267,15 @@
 - 16:53 : Build complet OK : 228 pages, précache 390, liens OK.
 - 16:53 : commité et poussé à la demande de l'utilisateur : mes 2 fichiers et cette section seulement. Statut :
   terminé. Réservations libérées.
+
+## 2026-11-15 — Cap Étoile : détails techniques en bas de la page de test (session SuiviFamilial)
+- Statut : en cours (2026-11-15T17:55+01:00). Demande de l'utilisateur : je ne suis pas sur que cela soit utile pour
+  mon amie de voir ces infos sur la page de téléchargement (peut etre les mettre en bas de page)
+- Réservations actives : `src/pages/suivi-familial/test-7o8v154o.astro`.
+- Ressources : serveur de dev sur le port 4493 ; eslint, `astro check`. Build annoncé ici avant.
+- 17:57 : Bloc « Détails techniques » repliable en bas de page (commit, empreinte, modifications) ; la carte ne garde
+  que le bouton, la date et la taille. eslint et astro check 0 erreur, captures bureau et téléphone sombre vues.
+  Lancement du build complet (écrit dist/, .astro/, public/vendor/ du worktree cap-etoile-details)…
+- 17:59 : Build complet OK : 228 pages, précache 390, liens OK. En attente du feu vert de l'utilisateur pour le push.
+- 18:10 : commité et poussé à la demande de l'utilisateur (« ok ») : mon fichier et cette section seulement. Statut :
+  terminé. Réservations libérées.
