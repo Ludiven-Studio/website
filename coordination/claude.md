@@ -3255,3 +3255,15 @@
   niveaux live joués par l'établi seul (taper, tourner, glisser), captures vues.
 - 09:24 : commité et poussé (mise à jour de prototype, accord permanent de Raphaël) : mon fichier et cette section
   seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-15 — Cap Étoile : page de test (nom, icône, licence) (session SuiviFamilial)
+- Statut : en cours (2026-11-15T16:45+01:00). Demande de l'utilisateur : ok retirer la 0.3.4, maj la page de test
+- Réservations actives : `src/pages/suivi-familial/test-7o8v154o.astro`, `public/suivi-familial/cap-etoile.png`.
+- Ressources : serveur de dev sur le port 4492 ; eslint, `astro check`. Build annoncé ici avant.
+- 16:47 : page mise à jour (nom, icône, clé de licence) ; eslint et astro check 0 erreur ; captures bureau et téléphone
+  sombre vues. En attente du choix final du nom avant le push.
+- 16:51 : Nom confirmé (Cap Étoile). Lancement du build complet (écrit dist/, .astro/, public/vendor/ du worktree
+  cap-etoile-test)…
+- 16:53 : Build complet OK : 228 pages, précache 390, liens OK.
+- 16:53 : commité et poussé à la demande de l'utilisateur : mes 2 fichiers et cette section seulement. Statut :
+  terminé. Réservations libérées.

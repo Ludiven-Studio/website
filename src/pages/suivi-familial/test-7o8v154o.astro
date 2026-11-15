@@ -9,14 +9,17 @@ const LATEST = `${SUPABASE_URL}/storage/v1/object/public/builds/suivifamilial/la
 ---
 
 <BaseLayout
-	title="Suivi familial — version de test | Ludiven Studio"
-	description="Version de test Windows du logiciel Suivi familial."
+	title="Cap Étoile — version de test | Ludiven Studio"
+	description="Version de test Windows du logiciel Cap Étoile."
 	noindex
 >
 	<div class="wrapper test-page stack gap-6">
-		<header class="stack gap-2">
-			<h1>Suivi familial — version de test</h1>
-			<p class="lead">Logiciel Windows en cours de développement, pour le suivi des familles accompagnées. Cette page n'est pas publique : ne la partagez pas.</p>
+		<header class="brand">
+			<img src="/suivi-familial/cap-etoile.png" width="72" height="72" alt="" />
+			<div class="stack gap-2">
+				<h1>Cap Étoile — version de test</h1>
+				<p class="lead">Suivi des enfants et des familles. Logiciel Windows en cours de développement. Cette page n'est pas publique : ne la partagez pas.</p>
+			</div>
 		</header>
 
 		<section class="card stack gap-4" id="build" data-latest={LATEST}>
@@ -60,8 +63,9 @@ const LATEST = `${SUPABASE_URL}/storage/v1/object/public/builds/suivifamilial/la
 					</div>
 					<p class="muted small">Dessin simplifié : la fenêtre réelle peut être un peu différente. Vous ne le ferez qu'une fois : les mises à jour s'installent ensuite sans cette fenêtre.</p>
 				</li>
-				<li>L'installation se fait pour votre compte Windows seulement, sans mot de passe administrateur, et crée un raccourci sur le bureau.</li>
+				<li>L'installation se fait pour votre compte Windows seulement, sans mot de passe administrateur, et crée un raccourci « Cap Étoile » sur le bureau.</li>
 				<li>Au premier lancement, choisissez votre phrase secrète.</li>
+				<li>Le logiciel ouvre ensuite Paramètres › Licence : saisissez la clé de licence qui vous a été envoyée, puis cliquez sur « Vérifier ma clé ». Sans clé valide, vous pouvez consulter, mais pas créer ni modifier.</li>
 			</ol>
 			<p class="muted">Pour une nouvelle version, refaites la même chose : elle s'installe par-dessus et garde vos dossiers. Désinstaller le logiciel (Paramètres Windows › Applications) ne supprime pas les dossiers.</p>
 		</section>
@@ -70,7 +74,7 @@ const LATEST = `${SUPABASE_URL}/storage/v1/object/public/builds/suivifamilial/la
 			<h2>Pendant les tests</h2>
 			<ul>
 				<li>Utilisez uniquement des familles et des dossiers inventés, jamais de vraies données.</li>
-				<li>La licence n'est pas encore vérifiée dans cette version : tout est utilisable.</li>
+				<li>Une clé de licence de test est nécessaire : demandez-la à Ludiven Studio. Elle vaut 30 jours, sur 2 ordinateurs au plus. Pour la vérifier, seuls la clé, le numéro de version et un numéro tiré au hasard pour l'ordinateur sont envoyés ; aucun contenu de vos dossiers ne quitte l'ordinateur.</li>
 				<li>Les mises à jour automatiques arriveront plus tard : revenez sur cette page pour une nouvelle version.</li>
 			</ul>
 		</section>
@@ -165,6 +169,15 @@ const LATEST = `${SUPABASE_URL}/storage/v1/object/public/builds/suivifamilial/la
 	.ss figcaption {
 		margin-top: 0.5rem;
 		font-weight: 600;
+	}
+	.brand {
+		display: flex;
+		gap: 1rem;
+		align-items: flex-start;
+	}
+	.brand img {
+		flex: none;
+		border-radius: 1rem;
 	}
 	.test-page [hidden] {
 		display: none !important;
