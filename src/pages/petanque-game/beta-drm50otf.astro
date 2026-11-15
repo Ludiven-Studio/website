@@ -2,23 +2,23 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 
 // Unlisted: noindex, out of the sitemap and of the offline precache (astro.config.mjs).
-// The next store version, built from the game's main (8c9b51e) under the .beta id, signed with the dev key,
+// The next store version, built from the game's main (2c06e61) under the .beta id, signed with the dev key,
 // ARM64 only, on a prerelease of this repo (the earlier betas' APKs stay there).
 const BETA = {
-	version: '1.0.9',
+	version: '1.0.10',
 	date: '2026-11-15',
-	size: 101285231,
+	size: 99771131,
 	android: '7.1',
-	sha256: '010e7eb42d5f29aee6f6370b67662768020696181f7c15ec10bedaa6aea75cf6',
-	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-game-beta/petanque-game-1.0.9-beta.apk',
+	sha256: '21ae89820749cd70d92dcf2e44e72d986f7f081a041f2104e757b4338d9cf51b',
+	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-game-beta/petanque-game-1.0.10-beta.apk',
 };
 const date = new Date(BETA.date).toLocaleDateString('fr-FR', { dateStyle: 'medium' });
 const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 ---
 
 <BaseLayout
-	title="Pétanque Game β — version 1.0.9 | Ludiven Studio"
-	description="Version bêta Android de Pétanque Game 1.0.9, pour les testeurs."
+	title="Pétanque Game β — version 1.0.10 | Ludiven Studio"
+	description="Version bêta Android de Pétanque Game 1.0.10, pour les testeurs."
 	noindex
 >
 	<div class="wrapper beta-page stack gap-6">
@@ -48,6 +48,10 @@ const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 				</li>
 				<li>
 					<strong>Après la partie</strong> : un prochain objectif sous le résultat. Les nouvelles parties se jouent en 7 points.
+				</li>
+				<li>
+					<strong>Nouveau dans la 1.0.10</strong> : les images des menus et de la manette prennent quatre fois moins de mémoire.
+					Rien ne doit changer à l'œil ; c'est surtout à essayer sur un téléphone ou une tablette modeste (2 Go de mémoire).
 				</li>
 			</ul>
 		</section>
