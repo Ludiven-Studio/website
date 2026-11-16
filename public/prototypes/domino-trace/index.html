@@ -15,8 +15,7 @@
 <canvas id="c" width="1080" height="1920"></canvas>
 <!-- Bump v when a script changes: browsers keep the old file for ten minutes otherwise. -->
 <script src="common.js?v=1"></script>
-<script src="pictures.js?v=1"></script>
-<script src="art.js?v=1"></script>
+<script src="art.js?v=2"></script>
 <script>
 // The player draws lines of dominoes with a finger, from the gold domino to the pieces of a hidden picture
 // scattered on the table. Then a flick: the wave runs along the lines. A piece it touches falls, shows its part
@@ -76,6 +75,26 @@ const LEVELS = [
     rocks: [[5.625, 6.0, 1.1]], water: [[-1, 9.8, 12.5, 11.0]], bridges: [[9.5, 9.5, 10.9, 11.3]],
     marble: { lever: [4.6, 8.6, Math.PI / 2], rail: [[4.6, 9.0], [4.6, 12.6]], to: [4.6, 13.0, Math.PI] },
     ref: [[[5.625, 2.4], [3.6, 4.6]], [[5.625, 2.4], [7.6, 3.9]], [[4.1, 8.1], [4.5, 8.4]], [[4.6, 13.4], [4.3, 13.4]], [[4.3, 14.8], [7.0, 14.8]]] },
+  // Challenges: a tight box, and one idea each: a piece over the river, the cheap side of a ring, the marble,
+  // a piece that bridges, everything at once.
+  { pic: 'Tortue', split: [3, 1], at: [[1.5, 14.2], [5.6, 8.4], [9.7, 14.2]], start: [1.0, 2.4], budget: 1.15, hard: true,
+    rocks: [[3.0, 4.4, 1.0]], water: [[-1, 8.8, 12.5, 10.0]],
+    ref: [[[1.0, 2.4], [4.6, 3.0], [5.0, 4.9]], [[4.4, 11.6], [2.9, 11.9]], [[6.8, 11.6], [8.3, 11.9]]],
+    hint: 'Défi : peu de dominos dans la boîte. Cherche le chemin le plus court.' },
+  { pic: 'Glace', split: [3, 2], at: [[2.0, 15.6], [5.6, 16.0], [9.2, 15.6], [1.6, 9.6], [5.6, 6.0], [9.6, 9.6]], start: [5.6, 2.4], budget: 1.15, hard: true,
+    rocks: [[5.6, 11.0, 2.2]],
+    ref: [[[5.6, 2.4], [5.6, 4.0]], [[4.4, 7.3], [3.0, 8.0]], [[6.8, 7.3], [8.2, 8.0]], [[1.6, 11.3], [1.6, 13.8]], [[3.1, 15.6], [4.2, 15.6]], [[6.8, 15.6], [8.0, 15.6]]] },
+  { pic: 'Fusée', split: [2, 2], at: [[4.2, 16.2], [9.0, 15.4], [5.0, 7.8], [9.2, 6.4]], start: [9.8, 2.4], budget: 1.15, hard: true,
+    rocks: [[6.6, 14.6, 0.7]], water: [[-1, 11.0, 12.5, 12.2]],
+    marble: { lever: [1.2, 7.4, Math.PI / 2], rail: [[1.2, 7.8], [1.2, 13.4]], to: [1.2, 13.8, 0] },
+    ref: [[[9.8, 2.4], [9.6, 4.4]], [[7.6, 6.6], [7.0, 6.6]], [[3.4, 7.4], [2.0, 7.4]], [[1.6, 13.8], [2.3, 14.4]], [[5.9, 16.2], [7.2, 16.2]]] },
+  { pic: 'Chat', split: [3, 1], at: [[2.6, 15.6], [6.0, 12.0], [9.6, 15.6]], start: [9.8, 2.4], budget: 1.15, hard: true,
+    water: [[-1, 5.8, 12.5, 7.0], [-1, 11.6, 12.5, 12.8]], bridges: [[9.2, 5.5, 10.6, 7.3], [0.3, 11.3, 1.4, 13.1]],
+    ref: [[[9.8, 2.4], [9.9, 5.2], [9.9, 7.6], [7.6, 9.2]], [[4.8, 14.4], [3.95, 14.4]], [[7.2, 14.4], [8.3, 14.4]]] },
+  { pic: 'Lune', split: [3, 2], at: [[1.8, 16.2], [5.6, 16.4], [9.6, 16.2], [1.6, 6.0], [5.6, 6.6], [9.6, 4.6]], start: [5.6, 2.4], budget: 1.15, hard: true,
+    rocks: [[4.6, 12.6, 1.2]], water: [[-1, 10.0, 12.5, 11.2]], bridges: [[0.4, 9.7, 1.8, 11.5]],
+    marble: { lever: [8.4, 8.4, Math.PI / 2], rail: [[8.4, 8.8], [8.4, 12.8]], to: [8.4, 13.2, Math.PI / 2] },
+    ref: [[[5.6, 2.4], [5.6, 4.7]], [[4.4, 6.4], [2.9, 6.4]], [[6.9, 5.6], [8.3, 5.6]], [[8.7, 6.3], [8.5, 7.8]], [[8.6, 13.6], [8.7, 14.4]], [[8.4, 16.0], [7.0, 16.0]], [[4.3, 16.0], [3.0, 16.0]]] },
 ];
 
 let prog = { stars: {} };
@@ -84,12 +103,7 @@ function saveProg() { try { localStorage.setItem(SAVE, JSON.stringify(prog)); } 
 
 // state: menu, edit (drawing), run (the wave), miss (pieces left standing), rise (all stands up again), won.
 let state = 'menu', L = null, clock = 0, since = 0, endAt = 0, pen = null, erasing = false;
-// While a finger is down the table zooms by `s` about the point (ax, ay) of the unzoomed screen, so a finger
-// move draws a shorter line; near an edge of the view it scrolls that way.
-const ZOOM = 1.75, EDGE = 170, TOP_BAR = 1764, SCROLL = 650;
-const cam = { s: 1, ax: W / 2, ay: H / 2 };
-const toScreen = (x, y) => [(x - cam.ax) * cam.s + cam.ax, (y - cam.ay) * cam.s + cam.ay];
-const fromScreen = (x, y) => [(x - cam.ax) / cam.s + cam.ax, (y - cam.ay) / cam.s + cam.ay];
+const TOP_BAR = 1764, COLS = 22, ROWS = 20;
 // The picture's drawn version comes in at REVEAL after the win, the panel at PANEL.
 const REVEAL = 1.45, PANEL = 2.1;
 
@@ -118,19 +132,46 @@ const mallet = (step, vol = 0.2, when = 0) => { tone(SCALE[step], vol, 0.55, 'si
 const tock = p => tone(1400 + 900 * p, 0.03, 0.03, 'triangle');
 const bonk = () => { tone(150, 0.2, 0.25, 'square'); tone(110, 0.15, 0.3, 'square', 0.08); };
 
+// The cells' colours, from the drawn picture's first frame: each cell takes the colour most of it shows, or a
+// detail of another brightness (an eye, a smile) that covers enough of it.
+const mosaics = new Map();
+function mosaic(name) {
+  if (mosaics.has(name)) return mosaics.get(name);
+  const k = 8, c = document.createElement('canvas');
+  c.width = COLS * k; c.height = ROWS * k;
+  const g = c.getContext('2d', { willReadFrequently: true });
+  g.scale(k, k); ART[name](g, 0);
+  const d = g.getImageData(0, 0, c.width, c.height).data, out = [], lum = b => (b[1] * 0.3 + b[2] * 0.59 + b[3] * 0.11) / b[0];
+  for (let r = 0; r < ROWS; r++) for (let j = 0; j < COLS; j++) {
+    const bins = new Map();
+    for (let v = 0; v < k; v++) for (let u = 0; u < k; u++) {
+      const i = ((r * k + v) * c.width + j * k + u) * 4, key = (d[i] >> 5) << 6 | (d[i + 1] >> 5) << 3 | d[i + 2] >> 5;
+      const b = bins.get(key) || [0, 0, 0, 0];
+      b[0]++; b[1] += d[i]; b[2] += d[i + 1]; b[3] += d[i + 2];
+      bins.set(key, b);
+    }
+    const sorted = [...bins.values()].sort((a, b) => b[0] - a[0]), main = sorted[0];
+    const detail = sorted.find(b => b[0] >= k * k * 0.2 && Math.abs(lum(b) - lum(main)) > 90);
+    const b = detail || main;
+    out.push([b[1] / b[0], b[2] / b[0], b[3] / b[0]].map(Math.round));
+  }
+  mosaics.set(name, out);
+  return out;
+}
+
 // ---- A level: the start, the pieces of the picture, the player's dominoes
 function load(n) {
-  const lv = LEVELS[n], pic = PICS.list.find(p => p.name === lv.pic), [sx, sy] = lv.split, cells = [], islands = [];
+  const lv = LEVELS[n], pic = { name: lv.pic }, colors = mosaic(lv.pic), [sx, sy] = lv.split, cells = [], islands = [];
   for (let iy = 0; iy < sy; iy++) for (let ix = 0; ix < sx; ix++) {
-    const c0 = Math.round(ix * PICS.cols / sx), c1 = Math.round((ix + 1) * PICS.cols / sx);
-    const r0 = Math.round(iy * PICS.rows / sy), r1 = Math.round((iy + 1) * PICS.rows / sy);
+    const c0 = Math.round(ix * COLS / sx), c1 = Math.round((ix + 1) * COLS / sx);
+    const r0 = Math.round(iy * ROWS / sy), r1 = Math.round((iy + 1) * ROWS / sy);
     const [cx, cz] = lv.at[islands.length];
     const isl = { index: islands.length, cells: [], x: cx, z: cz, x0: cx - (c1 - c0) * CELL / 2, x1: cx + (c1 - c0) * CELL / 2, z0: cz - (r1 - r0) * CELL / 2, z1: cz + (r1 - r0) * CELL / 2 };
     for (let r = r0; r < r1; r++) for (let j = c0; j < c1; j++) {
       const cell = { kind: 'cell', island: isl.index, x: cx + (j - (c0 + c1) / 2 + 0.5) * CELL, z: cz + ((r0 + r1) / 2 - r - 0.5) * CELL,
         // Its place in the finished picture.
-        tx: W / S / 2 + (j + 0.5 - PICS.cols / 2) * BIG, tz: 11.2 + (PICS.rows / 2 - r - 0.5) * BIG,
-        rgb: CC.rgb(PICS.palette[parseInt(pic.cells[r * PICS.cols + j], 36)]) };
+        tx: W / S / 2 + (j + 0.5 - COLS / 2) * BIG, tz: 11.2 + (ROWS / 2 - r - 0.5) * BIG,
+        rgb: colors[r * COLS + j] };
       cells.push(cell); isl.cells.push(cell);
     }
     islands.push(isl);
@@ -308,7 +349,6 @@ const reached = () => L.islands.filter(isl => isFinite(isl.at)).length;
 const starsNow = () => L.used <= L.three ? 3 : L.used <= L.two ? 2 : 1;
 function step() {
   const t = CC.time;
-  stepCamera();
   if (state === 'run') {
     clock += CC.DT;
     for (; L.seqI < L.seq.length && L.seq[L.seqI].at <= clock; L.seqI++) {
@@ -331,20 +371,6 @@ function step() {
     [7, 8, 6, 8].forEach((s, k) => mallet(s, 0.12, k * 0.08));
   } else if (state === 'miss' && t - since > 2.2) { state = 'rise'; since = t; }
   else if (state === 'rise' && t - since > 0.5) { state = 'edit'; standUp(); }
-}
-function stepCamera() {
-  const want = pen && (pen.moved || CC.time - pen.t0 > 0.1) ? ZOOM : 1;
-  cam.s += (want - cam.s) * (1 - Math.exp(-CC.DT * 9));
-  if (Math.abs(cam.s - 1) < 0.002) cam.s = 1;
-  if (!pen || pen.fx == null) return;
-  const push = (v, hi) => Math.max(-1, Math.min(1, v < EDGE ? (v - EDGE) / EDGE : v > hi - EDGE ? (v - hi + EDGE) / EDGE : 0));
-  const vx = push(pen.fx, W), vy = push(pen.fy, TOP_BAR);
-  if (cam.s > 1.05 && (vx || vy)) {
-    const k = SCROLL * CC.DT / (1 - 1 / cam.s);
-    cam.ax = Math.max(0, Math.min(W, cam.ax + vx * k)); cam.ay = Math.max(0, Math.min(H, cam.ay + vy * k));
-  }
-  // The table moves under a still finger: the line goes on.
-  move(pen.fx, pen.fy, true);
 }
 // How far a piece leans, from standing (0) to its rest; all stand up again during `rise`.
 function lean(p) {
@@ -415,8 +441,6 @@ function draw(ctx) {
   if (state === 'menu') { drawMenu(ctx); return; }
   const t = CC.time, lv = L.lv;
   table(ctx);
-  ctx.save();
-  ctx.translate(cam.ax * (1 - cam.s), cam.ay * (1 - cam.s)); ctx.scale(cam.s, cam.s);
   // Water, bridges, the marble's rail, rocks.
   for (const w of lv.water || []) {
     const [x, y, ww, hh] = rect(w);
@@ -474,7 +498,6 @@ function draw(ctx) {
     ctx.beginPath(); ctx.arc(px(s0.x + 0.1), py(s0.z + 0.25), 58 + 10 * beat, 0, Math.PI * 2); ctx.stroke();
     if (pen && pen.fx != null) drawPen(ctx);
   }
-  ctx.restore();
   if (won) {
     ctx.fillStyle = `rgba(20,24,44,${0.72 * k})`; ctx.fillRect(0, 0, W, H);
     const r = smooth((t - since - REVEAL) / 0.5);
@@ -490,11 +513,8 @@ function draw(ctx) {
   text(ctx, '‹', 70, 62, 70); text(ctx, String(L.n + 1), 122, 68, 44);
   stars3(ctx, W - 130, 66, 30, prog.stars[L.n] || 0);
   if (state === 'edit' && lv.hint) {
-    ctx.save();
-    ctx.globalAlpha = 1 - 0.75 * (cam.s - 1) / (ZOOM - 1);
     ctx.fillStyle = 'rgba(0,0,0,0.3)'; CC.roundRect(ctx, 200, 130, W - 260, 150, 30); ctx.fill();
     wrap(ctx, lv.hint, W / 2 + 70, 205, 36, W - 320, '#fff');
-    ctx.restore();
   }
   if (state === 'miss') {
     const left = L.islands.length - reached();
@@ -539,7 +559,7 @@ function drawPen(ctx) {
 }
 // The drawn picture over the cells, coming in with a little pop and sparkles.
 function drawArt(ctx, r, t) {
-  const side = BIG * S, w = PICS.cols * side, h = PICS.rows * side, cy = py(11.2), pop = 1 + 0.05 * Math.sin(Math.PI * r);
+  const side = BIG * S, w = COLS * side, h = ROWS * side, cy = py(11.2), pop = 1 + 0.05 * Math.sin(Math.PI * r);
   ctx.save();
   ctx.globalAlpha = r;
   ctx.translate(W / 2, cy); ctx.scale(pop, pop); ctx.translate(-w / 2, -h / 2);
@@ -609,19 +629,25 @@ function wonButtons() {
     { label: 'Rejouer', rect: [395, 1770, 290, 80], act: () => { state = 'rise'; since = CC.time; } },
     ...(more ? [{ label: 'Suivant', main: true, rect: [710, 1770, 290, 80], act: () => load(L.n + 1) }] : [])];
 }
-const tileRect = i => [50 + (i % 4) * 250, 330 + Math.floor(i / 4) * 250, 230, 230];
+// The challenges start a new block of tiles under their own title.
+const FIRST_HARD = LEVELS.findIndex(lv => lv.hard), HARD_TOP = 1150;
+const tileRect = i => {
+  const j = i < FIRST_HARD ? i : i - FIRST_HARD, top = i < FIRST_HARD ? 330 : HARD_TOP;
+  return [50 + (j % 4) * 250, top + Math.floor(j / 4) * 250, 230, 230];
+};
 function drawMenu(ctx) {
   table(ctx);
   text(ctx, 'Le tracé de dominos', W / 2, 110, 76);
   wrap(ctx, 'Dessine des chemins de dominos jusqu’aux morceaux de l’image, puis lance la vague.', W / 2, 220, 36, W - 160, 'rgba(255,255,255,0.85)');
+  text(ctx, 'Défis', 70, HARD_TOP - 50, 44, '#ffd23f', 'left');
   for (let i = 0; i < LEVELS.length; i++) {
     const [x, y, w, h] = tileRect(i), st = prog.stars[i] || 0;
     ctx.fillStyle = st ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.25)'; CC.roundRect(ctx, x, y, w, h, 28); ctx.fill();
     if (st) {
       // A level done shows its picture.
-      const c = 7, left = x + (w - PICS.cols * c) / 2;
+      const c = 7, left = x + (w - COLS * c) / 2;
       ctx.save();
-      CC.roundRect(ctx, left, y + 18, PICS.cols * c, PICS.rows * c, 16); ctx.clip();
+      CC.roundRect(ctx, left, y + 18, COLS * c, ROWS * c, 16); ctx.clip();
       ctx.translate(left, y + 18); ctx.scale(c, c);
       ART[LEVELS[i].pic](ctx, CC.time + i * 0.7);
       ctx.restore();
@@ -635,8 +661,7 @@ function drawMenu(ctx) {
 // ---- Input
 const inRect = (x, y, r, pad = 0) => x >= r[0] - pad && x <= r[0] + r[2] + pad && y >= r[1] - pad && y <= r[1] + r[3] + pad;
 const inCircle = (x, y, c, pad = 0) => Math.hypot(x - c[0], y - c[1]) <= c[2] + pad;
-// A screen point to the ground, through the zoom.
-const toGround = (x, y) => { const [wx, wy] = fromScreen(x, y); return [wx / S, (H - wy) / S]; };
+const toGround = (x, y) => [x / S, (H - y) / S];
 function down(x, y) {
   audio();
   if (state === 'menu') {
@@ -650,21 +675,14 @@ function down(x, y) {
   if (inCircle(x, y, ERASE, 10)) { erasing = !erasing; tock(0.6); return; }
   if (inRect(x, y, PLAY, 10)) { flick(); return; }
   if (y > TOP_BAR) return;
-  // Zoom about the finger, unless the last zoom has not settled back yet.
-  if (cam.s === 1) { cam.ax = x; cam.ay = y; }
-  const [gx, gz] = toGround(x, y), s0 = L.fixed[0], finger = { fx: x, fy: y, x0: x, y0: y, t0: CC.time, moved: false };
-  if (erasing) { pen = { erase: true, ...finger }; eraseAt(gx, gz); return; }
+  const [gx, gz] = toGround(x, y), s0 = L.fixed[0];
+  if (erasing) { pen = { erase: true, fx: x, fy: y }; eraseAt(gx, gz); return; }
   penDown(gx, gz);
-  const [sx, sy] = toScreen(px(s0.x), py(s0.z + 0.25));
-  Object.assign(pen, finger, { onStart: Math.hypot(x - sx, y - sy) < 80 * cam.s });
+  Object.assign(pen, { fx: x, fy: y, onStart: Math.hypot(x - px(s0.x), y - py(s0.z + 0.25)) < 80 });
 }
-// auto: the camera moved under a still finger.
-function move(x, y, auto) {
+function move(x, y) {
   if (!pen) return;
-  if (!auto) {
-    pen.fx = x; pen.fy = y;
-    if (Math.hypot(x - pen.x0, y - pen.y0) > 14) pen.moved = true;
-  }
+  pen.fx = x; pen.fy = y;
   const [gx, gz] = toGround(x, y);
   if (pen.erase) eraseAt(gx, gz); else penMove(gx, gz);
 }
