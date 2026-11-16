@@ -3305,3 +3305,12 @@
 - 18:43 : Build complet OK : 228 pages, précache 390, liens OK ; l'ancienne adresse redirige. En attente du feu vert.
 - 18:57 : commité et poussé à la demande de l'utilisateur (« ok ») : mes fichiers et cette section seulement. Statut :
   terminé. Réservations libérées.
+
+## 2026-11-16 — Pétanque Scan : bêta 1.2.15 (session petanque-scan)
+- Statut : en cours (2026-11-16T13:36+01:00). Demande de l'utilisateur : Publie (bêta 1.2.15)
+- Réservations actives : `src/pages/petanque-scanner/beta-cd53d8qv.astro`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 13:37 : APK 1.2.15 sur la prerelease petanque-scanner-beta (109981001 o, sha256 0fe7a1ea…) ; page en 1.2.15 ; eslint
+  et astro check 0 erreur.
+- 13:37 : commité et poussé à la demande de l'utilisateur (« Publie », tapé dans la session Pétanque Scan) : ma page et
+  cette section seulement. Statut : terminé. Réservations libérées.

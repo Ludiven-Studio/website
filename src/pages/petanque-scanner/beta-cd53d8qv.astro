@@ -2,29 +2,29 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 
 // Unlisted: noindex, out of the sitemap and of the offline precache (astro.config.mjs).
-// The 1.2.13 store build under the .beta id. Over 50 MB, so the APK is a GitHub prerelease asset.
+// The next store build, from main, under the .beta id. Over 50 MB, so the APK is a GitHub prerelease asset.
 const BETA = {
-	version: '1.2.13',
-	date: '2026-11-06',
-	size: 102982288,
+	version: '1.2.15',
+	date: '2026-11-16',
+	size: 109981001,
 	android: '7.1',
-	sha256: '5adfb29622149a279aa244ec3642e6bfb6a60e3ebf51348cb2c525d5ecab78bc',
-	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-scanner-beta/petanque-scan-beta-1.2.13.apk',
+	sha256: '0fe7a1ea4bf74390c5a11fc690bbf28e6f5dd82414b0cc0ec883454d4b98d5ee',
+	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-scanner-beta/petanque-scan-beta-1.2.15.apk',
 };
 const date = new Date(BETA.date).toLocaleDateString('fr-FR', { dateStyle: 'medium' });
 const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 ---
 
 <BaseLayout
-	title="Pétanque Scan β — version 1.2.13 | Ludiven Studio"
-	description="Version bêta Android de Pétanque Scan 1.2.13, pour les testeurs."
+	title="Pétanque Scan β — version 1.2.15 | Ludiven Studio"
+	description="Version bêta Android de Pétanque Scan 1.2.15, pour les testeurs."
 	noindex
 >
 	<div class="wrapper beta-page stack gap-6">
 		<header class="stack gap-2">
 			<h1>Pétanque Scan&nbsp;β</h1>
 			<p class="lead">
-				La version {BETA.version} telle qu'elle part sur les stores, à tester une dernière fois avant sa sortie. Elle s'appelle
+				La version {BETA.version}, la prochaine de l'appli du store, à tester avant sa sortie. Elle s'appelle
 				« Pétanque Scan β » et s'installe à côté de l'appli du Play Store, sans toucher à ses données.
 			</p>
 		</header>
@@ -38,7 +38,7 @@ const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 				</li>
 				<li>
 					<strong>Pas de vraies pubs.</strong> La β n'en affiche jamais : la fenêtre des pubs s'ouvre comme dans l'appli du store, mais
-					quelle que soit ta réponse, ce sont notre bannière et notre vidéo pour Pétanque Meet qui s'affichent.
+					quelle que soit ta réponse, ce sont nos bannières et nos vidéos pour les autres jeux du studio qui s'affichent.
 				</li>
 				<li>
 					<strong>Ses propres données.</strong> Elle démarre comme une première installation, avec ses 10 scans gratuits par jour.
