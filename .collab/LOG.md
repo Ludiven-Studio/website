@@ -55,3 +55,4 @@ Une ligne par ticket : date · id · résumé · décision.
 
 - 2026-11-06 · 0060 · refonte de l'accueil, direction à l'aveugle (Codex, critique et 3 maquettes) · direction B « Escales ludiques » sur la planche de Raphaël ; retenus pour la recommandation : la barre du bas avec « Défi du jour », les badges des seuls stores réels ; 5 erreurs d'image signalées
 - 2026-11-06 · 0062 · politique de la 1.0.1 de Dragon Gems (session website) · faite sur main (dg-1.0.1, 601870d et 804c5f6, avec les deux précisions de la session Dragon Gems), poussée avec les CGU et /publicite/societes/ (7d5cc44)
+- 2026-11-16 · 0063 · revue Codex des commits du site du 16/11 (session website) · 7 constats serveur (4 major, 3 minor) + 1 vu par Claude, aucun corrigé : à arbitrer par Raphaël (rapport du matin)
