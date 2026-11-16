@@ -15,7 +15,7 @@
 <canvas id="c" width="1080" height="1920"></canvas>
 <!-- Bump v when a script changes: browsers keep the old file for ten minutes otherwise. -->
 <script src="common.js?v=1"></script>
-<script src="art.js?v=2"></script>
+<script src="art.js?v=3"></script>
 <script>
 // The player draws lines of dominoes with a finger, from the gold domino to the pieces of a hidden picture
 // scattered on the table. Then a flick: the wave runs along the lines. A piece it touches falls, shows its part
@@ -32,6 +32,10 @@ const STEP = 0.5, REACH = 0.85, SPEED = 8, MARBLE = 3.5, CELL = 0.3, BIG = 0.42;
 const TALL = 0.9, WIDE = 0.5, THIN = 0.12, REST = 76 * Math.PI / 180, FALL = 0.24;
 // Where dominoes may stand: x0, z0, x1, z1.
 const BOARD = [0.3, 1.95, 10.95, 18.3];
+// The overpass deck's height, a catapult ball's flight time per unit, the drawbridge's delay after its lever
+// falls, a turntable's radius, the wave colours.
+const DECK_H = 0.5, FLY = 0.09, DROP = 0.7, DISC = 0.85;
+const PAL = [[232, 72, 63], [58, 120, 230]];
 const SAVE = 'cc-trace-v1', FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
 const px = x => x * S, py = z => H - z * S;
 const smooth = k => { k = Math.max(0, Math.min(1, k)); return k * k * (3 - 2 * k); };
@@ -40,6 +44,12 @@ const inBox = (x, z, b) => x >= b[0] && x <= b[2] && z >= b[1] && z <= b[3];
 // split: the picture cut in columns x rows of pieces; at: the centre of each piece, row by row from the top
 // left. ref: one way to reach every piece, as finger strokes; it sets the stars. budget: the box, against ref.
 // marble: a red lever the wave knocks; its marble runs the rail and knocks the domino at `to`.
+// starts: [x, z, colour] in place of `start`, with cols: the colour each piece needs. A wave colours every
+// domino it reaches first, and a piece only falls under its own colour.
+// decks: overpasses [x0, z0, x1, z1] running up the screen; a line that comes in by an end goes over, by a side
+// under. catapults: [x, z, direction in eighths of a turn, distance]; the ball knocks what is near where it lands.
+// turns: turntables [x, z, direction] carrying three dominoes. lift: a drawbridge `span` over water, lowered
+// DROP seconds after its `lever` falls. refAim, refTurn: the directions the ref needs.
 const LEVELS = [
   { pic: 'Soleil', split: [1, 1], at: [[5.625, 12.6]], start: [5.625, 3.4],
     ref: [[[5.625, 3.4], [5.625, 9.3]]],
@@ -95,6 +105,51 @@ const LEVELS = [
     rocks: [[4.6, 12.6, 1.2]], water: [[-1, 10.0, 12.5, 11.2]], bridges: [[0.4, 9.7, 1.8, 11.5]],
     marble: { lever: [8.4, 8.4, Math.PI / 2], rail: [[8.4, 8.8], [8.4, 12.8]], to: [8.4, 13.2, Math.PI / 2] },
     ref: [[[5.6, 2.4], [5.6, 4.7]], [[4.4, 6.4], [2.9, 6.4]], [[6.9, 5.6], [8.3, 5.6]], [[8.7, 6.3], [8.5, 7.8]], [[8.6, 13.6], [8.7, 14.4]], [[8.4, 16.0], [7.0, 16.0]], [[4.3, 16.0], [3.0, 16.0]]] },
+  // New pieces, two levels each, then mixes: the catapult, the turntable, the drawbridge, colours, the overpass.
+  { pic: 'Poisson', split: [1, 1], at: [[5.6, 14.2]], start: [5.6, 2.4], fresh: true,
+    water: [[-1, 8.4, 12.5, 9.8]], catapults: [[5.6, 6.0, 0, 5.4]], refAim: [2],
+    ref: [[[5.6, 2.4], [5.6, 5.0]]],
+    hint: 'La catapulte lance une bille par-dessus l’eau. Touche-la pour la tourner.' },
+  { pic: 'Fleur', split: [2, 1], at: [[2.2, 14.6], [9.0, 14.6]], start: [5.6, 2.4], fresh: true, budget: 1.3,
+    water: [[-1, 7.6, 12.5, 9.0]], catapults: [[5.6, 5.2, 1, 5.6]], refAim: [2],
+    ref: [[[5.6, 2.4], [5.6, 4.2]], [[5.6, 10.8], [5.0, 11.0], [4.2, 11.6]], [[6.1, 11.0], [7.0, 11.6]]],
+    hint: 'Lance pour voir où tombe la bille : une croix la marque. Trace la suite depuis là.' },
+  { pic: 'Bateau', split: [2, 1], at: [[2.6, 14.6], [8.6, 14.6]], start: [5.6, 2.4], fresh: true,
+    water: [[-1, 8.4, 12.5, 9.6]], turns: [[5.6, 9.0, 0]], refTurn: [2],
+    ref: [[[5.6, 2.4], [5.6, 7.9]], [[5.6, 10.2], [5.6, 10.6], [4.4, 11.4]], [[5.6, 10.6], [6.8, 11.4]]],
+    hint: 'Touche le plateau pour le tourner : ses dominos font le passage.' },
+  { pic: 'Maison', split: [2, 1], at: [[2.2, 14.8], [9.0, 14.8]], start: [5.6, 2.4], fresh: true, budget: 1.25,
+    water: [[-1, 8.4, 12.5, 9.6]], rocks: [[3.0, 10.9, 0.8], [8.2, 10.9, 0.8]], turns: [[3.0, 9.0, 0], [8.2, 9.0, 0]], refTurn: [1, 3],
+    ref: [[[5.6, 2.4], [4.4, 5.2], [2.75, 7.9]], [[4.4, 5.2], [8.9, 7.9]], [[3.85, 9.75], [4.3, 11.0], [4.3, 11.9]], [[7.35, 9.75], [6.9, 11.0], [6.9, 11.9]]] },
+  { pic: 'Escargot', split: [2, 1], at: [[2.4, 14.8], [8.8, 14.8]], start: [5.6, 2.4], fresh: true,
+    water: [[-1, 9.4, 12.5, 10.6]], lift: { span: [4.9, 9.3, 6.3, 10.7], lever: [4.8, 2.4, Math.PI / 2] },
+    ref: [[[5.6, 2.4], [5.6, 10.9]], [[5.6, 10.9], [4.4, 11.6]], [[5.6, 10.9], [6.8, 11.6]]],
+    hint: 'Le levier violet baisse le pont-levis, un peu après sa chute. Avant, la vague ne passe pas.' },
+  { pic: 'Hibou', split: [2, 1], at: [[2.4, 14.6], [8.8, 14.6]], start: [1.0, 2.4], fresh: true, budget: 1.25,
+    water: [[-1, 8.4, 12.5, 9.6]], lift: { span: [0.9, 8.3, 2.3, 9.7], lever: [10.0, 3.0, Math.PI / 2] },
+    ref: [[[1.0, 2.4], [9.5, 2.9]], [[9.8, 3.6], [1.6, 7.9], [1.6, 11.3]], [[4.3, 13.0], [6.9, 13.0]]] },
+  { pic: 'Champignon', split: [2, 1], at: [[2.4, 13.6], [8.8, 13.6]], starts: [[2.4, 2.4, 0], [8.8, 2.4, 1]], cols: [0, 1], fresh: true,
+    ref: [[[2.4, 2.4], [2.4, 10.3]], [[8.8, 2.4], [8.8, 10.3]]],
+    hint: 'Chaque couleur fait tomber ses morceaux. Si deux couleurs se touchent, la première arrivée prend tout.' },
+  { pic: 'Pingouin', split: [2, 1], at: [[1.95, 15.1], [9.3, 15.1]], starts: [[1.2, 2.4, 0], [10.0, 2.4, 1]], cols: [1, 0], fresh: true,
+    decks: [[4.8, 6.6, 6.4, 10.6]],
+    ref: [[[1.2, 2.4], [5.6, 5.9], [5.6, 11.2], [7.4, 12.0]], [[10.0, 2.4], [10.0, 8.6], [2.0, 8.6], [2.0, 11.8]]],
+    hint: 'Un trait qui monte sur le pont par un bout passe dessus ; par un côté, il passe dessous.' },
+  { pic: 'Grenouille', split: [3, 1], at: [[1.5, 15.0], [5.6, 15.0], [9.7, 15.0]], starts: [[1.0, 2.4, 0], [5.6, 2.4, 1]], cols: [0, 1, 0], fresh: true, budget: 1.25,
+    decks: [[4.8, 5.4, 6.4, 9.4]],
+    ref: [[[1.0, 2.4], [1.2, 11.7]], [[1.1, 4.0], [2.6, 5.0], [2.6, 7.6], [9.8, 7.6], [9.8, 11.7]], [[5.6, 2.4], [5.6, 11.7]]] },
+  { pic: 'Abeille', split: [2, 1], at: [[2.2, 14.8], [9.0, 14.8]], starts: [[1.0, 2.4, 0], [9.8, 2.4, 1]], cols: [1, 0], fresh: true, budget: 1.3,
+    catapults: [[2.2, 6.0, 0, 6.8]], refAim: [1],
+    ref: [[[1.0, 2.4], [2.0, 5.2]], [[6.8, 10.8], [7.4, 11.5]], [[9.8, 2.4], [4.0, 8.4], [3.0, 11.5]]],
+    hint: 'La bille de la catapulte passe par-dessus les autres dominos.' },
+  { pic: 'Dragon', split: [2, 1], at: [[2.6, 15.2], [8.6, 15.2]], start: [10.0, 2.4], fresh: true, budget: 1.25,
+    water: [[-1, 10.4, 12.5, 11.6], [3.4, 1.0, 4.4, 10.5]], lift: { span: [8.9, 10.3, 10.3, 11.7], lever: [1.8, 5.0, Math.PI / 2] },
+    catapults: [[7.8, 5.0, 0, 6.0]], refAim: [4],
+    ref: [[[10.0, 2.4], [8.3, 4.7]], [[10.0, 2.4], [10.0, 3.2], [4.9, 3.2], [4.9, 9.9], [9.6, 9.9], [9.6, 11.9]], [[9.6, 11.9], [8.0, 11.85]], [[7.0, 13.4], [4.5, 13.4]]],
+    hint: 'Défi : le pont-levis doit être baissé quand la vague arrive.' },
+  { pic: 'Arc-en-ciel', split: [2, 1], at: [[2.2, 14.8], [9.0, 14.8]], starts: [[1.0, 2.4, 0], [10.0, 2.4, 1]], cols: [1, 0], fresh: true, budget: 1.25,
+    water: [[-1, 9.0, 12.5, 10.2]], decks: [[4.8, 4.2, 6.4, 7.8]], turns: [[5.6, 9.6, 0]], catapults: [[2.0, 7.0, 0, 4.6]], refTurn: [2], refAim: [2],
+    ref: [[[1.0, 2.4], [5.6, 3.7], [5.6, 8.4]], [[5.6, 10.9], [7.2, 12.0]], [[10.0, 2.4], [10.0, 6.0], [2.6, 6.0], [2.0, 6.4]]] },
 ];
 
 let prog = { stars: {} };
@@ -165,10 +220,10 @@ function load(n) {
   for (let iy = 0; iy < sy; iy++) for (let ix = 0; ix < sx; ix++) {
     const c0 = Math.round(ix * COLS / sx), c1 = Math.round((ix + 1) * COLS / sx);
     const r0 = Math.round(iy * ROWS / sy), r1 = Math.round((iy + 1) * ROWS / sy);
-    const [cx, cz] = lv.at[islands.length];
-    const isl = { index: islands.length, cells: [], x: cx, z: cz, x0: cx - (c1 - c0) * CELL / 2, x1: cx + (c1 - c0) * CELL / 2, z0: cz - (r1 - r0) * CELL / 2, z1: cz + (r1 - r0) * CELL / 2 };
+    const [cx, cz] = lv.at[islands.length], need = lv.cols ? lv.cols[islands.length] : null;
+    const isl = { index: islands.length, cells: [], need, x: cx, z: cz, x0: cx - (c1 - c0) * CELL / 2, x1: cx + (c1 - c0) * CELL / 2, z0: cz - (r1 - r0) * CELL / 2, z1: cz + (r1 - r0) * CELL / 2 };
     for (let r = r0; r < r1; r++) for (let j = c0; j < c1; j++) {
-      const cell = { kind: 'cell', island: isl.index, x: cx + (j - (c0 + c1) / 2 + 0.5) * CELL, z: cz + ((r0 + r1) / 2 - r - 0.5) * CELL,
+      const cell = { kind: 'cell', island: isl.index, need, x: cx + (j - (c0 + c1) / 2 + 0.5) * CELL, z: cz + ((r0 + r1) / 2 - r - 0.5) * CELL,
         // Its place in the finished picture.
         tx: W / S / 2 + (j + 0.5 - COLS / 2) * BIG, tz: 11.2 + (ROWS / 2 - r - 0.5) * BIG,
         rgb: colors[r * COLS + j] };
@@ -176,25 +231,56 @@ function load(n) {
     }
     islands.push(isl);
   }
-  const fixed = [{ kind: 'start', x: lv.start[0], z: lv.start[1], a: Math.PI / 2, rgb: [255, 200, 40] }];
+  const base = lv.starts ? lv.starts.map(([x, z, c]) => ({ kind: 'start', x, z, a: Math.PI / 2, team: c, rgb: PAL[c] }))
+    : [{ kind: 'start', x: lv.start[0], z: lv.start[1], a: Math.PI / 2, rgb: [255, 200, 40] }];
   if (lv.marble) {
     const m = lv.marble;
-    fixed.push({ kind: 'lever', x: m.lever[0], z: m.lever[1], a: m.lever[2], rgb: [226, 61, 61] },
+    base.push({ kind: 'lever', x: m.lever[0], z: m.lever[1], a: m.lever[2], rgb: [226, 61, 61] },
       { kind: 'fixed', x: m.to[0], z: m.to[1], a: m.to[2], rgb: [185, 138, 82] });
   }
-  L = { n, lv, pic, cells, islands, fixed, doms: [], strokes: 0, budget: Infinity, blocked: 0, fullAt: -9, order: null };
+  if (lv.lift) base.push({ kind: 'lift', x: lv.lift.lever[0], z: lv.lift.lever[1], a: lv.lift.lever[2], rgb: [150, 90, 220] });
+  L = { n, lv, pic, cells, islands, base, fixed: [], doms: [], strokes: 0, budget: Infinity, blocked: 0, fullAt: -9, order: null,
+    catas: (lv.catapults || []).map(([x, z, dir, dist]) => ({ x, z, dir, dir0: dir, dist })),
+    turns: (lv.turns || []).map(([x, z, dir]) => ({ x, z, dir, dir0: dir, shown: dir * Math.PI / 4 })), marks: [] };
+  setTools(true);
   drawStrokes(lv.ref);
   L.par = L.doms.length; L.refBlocked = L.blocked;
   L.doms = []; L.strokes = 0; L.blocked = 0;
+  setTools(false);
   L.budget = Math.ceil(L.par * (lv.budget || 2)); L.three = Math.ceil(L.par * 1.1); L.two = Math.ceil(L.par * 1.4);
   state = 'edit'; pen = null; erasing = false;
   standUp();
 }
+// The catapults and turntables as the level starts, or as its ref sets them.
+function setTools(ref) {
+  L.catas.forEach((c, k) => { c.dir = ref && L.lv.refAim ? L.lv.refAim[k] : c.dir0; });
+  L.turns.forEach((t, k) => { t.dir = ref && L.lv.refTurn ? L.lv.refTurn[k] : t.dir0; t.goal = t.shown = t.dir * Math.PI / 4; });
+  buildFixed();
+}
+// The fixed pieces: start, levers, the catapults with where their ball lands, the turntables' dominoes.
+function buildFixed() {
+  const thrown = L.catas.map(c => {
+    const a = c.dir * Math.PI / 4, x = c.x + Math.cos(a) * c.dist, z = c.z + Math.sin(a) * c.dist;
+    c.piece = { kind: 'cata', x: c.x, z: c.z, a, rgb: [176, 112, 60], cata: c };
+    // A ball in the water, on a rock or off the table knocks nothing.
+    c.land = { kind: 'land', x, z, cata: c, dead: !inBox(x, z, [0, 1.6, 11.25, 18.6]) || wet(x, z) || (L.lv.rocks || []).some(([rx, rz, r]) => Math.hypot(x - rx, z - rz) < r) };
+    return c.piece;
+  });
+  const turned = L.turns.flatMap(t => {
+    const a = t.dir * Math.PI / 4;
+    return [-1, 0, 1].map(k => ({ kind: 'turn', x: t.x + Math.cos(a) * k * 0.55, z: t.z + Math.sin(a) * k * 0.55, a, rgb: [250, 238, 214], turn: t }));
+  });
+  L.fixed = [...L.base, ...thrown, ...turned];
+  changed();
+}
+function changed() { L.order = null; L.dirty = true; }
 function standUp() {
-  for (const p of pieces()) { p.at = Infinity; p.from = null; }
+  for (const p of [...pieces(), ...lands()]) { p.at = Infinity; p.from = null; }
   clock = 0;
 }
 const pieces = () => [...L.fixed, ...L.doms, ...L.cells];
+const lands = () => L.catas.map(c => c.land);
+const wet = (x, z) => (L.lv.water || []).some(w => inBox(x, z, w)) && !(L.lv.bridges || []).some(b => inBox(x, z, b)) && !(L.lv.lift && inBox(x, z, L.lv.lift.span));
 function hue(h) {
   const f = k => { const m = (k + h / 30) % 12; return Math.round(255 * (0.6 - 0.34 * Math.max(-1, Math.min(m - 3, 9 - m, 1)))); };
   return [f(0), f(8), f(4)];
@@ -202,15 +288,31 @@ function hue(h) {
 
 // ---- Drawing dominoes with a finger
 // A domino may not stand on a rock, in water off a bridge, on a piece of the picture, off the table, or on another.
-function blocked(x, z) {
-  const lv = L.lv;
+function blocked(x, z, layer) {
+  const lv = L.lv, near = (p, r) => Math.hypot(x - p.x, z - p.z) < r;
   if (!inBox(x, z, BOARD)) return true;
+  if (layer) return L.doms.some(d => d.layer && near(d, 0.32));
   for (const [rx, rz, r] of lv.rocks || []) if (Math.hypot(x - rx, z - rz) < r + 0.2) return true;
-  if ((lv.water || []).some(w => inBox(x, z, w)) && !(lv.bridges || []).some(b => inBox(x, z, b))) return true;
+  if (wet(x, z)) return true;
   for (const isl of L.islands) if (x > isl.x0 - 0.15 && x < isl.x1 + 0.15 && z > isl.z0 - 0.15 && z < isl.z1 + 0.15) return true;
-  for (const p of L.fixed) if (Math.hypot(x - p.x, z - p.z) < 0.32) return true;
-  for (const d of L.doms) if (Math.hypot(x - d.x, z - d.z) < 0.32) return true;
-  return false;
+  for (const t of L.turns) if (near(t, DISC + 0.05)) return true;
+  for (const p of L.fixed) if (near(p, p.kind === 'cata' ? 0.55 : 0.32)) return true;
+  return L.doms.some(d => !d.layer && near(d, 0.32));
+}
+// On a deck, a line that came in by one of its ends runs on top (1), one that came in by a side runs under (0).
+function layerAt(x, z) {
+  const decks = L.lv.decks || [], k = decks.findIndex(d => inBox(x, z, d));
+  if (k < 0) return [0, -1];
+  const d = decks[k], [x0, z0] = pen.p;
+  if (inBox(x0, z0, d)) return [pen.layer, k];
+  return [z0 < d[1] || z0 > d[3] ? 1 : 0, k];
+}
+// Only a deck's ends join its top to the ground.
+function touch(p, q) {
+  const a = p.layer || 0, b = q.layer || 0;
+  if (a === b) return true;
+  const low = a ? q : p, d = L.lv.decks[(a ? p : q).deck];
+  return (low.z < d[1] || low.z > d[3]) && low.x > d[0] - 0.3 && low.x < d[2] + 0.3;
 }
 // The nearest piece within `max`, the dominoes of stroke `skip` left out.
 function nearest(x, z, max, skip) {
@@ -222,21 +324,24 @@ function nearest(x, z, max, skip) {
   }
   return best;
 }
-function place(x, z, a) {
+function place(x, z, a, quiet) {
   if (L.doms.length >= L.budget) {
     if (!pen.full) { pen.full = true; L.fullAt = CC.time; bonk(); }
     return false;
   }
-  if (blocked(x, z)) { L.blocked++; return false; }
-  const d = { kind: 'dom', x, z, a, stroke: pen.stroke, rgb: hue((L.doms.length * 9 + L.n * 47) % 360), at: Infinity, from: null, born: CC.time };
-  L.doms.push(d); L.order = null;
+  const [layer, deck] = layerAt(x, z);
+  if (blocked(x, z, layer)) { if (!quiet) L.blocked++; return false; }
+  const span = !layer && !!L.lv.lift && inBox(x, z, L.lv.lift.span);
+  const d = { kind: 'dom', x, z, a, layer, deck, span, stroke: pen.stroke, rgb: hue((L.doms.length * 9 + L.n * 47) % 360), at: Infinity, from: null, born: CC.time };
+  L.doms.push(d); changed();
+  pen.layer = layer;
   tock(Math.min(1, pen.count++ / 20) * 0.6);
   return true;
 }
 // A stroke starting on a piece goes on from it; else its first domino stands where the finger came down.
 function penDown(x, z) {
-  const t = nearest(x, z, 1.0, null);
-  pen = { stroke: ++L.strokes, p: t ? [t.x, t.z] : [x, z], loose: !t, count: 0, full: false };
+  const t = nearest(x, z, 1.0, null), onDeck = (L.lv.decks || []).some(d => inBox(x, z, d));
+  pen = { stroke: ++L.strokes, p: t ? [t.x, t.z] : [x, z], layer: t ? t.layer || 0 : onDeck ? 1 : 0, loose: !t, count: 0, full: false };
 }
 function penMove(x, z) {
   let d = Math.hypot(x - pen.p[0], z - pen.p[1]);
@@ -260,10 +365,14 @@ function penUp() {
     pen.p = [last.x, last.z];
     for (let k = 0; t && k < 3 && Math.hypot(t.x - pen.p[0], t.z - pen.p[1]) > REACH; k++) {
       // Short of the target's own edge: a piece of the picture keeps its dominoes off its border.
+      // A turntable keeps them farther off, so the last one may stand just within reach instead.
       const d = Math.hypot(t.x - pen.p[0], t.z - pen.p[1]), ux = (t.x - pen.p[0]) / d, uz = (t.z - pen.p[1]) / d;
-      const len = Math.max(0.33, Math.min(STEP, d - 0.35)), nx = pen.p[0] + ux * len, nz = pen.p[1] + uz * len;
-      if (!place(nx, nz, Math.atan2(uz, ux))) break;
-      pen.p = [nx, nz];
+      const len = [Math.max(0.33, Math.min(STEP, d - 0.35)), d - REACH + 0.08, 0.34].find(l => {
+        if (l < 0.3 || l > STEP + 0.01) return false;
+        return place(pen.p[0] + ux * l, pen.p[1] + uz * l, Math.atan2(uz, ux), true);
+      });
+      if (len == null) break;
+      pen.p = [pen.p[0] + ux * len, pen.p[1] + uz * len];
     }
   }
   pen = null;
@@ -278,21 +387,32 @@ function drawStrokes(strokes) {
 function undo() {
   if (!L.doms.length) return;
   const last = Math.max(...L.doms.map(d => d.stroke));
-  L.doms = L.doms.filter(d => d.stroke !== last); L.order = null;
+  L.doms = L.doms.filter(d => d.stroke !== last); changed();
   tock(0);
 }
 function eraseAt(x, z) {
   const before = L.doms.length;
   L.doms = L.doms.filter(d => Math.hypot(x - d.x, z - d.z) > 0.45);
-  if (L.doms.length < before) { L.order = null; tock(0.1); }
+  if (L.doms.length < before) { changed(); tock(0.1); }
+}
+// A tap on a catapult or a turntable turns it an eighth of a turn.
+function toolAt(x, z) {
+  return L.catas.find(c => Math.hypot(x - c.x, z - c.z) < 0.6) || L.turns.find(t => Math.hypot(x - t.x, z - t.z) < DISC);
+}
+function turnTool(tool) {
+  tool.dir = (tool.dir + 1) % 8;
+  if (tool.goal != null) tool.goal += Math.PI / 4;
+  buildFixed();
+  tone(520, 0.08, 0.06, 'triangle'); tone(780, 0.06, 0.05, 'triangle', 0.05);
 }
 
-// ---- The wave: each piece falls at the soonest time the wave can reach it, from the gold domino.
-function flick() {
-  if (state !== 'edit') return;
-  const all = pieces(), grid = new Map(), key = (i, j) => i * 4096 + j;
+// ---- The wave: each piece falls at the soonest time a wave can reach it, from the start dominoes, and takes
+// that wave's colour.
+function solve() {
+  const all = [...pieces(), ...lands()], grid = new Map(), key = (i, j) => i * 4096 + j;
   for (const p of all) {
-    p.at = Infinity; p.from = null; p.done = false;
+    p.at = Infinity; p.from = null; p.done = false; p.col = null;
+    if (p.kind === 'land') continue;
     const k = key(Math.floor(p.x / REACH), Math.floor(p.z / REACH));
     if (!grid.has(k)) grid.set(k, []);
     grid.get(k).push(p);
@@ -317,19 +437,36 @@ function flick() {
     }
     return top;
   };
-  const relax = (p, q, at) => { if (at < q.at) { q.at = at; q.from = p; push(q); } };
-  L.fixed[0].at = 0; push(L.fixed[0]);
+  // A piece of the picture stays up under another colour's wave.
+  const relax = (p, q, at) => {
+    if (q.need != null && q.need !== p.col) return;
+    if (at < q.at) { q.at = at; q.from = p; q.col = p.col; push(q); }
+  };
+  // The drawbridge's dominoes are out of reach until it is down: the lever has fallen DROP seconds before.
+  const lift = L.fixed.find(p => p.kind === 'lift'), downAt = () => lift && lift.done ? lift.at + DROP : Infinity;
+  for (const s of L.fixed) if (s.kind === 'start') { s.at = 0; s.col = s.team ?? null; push(s); }
   while (heap.length) {
     const p = pop();
     if (p.done) continue;
     p.done = true;
+    // A catapult knocks nothing near it: its ball does, where it lands.
+    if (p.kind === 'cata') { if (!p.cata.land.dead) relax(p, p.cata.land, p.at + 0.25 + p.cata.dist * FLY); continue; }
     const i0 = Math.floor(p.x / REACH), j0 = Math.floor(p.z / REACH);
     for (let i = i0 - 1; i <= i0 + 1; i++) for (let j = j0 - 1; j <= j0 + 1; j++) for (const q of grid.get(key(i, j)) || []) {
-      const d = Math.hypot(q.x - p.x, q.z - p.z);
-      if (q !== p && d <= REACH) relax(p, q, p.at + d / SPEED);
+      const d = Math.hypot(q.x - p.x, q.z - p.z), at = p.at + d / SPEED;
+      if (q === p || d > REACH || !touch(p, q)) continue;
+      if ((p.span || q.span) && at < downAt()) continue;
+      relax(p, q, at);
     }
     if (p === lever) relax(p, to, p.at + rail / MARBLE);
   }
+  L.downAt = lift ? downAt() : null;
+  return { all, lever, rail };
+}
+function flick() {
+  if (state !== 'edit') return;
+  const { all, lever, rail } = solve();
+  if (L.lv.starts) for (const d of L.doms) d.rgb = d.col != null ? PAL[d.col].map(v => Math.round(v + (255 - v) * 0.35)) : [200, 202, 210];
   // A domino tips away from the one that knocked it; the last of a line lies flat.
   const knocks = new Set(all.map(p => p.from));
   for (const p of all) {
@@ -355,10 +492,17 @@ function step() {
       const p = L.seq[L.seqI];
       if (p.kind === 'cell') {
         if (p.at === L.islands[p.island].at) [0, 2, 4].forEach((s, k) => mallet(s + p.island % 3, 0.15, k * 0.07));
-      } else if (t - lastTock > 0.04) { tock(L.seqI % 7 / 7); lastTock = t; }
+      } else if (p.kind === 'land') { tone(180, 0.2, 0.18, 'triangle'); tone(90, 0.15, 0.25, 'sine'); }
+      else if (p.kind === 'cata') tone(300, 0.12, 0.12, 'sawtooth');
+      else if (t - lastTock > 0.04) { tock(L.seqI % 7 / 7); lastTock = t; }
     }
+    if (L.downAt != null && clock >= L.downAt && clock - CC.DT < L.downAt) { tone(120, 0.25, 0.2, 'square'); tone(240, 0.1, 0.15, 'triangle', 0.05); }
     if (clock >= endAt) {
       since = t;
+      // Where each ball landed stays marked for the next tries.
+      for (const c of L.catas) if (isFinite(c.land.at) || isFinite(c.piece.at)) {
+        if (!L.marks.some(m => Math.hypot(m[0] - c.land.x, m[1] - c.land.z) < 0.1)) L.marks.push([c.land.x, c.land.z]);
+      }
       if (reached() === L.islands.length) {
         state = 'won'; L.chimed = false;
         prog.stars[L.n] = Math.max(prog.stars[L.n] || 0, starsNow());
@@ -370,7 +514,15 @@ function step() {
     L.chimed = true;
     [7, 8, 6, 8].forEach((s, k) => mallet(s, 0.12, k * 0.08));
   } else if (state === 'miss' && t - since > 2.2) { state = 'rise'; since = t; }
-  else if (state === 'rise' && t - since > 0.5) { state = 'edit'; standUp(); }
+  else if (state === 'rise' && t - since > 0.5) { state = 'edit'; standUp(); changed(); }
+  for (const tt of L ? L.turns : []) tt.shown += (tt.goal - tt.shown) * Math.min(1, CC.DT * 14);
+  if (state === 'edit' && L.dirty) { L.dirty = false; if (L.lv.starts) preview(); }
+}
+// With colours, each domino shows while drawing the colour of the wave that would reach it first.
+function preview() {
+  solve();
+  for (const d of L.doms) d.rgb = d.col != null ? PAL[d.col].map(v => Math.round(v + (255 - v) * 0.35)) : [200, 202, 210];
+  for (const p of [...pieces(), ...lands()]) { p.at = Infinity; p.from = null; }
 }
 // How far a piece leans, from standing (0) to its rest; all stand up again during `rise`.
 function lean(p) {
@@ -458,6 +610,20 @@ function draw(ctx) {
     ctx.strokeStyle = 'rgba(60,35,10,0.5)'; ctx.lineWidth = 3;
     for (let Y = y + 18; Y < y + hh; Y += 22) { ctx.beginPath(); ctx.moveTo(x + 4, Y); ctx.lineTo(x + ww - 4, Y); ctx.stroke(); }
   }
+  if (lv.lift) drawSpan(ctx, t);
+  for (const tt of L.turns) {
+    ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.arc(px(tt.x) + 8, py(tt.z) + 8, DISC * S, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#d6a866'; ctx.beginPath(); ctx.arc(px(tt.x), py(tt.z), DISC * S, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#8a5a2e'; ctx.lineWidth = 8; ctx.stroke();
+    // Two arrows round the rim say it turns.
+    ctx.strokeStyle = 'rgba(90,55,20,0.55)'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+    for (const a0 of [0.3, Math.PI + 0.3]) {
+      const a = a0 - tt.shown, r = DISC * S - 16;
+      ctx.beginPath(); ctx.arc(px(tt.x), py(tt.z), r, a, a + 1.1); ctx.stroke();
+      const ex = px(tt.x) + Math.cos(a + 1.1) * r, ey = py(tt.z) + Math.sin(a + 1.1) * r, ta = a + 1.1 + Math.PI / 2;
+      ctx.beginPath(); ctx.moveTo(ex + Math.cos(ta - 2.5) * 14, ey + Math.sin(ta - 2.5) * 14); ctx.lineTo(ex, ey); ctx.lineTo(ex + Math.cos(ta + 2.5) * 14, ey + Math.sin(ta + 2.5) * 14); ctx.stroke();
+    }
+  }
   if (lv.marble) {
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     for (const [c, w] of [['#4a5068', 30], ['#9aa3b5', 14]]) {
@@ -476,13 +642,25 @@ function draw(ctx) {
   for (const isl of L.islands) {
     const [x, y, ww, hh] = rect([isl.x0 - 0.12, isl.z0 - 0.12, isl.x1 + 0.12, isl.z1 + 0.12]);
     ctx.fillStyle = `rgba(0,0,0,${0.25 * (1 - k)})`; CC.roundRect(ctx, x, y, ww, hh, 16); ctx.fill();
+    if (isl.need != null && !won) { ctx.strokeStyle = shade(PAL[isl.need], 1); ctx.lineWidth = 9; ctx.stroke(); }
     if (state === 'miss' && !isFinite(isl.at)) {
       const beat = 0.5 + 0.5 * Math.sin(t * 8);
       ctx.strokeStyle = `rgba(255,210,63,${0.5 + 0.5 * beat})`; ctx.lineWidth = 8 + 6 * beat; ctx.stroke();
     }
   }
   if (!L.order) L.order = pieces().sort((p, q) => q.z - p.z);
-  if (k < 1) for (const p of L.order) if (!(won && p.kind === 'cell')) drawPiece(ctx, p, t);
+  if (k < 1) {
+    for (const p of L.order) if (!p.layer && p.kind !== 'cata' && !(won && p.kind === 'cell')) drawPiece(ctx, p, t);
+    // Catapults on top: the dominoes falling onto them must not hide them.
+    for (const c of L.catas) drawCata(ctx, c.piece, t);
+    for (const d of lv.decks || []) drawDeck(ctx, d);
+    for (const p of L.order) if (p.layer) drawPiece(ctx, p, t);
+    for (const c of L.catas) drawBall(ctx, c, t);
+    if (state === 'edit') for (const [x, z] of L.marks) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(px(x) - 14, py(z) - 14); ctx.lineTo(px(x) + 14, py(z) + 14); ctx.moveTo(px(x) + 14, py(z) - 14); ctx.lineTo(px(x) - 14, py(z) + 14); ctx.stroke();
+    }
+  }
   if (lv.marble) {
     // The marble waits at the top of its rail, then runs it once the lever falls.
     const m = lv.marble, run = L.marbleAt != null && state !== 'edit' ? Math.max(0, Math.min(1, (clock - L.marbleAt - 0.15) * MARBLE / L.railLen)) : 0;
@@ -492,10 +670,13 @@ function draw(ctx) {
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(px(x), py(z) - 6, 22, 0, Math.PI * 2); ctx.fill();
   }
   if (state === 'edit') {
-    // The gold domino calls for the first stroke.
-    const s0 = L.fixed[0], beat = 0.5 + 0.5 * Math.sin(t * 5);
-    ctx.strokeStyle = `rgba(255,220,80,${L.doms.length ? 0.4 : 0.9})`; ctx.lineWidth = 6;
-    ctx.beginPath(); ctx.arc(px(s0.x + 0.1), py(s0.z + 0.25), 58 + 10 * beat, 0, Math.PI * 2); ctx.stroke();
+    // The start dominoes call for the first stroke.
+    const beat = 0.5 + 0.5 * Math.sin(t * 5);
+    for (const s0 of L.fixed) if (s0.kind === 'start') {
+      const c = s0.team != null ? PAL[s0.team].join(',') : '255,220,80';
+      ctx.strokeStyle = `rgba(${c},${L.doms.length ? 0.45 : 0.9})`; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.arc(px(s0.x + 0.1), py(s0.z + 0.25), 58 + 10 * beat, 0, Math.PI * 2); ctx.stroke();
+    }
     if (pen && pen.fx != null) drawPen(ctx);
   }
   if (won) {
@@ -527,8 +708,17 @@ function drawPiece(ctx, p, t) {
   const tilt = lean(p);
   if (p.kind !== 'cell') {
     const grow = p.born ? Math.min(1, 0.3 + (t - p.born) / 0.12) : 1;
-    const big = p.kind === 'start', lever = p.kind === 'lever';
-    box(ctx, p.x, p.z, p.fa != null && isFinite(p.at) ? p.fa : p.a, 0, big || lever ? 0.15 : THIN, big ? 0.6 : WIDE, (big ? 1.05 : lever ? 0.8 : TALL) * grow, tilt, p.rgb);
+    const big = p.kind === 'start', lever = p.kind === 'lever' || p.kind === 'lift';
+    let x = p.x, z = p.z, a = p.fa != null && isFinite(p.at) ? p.fa : p.a;
+    if (p.turn) {
+      // Turning with its turntable.
+      const tt = p.turn, r = tt.shown - tt.goal, c = Math.cos(r), s = Math.sin(r), dx = x - tt.x, dz = z - tt.z;
+      x = tt.x + dx * c - dz * s; z = tt.z + dx * s + dz * c; a += r;
+    }
+    ctx.save();
+    if (p.span) ctx.globalAlpha = spanUp();
+    box(ctx, x, z, a, p.layer ? DECK_H : 0, big || lever ? 0.15 : THIN, big ? 0.6 : WIDE, (big ? 1.05 : lever ? 0.8 : TALL) * grow, tilt, p.rgb);
+    ctx.restore();
     return;
   }
   const hei = CELL * 1.15, left = px(p.x - CELL * 0.46), wide = CELL * 0.92 * S;
@@ -541,6 +731,82 @@ function drawPiece(ctx, p, t) {
   } else if (tilt >= Math.PI / 2 - 0.001) {
     ctx.fillStyle = shade(p.rgb, 1); ctx.fillRect(left, py(p.z + CELL / 2 - 0.01), wide, CELL * S * 0.97);
   } else box(ctx, p.x, p.z, p.fa, 0, 0.06, CELL * 0.92, hei, tilt, [236, 238, 242], p.rgb);
+}
+// The drawbridge: see-through while up, solid once down; a dotted cord ties it to its lever.
+function spanUp() {
+  if (state === 'edit' || L.downAt == null || !isFinite(L.downAt)) return 0.4;
+  return 0.4 + 0.6 * smooth((clock - L.downAt + 0.4) / 0.4);
+}
+function drawSpan(ctx, t) {
+  const { span, lever } = L.lv.lift, [x, y, ww, hh] = rect(span), a = spanUp();
+  ctx.save();
+  ctx.strokeStyle = 'rgba(190,140,255,0.8)'; ctx.lineWidth = 5; ctx.setLineDash([4, 14]); ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(px(lever[0]), py(lever[1])); ctx.lineTo(x + ww / 2, y + hh); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.globalAlpha = a;
+  ctx.fillStyle = '#9c6b3c'; CC.roundRect(ctx, x, y, ww, hh, 10); ctx.fill();
+  ctx.strokeStyle = 'rgba(60,35,10,0.5)'; ctx.lineWidth = 3;
+  for (let Y = y + 18; Y < y + hh; Y += 22) { ctx.beginPath(); ctx.moveTo(x + 4, Y); ctx.lineTo(x + ww - 4, Y); ctx.stroke(); }
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = '#a070e0'; ctx.lineWidth = 6; ctx.setLineDash(a < 1 ? [18, 10] : []);
+  CC.roundRect(ctx, x, y, ww, hh, 10); ctx.stroke();
+  ctx.restore();
+}
+// An overpass: a wooden deck on posts, ramps at both ends.
+function drawDeck(ctx, d) {
+  const [x0, z0, x1, z1] = d, h = DECK_H, X = x => px(x + AX * h), Z = z => py(z + K * h), R = 0.45;
+  const quad = (pts, c) => { ctx.fillStyle = c; ctx.beginPath(); for (const [a, b] of pts) ctx.lineTo(a, b); ctx.closePath(); ctx.fill(); };
+  ctx.save();
+  quad([[px(x1), py(z0)], [X(x1), Z(z0)], [X(x1), Z(z1)], [px(x1), py(z1)]], 'rgba(90,55,25,0.9)');
+  quad([[px(x0), py(z0 - R)], [px(x1), py(z0 - R)], [X(x1), Z(z0)], [X(x0), Z(z0)]], '#a8743f');
+  quad([[X(x0), Z(z1)], [X(x1), Z(z1)], [px(x1), py(z1 + R)], [px(x0), py(z1 + R)]], '#8f6234');
+  ctx.globalAlpha = 0.8;
+  quad([[X(x0), Z(z0)], [X(x1), Z(z0)], [X(x1), Z(z1)], [X(x0), Z(z1)]], '#c08a50');
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = 'rgba(70,40,15,0.45)'; ctx.lineWidth = 3;
+  for (let z = z0 + 0.3; z < z1; z += 0.3) { ctx.beginPath(); ctx.moveTo(X(x0), Z(z)); ctx.lineTo(X(x1), Z(z)); ctx.stroke(); }
+  ctx.strokeStyle = '#6b4220'; ctx.lineWidth = 9; ctx.lineCap = 'round';
+  for (const x of [x0, x1]) { ctx.beginPath(); ctx.moveTo(X(x), Z(z0)); ctx.lineTo(X(x), Z(z1)); ctx.stroke(); }
+  ctx.restore();
+}
+const proj = (x, z, y) => [px(x + AX * y), py(z + K * y)];
+// A catapult: a base, an arm with a cup, an arrow where it throws while drawing.
+function drawCata(ctx, p, t) {
+  const ca = Math.cos(p.a), sa = Math.sin(p.a);
+  const swing = state !== 'edit' && isFinite(p.at) ? smooth((clock - p.at) / 0.18) : 0;
+  box(ctx, p.x, p.z, p.a, 0, 0.75, 0.6, 0.22, 0, [150, 96, 50]);
+  // The arm turns about the base's middle: cup behind and low, then up and forward.
+  const back = -0.5 + 0.75 * swing, up = 0.35 + 0.55 * Math.sin(Math.PI * Math.min(1, swing * 1.2)) + 0.2 * swing;
+  const [ax, ay] = proj(p.x, p.z, 0.25), [bx, by] = proj(p.x + ca * back, p.z + sa * back, up);
+  ctx.strokeStyle = '#6b4220'; ctx.lineWidth = 12; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+  ctx.fillStyle = '#4a2c12'; ctx.beginPath(); ctx.arc(bx, by, 16, 0, Math.PI * 2); ctx.fill();
+  if (!swing) { ctx.fillStyle = '#8b93a6'; ctx.beginPath(); ctx.arc(bx, by - 6, 13, 0, Math.PI * 2); ctx.fill(); }
+  if (state === 'edit') {
+    const [x0, y0] = proj(p.x + ca * 0.55, p.z + sa * 0.55, 0), [x1, y1] = proj(p.x + ca * 1.35, p.z + sa * 1.35, 0);
+    const ta = Math.atan2(y1 - y0, x1 - x0);
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1);
+    ctx.moveTo(x1 + Math.cos(ta + 2.5) * 22, y1 + Math.sin(ta + 2.5) * 22); ctx.lineTo(x1, y1); ctx.lineTo(x1 + Math.cos(ta - 2.5) * 22, y1 + Math.sin(ta - 2.5) * 22);
+    ctx.stroke();
+  }
+}
+// The ball in flight, its landing puff, then lying where it fell.
+function drawBall(ctx, c, t) {
+  const p = c.piece, land = c.land;
+  if (state === 'edit' || !isFinite(p.at) || clock < p.at + 0.1) return;
+  const T = 0.15 + c.dist * FLY, s = Math.min(1, (clock - p.at - 0.1) / T), x = p.x + (land.x - p.x) * s, z = p.z + (land.z - p.z) * s;
+  const y = 0.9 + (1.2 + c.dist * 0.25) * 4 * s * (1 - s) - 0.9 * s;
+  ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(px(x), py(z), 16, 9, 0, 0, Math.PI * 2); ctx.fill();
+  const [bx, by] = proj(x, z, Math.max(0.12, y));
+  const g = ctx.createRadialGradient(bx - 5, by - 6, 2, bx, by, 15);
+  g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#7d8597');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(bx, by, 15, 0, Math.PI * 2); ctx.fill();
+  const after = clock - p.at - 0.1 - T;
+  if (after > 0 && after < 0.5) {
+    ctx.strokeStyle = land.dead && wet(land.x, land.z) ? `rgba(200,230,255,${1 - after * 2})` : `rgba(255,240,200,${1 - after * 2})`;
+    ctx.lineWidth = 6; ctx.beginPath(); ctx.ellipse(px(land.x), py(land.z), 20 + after * 160, (20 + after * 160) * 0.6, 0, 0, Math.PI * 2); ctx.stroke();
+  }
 }
 // Under the finger: the eraser's reach, or a dotted line to where the next dominoes go.
 function drawPen(ctx) {
@@ -629,32 +895,33 @@ function wonButtons() {
     { label: 'Rejouer', rect: [395, 1770, 290, 80], act: () => { state = 'rise'; since = CC.time; } },
     ...(more ? [{ label: 'Suivant', main: true, rect: [710, 1770, 290, 80], act: () => load(L.n + 1) }] : [])];
 }
-// The challenges start a new block of tiles under their own title.
-const FIRST_HARD = LEVELS.findIndex(lv => lv.hard), HARD_TOP = 1150;
+// Blocks of tiles, five a row: the first levels, the challenges, the new pieces, each under its title.
+const BLOCKS = [{ top: 300, from: 0 }, { title: 'Défis', top: 790, from: LEVELS.findIndex(lv => lv.hard) },
+  { title: 'Nouvelles pièces', top: 1080, from: LEVELS.findIndex(lv => lv.fresh) }];
 const tileRect = i => {
-  const j = i < FIRST_HARD ? i : i - FIRST_HARD, top = i < FIRST_HARD ? 330 : HARD_TOP;
-  return [50 + (j % 4) * 250, top + Math.floor(j / 4) * 250, 230, 230];
+  const b = BLOCKS.findLast(b => i >= b.from), j = i - b.from;
+  return [45 + (j % 5) * 200, b.top + Math.floor(j / 5) * 200, 190, 190];
 };
 function drawMenu(ctx) {
   table(ctx);
   text(ctx, 'Le tracé de dominos', W / 2, 110, 76);
   wrap(ctx, 'Dessine des chemins de dominos jusqu’aux morceaux de l’image, puis lance la vague.', W / 2, 220, 36, W - 160, 'rgba(255,255,255,0.85)');
-  text(ctx, 'Défis', 70, HARD_TOP - 50, 44, '#ffd23f', 'left');
+  for (const b of BLOCKS) if (b.title) text(ctx, b.title, 60, b.top - 40, 42, '#ffd23f', 'left');
   for (let i = 0; i < LEVELS.length; i++) {
     const [x, y, w, h] = tileRect(i), st = prog.stars[i] || 0;
     ctx.fillStyle = st ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.25)'; CC.roundRect(ctx, x, y, w, h, 28); ctx.fill();
     if (st) {
       // A level done shows its picture.
-      const c = 7, left = x + (w - COLS * c) / 2;
+      const c = 6.5, left = x + (w - COLS * c) / 2;
       ctx.save();
-      CC.roundRect(ctx, left, y + 18, COLS * c, ROWS * c, 16); ctx.clip();
-      ctx.translate(left, y + 18); ctx.scale(c, c);
+      CC.roundRect(ctx, left, y + 12, COLS * c, ROWS * c, 14); ctx.clip();
+      ctx.translate(left, y + 12); ctx.scale(c, c);
       ART[LEVELS[i].pic](ctx, CC.time + i * 0.7);
       ctx.restore();
-      ctx.fillStyle = 'rgba(20,24,44,0.75)'; CC.roundRect(ctx, x + 8, y + 8, 62, 50, 18); ctx.fill();
-      text(ctx, String(i + 1), x + 39, y + 35, 32);
-    } else text(ctx, String(i + 1), x + w / 2, y + 96, 84);
-    stars3(ctx, x + w / 2, y + h - 36, 20, st);
+      ctx.fillStyle = 'rgba(20,24,44,0.75)'; CC.roundRect(ctx, x + 6, y + 6, 58, 46, 16); ctx.fill();
+      text(ctx, String(i + 1), x + 35, y + 31, 30);
+    } else text(ctx, String(i + 1), x + w / 2, y + 80, 72);
+    stars3(ctx, x + w / 2, y + h - 26, 16, st);
   }
 }
 
@@ -675,10 +942,12 @@ function down(x, y) {
   if (inCircle(x, y, ERASE, 10)) { erasing = !erasing; tock(0.6); return; }
   if (inRect(x, y, PLAY, 10)) { flick(); return; }
   if (y > TOP_BAR) return;
-  const [gx, gz] = toGround(x, y), s0 = L.fixed[0];
+  const [gx, gz] = toGround(x, y);
   if (erasing) { pen = { erase: true, fx: x, fy: y }; eraseAt(gx, gz); return; }
+  const tool = toolAt(gx, gz);
+  if (tool) { turnTool(tool); return; }
   penDown(gx, gz);
-  Object.assign(pen, { fx: x, fy: y, onStart: Math.hypot(x - px(s0.x), y - py(s0.z + 0.25)) < 80 });
+  Object.assign(pen, { fx: x, fy: y, onStart: L.fixed.some(s0 => s0.kind === 'start' && Math.hypot(x - px(s0.x), y - py(s0.z + 0.25)) < 80) });
 }
 function move(x, y) {
   if (!pen) return;
@@ -700,7 +969,7 @@ canvas.addEventListener('pointercancel', () => { if (pen && !pen.erase) penUp();
 
 // ---- Test hooks
 window.__level = n => { load(n); return { par: L.par, budget: L.budget, three: L.three, two: L.two }; };
-window.__ref = () => { drawStrokes(L.lv.ref); return L.doms.length; };
+window.__ref = () => { setTools(true); drawStrokes(L.lv.ref); return L.doms.length; };
 window.__flick = flick;
 window.__skip = n => { for (let k = 0; k < n; k++) { step(); CC.time += CC.DT; } return state; };
 window.__shot = () => { draw(canvas.getContext('2d')); return canvas.toDataURL('image/png'); };
@@ -714,6 +983,11 @@ window.__check = () => LEVELS.map((lv, n) => {
   window.__ref(); flick();
   out.seconds = until(() => state !== 'run');
   out.state = state; out.stars = state === 'won' ? starsNow() : 0;
+  if (L.catas.length || L.turns.length) {
+    // The same lines with the catapults and turntables as the level starts must not do.
+    load(n); drawStrokes(lv.ref); flick(); until(() => state !== 'run');
+    out.untuned = state;
+  }
   return out;
 });
 
