@@ -2,23 +2,23 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 
 // Unlisted: noindex, out of the sitemap and of the offline precache (astro.config.mjs).
-// The next store version, built from the game's main (28f9b3a) under the .beta id, signed with the dev key,
+// The next store version, built from the game's main (c79d0e7) under the .beta id, signed with the dev key,
 // ARM64 only, on a prerelease of this repo (the earlier betas' APKs stay there).
 const BETA = {
-	version: '1.0.11',
-	date: '2026-11-15',
-	size: 99776051,
+	version: '1.0.12',
+	date: '2026-11-16',
+	size: 99802447,
 	android: '7.1',
-	sha256: '8c28ae5d2f0f3746581d429dac6dcd9deaf0af5382ad47665502a4a6b7085cdf',
-	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-game-beta/petanque-game-1.0.11-beta.apk',
+	sha256: '7234c8f42511883f42e8f43a551dadfa55e11ba98c05808f9e1943219bd06154',
+	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-game-beta/petanque-game-1.0.12-beta.apk',
 };
 const date = new Date(BETA.date).toLocaleDateString('fr-FR', { dateStyle: 'medium' });
 const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 ---
 
 <BaseLayout
-	title="Pétanque Game β — version 1.0.11 | Ludiven Studio"
-	description="Version bêta Android de Pétanque Game 1.0.11, pour les testeurs."
+	title="Pétanque Game β — version 1.0.12 | Ludiven Studio"
+	description="Version bêta Android de Pétanque Game 1.0.12, pour les testeurs."
 	noindex
 >
 	<div class="wrapper beta-page stack gap-6">
@@ -58,6 +58,15 @@ const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 					sa première boule.
 				</li>
 				<li>Les images des menus et de la planche prennent quatre fois moins de mémoire.</li>
+				<li>
+					<strong>Nouveau dans la 1.0.12 : le défi de tir du jour</strong> (accueil › Défi de tir du jour) : dix boules à tirer, la
+					même série pour tout le monde, 50 points au plus, à rejouer autant que tu veux. Avec un compte, ton score entre dans
+					le classement mondial du jour et de la semaine.
+				</li>
+				<li>
+					<strong>Nouveau dans la 1.0.12 : après une mise à jour</strong>, si le jeu a perdu ta connexion, il te propose de te
+					reconnecter au lieu de te faire recréer ton joueur.
+				</li>
 			</ul>
 		</section>
 
