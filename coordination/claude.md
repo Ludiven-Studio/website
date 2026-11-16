@@ -3223,6 +3223,25 @@
   enregistrement, page ouverte sans erreur de console ; poussé comme mise à jour de prototype : mon fichier et cette
   section seulement. Statut : terminé. Réservations libérées.
 
+## 2026-11-14 — Pétanque Game : compteur de joueurs en ligne (session PetanqueGame)
+- Statut : en cours (2026-11-14T07:55+01:00). Demande de l'utilisateur : Raphaël, dans la session : « Pour le multi, ce
+  serait bien de pouvoir savoir combien de personnes jouent en même temps » (choix : les deux, joueurs dans le jeu et
+  qui attendent)
+- Réservations actives : `supabase/functions/app-presence/`, `supabase/migrations/20261114120000_app_presence.sql`
+  (worktree pg-presence).
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 08:02 : fonction app-presence et table app_presence écrites dans le worktree pg-presence (branche pg-presence), rien
+  de commité ni déployé : migration et déploiement de la fonction attendent le mot de Raphaël dans la session
+  PetanqueGame
+- 10:02 : Sur l'accord de Raphaël (« ok tu peux déployer la fonction supabase ») : migration
+  20261114120000_app_presence appliquée (seule en attente) et fonction app-presence déployée ; testée en ligne :
+  {online:1}, app inconnue refusée, RPC fermée à anon (401). Les 2 fichiers restent non commités dans le worktree
+  pg-presence, push du site sur son mot.
+- 22:31 : commité et poussé sur l'accord de Raphaël relayé par le Producer (« Oui, ajouter et pousser ») : mes 2
+  fichiers (migration app_presence et fonction app-presence, déjà en ligne depuis le 15/11) et cette section, depuis le
+  worktree pg-presence recalé sur origin/main ; deno check et eslint OK ; aucun nouveau déploiement serveur. Statut :
+  terminé. Réservations libérées.
+
 ## 2026-11-14 — Nino Rush : version.json 1.0.3 (session NinoRush)
 - Statut : en cours (2026-11-14T08:19+01:00). Demande de l'utilisateur : Nino Rush 1.0.3 en ligne sur Google Play et
   l'App Store (Raphaël, relayé par le Producer : « Nino Rush est live sur google et apple »)
