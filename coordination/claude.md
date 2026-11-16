@@ -3314,3 +3314,10 @@
   et astro check 0 erreur.
 - 13:37 : commité et poussé à la demande de l'utilisateur (« Publie », tapé dans la session Pétanque Scan) : ma page et
   cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-16 — Dragon Gems : bêta 1.1.4 (session DragonsGemsSwipe)
+- Statut : en cours (2026-11-16T20:10+01:00). Demande de l'utilisateur : publie (bêta 1.1.4)
+- Réservations actives : `src/pages/dragons-gems/beta-h4yb1lyxzz.astro`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 20:10 : commité et poussé à la demande de l'utilisateur : la page bêta (1.1.4, Tout débloquer) et cette section
+  seulement. Statut : terminé. Réservations libérées.
