@@ -1,6 +1,9 @@
 // deno test supabase/functions/_shared/partners_test.ts
 import { assertEquals } from 'jsr:@std/assert@1';
-import { cleanPartnerNote, cleanPartnerPhone, findContest, missing, partnerFields, shapePartnerSearch, teamSize } from './partners.ts';
+import {
+	cleanPartnerNote, cleanPartnerPhone, contactRefusal, findContest, isOpenCapError, missing, partnerFields, partnerTournamentOpen,
+	shapePartnerSearch, teamSize,
+} from './partners.ts';
 
 const NOW = Date.parse('2026-11-06T09:00:00Z');
 const CONTESTS = [
@@ -84,4 +87,25 @@ Deno.test('a number is stored with its country code', () => {
 	assertEquals(cleanPartnerPhone('612345678'), null);
 	assertEquals(cleanPartnerPhone('+0612345678'), null);
 	assertEquals(cleanPartnerPhone('+1234567890123456'), null);
+});
+
+Deno.test('a cancelled or hidden tournament shows no search and gives no number', () => {
+	assertEquals(partnerTournamentOpen({ status: 'open', hidden: false }), true);
+	assertEquals(partnerTournamentOpen({ status: 'cancelled', hidden: false }), false);
+	assertEquals(partnerTournamentOpen({ status: 'open', hidden: true }), false);
+	assertEquals(partnerTournamentOpen(null), false);
+});
+
+Deno.test('the locked contact call answers the number or a refusal', () => {
+	assertEquals(contactRefusal('ok'), null);
+	assertEquals(contactRefusal('player_cap')?.status, 429);
+	assertEquals(contactRefusal('ip_cap')?.status, 429);
+	assertEquals(contactRefusal('gone')?.status, 409);
+	assertEquals(contactRefusal(null)?.status, 409);
+});
+
+Deno.test('the open-search cap is told from other insert errors', () => {
+	assertEquals(isOpenCapError({ message: 'partner_open_cap' }), true);
+	assertEquals(isOpenCapError({ message: 'duplicate key value violates unique constraint' }), false);
+	assertEquals(isOpenCapError(null), false);
 });
