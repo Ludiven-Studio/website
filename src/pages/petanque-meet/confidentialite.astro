@@ -74,6 +74,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			<ul>
 				<li><strong>Pour une partie</strong>&nbsp;: le terrain (position exacte de l'épingle et nom du lieu), la date et l'heure, le format, le nombre de places, le <strong>prénom de l'organisateur</strong> et les <strong>prénoms des inscrits</strong>.</li>
 				<li><strong>Pour un concours</strong>&nbsp;: le nom du club, le titre, le lieu, la date, la catégorie, le prix d'inscription, les détails, et s'ils ont été fournis le <strong>numéro de téléphone</strong> et l'<strong>affiche</strong> (une fois validée par l'éditeur).</li>
+				<li><strong>Pour une recherche de partenaires</strong> sur un concours&nbsp;: ton prénom, l'épreuve, si tu es seul ou à deux, ton niveau et ta note. <strong>Ton numéro de téléphone n'est jamais affiché</strong>&nbsp;: un joueur connecté qui touche «&nbsp;Contacter&nbsp;» reçoit ce seul numéro, pour t'appeler ou t'écrire, et tu vois combien de joueurs l'ont demandé.</li>
 				<li>Les <strong>concours que tu suis</strong> ne sont visibles de personne&nbsp;: l'organisateur voit seulement combien de joueurs suivent le sien.</li>
 				<li>Un <strong>repère anonyme</strong> par compte, qui permet de reconnaître que plusieurs annonces viennent du même organisateur, sans révéler qui il est.</li>
 			</ul>
@@ -119,6 +120,12 @@ import LangSwitch from '../../components/LangSwitch.astro';
 							<td>Annoncer un concours</td>
 							<td>Exécution du contrat</td>
 							<td>Supabase&nbsp;; public après validation de l'affiche</td>
+						</tr>
+						<tr>
+							<td>Recherches de partenaires&nbsp;: prénom, épreuve, seul ou à deux, niveau, note, numéro de téléphone&nbsp;; les comptes qui ont demandé le numéro</td>
+							<td>Trouver un partenaire ou un troisième joueur pour un concours</td>
+							<td>Exécution du contrat</td>
+							<td>Supabase&nbsp;; public, sauf le numéro, donné un par un aux joueurs connectés qui le demandent (10 par jour au plus)</td>
 						</tr>
 						<tr>
 							<td>Concours suivis</td>
@@ -215,8 +222,8 @@ import LangSwitch from '../../components/LangSwitch.astro';
 		<section class="stack gap-2">
 			<h2>7. Signalements et modération</h2>
 			<p>
-				Tu peux signaler une partie ou un concours (prénom choquant, fausse annonce, affiche inadaptée,
-				personne n'est venu). Ton signalement est <strong>anonyme vis-à-vis des autres joueurs</strong>&nbsp;:
+				Tu peux signaler une partie, un concours ou une recherche de partenaires (prénom choquant, fausse annonce,
+				affiche inadaptée, propos déplacés, personne n'est venu). Ton signalement est <strong>anonyme vis-à-vis des autres joueurs</strong>&nbsp;:
 				personne ne sait qui l'a fait. Il est toutefois enregistré avec ton identifiant de compte, pour éviter
 				les signalements en série.
 			</p>
@@ -320,7 +327,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			<h2>10. Ce qui est stocké sur ton téléphone</h2>
 			<ul>
 				<li>ta session de connexion et ton adresse mail&nbsp;;</li>
-				<li>le prénom que tu as saisi, les parties rejointes, les lieux que tu as enregistrés, le dernier endroit affiché sur la carte&nbsp;;</li>
+				<li>le prénom que tu as saisi, les parties rejointes, les lieux que tu as enregistrés, le dernier endroit affiché sur la carte, le dernier numéro donné pour une recherche de partenaires&nbsp;;</li>
 				<li>tes préférences&nbsp;: langue, thème, organisateurs masqués, messages déjà vus&nbsp;;</li>
 				<li>ton choix sur la publicité et, si tu l'as acceptée, les données des modules publicitaires d'ironSource et de Unity Ads (voir §9)&nbsp;;</li>
 				<li>un cache des fonds de carte et des affiches, pour un affichage plus rapide.</li>
@@ -371,6 +378,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			<ul>
 				<li><strong>Parties et inscriptions</strong>&nbsp;: retirées de la carte dès qu'elles sont terminées ou annulées, puis effacées <strong>12 mois</strong> après leur date.</li>
 				<li><strong>Concours</strong>&nbsp;: retirés de la carte le lendemain, effacés 12 mois après leur date. L'affiche est effacée une semaine après le concours. Le suivi d'un concours est effacé une fois le concours passé, au plus tard avec lui.</li>
+				<li><strong>Recherches de partenaires</strong>&nbsp;: effacées, avec leur numéro, la liste de qui l'a demandé et leurs signalements, dès que l'épreuve commence ou que tu la fermes («&nbsp;J'ai trouvé&nbsp;»).</li>
 				<li><strong>Signalements</strong>&nbsp;: effacés une fois traités, et au plus tard 12 mois après.</li>
 				<li><strong>Demandes «&nbsp;C'est mon club&nbsp;»</strong>&nbsp;: gardées avec ton compte, effacées quand tu le supprimes.</li>
 				<li><strong>Compteurs anti-abus</strong>&nbsp;: effacés au bout de 30 jours.</li>
@@ -391,7 +399,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			<ul>
 				<li>ton compte et ton adresse mail sont effacés&nbsp;;</li>
 				<li>tes parties à venir sont annulées (les inscrits le voient) et ton prénom est remplacé par «&nbsp;Compte supprimé&nbsp;» sur toutes tes parties&nbsp;;</li>
-				<li>tes inscriptions, tes concours, leurs affiches, les concours que tu suis, tes signalements et tes demandes «&nbsp;C'est mon club&nbsp;» sont effacés&nbsp;;</li>
+				<li>tes inscriptions, tes concours, leurs affiches, les concours que tu suis, tes recherches de partenaires et leur numéro, tes signalements et tes demandes «&nbsp;C'est mon club&nbsp;» sont effacés&nbsp;;</li>
 				<li>sur iPhone, l'application te redemande la connexion Apple, pour retirer à Pétanque Meet l'accès à ton identifiant Apple.</li>
 			</ul>
 			<p>

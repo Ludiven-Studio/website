@@ -79,6 +79,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<ul>
 				<li><strong>For a game</strong>: the pitch (exact position of the pin and name of the place), the date and time, the format, the number of places, the <strong>organiser's first name</strong> and the <strong>first names of those signed up</strong>.</li>
 				<li><strong>For a tournament</strong>: the club's name, the title, the place, the date, the category, the entry fee, the details, and, if they were provided, the <strong>phone number</strong> and the <strong>poster</strong> (once approved by the publisher).</li>
+				<li><strong>For a partner search</strong> on a tournament: your first name, the contest, whether you are alone or two, your level and your note. <strong>Your phone number is never shown</strong>: a signed-in player who taps "Contact" receives that one number, to call or text you, and you see how many players asked for it.</li>
 				<li>The <strong>tournaments you follow</strong> are visible to no one: the organiser only sees how many players follow theirs.</li>
 				<li>An <strong>anonymous marker</strong> per account, which makes it possible to recognise that several listings come from the same organiser, without revealing who they are.</li>
 			</ul>
@@ -124,6 +125,12 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 							<td>Announcing a tournament</td>
 							<td>Performance of the contract</td>
 							<td>Supabase; public once the poster is approved</td>
+						</tr>
+						<tr>
+							<td>Partner searches: first name, contest, alone or two, level, note, phone number; the accounts that asked for the number</td>
+							<td>Finding a partner or a third player for a tournament</td>
+							<td>Performance of the contract</td>
+							<td>Supabase; public, except the number, given one at a time to signed-in players who ask for it (10 a day at most)</td>
 						</tr>
 						<tr>
 							<td>Followed tournaments</td>
@@ -220,8 +227,8 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 		<section class="stack gap-2">
 			<h2>7. Reports and moderation</h2>
 			<p>
-				You can report a game or a tournament (offensive first name, fake listing, unsuitable poster, nobody
-				came). Your report is <strong>anonymous towards other players</strong>: no one knows who made it. It
+				You can report a game, a tournament or a partner search (offensive first name, fake listing, unsuitable
+				poster, offensive words, nobody came). Your report is <strong>anonymous towards other players</strong>: no one knows who made it. It
 				is, however, recorded with your account identifier, to prevent serial reporting.
 			</p>
 			<p>
@@ -320,7 +327,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<h2>10. What is stored on your phone</h2>
 			<ul>
 				<li>your sign-in session and your email address;</li>
-				<li>the first name you entered, the games you joined, the places you saved, the last spot shown on the map;</li>
+				<li>the first name you entered, the games you joined, the places you saved, the last spot shown on the map, the last number given for a partner search;</li>
 				<li>your preferences: language, theme, hidden organisers, messages already seen;</li>
 				<li>your choice about advertising and, if you accepted it, the data of the ironSource and Unity Ads advertising modules (see §9);</li>
 				<li>a cache of map tiles and posters, for faster display.</li>
@@ -370,6 +377,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<ul>
 				<li><strong>Games and sign-ups</strong>: removed from the map as soon as they are over or cancelled, then erased <strong>12 months</strong> after their date.</li>
 				<li><strong>Tournaments</strong>: removed from the map the next day, erased 12 months after their date. The poster is erased one week after the tournament. Following a tournament is erased once the tournament is over, at the latest with it.</li>
+				<li><strong>Partner searches</strong>: erased, with their number, the list of who asked for it and their reports, as soon as the contest starts or you close it ("I found someone").</li>
 				<li><strong>Reports</strong>: erased once dealt with, and at the latest 12 months later.</li>
 				<li><strong>"This is my club" requests</strong>: kept with your account, erased when you delete it.</li>
 				<li><strong>Anti-abuse counters</strong>: erased after 30 days.</li>
@@ -389,7 +397,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<ul>
 				<li>your account and your email address are erased;</li>
 				<li>your upcoming games are cancelled (those signed up see it) and your first name is replaced by "Deleted account" on all your games;</li>
-				<li>your sign-ups, your tournaments, their posters, the tournaments you follow, your reports and your "This is my club" requests are erased;</li>
+				<li>your sign-ups, your tournaments, their posters, the tournaments you follow, your partner searches and their number, your reports and your "This is my club" requests are erased;</li>
 				<li>on iPhone, the app asks you to sign in with Apple again, to remove Pétanque Meet's access to your Apple ID.</li>
 			</ul>
 			<p>
