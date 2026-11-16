@@ -31,7 +31,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			This policy covers <strong>the Pétanque Game mobile app</strong>
 			(<code>com.ludivenstudio.petanquegame</code>). The pétanque game on the website
 			(<a href="/jeux/petanque/">ludiven-studio.fr/jeux/petanque</a>) and the rest of the website have their
-			<a href="/confidentialite/">own policy</a>. Last updated: 11 November 2026 (version 1.0.8: our own ads, new "Personalised advertising" window, no more Google backup on Android).
+			<a href="/confidentialite/">own policy</a>. Last updated: 16 November 2026 (version 1.0.13: the number of players online right now; version 1.0.8: our own ads, new "Personalised advertising" window, no more Google backup on Android).
 		</p>
 		<p class="updated">
 			This is a courtesy translation. In case of discrepancy, the
@@ -197,6 +197,12 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 							<td>Showing you videos of our other games and apps (see §6)</td>
 							<td>Legitimate interest</td>
 							<td>GitHub, our website's host</td>
+						</tr>
+						<tr>
+							<td>A random number drawn at each launch of the game, sent once a minute while the game is open, with no account or player identifier</td>
+							<td>Show how many players are playing right now</td>
+							<td>Legitimate interest</td>
+							<td>Our function at Supabase (see §12)</td>
 						</tr>
 						<tr>
 							<td>Usage statistics, with no account or identifier (see §7)</td>
@@ -389,7 +395,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 		<section class="stack gap-2">
 			<h2>12. Recipients and transfers outside the European Union</h2>
 			<p>
-				Our only servers are the usage statistics server (see §7) and a function that removes the "Sign in with Apple" access when you delete your account (see §11). Your data is neither sold nor passed on. It is processed only by these
+				Our only servers are the usage statistics server (see §7), a function that counts the players online right now (see §5) and a function that removes the "Sign in with Apple" access when you delete your account (see §11). Your data is neither sold nor passed on. It is processed only by these
 				providers:
 			</p>
 			<ul>
@@ -398,7 +404,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Google</strong> (Google Ireland Limited, Google LLC) — sign-in on Android and iPhone, Google Play (distribution, payment, rating form).</li>
 				<li><strong>Apple Inc.</strong> — "Sign in with Apple", tracking permission, App Store (distribution, payment, rating form).</li>
 				<li><strong>Hetzner Online GmbH</strong> (Germany) — hosting of our usage statistics server (see §7).</li>
-				<li><strong>Supabase, Inc.</strong> — hosting of our function that removes the "Sign in with Apple" access (see §11): it receives Apple's code, the app's identifier and the phone's IP address, and keeps nothing.</li>
+				<li><strong>Supabase, Inc.</strong> — hosting of our function that removes the "Sign in with Apple" access (see §11): it receives Apple's code, the app's identifier and the phone's IP address, and keeps nothing; and of the one that counts the players online, which receives the random number drawn at launch and the IP address, without keeping it.</li>
 				<li><strong>GitHub, Inc.</strong> — hosting of our website, read for the update check (see §9) and for our own ads (see §6); GitHub logs the IP address of each visit for the security of its service.</li>
 			</ul>
 			<p>
@@ -414,6 +420,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Account and progress</strong> (Unity Authentication and Cloud Save): until you delete your account.</li>
 				<li><strong>Ranking</strong>: your rating and your name, until you have them removed (see §11).</li>
 				<li><strong>Online games</strong>: a public game leaves the list as soon as it starts or you close it; throws are not kept after the game.</li>
+				<li><strong>Players online right now</strong>: the random number is erased three minutes after the game went quiet.</li>
 				<li><strong>Usage statistics</strong>: kept <strong>24 months</strong> on our server, then erased; its backups, 14 days.</li>
 				<li><strong>Advertising data</strong>: according to the rules of Unity and ironSource.</li>
 				<li><strong>Your answer about ads</strong>: 182 days (6 months) on your phone, then the game asks again.</li>

@@ -30,7 +30,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			Cette politique concerne <strong>l'application mobile Pétanque Game</strong>
 			(<code>com.ludivenstudio.petanquegame</code>). Le jeu de pétanque du site
 			(<a href="/jeux/petanque/">ludiven-studio.fr/jeux/petanque</a>) et le reste du site ont leur
-			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 11 novembre 2026 (version 1.0.8&nbsp;: nos propres publicités, nouvelle fenêtre «&nbsp;Publicité personnalisée&nbsp;», plus de sauvegarde Google sur Android).
+			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 16 novembre 2026 (version 1.0.13&nbsp;: le nombre de joueurs en ligne en ce moment&nbsp;; version 1.0.8&nbsp;: nos propres publicités, nouvelle fenêtre «&nbsp;Publicité personnalisée&nbsp;», plus de sauvegarde Google sur Android).
 		</p>
 
 		<div class="summary">
@@ -193,6 +193,12 @@ import LangSwitch from '../../components/LangSwitch.astro';
 							<td>Te montrer des vidéos de nos autres jeux et applis (voir §6)</td>
 							<td>Intérêt légitime</td>
 							<td>GitHub, hébergeur de notre site</td>
+						</tr>
+						<tr>
+							<td>Un numéro tiré au hasard à chaque lancement du jeu, envoyé une fois par minute tant que le jeu est ouvert, sans compte ni identifiant de joueur</td>
+							<td>Afficher combien de joueurs jouent en ce moment</td>
+							<td>Intérêt légitime</td>
+							<td>Notre fonction chez Supabase (voir §12)</td>
 						</tr>
 						<tr>
 							<td>Statistiques d'usage, sans compte ni identifiant (voir §7)</td>
@@ -393,7 +399,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 		<section class="stack gap-2">
 			<h2>12. Destinataires et transferts hors Union européenne</h2>
 			<p>
-				Nos seuls serveurs sont celui des statistiques d'usage (voir §7) et une fonction qui retire l'accès «&nbsp;Se connecter avec Apple&nbsp;» quand tu supprimes ton compte (voir §11). Tes données ne sont ni vendues ni cédées. Elles ne sont traitées
+				Nos seuls serveurs sont celui des statistiques d'usage (voir §7), une fonction qui compte les joueurs en ligne en ce moment (voir §5) et une fonction qui retire l'accès «&nbsp;Se connecter avec Apple&nbsp;» quand tu supprimes ton compte (voir §11). Tes données ne sont ni vendues ni cédées. Elles ne sont traitées
 				que par ces prestataires&nbsp;:
 			</p>
 			<ul>
@@ -402,7 +408,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li><strong>Google</strong> (Google Ireland Limited, Google LLC) — connexion sur Android et sur iPhone, Google Play (distribution, paiement, fiche de notation).</li>
 				<li><strong>Apple Inc.</strong> — «&nbsp;Se connecter avec Apple&nbsp;», autorisation de suivi, App Store (distribution, paiement, fiche de notation).</li>
 				<li><strong>Hetzner Online GmbH</strong> (Allemagne) — hébergement de notre serveur de statistiques d'usage (voir §7).</li>
-				<li><strong>Supabase, Inc.</strong> — hébergement de notre fonction qui retire l'accès «&nbsp;Se connecter avec Apple&nbsp;» (voir §11)&nbsp;: elle reçoit le code d'Apple, l'identifiant de l'application et l'adresse IP du téléphone, et ne garde rien.</li>
+				<li><strong>Supabase, Inc.</strong> — hébergement de notre fonction qui retire l'accès «&nbsp;Se connecter avec Apple&nbsp;» (voir §11)&nbsp;: elle reçoit le code d'Apple, l'identifiant de l'application et l'adresse IP du téléphone, et ne garde rien&nbsp;; et de celle qui compte les joueurs en ligne, qui reçoit le numéro tiré au hasard au lancement et l'adresse IP, sans la garder.</li>
 				<li><strong>GitHub, Inc.</strong> — hébergement de notre site, lu pour la vérification de mise à jour (voir §9) et pour nos propres publicités (voir §6)&nbsp;; GitHub enregistre l'adresse IP de chaque visite pour la sécurité de son service.</li>
 			</ul>
 			<p>
@@ -418,6 +424,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li><strong>Compte et progression</strong> (Unity Authentication et Cloud Save)&nbsp;: jusqu'à ce que tu supprimes ton compte.</li>
 				<li><strong>Classement</strong>&nbsp;: ta note et ton pseudo, jusqu'à ce que tu les fasses retirer (voir §11).</li>
 				<li><strong>Parties en ligne</strong>&nbsp;: une partie publique quitte la liste dès qu'elle commence ou que tu la fermes&nbsp;; les lancers ne sont pas gardés après la partie.</li>
+				<li><strong>Joueurs en ligne en ce moment</strong>&nbsp;: le numéro tiré au hasard est effacé trois minutes après que le jeu s'est tu.</li>
 				<li><strong>Statistiques d'usage</strong>&nbsp;: gardées <strong>24 mois</strong> sur notre serveur, puis effacées&nbsp;; ses sauvegardes, 14 jours.</li>
 				<li><strong>Données publicitaires</strong>&nbsp;: selon les règles de Unity et d'ironSource.</li>
 				<li><strong>Ta réponse sur la publicité</strong>&nbsp;: 182 jours (6 mois) sur ton téléphone, puis le jeu te la redemande.</li>
