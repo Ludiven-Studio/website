@@ -5,12 +5,12 @@ import { SUPABASE_URL } from '../../data/site';
 // Unlisted: noindex, out of the sitemap and of the offline precache (astro.config.mjs).
 // Main's next version under the .beta id, signed with the test key, uploaded by hand.
 const BETA = {
-	version: '1.0.3',
+	version: '1.0.4',
 	date: '2026-11-16',
-	size: 35473115,
+	size: 35602459,
 	android: '7.1',
-	sha256: 'f1d3bb168ed01850399ab06eaf027e4d614343b9c1c7982bda3e851621cfb95d',
-	url: `${SUPABASE_URL}/storage/v1/object/public/builds/petanquemeet-beta-0gn9lbmb/petanque-meet-beta-1.0.3.apk`,
+	sha256: '166feb9fd253ca677f7ea404c2710f859ec5119ae34bbf0e80ac6d274e7189ab',
+	url: `${SUPABASE_URL}/storage/v1/object/public/builds/petanquemeet-beta-0gn9lbmb/petanque-meet-beta-1.0.4.apk`,
 };
 const date = new Date(BETA.date).toLocaleDateString('fr-FR', { dateStyle: 'medium' });
 const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
@@ -50,7 +50,10 @@ const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 					<strong>Pas de mise à jour par le Play Store.</strong> Une nouvelle bêta se télécharge sur cette page.
 				</li>
 			</ul>
-			<p class="muted">Le reste marche comme dans l'appli du store : la carte, les rappels de parties, le partage et les affiches.</p>
+			<p class="muted">
+				Nouveau dans la {BETA.version} : la carte écrit les noms des lieux dans la langue de l'appli, et se dézoome jusqu'au monde
+				entier. Le reste marche comme dans l'appli du store : les rappels de parties, le partage et les affiches.
+			</p>
 		</section>
 
 		<section class="card stack gap-3">
