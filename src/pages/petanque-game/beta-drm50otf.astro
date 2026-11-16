@@ -2,23 +2,23 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 
 // Unlisted: noindex, out of the sitemap and of the offline precache (astro.config.mjs).
-// The next store version, built from the game's main (c79d0e7) under the .beta id, signed with the dev key,
+// The next store version, built from the game's main (1fc1caa) under the .beta id, signed with the dev key,
 // ARM64 only, on a prerelease of this repo (the earlier betas' APKs stay there).
 const BETA = {
-	version: '1.0.12',
+	version: '1.0.13',
 	date: '2026-11-16',
-	size: 99802447,
+	size: 99823487,
 	android: '7.1',
-	sha256: '7234c8f42511883f42e8f43a551dadfa55e11ba98c05808f9e1943219bd06154',
-	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-game-beta/petanque-game-1.0.12-beta.apk',
+	sha256: 'b9a6b721ac0c4cf37184c8fa37e2fcf02d1fc39a6dcdf5f235647864447d59e5',
+	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-game-beta/petanque-game-1.0.13-beta.apk',
 };
 const date = new Date(BETA.date).toLocaleDateString('fr-FR', { dateStyle: 'medium' });
 const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 ---
 
 <BaseLayout
-	title="Pétanque Game β — version 1.0.12 | Ludiven Studio"
-	description="Version bêta Android de Pétanque Game 1.0.12, pour les testeurs."
+	title="Pétanque Game β — version 1.0.13 | Ludiven Studio"
+	description="Version bêta Android de Pétanque Game 1.0.13, pour les testeurs."
 	noindex
 >
 	<div class="wrapper beta-page stack gap-6">
@@ -59,13 +59,27 @@ const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 				</li>
 				<li>Les images des menus et de la planche prennent quatre fois moins de mémoire.</li>
 				<li>
-					<strong>Nouveau dans la 1.0.12 : le défi de tir du jour</strong> (accueil › Défi de tir du jour) : dix boules à tirer, la
-					même série pour tout le monde, 50 points au plus, à rejouer autant que tu veux. Avec un compte, ton score entre dans
-					le classement mondial du jour et de la semaine.
+					<strong>Le défi de tir du jour</strong> (accueil › Défi de tir du jour) : à rejouer autant que tu veux. Avec un compte,
+					ton score entre dans le classement mondial du jour et de la semaine.
 				</li>
 				<li>
 					<strong>Nouveau dans la 1.0.12 : après une mise à jour</strong>, si le jeu a perdu ta connexion, il te propose de te
 					reconnecter au lieu de te faire recréer ton joueur.
+				</li>
+				<li>
+					<strong>Nouveau dans la 1.0.13 : le défi de tir devient le tir de précision des championnats</strong> : cinq ateliers
+					(la boule seule, derrière le bouchon, entre deux boules, derrière une boule, le bouchon), chacun à 6 puis 8 m, dix
+					boules, 50 points au plus. Carreau 5, les deux sortent 3, touchée 1. Ta boule doit tomber dans le cercle. Il se joue
+					seul sur une piste d'un boulodrome couvert.
+				</li>
+				<li>
+					<strong>Nouveau dans la 1.0.13 : le rythme rapide</strong> (Options › Rythme, ou « Passer ») : l'écran passe au noir
+					un court instant pendant que les joueurs se replacent, on ne les voit plus se téléporter.
+				</li>
+				<li>
+					<strong>Nouveau dans la 1.0.13 : Options › Repartir de zéro (test)</strong>, en bas des options : le jeu se ferme et
+					repart comme au tout premier lancement, pour revoir l'arrivée d'un nouveau joueur. Ton compte et sa sauvegarde en
+					ligne restent : reconnecte-toi pour les retrouver.
 				</li>
 			</ul>
 		</section>
