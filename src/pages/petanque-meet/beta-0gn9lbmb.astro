@@ -3,29 +3,29 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import { SUPABASE_URL } from '../../data/site';
 
 // Unlisted: noindex, out of the sitemap and of the offline precache (astro.config.mjs).
-// The 1.0.1 store build under the .beta id, signed with the test key, uploaded by hand.
+// Main's next version under the .beta id, signed with the test key, uploaded by hand.
 const BETA = {
-	version: '1.0.1',
-	date: '2026-11-06',
-	size: 34477657,
+	version: '1.0.3',
+	date: '2026-11-16',
+	size: 35473115,
 	android: '7.1',
-	sha256: '3d9e6436861bc01a174165d8c11ee20f875b9f505bb4129965bf8c00aa9631e6',
-	url: `${SUPABASE_URL}/storage/v1/object/public/builds/petanquemeet-beta-0gn9lbmb/petanque-meet-beta-1.0.1.apk`,
+	sha256: 'f1d3bb168ed01850399ab06eaf027e4d614343b9c1c7982bda3e851621cfb95d',
+	url: `${SUPABASE_URL}/storage/v1/object/public/builds/petanquemeet-beta-0gn9lbmb/petanque-meet-beta-1.0.3.apk`,
 };
 const date = new Date(BETA.date).toLocaleDateString('fr-FR', { dateStyle: 'medium' });
 const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 ---
 
 <BaseLayout
-	title="Pétanque Meet β — version 1.0.1 | Ludiven Studio"
-	description="Version bêta Android de Pétanque Meet 1.0.1, pour les testeurs."
+	title={`Pétanque Meet β — version ${BETA.version} | Ludiven Studio`}
+	description={`Version bêta Android de Pétanque Meet ${BETA.version}, pour les testeurs.`}
 	noindex
 >
 	<div class="wrapper beta-page stack gap-6">
 		<header class="stack gap-2">
 			<h1>Pétanque Meet&nbsp;β</h1>
 			<p class="lead">
-				La version {BETA.version} telle qu'elle part sur les stores, à tester une dernière fois avant sa sortie. Elle s'appelle
+				La prochaine version, {BETA.version}, à tester avant sa sortie sur les stores. Elle s'appelle
 				« Pétanque Meet β » et s'installe à côté de l'appli du Play Store, sans toucher à ses données.
 			</p>
 		</header>
@@ -39,7 +39,7 @@ const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 				</li>
 				<li>
 					<strong>Pas de vraies pubs.</strong> La β n'en affiche jamais : la fenêtre des pubs s'ouvre comme dans l'appli du store, mais
-					quelle que soit ta réponse, c'est notre bannière pour Pétanque Scan qui s'affiche.
+					quelle que soit ta réponse, c'est notre bannière pour nos autres applis qui s'affiche.
 				</li>
 				<li>
 					<strong>Connexion Google.</strong> Elle marche, avec ton compte habituel. Si l'appli du Play Store est aussi sur ton
