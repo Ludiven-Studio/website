@@ -3388,3 +3388,20 @@
   pg-beta-1014b…
 - 14:00 : build complet OK (235 pages, 0 erreur) ; commité et poussé à la demande de Raphaël (« envoie-la et pousse sa
   page », 13:54) : la page bêta et cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-17 — Pétanque Game : compteur de joueurs durci (app-presence) (session PetanqueGame)
+- Statut : en cours (2026-11-17T14:57+01:00). Demande de l'utilisateur : Déploie pg-presence-hardening sur le serveur :
+  intègre-la dans main et pousse, applique la migration 20261117120000_app_presence_confirmed en production, déploie la
+  fonction app-presence, puis vérifie qu'un battement répond et que le compteur tient. (Raphaël, 14:17)
+- Réservations actives : `supabase/functions/app-presence/`, `supabase/functions/_shared/presence*.ts`,
+  `supabase/migrations/20261117120000_app_presence_confirmed.sql`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 15:00 : branche recalée sur origin/main ; deno test presence 5/5, deno check OK. Migration
+  20261117120000_app_presence_confirmed appliquée en production (à blanc d'abord : seule en attente), fonction
+  app-presence déployée (v3, --use-api). Vérifié en ligne : un battement répond {online:1} ; une session qui n'a battu
+  qu'une fois ne compte que pour elle (A seul : 1, puis A et B confirmés : 2) ; session non v4 et app inconnue refusées
+  (400) ; après 20 sessions nouvelles d'une même IP, 429, le compte restant à 3. Poussé sur main : e6bdf2e (4 fichiers
+  sous supabase/, rien du site).
+- 15:00 : à la demande de Raphaël (« intègre-la dans main et pousse »), cette section commitée et poussée à part, faute
+  de l'avoir jointe à e6bdf2e ; pas de build complet, le site ne lit pas supabase/. Statut : terminé. Réservations
+  libérées.
