@@ -74,6 +74,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Nutzungsstatistiken</strong> ohne Kennung (siehe §7);</li>
 				<li>das Abrufen der <strong>Nummer der neuesten Version</strong> des Spiels auf unserer Website (siehe §9);</li>
 				<li>ein <strong>Anwesenheitssignal</strong>, einmal pro Minute, solange das Spiel geöffnet ist: eine bei jedem Start zufällig gezogene Nummer, ohne Konto und ohne Spielerkennung, um anzuzeigen, wie viele gerade spielen (siehe §5 und §12);</li>
+				<li>wenn du online <strong>einen Gegner suchst</strong>, geht dieses Signal alle 15 Sekunden mit deinem Spitznamen, dem Format der Partie und ihrer Kennung bei Unity: Sie werden den Spielern gezeigt, die das Spiel geöffnet haben („Bébert sucht einen Gegner“), solange du suchst, damit sie dir beitreten können;</li>
 				<li>das Abrufen der Liste <strong>unserer eigenen Werbung</strong> auf unserer Website, bei jedem Start, dann von Bild und Video der Werbung, die gezeigt wird (siehe §6).</li>
 			</ul>
 			<p>
@@ -456,6 +457,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Münzen der Schuss-Challenge</strong>: für jeden Gewinnplatz deine Unity-ID, die Rangliste, der Platz, die Punktzahl und die Münzen, ohne Spitznamen, 30 Tage auf unserem Server, danach gelöscht; früher, wenn du dein Konto löschst (ein nach der Löschung erfasster Platz bleibt höchstens 30 Tage). Unity bewahrt keine Archive abgeschlossener Ranglisten auf.</li>
 				<li><strong>Online-Partien</strong>: Eine öffentliche Partie verschwindet aus der Liste, sobald sie beginnt oder du sie schließt; die Würfe werden nach der Partie nicht aufbewahrt.</li>
 				<li><strong>Gerade online</strong>: Die zufällige Nummer wird in den Minuten nach dem Beenden des Spiels gelöscht.</li>
+				<li><strong>Suche nach einem Gegner</strong>: Dein Spitzname, das Format und die Kennung der Partie werden gelöscht, sobald du nicht mehr suchst, spätestens wenige Minuten danach.</li>
 				<li><strong>Nutzungsstatistiken</strong>: <strong>24 Monate</strong> auf unserem Server gespeichert, dann gelöscht; seine Sicherungen 14 Tage.</li>
 				<li><strong>Werbedaten</strong>: nach den Regeln von Unity und ironSource.</li>
 				<li><strong>Deine Antwort zur Werbung</strong>: 182 Tage (6 Monate) auf deinem Handy, dann fragt das Spiel erneut.</li>

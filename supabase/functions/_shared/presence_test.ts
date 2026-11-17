@@ -1,6 +1,6 @@
 // deno test supabase/functions/_shared/presence_test.ts
 import { assert, assertEquals } from 'jsr:@std/assert@1';
-import { BeatLimiter, clientIp, isSession } from './presence.ts';
+import { BeatLimiter, clientIp, isSession, parseSeek } from './presence.ts';
 
 const LIMITS = { sessionsPerIp: 3, sessionWindowMs: 10 * 60_000, beatsPerMinute: 5 };
 const id = (n: number): string => `0000000${n}-1111-4222-8333-444444444444`.slice(-36);
@@ -49,4 +49,15 @@ Deno.test('nothing about an address stays once its window is over', () => {
 	t += 10 * 60_000;
 	limiter.allow('198.51.100.2', id(2));
 	assertEquals(limiter.size, 1, 'only the address just heard');
+});
+
+Deno.test('a search carries a clean name, a format and a session to join', () => {
+	assertEquals(parseSeek({ nick: ' Bébert ', players: 1, game: 'aB3-x_9' }), { nick: 'Bébert', players: 1, game: 'aB3-x_9' });
+	assertEquals(parseSeek({ nick: '<b>Marcel</b>\u0007', players: 2, game: 'g1' })?.nick, 'bMarcel/b', 'no rich text, no control');
+	assertEquals(parseSeek({ nick: 'x'.repeat(40), players: 3, game: 'g1' })?.nick.length, 20);
+	assertEquals(parseSeek({ nick: 'Bébert', players: 4, game: 'g1' }), null, 'one to three a side');
+	assertEquals(parseSeek({ nick: '   ', players: 1, game: 'g1' }), null, 'a name');
+	assertEquals(parseSeek({ nick: 'Bébert', players: 1, game: 'a b' }), null, 'a session id');
+	assertEquals(parseSeek(undefined), null);
+	assertEquals(parseSeek('Bébert'), null);
 });
