@@ -118,13 +118,50 @@ const copy: Record<LandingLang, AppCopy> = {
 	fr: typoFr<AppCopy>({
 		title: 'Pétanque Game — le jeu de boules en 3D sur ton téléphone',
 		description:
-			"Pétanque en 3D sur Android et iPhone : contre l'ordinateur, à deux sur un téléphone ou en ligne, en tête-à-tête, doublette ou triplette. Ligues, défis du jour, 14 boules, quatre décors. Sur l'App Store et Google Play.",
+			"Pétanque en 3D sur Android et iPhone : contre l'ordinateur, à deux sur un téléphone ou en ligne, en tête-à-tête, doublette ou triplette. Défi de tir du jour, ligues, 14 boules, cinq décors. Sur l'App Store et Google Play.",
 		tagline:
 			"Une partie sur la place du village, à l'ombre des platanes. Les boules roulent, rebondissent et se choquent comme pour de vrai, le terrain a ses pentes et ses cailloux, et la partie se joue en 13 points, selon les règles de la pétanque. Le jeu est fait pour ceux qui jouent pour de vrai : on pointe, on tire, on lit le terrain avant de lancer.",
 		heroAlt: "Deux boules et un bouchon sur le gravier d'une place de village au soleil couchant, sous le titre Pétanque Game",
 		badges: { play: play('fr'), playAlt: 'Disponible sur Google Play', apple: STORES.apple, appleAlt: "Télécharger dans l'App Store" },
 		soon: "Bientôt sur l'App Store",
 		soonShort: 'Bientôt',
+		news: {
+			title: 'Nouveau dans la version 1.0.14',
+			items: [
+				{
+					title: 'Le défi de tir du jour',
+					body: 'Le tir de précision des championnats, au boulodrome couvert : cinq ateliers, dix boules, un score sur 50. Rejoue autant que tu veux, ton meilleur score compte. Il se joue aussi sans internet.',
+				},
+				{
+					title: 'Des pièces pour les meilleurs',
+					body: 'Un classement mondial du jour et un de la semaine. Chaque jour : 300 pièces au premier, 150 au deuxième et au troisième, 75 du 4e au 10e. Chaque semaine : 1 500 pièces au premier, 800 au deuxième et au troisième, 300 du 4e au 10e, 100 du 11e au 50e. Pour entrer au classement, il faut un compte.',
+				},
+				{
+					title: 'Une leçon pour bien commencer',
+					body: "Au premier lancement, deux lancers pour apprendre la planche : pointer, puis tirer. En moins d'une minute, tu sais jouer.",
+				},
+				{
+					title: "S'entraîner seul",
+					body: "Personne en face : tu lances toutes les boules, et le tableau dit à quelle distance du bouchon est ta meilleure. Une boule collée au bouchon le « touche », au lieu d'être à « 0 mm ».",
+				},
+				{
+					title: 'Sans compte',
+					body: 'Les pièces, le magasin et les ligues marchent sans compte : ta progression reste sur ton téléphone. Un compte sert au jeu en ligne et aux classements, et à retrouver ta progression sur un autre téléphone.',
+				},
+				{
+					title: 'Une partie coupée reprend',
+					body: "Un appel, le téléphone qui s'éteint : ta partie contre l'ordinateur reprend là où elle en était. En ligne, une partie classée coupée attend 30 secondes le retour de la connexion ; ensuite, celui qui l'a perdue perd la partie.",
+				},
+				{
+					title: 'Une planche plus claire',
+					body: "La planche de lancer est redessinée, et une visite guidée te montre, pas à pas, comment t'en servir.",
+				},
+				{
+					title: 'La règle du tir',
+					body: 'Comme dans le règlement officiel : si un tir ne laisse aucune boule en jeu, le tireur rejoue.',
+				},
+			],
+		},
 		stepsTitle: 'Comment on lance',
 		steps: [
 			{
@@ -147,7 +184,7 @@ const copy: Record<LandingLang, AppCopy> = {
 		features: [
 			{
 				title: "Contre l'ordinateur ou à deux",
-				body: 'Quatre niveaux, de Facile au champion du village, ou à deux sur le même téléphone, chacun son tour. En tête-à-tête, en doublette ou en triplette, ici comme en ligne.',
+				body: 'Sept niveaux, de Débutant à Professionnel, et 24 adversaires au choix, ou à deux sur le même téléphone, chacun son tour. En tête-à-tête, en doublette ou en triplette, ici comme en ligne.',
 			},
 			{
 				title: 'En ligne',
@@ -155,11 +192,11 @@ const copy: Record<LandingLang, AppCopy> = {
 			},
 			{
 				title: 'Les ligues',
-				body: 'De Bronze à Diamant : des coupes en trois matchs à élimination, des trophées et des terrains de plus en plus durs. Chaque semaine, une coupe de Bronze est offerte.',
+				body: '28 coupes par format, les sept niveaux en Bronze, Argent, Or et Platine : des coupes en trois matchs à élimination, des trophées et des terrains de plus en plus durs. Chaque semaine, une coupe de Bronze est offerte.',
 			},
 			{
 				title: 'Chaque jour',
-				body: "Trois défis qui rapportent des pièces, tous faisables contre l'ordinateur, et un bonus quand tu reviens jouer. Des succès et tes statistiques : biberons, carreaux, fannies…",
+				body: "Le défi de tir et son classement, trois défis qui rapportent des pièces, tous faisables contre l'ordinateur, et un bonus quand tu reviens jouer. Des succès et tes statistiques : biberons, carreaux, fannies…",
 			},
 			{
 				title: 'Un terrain qui compte',
@@ -174,13 +211,13 @@ const copy: Record<LandingLang, AppCopy> = {
 				body: 'Douze joueurs et joueuses, ton pseudo et la tenue de toute ton équipe. Dans le cercle, chacun a son petit rituel avant de lancer, comme les vrais joueurs.',
 			},
 			{
-				title: 'Quatre décors',
-				body: 'La place du village, la place au crépuscule et ses guirlandes, le boulodrome de campagne, le port et son phare. Une musique douce et les bruits du lieu : cigales, vagues, grillons le soir.',
+				title: 'Cinq décors',
+				body: 'La place du village, la place au crépuscule et ses guirlandes, le boulodrome de campagne, le port et son phare, la cour du château. Une musique douce et les bruits du lieu : cigales, vagues, grillons le soir.',
 			},
 		],
 		photoTitle: 'Apprendre sans peine',
 		photoBody:
-			"« Comment jouer » montre les règles en six pages illustrées, et une main y fait le lancer sur la planche. Avec « S'entraîner », tu lances toutes les boules, sans adversaire, et un coach te dit si ta boule était trop courte, trop longue, à gauche ou à droite, et comment corriger.",
+			"Au premier lancement, une petite leçon de deux lancers t'apprend la planche. « Comment jouer » montre les règles en six pages illustrées, et une main y fait le lancer sur la planche. Avec « S'entraîner », tu lances toutes les boules, sans adversaire : le tableau donne l'écart de ta meilleure boule, et un coach te dit si ta boule était trop courte, trop longue, à gauche ou à droite, et comment corriger.",
 		photoNote:
 			"Il t'aide aussi dans tes premières parties. Les textes sont grands, les boutons aussi, sur téléphone comme sur tablette, et le jeu se règle à ta main : droitier ou gaucher, vue derrière le joueur ou à la première personne, cercles de distance autour du bouchon.",
 		limitsTitle: 'Bon à savoir',
@@ -188,15 +225,15 @@ const copy: Record<LandingLang, AppCopy> = {
 		limits: [
 			{
 				title: 'Sans internet ni compte',
-				body: "Contre l'ordinateur, à deux sur un téléphone et à l'entraînement, tu joues hors ligne, sans rien créer.",
+				body: "Contre l'ordinateur, à deux sur un téléphone, à l'entraînement et au défi de tir, tu joues hors ligne, sans rien créer.",
 			},
 			{
 				title: 'Avec un compte',
-				body: 'Les pièces, le magasin, les ligues, le jeu en ligne et le classement demandent internet et un compte Google (Android) ou Apple (iPhone), pour retrouver ta progression sur un autre téléphone. Tu le supprimes quand tu veux, dans Options.',
+				body: 'Le jeu en ligne et les classements demandent internet et un compte Google ou Apple. Le magasin et les ligues demandent internet, pas de compte. Sans compte, ta progression reste sur ce téléphone ; avec, tu la retrouves sur un autre. Tu le supprimes quand tu veux, dans Options.',
 			},
 			{
 				title: "La publicité, si tu l'acceptes",
-				body: "Au premier lancement, le jeu te demande si tu acceptes la publicité. Si tu refuses, tu joues normalement, sans pub et sans les vidéos qui donnent des pièces. Tu peux changer d'avis dans Options › Choix publicitaires.",
+				body: "Au premier lancement, le jeu te demande si tu acceptes la publicité. Si tu refuses, tu joues normalement, sans pub : les vidéos qui donnent des pièces montrent alors nos propres jeux. Tu peux changer d'avis dans Options › Choix publicitaires.",
 			},
 			{
 				title: 'Pas de chat',
@@ -216,11 +253,11 @@ const copy: Record<LandingLang, AppCopy> = {
 			},
 			{
 				q: 'Faut-il internet ?',
-				a: "Non pour jouer contre l'ordinateur, à deux sur un téléphone ou à l'entraînement. Oui pour le jeu en ligne, les ligues, le magasin et le classement.",
+				a: "Non pour jouer contre l'ordinateur, à deux sur un téléphone, à l'entraînement ou au défi de tir. Oui pour le jeu en ligne, les ligues, le magasin et les classements.",
 			},
 			{
 				q: 'Pourquoi un compte ?',
-				a: 'Tes pièces et tes objets sont gardés sur ton compte : tu les retrouves sur un autre téléphone. Tu te connectes avec Google sur Android, avec Apple sur iPhone, et tu supprimes ton compte quand tu veux, dans Options.',
+				a: 'Pour jouer en ligne et entrer aux classements. Il garde aussi tes pièces et tes objets : tu les retrouves sur un autre téléphone ; sans compte, tout reste sur celui-ci. Tu te connectes avec Google sur Android, avec Apple ou Google sur iPhone, et tu supprimes ton compte quand tu veux, dans Options.',
 			},
 			{
 				q: 'Les règles sont-elles les vraies ?',
@@ -249,13 +286,50 @@ const copy: Record<LandingLang, AppCopy> = {
 	en: {
 		title: 'Pétanque Game — French boules in 3D on your phone',
 		description:
-			'Pétanque in 3D for Android and iPhone: against the computer, two on one phone or online, in singles, doubles or triples. Leagues, daily challenges, 14 boules, four settings. Out now on the App Store and Google Play.',
+			'Pétanque in 3D for Android and iPhone: against the computer, two on one phone or online, in singles, doubles or triples. A daily shooting challenge, leagues, 14 boules, five settings. Out now on the App Store and Google Play.',
 		tagline:
 			'A match on the village square, in the shade of the plane trees. The boules roll, bounce and knock each other away as they do for real, the ground has its slopes and its stones, and the match is played to 13 points, by the rules of pétanque. The game is made for people who play for real: you point, you shoot, you read the ground before you throw.',
 		heroAlt: 'Two boules and a jack on the gravel of a village square at sunset, under the title Pétanque Game',
 		badges: { play: play('en'), playAlt: 'Get it on Google Play', apple: STORES.apple, appleAlt: 'Download on the App Store' },
 		soon: 'Coming soon to the App Store',
 		soonShort: 'Coming soon',
+		news: {
+			title: 'New in version 1.0.14',
+			items: [
+				{
+					title: "Today's shooting challenge",
+					body: "The championships' precision shooting, in a covered boulodrome: five workshops, ten boules, a score out of 50. Play it as often as you like: your best score counts. It also plays without internet.",
+				},
+				{
+					title: 'Coins for the best',
+					body: 'A world ranking of the day and one of the week. Each day: 300 coins for 1st place, 150 for 2nd and 3rd, 75 from 4th to 10th. Each week: 1,500 coins for 1st, 800 for 2nd and 3rd, 300 from 4th to 10th, 100 from 11th to 50th. You need an account to enter the ranking.',
+				},
+				{
+					title: 'A lesson to start',
+					body: 'At first launch, two throws to learn the pad: pointing, then shooting. In under a minute, you can play.',
+				},
+				{
+					title: 'Practice alone',
+					body: 'Nobody on the other side: you throw every boule, and the board tells you how far your best one is from the jack. A boule right against the jack is now “touching”, not at “0 mm”.',
+				},
+				{
+					title: 'No account needed',
+					body: 'Coins, the shop and the leagues work without an account: your progress stays on your phone. An account is for online play and the rankings, and to find your progress on another phone.',
+				},
+				{
+					title: 'A cut-off match picks up again',
+					body: 'A phone call, a phone that switches off: your match against the computer picks up where it stopped. Online, a ranked match that is cut off waits 30 seconds for the connection; after that, whoever lost it loses the match.',
+				},
+				{
+					title: 'A clearer pad',
+					body: 'The throwing pad is redrawn, and a guided tour shows you, step by step, how to use it.',
+				},
+				{
+					title: 'The shooting rule',
+					body: 'As in the official rules: if a shot leaves no boule in play, the shooter plays again.',
+				},
+			],
+		},
 		stepsTitle: 'How you throw',
 		steps: [
 			{
@@ -278,7 +352,7 @@ const copy: Record<LandingLang, AppCopy> = {
 		features: [
 			{
 				title: 'The computer, or two on one phone',
-				body: 'Four levels, from Easy to the village champion, or two players on one phone, taking turns. In singles, doubles or triples, here as online.',
+				body: 'Seven levels, from Beginner to Professional, and 24 opponents to choose from, or two players on one phone, taking turns. In singles, doubles or triples, here as online.',
 			},
 			{
 				title: 'Online',
@@ -286,11 +360,11 @@ const copy: Record<LandingLang, AppCopy> = {
 			},
 			{
 				title: 'Leagues',
-				body: 'From Bronze to Diamond: knockout cups of three matches, trophies, and rougher pitches as you go up. Every week, one Bronze cup entry is free.',
+				body: '28 cups per format, the seven levels in Bronze, Silver, Gold and Platinum: knockout cups of three matches, trophies, and rougher pitches as you go up. Every week, one Bronze cup entry is free.',
 			},
 			{
 				title: 'Every day',
-				body: 'Three challenges that pay coins, all doable against the computer, and a bonus when you come back to play. Achievements and your stats: kisses of the jack, carreaux, 13-0 wins…',
+				body: 'The shooting challenge and its ranking, three challenges that pay coins, all doable against the computer, and a bonus when you come back to play. Achievements and your stats: kisses of the jack, carreaux, 13-0 wins…',
 			},
 			{
 				title: 'Ground that matters',
@@ -305,13 +379,13 @@ const copy: Record<LandingLang, AppCopy> = {
 				body: 'Twelve men and women, your name and the outfit your whole team wears. In the circle, each player has their own little ritual before throwing, as real players do.',
 			},
 			{
-				title: 'Four settings',
-				body: 'The village square, the square at dusk with its string lights, the country ground, the harbour with its lighthouse. Gentle music and the sounds of the place: cicadas, waves, crickets in the evening.',
+				title: 'Five settings',
+				body: 'The village square, the square at dusk with its string lights, the country ground, the harbour with its lighthouse, the château courtyard. Gentle music and the sounds of the place: cicadas, waves, crickets in the evening.',
 			},
 		],
 		photoTitle: 'Easy to learn',
 		photoBody:
-			'"How to play" shows the rules in six illustrated pages, and a hand throws on the pad for you to watch. With "Practice", you throw every boule with no opponent, and a coach tells you when a boule was too short, too long, left or right, and how to fix it.',
+			'At first launch, a short two-throw lesson teaches you the pad. "How to play" shows the rules in six illustrated pages, and a hand throws on the pad for you to watch. With "Practice", you throw every boule with no opponent: the board shows how far your best boule is from the jack, and a coach tells you when a boule was too short, too long, left or right, and how to fix it.',
 		photoNote:
 			'It also helps in your first matches. The text is large, and so are the buttons, on a phone or a tablet, and the game fits your hand: right- or left-handed, view from behind the player or first person, distance rings around the jack.',
 		limitsTitle: 'Good to know',
@@ -319,15 +393,15 @@ const copy: Record<LandingLang, AppCopy> = {
 		limits: [
 			{
 				title: 'No internet, no account',
-				body: 'Against the computer, two on one phone and in practice, you play offline, with nothing to sign up for.',
+				body: 'Against the computer, two on one phone, in practice and in the shooting challenge, you play offline, with nothing to sign up for.',
 			},
 			{
 				title: 'With an account',
-				body: 'Coins, the shop, the leagues, online play and the ranking need internet and a Google (Android) or Apple (iPhone) account, so you keep your progress on another phone. You can delete it at any time in Options.',
+				body: 'Online play and the rankings need internet and a Google or Apple account. The shop and the leagues need internet, not an account. Without one, your progress stays on this phone; with one, you find it on another. You can delete it at any time in Options.',
 			},
 			{
 				title: 'Ads, only if you accept them',
-				body: 'At first launch, the game asks whether you accept ads. If you decline, you play as usual, with no ads and without the videos that give coins. You can change your mind in Options › Ad choices.',
+				body: 'At first launch, the game asks whether you accept ads. If you decline, you play as usual, with no ads: the videos that give coins then show our own games. You can change your mind in Options › Ad choices.',
 			},
 			{
 				title: 'No chat',
@@ -347,11 +421,11 @@ const copy: Record<LandingLang, AppCopy> = {
 			},
 			{
 				q: 'Do I need internet?',
-				a: 'Not to play against the computer, two on one phone or in practice. Yes for online play, the leagues, the shop and the ranking.',
+				a: 'Not to play against the computer, two on one phone, in practice or in the shooting challenge. Yes for online play, the leagues, the shop and the rankings.',
 			},
 			{
 				q: 'Why an account?',
-				a: 'Your coins and items are kept on your account, so you find them on another phone. You sign in with Google on Android, with Apple on iPhone, and you can delete your account at any time in Options.',
+				a: 'To play online and enter the rankings. It also keeps your coins and items, so you find them on another phone; without one, everything stays on this phone. You sign in with Google on Android, with Apple or Google on iPhone, and you can delete your account at any time in Options.',
 			},
 			{
 				q: 'Are the rules the real ones?',
@@ -380,13 +454,50 @@ const copy: Record<LandingLang, AppCopy> = {
 	es: {
 		title: 'Pétanque Game — la petanca en 3D en tu móvil',
 		description:
-			'Petanca en 3D para Android y iPhone: contra la máquina, entre dos en un teléfono o en línea, individual, dupletas o tripletas. Ligas, desafíos diarios, 14 bolas, cuatro escenarios. Ya en el App Store y Google Play.',
+			'Petanca en 3D para Android y iPhone: contra la máquina, entre dos en un teléfono o en línea, individual, dupletas o tripletas. Desafío de tiro del día, ligas, 14 bolas, cinco escenarios. Ya en el App Store y Google Play.',
 		tagline:
 			'Una partida en la plaza del pueblo, a la sombra de los plátanos. Las bolas ruedan, rebotan y se golpean como de verdad, el terreno tiene sus pendientes y sus piedras, y la partida se juega a 13 puntos, con las reglas de la petanca. El juego está hecho para quienes juegan de verdad: se arrima, se tira, se lee el terreno antes de lanzar.',
 		heroAlt: 'Dos bolas y un boliche sobre la grava de una plaza de pueblo al atardecer, bajo el título Pétanque Game',
 		badges: { play: play('es'), playAlt: 'Disponible en Google Play', apple: STORES.apple, appleAlt: 'Consíguelo en el App Store' },
 		soon: 'Próximamente en el App Store',
 		soonShort: 'Próximamente',
+		news: {
+			title: 'Novedades de la versión 1.0.14',
+			items: [
+				{
+					title: 'Desafío de tiro del día',
+					body: 'El tiro de precisión de los campeonatos, en una cancha cubierta: cinco talleres, diez bolas, una puntuación sobre 50. Repite cuantas veces quieras: cuenta tu mejor puntuación. También se juega sin internet.',
+				},
+				{
+					title: 'Monedas para los mejores',
+					body: 'Una clasificación mundial del día y otra de la semana. Cada día: 300 monedas al primero, 150 al segundo y al tercero, 75 del 4.º al 10.º. Cada semana: 1500 monedas al primero, 800 al segundo y al tercero, 300 del 4.º al 10.º, 100 del 11.º al 50.º. Para entrar en la clasificación hace falta una cuenta.',
+				},
+				{
+					title: 'Una lección para empezar',
+					body: 'En el primer inicio, dos lanzamientos para aprender la plataforma: arrimar y luego tirar. En menos de un minuto, ya sabes jugar.',
+				},
+				{
+					title: 'Entrenar a solas',
+					body: 'Nadie enfrente: lanzas todas las bolas, y el marcador te dice a qué distancia del boliche está la mejor. Una bola pegada al boliche ahora lo «toca», en vez de estar a «0 mm».',
+				},
+				{
+					title: 'Sin cuenta',
+					body: 'Las monedas, la tienda y las ligas funcionan sin cuenta: tu progreso se queda en tu teléfono. La cuenta sirve para jugar en línea y entrar en las clasificaciones, y para recuperar tu progreso en otro teléfono.',
+				},
+				{
+					title: 'Una partida cortada se retoma',
+					body: 'Una llamada, un teléfono que se apaga: tu partida contra la máquina se retoma donde se quedó. En línea, una partida clasificada cortada espera 30 segundos a que vuelva la conexión; después, pierde quien la perdió.',
+				},
+				{
+					title: 'Una plataforma más clara',
+					body: 'La plataforma de lanzamiento está rediseñada, y una visita guiada te enseña, paso a paso, cómo usarla.',
+				},
+				{
+					title: 'La regla del tiro',
+					body: 'Como en el reglamento oficial: si un tiro no deja ninguna bola en juego, el tirador vuelve a lanzar.',
+				},
+			],
+		},
 		stepsTitle: 'Cómo se lanza',
 		steps: [
 			{
@@ -409,7 +520,7 @@ const copy: Record<LandingLang, AppCopy> = {
 		features: [
 			{
 				title: 'Contra la máquina o entre dos',
-				body: 'Cuatro niveles, de Fácil al campeón del pueblo, o dos jugadores en el mismo teléfono, por turnos. Individual, dupletas o tripletas, aquí y en línea.',
+				body: 'Siete niveles, de Principiante a Profesional, y 24 rivales a elegir, o dos jugadores en el mismo teléfono, por turnos. Individual, dupletas o tripletas, aquí y en línea.',
 			},
 			{
 				title: 'En línea',
@@ -417,11 +528,11 @@ const copy: Record<LandingLang, AppCopy> = {
 			},
 			{
 				title: 'Ligas',
-				body: 'De Bronce a Diamante: copas de tres partidas a eliminación, trofeos y terrenos cada vez más duros. Cada semana, una copa de Bronce es gratis.',
+				body: '28 copas por formato, los siete niveles en Bronce, Plata, Oro y Platino: copas de tres partidas a eliminación, trofeos y terrenos cada vez más duros. Cada semana, una copa de Bronce es gratis.',
 			},
 			{
 				title: 'Cada día',
-				body: 'Tres desafíos que dan monedas, todos posibles contra la máquina, y un bono cuando vuelves a jugar. Logros y tus estadísticas: «biberones», «carreaux», victorias 13 a 0…',
+				body: 'El desafío de tiro y su clasificación, tres desafíos que dan monedas, todos posibles contra la máquina, y un bono cuando vuelves a jugar. Logros y tus estadísticas: «biberones», «carreaux», victorias 13 a 0…',
 			},
 			{
 				title: 'Un terreno que cuenta',
@@ -436,13 +547,13 @@ const copy: Record<LandingLang, AppCopy> = {
 				body: 'Doce jugadores y jugadoras, tu apodo y la equipación de todo tu equipo. En el círculo, cada uno tiene su pequeño ritual antes de lanzar, como los jugadores de verdad.',
 			},
 			{
-				title: 'Cuatro escenarios',
-				body: 'La plaza del pueblo, la plaza al atardecer con sus guirnaldas, la cancha de campo, el puerto con su faro. Música suave y los sonidos del lugar: cigarras, olas, grillos por la noche.',
+				title: 'Cinco escenarios',
+				body: 'La plaza del pueblo, la plaza al atardecer con sus guirnaldas, la cancha de campo, el puerto con su faro, el patio del castillo. Música suave y los sonidos del lugar: cigarras, olas, grillos por la noche.',
 			},
 		],
 		photoTitle: 'Fácil de aprender',
 		photoBody:
-			'«Cómo se juega» muestra las reglas en seis páginas ilustradas, y una mano hace el lanzamiento en la plataforma. Con «Entrenar», lanzas todas las bolas sin rival, y un entrenador te dice si tu bola se quedó corta, se pasó, se fue a la izquierda o a la derecha, y cómo corregirlo.',
+			'En el primer inicio, una breve lección de dos lanzamientos te enseña la plataforma. «Cómo se juega» muestra las reglas en seis páginas ilustradas, y una mano hace el lanzamiento en la plataforma. Con «Entrenar», lanzas todas las bolas sin rival: el marcador da la distancia de tu mejor bola, y un entrenador te dice si tu bola se quedó corta, se pasó, se fue a la izquierda o a la derecha, y cómo corregirlo.',
 		photoNote:
 			'También te ayuda en tus primeras partidas. Los textos son grandes, y los botones también, en el teléfono o en la tableta, y el juego se adapta a tu mano: diestro o zurdo, vista detrás del jugador o en primera persona, círculos de distancia alrededor del boliche.',
 		limitsTitle: 'Conviene saber',
@@ -450,15 +561,15 @@ const copy: Record<LandingLang, AppCopy> = {
 		limits: [
 			{
 				title: 'Sin internet ni cuenta',
-				body: 'Contra la máquina, entre dos en un teléfono y en el entrenamiento, juegas sin conexión y sin registrarte.',
+				body: 'Contra la máquina, entre dos en un teléfono, en el entrenamiento y en el desafío de tiro, juegas sin conexión y sin registrarte.',
 			},
 			{
 				title: 'Con una cuenta',
-				body: 'Las monedas, la tienda, las ligas, el juego en línea y la clasificación necesitan internet y una cuenta de Google (Android) o de Apple (iPhone), para recuperar tu progreso en otro teléfono. Puedes eliminarla cuando quieras en Opciones.',
+				body: 'El juego en línea y las clasificaciones necesitan internet y una cuenta de Google o de Apple. La tienda y las ligas necesitan internet, no una cuenta. Sin cuenta, tu progreso se queda en este teléfono; con ella, lo recuperas en otro. Puedes eliminarla cuando quieras en Opciones.',
 			},
 			{
 				title: 'Publicidad, solo si la aceptas',
-				body: 'En el primer inicio, el juego te pregunta si aceptas la publicidad. Si la rechazas, juegas igual, sin anuncios y sin los vídeos que dan monedas. Puedes cambiar de opinión en Opciones › Opciones de anuncios.',
+				body: 'En el primer inicio, el juego te pregunta si aceptas la publicidad. Si la rechazas, juegas igual, sin anuncios: los vídeos que dan monedas muestran entonces nuestros propios juegos. Puedes cambiar de opinión en Opciones › Opciones de anuncios.',
 			},
 			{
 				title: 'Sin chat',
@@ -478,11 +589,11 @@ const copy: Record<LandingLang, AppCopy> = {
 			},
 			{
 				q: '¿Hace falta internet?',
-				a: 'No para jugar contra la máquina, entre dos en un teléfono o en el entrenamiento. Sí para el juego en línea, las ligas, la tienda y la clasificación.',
+				a: 'No para jugar contra la máquina, entre dos en un teléfono, en el entrenamiento o en el desafío de tiro. Sí para el juego en línea, las ligas, la tienda y las clasificaciones.',
 			},
 			{
 				q: '¿Por qué una cuenta?',
-				a: 'Tus monedas y tus objetos se guardan en tu cuenta: los recuperas en otro teléfono. Inicias sesión con Google en Android, con Apple en iPhone, y puedes eliminar tu cuenta cuando quieras en Opciones.',
+				a: 'Para jugar en línea y entrar en las clasificaciones. También guarda tus monedas y tus objetos: los recuperas en otro teléfono; sin cuenta, todo se queda en este. Inicias sesión con Google en Android, con Apple o Google en iPhone, y puedes eliminar tu cuenta cuando quieras en Opciones.',
 			},
 			{
 				q: '¿Las reglas son las de verdad?',
@@ -511,13 +622,50 @@ const copy: Record<LandingLang, AppCopy> = {
 	de: {
 		title: 'Pétanque Game — Boule in 3D auf deinem Handy',
 		description:
-			'Boule in 3D für Android und iPhone: gegen den Computer, zu zweit auf einem Handy oder online, im Tête-à-tête, in der Doublette oder Triplette. Ligen, tägliche Aufgaben, 14 Kugeln, vier Spielorte. Jetzt im App Store und bei Google Play.',
+			'Boule in 3D für Android und iPhone: gegen den Computer, zu zweit auf einem Handy oder online, im Tête-à-tête, in der Doublette oder Triplette. Schuss-Challenge des Tages, Ligen, 14 Kugeln, fünf Spielorte. Jetzt im App Store und bei Google Play.',
 		tagline:
 			'Eine Partie auf dem Dorfplatz, im Schatten der Platanen. Die Kugeln rollen, springen und treffen sich wie in echt, der Platz hat seine Neigungen und Steine, und gespielt wird bis 13 Punkte, nach den Regeln der Pétanque. Das Spiel ist für alle gemacht, die selbst spielen: Du legst, du schießt, du liest den Boden, bevor du wirfst.',
 		heroAlt: 'Zwei Kugeln und eine Zielkugel auf dem Kies eines Dorfplatzes bei Sonnenuntergang, unter dem Titel Pétanque Game',
 		badges: { play: play('de'), playAlt: 'Jetzt bei Google Play', apple: STORES.apple, appleAlt: 'Download on the App Store' },
 		soon: 'Demnächst im App Store',
 		soonShort: 'Demnächst',
+		news: {
+			title: 'Neu in Version 1.0.14',
+			items: [
+				{
+					title: 'Schuss-Challenge des Tages',
+					body: 'Das Präzisionsschießen der Meisterschaften, in einer Boulehalle: fünf Stationen, zehn Kugeln, höchstens 50 Punkte. Spiel so oft du willst: Dein bestes Ergebnis zählt. Das geht auch ohne Internet.',
+				},
+				{
+					title: 'Münzen für die Besten',
+					body: 'Eine Weltrangliste des Tages und eine der Woche. Jeden Tag: 300 Münzen für Platz 1, 150 für Platz 2 und 3, 75 für Platz 4 bis 10. Jede Woche: 1.500 Münzen für Platz 1, 800 für Platz 2 und 3, 300 für Platz 4 bis 10, 100 für Platz 11 bis 50. Für die Rangliste brauchst du ein Konto.',
+				},
+				{
+					title: 'Eine Lektion zum Start',
+					body: 'Beim ersten Start zwei Würfe, um das Brett kennenzulernen: legen, dann schießen. In weniger als einer Minute kannst du spielen.',
+				},
+				{
+					title: 'Allein üben',
+					body: 'Niemand auf der anderen Seite: Du wirfst alle Kugeln, und die Tafel zeigt, wie weit deine beste von der Zielkugel liegt. Eine Kugel direkt an der Zielkugel „berührt“ sie jetzt, statt bei „0 mm“ zu liegen.',
+				},
+				{
+					title: 'Ohne Konto',
+					body: 'Münzen, Shop und Ligen gehen ohne Konto: Dein Fortschritt bleibt auf deinem Handy. Ein Konto brauchst du für das Online-Spiel und die Ranglisten, und um deinen Fortschritt auf ein anderes Handy mitzunehmen.',
+				},
+				{
+					title: 'Unterbrochene Partie geht weiter',
+					body: 'Ein Anruf, ein Handy, das ausgeht: Deine Partie gegen den Computer geht dort weiter, wo sie stand. Online wartet eine gewertete Partie 30 Sekunden auf die Verbindung; danach verliert, wessen Verbindung abriss.',
+				},
+				{
+					title: 'Ein klareres Brett',
+					body: 'Das Wurfbrett ist neu gestaltet, und eine geführte Tour zeigt dir Schritt für Schritt, wie es geht.',
+				},
+				{
+					title: 'Die Schussregel',
+					body: 'Wie im offiziellen Reglement: Lässt ein Schuss keine Kugel im Spiel, wirft der Schütze noch einmal.',
+				},
+			],
+		},
 		stepsTitle: 'So wirfst du',
 		steps: [
 			{
@@ -540,7 +688,7 @@ const copy: Record<LandingLang, AppCopy> = {
 		features: [
 			{
 				title: 'Gegen den Computer oder zu zweit',
-				body: 'Vier Stufen, von Leicht bis zum Dorfmeister, oder zu zweit auf einem Handy, abwechselnd. Im Tête-à-tête, in der Doublette oder Triplette, hier wie online.',
+				body: 'Sieben Stufen, von Anfänger bis Profi, und 24 Gegner zur Wahl, oder zu zweit auf einem Handy, abwechselnd. Im Tête-à-tête, in der Doublette oder Triplette, hier wie online.',
 			},
 			{
 				title: 'Online',
@@ -548,11 +696,11 @@ const copy: Record<LandingLang, AppCopy> = {
 			},
 			{
 				title: 'Ligen',
-				body: 'Von Bronze bis Diamant: Pokale mit drei K.-o.-Partien, Trophäen und immer schwierigere Plätze. Jede Woche ist ein Bronze-Pokal gratis.',
+				body: '28 Pokale je Format, die sieben Stufen in Bronze, Silber, Gold und Platin: Pokale mit drei K.-o.-Partien, Trophäen und immer schwierigere Plätze. Jede Woche ist ein Bronze-Pokal gratis.',
 			},
 			{
 				title: 'Jeden Tag',
-				body: 'Drei Aufgaben, die Münzen bringen, alle gegen den Computer machbar, und ein Bonus, wenn du wieder spielst. Erfolge und deine Statistik: Kugeln an der Zielkugel, Carreaux, 13:0-Siege…',
+				body: 'Die Schuss-Challenge mit Rangliste, drei Aufgaben, die Münzen bringen, alle gegen den Computer machbar, und ein Bonus, wenn du wieder spielst. Erfolge und deine Statistik: Kugeln an der Zielkugel, Carreaux, 13:0-Siege…',
 			},
 			{
 				title: 'Ein Boden, der zählt',
@@ -567,13 +715,13 @@ const copy: Record<LandingLang, AppCopy> = {
 				body: 'Zwölf Spielerinnen und Spieler, dein Name und das Trikot deines ganzen Teams. Im Kreis hat jeder vor dem Wurf sein kleines Ritual, wie echte Spieler.',
 			},
 			{
-				title: 'Vier Spielorte',
-				body: 'Der Dorfplatz, der Platz in der Abenddämmerung mit seinen Lichterketten, der Platz auf dem Land, der Hafen mit seinem Leuchtturm. Ruhige Musik und die Geräusche des Ortes: Zikaden, Wellen, Grillen am Abend.',
+				title: 'Fünf Spielorte',
+				body: 'Der Dorfplatz, der Platz in der Abenddämmerung mit seinen Lichterketten, der Platz auf dem Land, der Hafen mit seinem Leuchtturm, der Schlosshof. Ruhige Musik und die Geräusche des Ortes: Zikaden, Wellen, Grillen am Abend.',
 			},
 		],
 		photoTitle: 'Leicht zu lernen',
 		photoBody:
-			'„So wird gespielt“ zeigt die Regeln auf sechs bebilderten Seiten, und eine Hand macht dir den Wurf auf dem Brett vor. Bei „Üben“ wirfst du alle Kugeln ohne Gegner, und ein Trainer sagt dir, ob deine Kugel zu kurz, zu weit, links oder rechts lag, und wie du es besser machst.',
+			'Beim ersten Start bringt dir eine kurze Lektion in zwei Würfen das Brett bei. „So wird gespielt“ zeigt die Regeln auf sechs bebilderten Seiten, und eine Hand macht dir den Wurf auf dem Brett vor. Bei „Üben“ wirfst du alle Kugeln ohne Gegner: Die Tafel zeigt den Abstand deiner besten Kugel, und ein Trainer sagt dir, ob deine Kugel zu kurz, zu weit, links oder rechts lag, und wie du es besser machst.',
 		photoNote:
 			'Er hilft auch in deinen ersten Partien. Die Schrift ist groß, die Knöpfe auch, auf dem Handy wie auf dem Tablet, und das Spiel passt sich deiner Hand an: Rechts- oder Linkshänder, Ansicht hinter dem Spieler oder aus der Ich-Perspektive, Abstandskreise um die Zielkugel.',
 		limitsTitle: 'Gut zu wissen',
@@ -581,15 +729,15 @@ const copy: Record<LandingLang, AppCopy> = {
 		limits: [
 			{
 				title: 'Ohne Internet und ohne Konto',
-				body: 'Gegen den Computer, zu zweit auf einem Handy und beim Üben spielst du offline, ohne dich anzumelden.',
+				body: 'Gegen den Computer, zu zweit auf einem Handy, beim Üben und in der Schuss-Challenge spielst du offline, ohne dich anzumelden.',
 			},
 			{
 				title: 'Mit einem Konto',
-				body: 'Münzen, Shop, Ligen, Online-Spiel und Rangliste brauchen Internet und ein Google-Konto (Android) oder Apple-Konto (iPhone), damit du deinen Fortschritt auch auf einem anderen Handy hast. Du löschst es jederzeit unter Optionen.',
+				body: 'Online-Spiel und Ranglisten brauchen Internet und ein Google- oder Apple-Konto. Shop und Ligen brauchen Internet, aber kein Konto. Ohne Konto bleibt dein Fortschritt auf diesem Handy, mit Konto hast du ihn auch auf einem anderen. Du löschst es jederzeit unter Optionen.',
 			},
 			{
 				title: 'Werbung nur, wenn du zustimmst',
-				body: 'Beim ersten Start fragt dich das Spiel, ob du Werbung akzeptierst. Lehnst du ab, spielst du ganz normal, ohne Werbung und ohne die Videos, die Münzen bringen. Ändern kannst du das unter Optionen › Werbeeinstellungen.',
+				body: 'Beim ersten Start fragt dich das Spiel, ob du Werbung akzeptierst. Lehnst du ab, spielst du ganz normal, ohne Werbung: Die Videos, die Münzen bringen, zeigen dann unsere eigenen Spiele. Ändern kannst du das unter Optionen › Werbeeinstellungen.',
 			},
 			{
 				title: 'Kein Chat',
@@ -609,11 +757,11 @@ const copy: Record<LandingLang, AppCopy> = {
 			},
 			{
 				q: 'Brauche ich Internet?',
-				a: 'Nicht gegen den Computer, zu zweit auf einem Handy oder beim Üben. Ja für das Online-Spiel, die Ligen, den Shop und die Rangliste.',
+				a: 'Nicht gegen den Computer, zu zweit auf einem Handy, beim Üben oder in der Schuss-Challenge. Ja für das Online-Spiel, die Ligen, den Shop und die Ranglisten.',
 			},
 			{
 				q: 'Warum ein Konto?',
-				a: 'Deine Münzen und Gegenstände liegen in deinem Konto: So hast du sie auch auf einem anderen Handy. Du meldest dich mit Google unter Android an, mit Apple auf dem iPhone, und du löschst dein Konto jederzeit unter Optionen.',
+				a: 'Für das Online-Spiel und die Ranglisten. Es bewahrt auch deine Münzen und Gegenstände auf: So hast du sie auf einem anderen Handy; ohne Konto bleibt alles auf diesem. Du meldest dich mit Google unter Android an, mit Apple oder Google auf dem iPhone, und du löschst dein Konto jederzeit unter Optionen.',
 			},
 			{
 				q: 'Sind das die echten Regeln?',
@@ -642,13 +790,50 @@ const copy: Record<LandingLang, AppCopy> = {
 	it: {
 		title: 'Pétanque Game — le bocce in 3D sul tuo telefono',
 		description:
-			"Pétanque in 3D per Android e iPhone: contro il computer, in due su un telefono o online, individuale, coppie o terne. Leghe, sfide del giorno, 14 bocce, quattro ambientazioni. Ora su App Store e Google Play.",
+			"Pétanque in 3D per Android e iPhone: contro il computer, in due su un telefono o online, individuale, coppie o terne. Sfida di bocciata del giorno, leghe, 14 bocce, cinque ambientazioni. Ora su App Store e Google Play.",
 		tagline:
 			"Una partita nella piazza del paese, all'ombra dei platani. Le bocce rotolano, rimbalzano e si colpiscono come dal vero, il campo ha le sue pendenze e i suoi sassi, e la partita si gioca a 13 punti, con le regole della pétanque. Il gioco è fatto per chi gioca davvero: si accosta, si boccia, si legge il terreno prima di lanciare.",
 		heroAlt: 'Due bocce e un pallino sulla ghiaia di una piazza di paese al tramonto, sotto il titolo Pétanque Game',
 		badges: { play: play('it'), playAlt: 'Disponibile su Google Play', apple: STORES.apple, appleAlt: 'Download on the App Store' },
 		soon: "Presto sull'App Store",
 		soonShort: 'Presto',
+		news: {
+			title: 'Novità della versione 1.0.14',
+			items: [
+				{
+					title: 'Sfida di bocciata del giorno',
+					body: 'Il tiro di precisione dei campionati, in un bocciodromo coperto: cinque prove, dieci bocce, un punteggio su 50. Gioca quante volte vuoi: conta il tuo miglior punteggio. Si gioca anche senza internet.',
+				},
+				{
+					title: 'Monete per i migliori',
+					body: "Una classifica mondiale del giorno e una della settimana. Ogni giorno: 300 monete al primo, 150 al secondo e al terzo, 75 dal 4° al 10°. Ogni settimana: 1500 monete al primo, 800 al secondo e al terzo, 300 dal 4° al 10°, 100 dall'11° al 50°. Per entrare in classifica serve un account.",
+				},
+				{
+					title: 'Una lezione per iniziare',
+					body: 'Al primo avvio, due lanci per imparare la pedana: accostare, poi bocciare. In meno di un minuto sai giocare.',
+				},
+				{
+					title: 'Allenarsi da solo',
+					body: "Nessuno dall'altra parte: lanci tutte le bocce, e il tabellone ti dice quanto dista dal pallino la migliore. Una boccia attaccata al pallino ora lo «tocca», invece di stare a «0 mm».",
+				},
+				{
+					title: 'Senza account',
+					body: "Le monete, il negozio e le leghe funzionano senza account: i tuoi progressi restano sul telefono. L'account serve per il gioco online e le classifiche, e per ritrovare i progressi su un altro telefono.",
+				},
+				{
+					title: 'Una partita interrotta riprende',
+					body: "Una telefonata, il telefono che si spegne: la tua partita contro il computer riprende da dove era. Online, una partita classificata interrotta aspetta 30 secondi che torni la connessione; poi perde chi l'ha persa.",
+				},
+				{
+					title: 'Una pedana più chiara',
+					body: 'La pedana di lancio è ridisegnata, e una visita guidata ti mostra, passo dopo passo, come usarla.',
+				},
+				{
+					title: 'La regola della bocciata',
+					body: 'Come nel regolamento ufficiale: se una bocciata non lascia nessuna boccia in gioco, chi ha bocciato rigioca.',
+				},
+			],
+		},
 		stepsTitle: 'Come si lancia',
 		steps: [
 			{
@@ -671,7 +856,7 @@ const copy: Record<LandingLang, AppCopy> = {
 		features: [
 			{
 				title: 'Contro il computer o in due',
-				body: 'Quattro livelli, da Facile al campione del paese, o in due sullo stesso telefono, a turno. Individuale, coppie o terne, qui come online.',
+				body: 'Sette livelli, da Principiante a Professionista, e 24 avversari a scelta, o in due sullo stesso telefono, a turno. Individuale, coppie o terne, qui come online.',
 			},
 			{
 				title: 'Online',
@@ -679,11 +864,11 @@ const copy: Record<LandingLang, AppCopy> = {
 			},
 			{
 				title: 'Leghe',
-				body: 'Da Bronzo a Diamante: coppe di tre partite a eliminazione, trofei e campi sempre più difficili. Ogni settimana, una coppa di Bronzo è gratuita.',
+				body: '28 coppe per formato, i sette livelli in Bronzo, Argento, Oro e Platino: coppe di tre partite a eliminazione, trofei e campi sempre più difficili. Ogni settimana, una coppa di Bronzo è gratuita.',
 			},
 			{
 				title: 'Ogni giorno',
-				body: 'Tre sfide che danno monete, tutte possibili contro il computer, e un bonus quando torni a giocare. Traguardi e le tue statistiche: «biberon», «carreau», vittorie 13 a 0…',
+				body: 'La sfida di bocciata e la sua classifica, tre sfide che danno monete, tutte possibili contro il computer, e un bonus quando torni a giocare. Traguardi e le tue statistiche: «biberon», «carreau», vittorie 13 a 0…',
 			},
 			{
 				title: 'Un terreno che conta',
@@ -698,13 +883,13 @@ const copy: Record<LandingLang, AppCopy> = {
 				body: 'Dodici giocatori e giocatrici, il tuo nome e la divisa di tutta la tua squadra. Nel cerchio, ognuno ha il suo piccolo rituale prima di lanciare, come i veri giocatori.',
 			},
 			{
-				title: 'Quattro ambientazioni',
-				body: 'La piazza del paese, la piazza al tramonto con le sue luci, il campo di campagna, il porto con il suo faro. Musica tranquilla e i suoni del luogo: cicale, onde, grilli la sera.',
+				title: 'Cinque ambientazioni',
+				body: 'La piazza del paese, la piazza al tramonto con le sue luci, il campo di campagna, il porto con il suo faro, il cortile del castello. Musica tranquilla e i suoni del luogo: cicale, onde, grilli la sera.',
 			},
 		],
 		photoTitle: 'Facile da imparare',
 		photoBody:
-			'«Come si gioca» mostra le regole in sei pagine illustrate, e una mano fa il lancio sulla pedana. Con «Allenarsi» lanci tutte le bocce senza avversario, e un coach ti dice se la tua boccia era corta, lunga, a sinistra o a destra, e come correggere.',
+			'Al primo avvio, una breve lezione di due lanci ti insegna la pedana. «Come si gioca» mostra le regole in sei pagine illustrate, e una mano fa il lancio sulla pedana. Con «Allenarsi» lanci tutte le bocce senza avversario: il tabellone dà la distanza della tua boccia migliore, e un coach ti dice se la tua boccia era corta, lunga, a sinistra o a destra, e come correggere.',
 		photoNote:
 			'Ti aiuta anche nelle prime partite. I testi sono grandi, e anche i pulsanti, sul telefono come sul tablet, e il gioco si adatta alla tua mano: destrimano o mancino, visuale dietro il giocatore o in prima persona, cerchi di distanza intorno al pallino.',
 		limitsTitle: 'Da sapere',
@@ -712,15 +897,15 @@ const copy: Record<LandingLang, AppCopy> = {
 		limits: [
 			{
 				title: 'Senza internet né account',
-				body: 'Contro il computer, in due su un telefono e in allenamento, giochi offline, senza registrarti.',
+				body: 'Contro il computer, in due su un telefono, in allenamento e nella sfida di bocciata, giochi offline, senza registrarti.',
 			},
 			{
 				title: 'Con un account',
-				body: 'Le monete, il negozio, le leghe, il gioco online e la classifica richiedono internet e un account Google (Android) o Apple (iPhone), per ritrovare i tuoi progressi su un altro telefono. Puoi eliminarlo quando vuoi in Opzioni.',
+				body: 'Il gioco online e le classifiche richiedono internet e un account Google o Apple. Il negozio e le leghe richiedono internet, non un account. Senza account, i tuoi progressi restano su questo telefono; con un account, li ritrovi su un altro. Puoi eliminarlo quando vuoi in Opzioni.',
 			},
 			{
 				title: 'Pubblicità solo se la accetti',
-				body: 'Al primo avvio, il gioco ti chiede se accetti la pubblicità. Se rifiuti, giochi normalmente, senza pubblicità e senza i video che danno monete. Puoi cambiare idea in Opzioni › Scelte pubblicitarie.',
+				body: 'Al primo avvio, il gioco ti chiede se accetti la pubblicità. Se rifiuti, giochi normalmente, senza pubblicità: i video che danno monete mostrano allora i nostri giochi. Puoi cambiare idea in Opzioni › Scelte pubblicitarie.',
 			},
 			{
 				title: 'Niente chat',
@@ -740,11 +925,11 @@ const copy: Record<LandingLang, AppCopy> = {
 			},
 			{
 				q: 'Serve internet?',
-				a: 'No per giocare contro il computer, in due su un telefono o in allenamento. Sì per il gioco online, le leghe, il negozio e la classifica.',
+				a: 'No per giocare contro il computer, in due su un telefono, in allenamento o nella sfida di bocciata. Sì per il gioco online, le leghe, il negozio e le classifiche.',
 			},
 			{
 				q: 'Perché un account?',
-				a: 'Le tue monete e i tuoi oggetti sono salvati sul tuo account: li ritrovi su un altro telefono. Accedi con Google su Android, con Apple su iPhone, e puoi eliminare il tuo account quando vuoi in Opzioni.',
+				a: 'Per giocare online ed entrare nelle classifiche. Salva anche le tue monete e i tuoi oggetti: li ritrovi su un altro telefono; senza account, tutto resta su questo. Accedi con Google su Android, con Apple o Google su iPhone, e puoi eliminare il tuo account quando vuoi in Opzioni.',
 			},
 			{
 				q: 'Le regole sono quelle vere?',
