@@ -307,6 +307,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><code>save_offer</code>, <code>reconnect_offer</code> — das Spiel bietet ein Konto an, um deinen Spielstand zu sichern, oder eine erneute Anmeldung (Anzahl Partien in Stufen, online oder nicht);</li>
 				<li><code>online_invite</code> — deine Antwort auf die Einladung, online zu spielen;</li>
 				<li><code>reminders</code>, <code>review_ask</code>, <code>howto</code>, <code>update_prompt</code>, <code>update_tapped</code> — deine Antwort zu den Erinnerungen, die Bewertungsanfrage des Stores, eine Seite von „So wird gespielt“, das Angebot eines Updates.</li>
+				<li>Seit Version 1.0.14 tragen dieselben Ereignisse auch Namen, die unsere Apps gemeinsam nutzen (<code>shop_open</code>, <code>coins_spend</code>, <code>shop_gate</code>, <code>iap_restore</code>, <code>sign_in_offer</code>, <code>daily_claim</code>, <code>house_ad_show</code>, <code>house_ad_tap</code>, <code>reminders_answer</code>, <code>update_shown</code>, <code>update_tap</code>, <code>tutorial_start</code>, <code>tutorial_end</code>), mit denselben Angaben, dazu das Öffnen des Shops, das Wiederherstellen von Käufen (erfolgreich oder nicht, Anzahl) und der Gegenstand, den du wolltest, wenn Münzen fehlen. Die alten Namen verschwinden einige Wochen später. <code>app_open</code> sagt auch, ob es der erste Start ist, und deinen Münzstand, in Stufen;</li>
 			</ul>
 			<p>
 				Jede Übermittlung enthält außerdem die Plattform, die Version des Spiels und des Systems, das

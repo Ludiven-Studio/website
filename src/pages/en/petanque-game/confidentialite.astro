@@ -302,6 +302,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><code>save_offer</code>, <code>reconnect_offer</code> — the game offers an account to save your progress, or to sign in again (number of games in bands, online or not);</li>
 				<li><code>online_invite</code> — your answer to the invitation to play online;</li>
 				<li><code>reminders</code>, <code>review_ask</code>, <code>howto</code>, <code>update_prompt</code>, <code>update_tapped</code> — your answer about reminders, the store's review request, a "How to play" page, the update offer.</li>
+				<li>Since version 1.0.14, the same events also carry names shared by our apps (<code>shop_open</code>, <code>coins_spend</code>, <code>shop_gate</code>, <code>iap_restore</code>, <code>sign_in_offer</code>, <code>daily_claim</code>, <code>house_ad_show</code>, <code>house_ad_tap</code>, <code>reminders_answer</code>, <code>update_shown</code>, <code>update_tap</code>, <code>tutorial_start</code>, <code>tutorial_end</code>), with the same information, plus the shop being opened, purchases being restored (done or not, how many) and the item you wanted when coins are short. The former names go a few weeks later. <code>app_open</code> also says whether it is the first launch and your coin balance, in bands;</li>
 			</ul>
 			<p>
 				Each send also carries the platform, the version of the game and of the system, the phone model, the

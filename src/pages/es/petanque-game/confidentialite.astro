@@ -304,6 +304,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><code>save_offer</code>, <code>reconnect_offer</code> — el juego te propone una cuenta para guardar tu progreso, o volver a iniciar sesión (número de partidas por tramos, conectado o no);</li>
 				<li><code>online_invite</code> — tu respuesta a la invitación a jugar en línea;</li>
 				<li><code>reminders</code>, <code>review_ask</code>, <code>howto</code>, <code>update_prompt</code>, <code>update_tapped</code> — tu respuesta sobre los recordatorios, la petición de valoración de la tienda, una página de «Cómo se juega», la propuesta de actualización.</li>
+				<li>Desde la versión 1.0.14, los mismos eventos llevan también nombres comunes a nuestras apps (<code>shop_open</code>, <code>coins_spend</code>, <code>shop_gate</code>, <code>iap_restore</code>, <code>sign_in_offer</code>, <code>daily_claim</code>, <code>house_ad_show</code>, <code>house_ad_tap</code>, <code>reminders_answer</code>, <code>update_shown</code>, <code>update_tap</code>, <code>tutorial_start</code>, <code>tutorial_end</code>), con la misma información, más la apertura de la tienda, la restauración de compras (hecha o no, cuántas) y el objeto que querías cuando faltan monedas. Los nombres anteriores desaparecen unas semanas después. <code>app_open</code> dice también si es el primer inicio y tu saldo de monedas, por tramos;</li>
 			</ul>
 			<p>
 				Cada envío lleva también la plataforma, la versión del juego y del sistema, el modelo de teléfono, el
