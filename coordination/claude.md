@@ -3440,3 +3440,14 @@
   astro check OK). Rien de déployé, main intact : la mise en ligne attend la phrase de Raphaël.
 - 18:50 : remplacée par la section « prix du défi de tir, déploiement » : tout y est commité et déployé. Statut :
   terminé. Réservations libérées.
+
+## 2026-11-17 — Pétanque Game : page bêta 1.0.14, 4e (session PetanqueGame)
+- Statut : en cours (2026-11-17T18:59+01:00). Demande de l'utilisateur : Construis la 4e bêta 1.0.14 de Pétanque Game
+  depuis main, envoie-la et pousse sa page. (Raphaël, 18:51)
+- Réservations actives : `src/pages/petanque-game/beta-drm50otf.astro`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 19:00 : APK publiée (petanque-game-1.0.14-beta4.apk, 99,6 Mo, sha256 37c647d3…, lien vérifié) ; page remplie, eslint
+  OK, astro check 0 erreur. Lancement du build complet (écrit dist/, .astro/, public/vendor/) dans le worktree
+  pg-beta-1014d…
+- 19:02 : build complet OK (235 pages, 0 erreur) ; commité et poussé à la demande de Raphaël (« envoie-la et pousse sa
+  page », 18:51) : la page bêta et cette section seulement. Statut : terminé. Réservations libérées.
