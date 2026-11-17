@@ -1,23 +1,24 @@
 // shot-prizes — Pétanque Game's shooting challenge pays the best places of its day and week rankings
 // (Unity Leaderboards « shots_day », « shots_week »). A minute before each reset, pg_cron calls
-// « snapshot »: the paid places are read with Unity's Admin API and kept here by Unity player id, no
-// name, for 30 days. The game then asks for its own (« mine ») with the player's Unity access token, and
-// pays each prize once on its side; « forget » deletes a player's rows as their account is deleted.
-// Unity keeps no archive of the rankings: a deleted account leaves nothing behind there.
+// « snapshot » with the day closing: the paid places are read with Unity's Admin API and kept here by Unity
+// player id, no name; each period is closed by its first good snapshot, later ones change nothing; Unity is
+// tried three times. The game then asks for its own (« mine ») with the player's Unity access token, and pays
+// each prize once on its side; « forget » deletes a player's rows as their account is deleted. pg_cron
+// purges the rows after 30 days on its own. Unity keeps no archive of the rankings.
 //
-// POST { action: 'snapshot' }  header x-cron-key  -> { kept }
-// POST { action: 'mine' }      header x-unity-token -> { prizes: [{ board, period, rank, score, coins }] }
-// POST { action: 'forget' }    header x-unity-token -> { ok }
+// POST { action: 'snapshot', day: 'YYYY-MM-DD' }  header x-cron-key   -> { kept, closed }
+// POST { action: 'mine' }                         header x-unity-token -> { prizes: [{ board, period, rank, score, coins }] }
+// POST { action: 'forget' }                       header x-unity-token -> { ok }
 //
 // Deploy:  supabase functions deploy shot-prizes --no-verify-jwt   (the game holds no Supabase session)
-// Table:   migrations/20261118120000_shot_prizes.sql (shot_prizes, the cron job)
+// Table:   migrations/20261118120000_shot_prizes.sql (shot_prizes, shot_prizes_closed, the cron jobs)
 // Secrets: UNITY_SERVICE_KEY_ID, UNITY_SERVICE_SECRET (a Unity service account allowed to list leaderboard
 //          scores), UNITY_PROJECT_ID, UNITY_ENVIRONMENT_ID (production), SHOT_PRIZES_CRON_KEY (also in the
-//          vault as « shot_prizes_cron_key », read by the cron job)
+//          vault as « shot_prizes_cron_key », read by the cron job: set it before the first night)
 
 import { createClient } from 'jsr:@supabase/supabase-js@2.117.0';
 import { createRemoteJWKSet, jwtVerify } from 'jsr:@panva/jose@6.1.0';
-import { closing, KEEP_DAYS, paidPlaces, rowsFrom, type UnityScore } from '../_shared/shotPrizes.ts';
+import { closing, paidPlaces, rowsFrom, SPARE_LINES, type UnityScore } from '../_shared/shotPrizes.ts';
 
 const CORS = {
 	'Access-Control-Allow-Origin': '*',
@@ -46,42 +47,66 @@ function sameSecret(a: string, b: string): boolean {
 	return diff === 0;
 }
 
-/** The Unity player id of a valid token of this project, else null. */
+/** The Unity player id of a valid, unexpired token of this project (and environment, when it names one), else null. */
 async function playerOf(token: string): Promise<string | null> {
 	if (!token) return null;
 	try {
-		const { payload } = await jwtVerify(token, JWKS, { issuer: ISSUER });
-		if (payload.project_id !== undefined && payload.project_id !== env('UNITY_PROJECT_ID')) return null;
+		const { payload } = await jwtVerify(token, JWKS, {
+			issuer: ISSUER,
+			algorithms: ['RS256'],
+			requiredClaims: ['exp', 'sub', 'project_id'],
+		});
+		if (payload.project_id !== env('UNITY_PROJECT_ID')) return null;
+		const envId = payload.env_id ?? payload.environment_id;
+		if (envId !== undefined && envId !== env('UNITY_ENVIRONMENT_ID')) return null;
 		return typeof payload.sub === 'string' && payload.sub.length > 0 ? payload.sub : null;
-	} catch {
+	} catch (e) {
+		console.warn('token refused', e instanceof Error ? e.message : e);
 		return null;
 	}
 }
 
-/** The best `limit` lines of a ranking, from Unity's Leaderboards Admin API (service account, Basic auth). */
+/** The best `limit` lines of a ranking, from Unity's Leaderboards Admin API (service account, Basic auth), with
+ * their metadata when the API gives it (a deleted account's line is marked gone). Three tries a few seconds apart. */
 async function topScores(board: string, limit: number): Promise<UnityScore[]> {
 	const url = `https://services.api.unity.com/leaderboards/v1/projects/${env('UNITY_PROJECT_ID')}` +
-		`/environments/${env('UNITY_ENVIRONMENT_ID')}/leaderboards/${board}/scores?offset=0&limit=${limit}`;
+		`/environments/${env('UNITY_ENVIRONMENT_ID')}/leaderboards/${board}/scores?offset=0&limit=${limit}&includeMetadata=true`;
 	const basic = btoa(`${env('UNITY_SERVICE_KEY_ID')}:${env('UNITY_SERVICE_SECRET')}`);
-	const res = await fetch(url, { headers: { Authorization: `Basic ${basic}` } });
-	if (res.status === 404) return []; // the ranking not made yet
-	if (!res.ok) throw new Error(`${board} scores: ${res.status} ${(await res.text()).slice(0, 200)}`);
-	const body = await res.json();
-	return Array.isArray(body.results) ? body.results : [];
+	let last = '';
+	for (let attempt = 0; attempt < 3; attempt++) {
+		if (attempt > 0) await new Promise((r) => setTimeout(r, 4000));
+		const res = await fetch(url, { headers: { Authorization: `Basic ${basic}` } });
+		if (res.status === 404) return []; // the ranking not made yet
+		if (res.ok) {
+			const body = await res.json();
+			return Array.isArray(body.results) ? body.results : [];
+		}
+		last = `${res.status} ${(await res.text()).slice(0, 200)}`;
+	}
+	throw new Error(`${board} scores: ${last}`);
 }
 
-async function snapshot(): Promise<Response> {
+/** Closes the periods ending on `day`: each one once, by its first snapshot that reads Unity and writes. */
+async function snapshot(day: string): Promise<Response> {
+	const periods = closing(day, new Date());
+	if (!periods) return json({ error: 'not today: the rankings may have reset' }, 409);
 	let kept = 0;
-	for (const { board, week, period } of closing(new Date())) {
-		const rows = rowsFrom(await topScores(board, paidPlaces(week)), board, week, period);
-		if (rows.length === 0) continue;
-		const { error } = await db.from('shot_prizes').upsert(rows, { onConflict: 'board,period,player_id' });
-		if (error) throw new Error('upsert: ' + error.message);
+	const closed: string[] = [];
+	for (const { board, week, period } of periods) {
+		const { data: done } = await db.from('shot_prizes_closed').select('board').eq('board', board).eq('period', period).maybeSingle();
+		if (done) continue;
+		const rows = rowsFrom(await topScores(board, paidPlaces(week) + SPARE_LINES), board, week, period);
+		if (rows.length > 0) {
+			const { error } = await db.from('shot_prizes').upsert(rows, { onConflict: 'board,period,player_id', ignoreDuplicates: true });
+			if (error) throw new Error('insert: ' + error.message);
+		}
+		// Closed once written: a later call changes nothing, even if the ranking moved.
+		const { error } = await db.from('shot_prizes_closed').upsert({ board, period }, { onConflict: 'board,period', ignoreDuplicates: true });
+		if (error) throw new Error('close: ' + error.message);
 		kept += rows.length;
+		closed.push(`${board}:${period}`);
 	}
-	const { error } = await db.from('shot_prizes').delete().lt('period', iso(Date.now() - KEEP_DAYS * DAY_MS));
-	if (error) console.error('purge', error.message);
-	return json({ kept });
+	return json({ kept, closed });
 }
 
 Deno.serve(async (req) => {
@@ -99,7 +124,7 @@ Deno.serve(async (req) => {
 	try {
 		if (action === 'snapshot') {
 			if (!sameSecret(req.headers.get('x-cron-key') ?? '', env('SHOT_PRIZES_CRON_KEY'))) return json({ error: 'forbidden' }, 403);
-			return await snapshot();
+			return await snapshot(String(body.day ?? ''));
 		}
 		if (action !== 'mine' && action !== 'forget') return json({ error: 'unknown action' }, 400);
 		const player = await playerOf(req.headers.get('x-unity-token') ?? '');

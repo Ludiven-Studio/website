@@ -9,26 +9,37 @@ Deno.test('the prizes are the game\'s table', () => {
 	assertEquals([paidPlaces(false), paidPlaces(true)], [10, 50]);
 });
 
-Deno.test('a run before midnight closes the day, and the week on a Sunday', () => {
-	assertEquals(closing(new Date('2026-11-18T23:59:10Z')), [{ board: 'shots_day', week: false, period: '2026-11-18' }]);
-	assertEquals(closing(new Date('2026-11-22T23:59:10Z')), [
+Deno.test('the cron\'s day closes the day, and the week on a Sunday', () => {
+	assertEquals(closing('2026-11-18', new Date('2026-11-18T23:59:10Z')), [{ board: 'shots_day', week: false, period: '2026-11-18' }]);
+	assertEquals(closing('2026-11-22', new Date('2026-11-22T23:59:40Z')), [
 		{ board: 'shots_day', week: false, period: '2026-11-22' },
 		{ board: 'shots_week', week: true, period: '2026-11-16' },
 	]);
 });
 
+Deno.test('a call that comes past midnight closes nothing: Unity has reset the rankings', () => {
+	assertEquals(closing('2026-11-18', new Date('2026-11-19T00:00:02Z')), null);
+	assertEquals(closing('2026-11-18', new Date('2026-11-17T23:59:00Z')), null, 'nor a day to come');
+	assertEquals(closing('18/11/2026', new Date('2026-11-18T23:59:00Z')), null, 'nor a malformed day');
+});
+
 Deno.test('only paid places with points are kept, and no name', () => {
-	const rows = rowsFrom([
-		{ playerId: 'a', rank: 0, score: 46.0302 },
-		{ playerId: 'b', rank: 1, score: 31.01 },
-		{ playerId: 'c', rank: 9, score: 12 },
-		{ playerId: 'd', rank: 10, score: 11 },
-		{ playerId: 'e', rank: 2, score: 0 },
-		{ playerId: '', rank: 3, score: 9 },
-	], 'shots_day', false, '2026-11-18');
-	assertEquals(rows, [
-		{ board: 'shots_day', period: '2026-11-18', player_id: 'a', rank: 1, score: 46, coins: 300 },
-		{ board: 'shots_day', period: '2026-11-18', player_id: 'b', rank: 2, score: 31, coins: 150 },
-		{ board: 'shots_day', period: '2026-11-18', player_id: 'c', rank: 10, score: 12, coins: 75 },
+	const lines = Array.from({ length: 12 }, (_, i) => ({ playerId: 'p' + i, rank: i, score: 46.0302 - i }));
+	lines[2].score = 0; // a series of 0 wins nothing
+	lines[3].playerId = ''; // no id: skipped
+	const rows = rowsFrom(lines, 'shots_day', false, '2026-11-18');
+	assertEquals(rows.map((r) => [r.player_id, r.rank, r.score, r.coins]), [
+		['p0', 1, 46, 300], ['p1', 2, 45, 150], ['p4', 4, 42, 75], ['p5', 5, 41, 75], ['p6', 6, 40, 75],
+		['p7', 7, 39, 75], ['p8', 8, 38, 75], ['p9', 9, 37, 75], ['p10', 10, 36, 75],
 	]);
+	assertEquals(Object.keys(rows[0]).sort(), ['board', 'coins', 'period', 'player_id', 'rank', 'score']);
+});
+
+Deno.test('a deleted account\'s line is skipped and the places below move up', () => {
+	const rows = rowsFrom([
+		{ playerId: 'x', rank: 0, score: 48, metadata: '{"nick":"","gone":"1"}' },
+		{ playerId: 'a', rank: 1, score: 40, metadata: '{"nick":"Marcel"}' },
+		{ playerId: 'b', rank: 2, score: 30 },
+	], 'shots_day', false, '2026-11-18');
+	assertEquals(rows.map((r) => [r.player_id, r.rank, r.coins]), [['a', 1, 300], ['b', 2, 150]]);
 });
