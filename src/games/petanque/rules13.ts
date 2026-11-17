@@ -46,7 +46,10 @@ export interface Match13 {
 	dir: 1 | -1; // ends alternate direction, otherwise the circle walks off the pitch
 	left: [number, number]; // boules still in hand
 	lastJack: { x: number; y: number } | null; // where the jack last lay in play, a dead one before it went out
-	tied: boolean; // the point was tied after the last boule: a tie that holds makes the sides take turns
+	// the point was null after the last boule, tied or no boule left in play after one had lain there (FIPJP
+	// art. 15 and 28): a null point that holds makes the sides take turns
+	tied: boolean;
+	pointSeen?: boolean; // a boule has lain in play this end
 	endNo: number;
 	winner: Side | null;
 	lastEvent: MatchEvent | null;
@@ -148,13 +151,16 @@ export function endScore(bs: Played[], jack: Played): { side: Side | null; point
  * Who plays next, `state.turn` being the side that just played. The side without the point, if it
  * still has boules; otherwise the other side plays out its hand; `null` once both are empty. On a
  * tie the side that just played replays, then, while the tie holds, the sides take turns (FIPJP
- * art. 28): `state.tied` says it was tied before this boule. With no live boule on the ground (the
- * one just thrown went out), nobody holds the point, so the turn passes to the other side.
+ * art. 28): `state.tied` says it was null before this boule. A shot or a point that leaves no boule in
+ * play once one has lain there is a null point too (art. 15): the side that threw has not taken the
+ * point and replays. While no boule has lain in play yet this end, the other side plays (art. 15).
  */
 export function whoPlays(state: Match13, bs: Played[], jack: Played): Side | null {
 	const h = pointHolder(bs, jack);
-	const want: Side = h === null ? other(state.turn)
-		: h === 'tie' ? (state.tied ? other(state.turn) : state.turn) : other(h);
+	const seen = state.pointSeen === true;
+	const nul = h === 'tie' || (h === null && seen);
+	const want: Side = h === null && !seen ? other(state.turn)
+		: nul ? (state.tied ? other(state.turn) : state.turn) : other(h as Side);
 	if (state.left[want] > 0) return want;
 	const o = other(want);
 	return state.left[o] > 0 ? o : null;
@@ -203,7 +209,13 @@ export function applySettled(state: Match13, bs: Played[], jack: Played): Match1
 	}
 
 	const t = whoPlays(next, bs, jack);
-	const after: Match13 = { ...next, lastJack: { x: jack.x, y: jack.y }, tied: pointHolder(bs, jack) === 'tie' };
+	const h = pointHolder(bs, jack);
+	const after: Match13 = {
+		...next,
+		lastJack: { x: jack.x, y: jack.y },
+		tied: h === 'tie' || (h === null && state.pointSeen === true),
+		pointSeen: state.pointSeen === true || h !== null,
+	};
 	if (t === null) return { ...after, phase: 'end-done' };
 	return { ...after, turn: t };
 }
@@ -241,6 +253,7 @@ export function finishEnd(state: Match13, bs: Played[], jack: Played): Match13 {
 		left: [BOULES_PER_SIDE, BOULES_PER_SIDE],
 		lastJack: null,
 		tied: false,
+		pointSeen: false,
 		endNo: state.endNo + 1,
 		lastEvent: { k: 'end', side: won, points: res.points },
 	};

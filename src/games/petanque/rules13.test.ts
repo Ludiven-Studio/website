@@ -120,6 +120,25 @@ describe('who plays next — the rule that makes the game', () => {
 		expect(m.tied).toBe(false);
 	});
 
+	it('a shot that leaves no boule in play is played again by the shooter (FIPJP art. 15 and 28)', () => {
+		let m: Match13 = { ...initMatch13(13, 0), phase: 'play', turn: 0, left: [3, 3] };
+		const bs: Played[] = [at(2, 8.3, 0)];
+		m = applySettled(m, bs, j);
+		expect(m.turn).toBe(1);
+		bs[0] = { ...bs[0], live: false }; // 1 shoots: both boules go out
+		bs.push({ ...at(2, 8.3, 1), live: false });
+		m = applySettled(m, bs, j);
+		expect(m.turn).toBe(1); // 1 has not taken the point
+		expect(m.tied).toBe(true);
+		bs.push({ ...at(2, 30, 1), live: false }); // still none in play: now 0
+		m = applySettled(m, bs, j);
+		expect(m.turn).toBe(0);
+		bs.push(at(2, 8.5, 0)); // 0 holds the point again: 1 plays
+		m = applySettled(m, bs, j);
+		expect(m.turn).toBe(1);
+		expect(m.tied).toBe(false);
+	});
+
 	it('a first boule that goes out hands the turn to the other side', () => {
 		const dead = { ...at(2, 8.2, 0), live: false };
 		expect(whoPlays(state(0, [2, 3]), [dead], j)).toBe(1);
