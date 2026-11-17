@@ -31,7 +31,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			Questa informativa riguarda <strong>l'app mobile Pétanque Game</strong>
 			(<code>com.ludivenstudio.petanquegame</code>). Il gioco di pétanque del sito
 			(<a href="/jeux/petanque/">ludiven-studio.fr/jeux/petanque</a>) e il resto del sito hanno una
-			<a href="/confidentialite/">propria informativa</a>. Ultimo aggiornamento: 11 novembre 2026 (versione 1.0.8: le nostre pubblicità, nuova finestra «Pubblicità personalizzata», niente più backup di Google su Android).
+			<a href="/confidentialite/">propria informativa</a>. Ultimo aggiornamento: 17 novembre 2026 (versione 1.0.14: il numero di giocatori collegati in questo momento, la sfida di bocciata e le sue classifiche, monete e acquisti senza account; versione 1.0.8: le nostre pubblicità, nuova finestra «Pubblicità personalizzata», niente più backup di Google su Android).
 		</p>
 		<p class="updated">
 			Questa è una traduzione di cortesia. In caso di discordanza, prevale la
@@ -41,8 +41,8 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 		<div class="summary">
 			<p><strong>L'essenziale:</strong></p>
 			<ul>
-				<li>Contro il computer o in due su un telefono, giochi <strong>senza account</strong>, anche offline. Quando c'è internet, dal telefono partono solo la pubblicità, se l'hai accettata, statistiche d'uso anonime e alcune richieste al nostro sito (l'ultima versione del gioco, le nostre pubblicità) (vedi §2).</li>
-				<li>Le monete, il negozio, le leghe e il gioco online richiedono un <strong>account Google</strong> (Android o iPhone) <strong>o Apple</strong> (iPhone). I tuoi progressi vengono allora salvati da <strong>Unity</strong>, il nostro fornitore, per ritrovarli su tutti i tuoi telefoni.</li>
+				<li>Contro il computer o in due su un telefono, giochi <strong>senza account</strong>, anche offline. Quando c'è internet, dal telefono partono solo la pubblicità, se l'hai accettata, statistiche d'uso anonime, alcune richieste al nostro sito (l'ultima versione del gioco, le nostre pubblicità) e, una volta al minuto mentre giochi, un segnale senza identificativo che serve a contare i giocatori collegati in questo momento (vedi §2).</li>
+				<li>Il gioco online e le classifiche richiedono un <strong>account Google</strong> (Android o iPhone) <strong>o Apple</strong> (iPhone). Monete, negozio e leghe funzionano anche senza account: i tuoi progressi restano allora sul telefono. Con un account, vengono salvati presso <strong>Unity</strong>, il nostro fornitore, per ritrovarli su tutti i tuoi telefoni.</li>
 				<li><strong>Il tuo nickname è pubblico</strong>: nell'elenco delle partite pubbliche, per il tuo avversario e in classifica, con il tuo punteggio. Non c'è chat.</li>
 				<li>La pubblicità dei circuiti pubblicitari compare <strong>solo con il tuo consenso</strong>, chiesto al primo avvio. Senza, giochi normalmente, senza pubblicità tra le partite; possono comparire solo video dei nostri altri giochi e app, quando chiedi una ricompensa. Nessuna rivendita di dati.</li>
 				<li>Puoi <strong>eliminare il tuo account</strong> in qualsiasi momento: Opzioni › «Elimina il mio account» (<a href="#suppression">vedi §11</a>).</li>
@@ -73,6 +73,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li>la <strong>pubblicità</strong>, se l'hai accettata (vedi §6);</li>
 				<li><strong>statistiche d'uso</strong> senza identificativo (vedi §7);</li>
 				<li>la lettura del <strong>numero dell'ultima versione</strong> del gioco sul nostro sito (vedi §9);</li>
+				<li>un <strong>segnale di presenza</strong>, una volta al minuto finché il gioco è aperto: un numero estratto a caso a ogni avvio, senza account né identificativo del giocatore, per mostrare quanti giocano in questo momento (vedi §5 e §12);</li>
 				<li>la lettura dell'elenco delle <strong>nostre pubblicità</strong> sul nostro sito, a ogni avvio, poi dell'immagine e del video di quella che viene mostrata (vedi §6).</li>
 			</ul>
 			<p>
@@ -85,8 +86,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 		<section class="stack gap-2">
 			<h2>3. Il tuo account</h2>
 			<p>
-				Le monete, il negozio, le leghe, il gioco online e gli acquisti richiedono un account. Il gioco te lo
-				propone quando ti serve: accedi con <strong>Google</strong> su Android; su iPhone, a scelta con <strong>Apple</strong> («Accedi con Apple») o con <strong>Google</strong>. Non riceviamo mai la tua password.
+				Il gioco online e le classifiche richiedono un account. Senza account, monete, negozio, sfide, leghe e acquisti funzionano comunque e restano sul telefono; il gioco ti propone un account per salvare i tuoi progressi, dopo la 3ª e la 15ª partita contro il computer, o quando ti serve: accedi con <strong>Google</strong> su Android; su iPhone, a scelta con <strong>Apple</strong> («Accedi con Apple») o con <strong>Google</strong>. Non riceviamo mai la tua password.
 			</p>
 			<p>
 				Il telefono consegna un token di accesso a <strong>Unity Authentication</strong>, che crea il tuo
@@ -107,7 +107,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<p>
 				Una copia resta sul telefono per giocare offline; viene sincronizzata alla connessione successiva. Se
 				il telefono e l'account non hanno gli stessi progressi, il gioco ti chiede quali tenere. Uscire
-				dall'account (Opzioni › «Account») lascia i tuoi progressi sul tuo account.
+				dall'account (Opzioni › «Account») lascia i tuoi progressi sul tuo account. Al tuo primo accesso, i progressi fatti senza account passano sul tuo account, se questo telefono non ne ha ancora una copia. Se la sessione del tuo account si perde (dopo un aggiornamento, per esempio), il gioco conserva i tuoi progressi e ti chiede di accedere di nuovo.
 			</p>
 		</section>
 
@@ -124,6 +124,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Partita pubblica</strong>: il tuo nickname, il tuo punteggio e il formato della partita compaiono nell'elenco delle partite pubbliche, finché un avversario non entra nella partita. Una partita privata, con un amico tramite il suo codice, non vi compare.</li>
 				<li><strong>Durante la partita</strong>, il tuo avversario riceve il tuo nickname, il tuo punteggio, il tuo giocatore, la tua divisa e la tua boccia, poi i tuoi lanci (la loro velocità e il punto in cui la tua mano lascia la boccia). Dopo ogni lancio, il telefono che ha aperto la partita invia l'arbitraggio (posizione delle bocce, punteggio della partita). Questi messaggi passano da <strong>Unity Relay</strong>, che li inoltra senza conservarli.</li>
 				<li><strong>Classifica</strong>: ogni partita pubblica individuale giocata fino alla fine fa variare il tuo punteggio (un punteggio Elo). Il tuo punteggio e il tuo nickname vengono allora inviati alla classifica <strong>Unity Leaderboards</strong>, che tutti i giocatori del gioco possono consultare: i primi 50, e ognuno la propria riga. Le partite con un amico tramite codice e le partite a squadre non contano.</li>
+				<li><strong>Sfida di bocciata</strong>: se hai un account, il punteggio di ogni serie (su 50) e il tuo nickname vanno alle classifiche del giorno e della settimana (<strong>Unity Leaderboards</strong>), consultabili da tutti i giocatori del gioco. Senza account, le tue serie restano sul telefono.</li>
 			</ul>
 			<p>
 				Non ci sono <strong>né chat, né messaggi, né voce</strong>. Per far rimuovere un nickname, il tuo o
@@ -170,8 +171,8 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 							<td>Unity (Relay); il tuo avversario</td>
 						</tr>
 						<tr>
-							<td>Punteggio e nickname</td>
-							<td>La classifica online</td>
+							<td>Punteggio Elo, punteggio della sfida di bocciata e nickname</td>
+							<td>La classifica online e quelle della sfida di bocciata</td>
 							<td>Esecuzione del contratto</td>
 							<td>Unity (Leaderboards); i giocatori del gioco</td>
 						</tr>
@@ -198,6 +199,12 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 							<td>Mostrarti video dei nostri altri giochi e app (vedi §6)</td>
 							<td>Legittimo interesse</td>
 							<td>GitHub, che ospita il nostro sito</td>
+						</tr>
+						<tr>
+							<td>Un numero estratto a caso a ogni avvio del gioco, inviato una volta al minuto finché il gioco è aperto, senza account né identificativo del giocatore</td>
+							<td>Mostrare quanti giocatori giocano in questo momento</td>
+							<td>Legittimo interesse</td>
+							<td>La nostra funzione presso Supabase (vedi §12)</td>
 						</tr>
 						<tr>
 							<td>Statistiche d'uso, senza account né identificativo (vedi §7)</td>
@@ -271,18 +278,26 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				alcune azioni, con qualche dettaglio:
 			</p>
 			<ul>
-				<li><code>app_open</code> — il gioco si avvia (indicando se la pubblicità può essere mostrata o no);</li>
-				<li><code>match_start</code> / <code>match_end</code> — una partita inizia o finisce (modalità, livello, risultato, punteggio della partita);</li>
+				<li><code>app_open</code> — il gioco si avvia (indicando se la pubblicità può essere mostrata o no, e da quanti giorni il gioco è su questo telefono, per fasce);</li>
+				<li><code>match_start</code> / <code>match_end</code> — una partita inizia o finisce (modalità, livello, risultato, punteggio della partita; il tuo saldo di monete e il numero di partite, per fasce; account o no);</li>
 				<li><code>cup_enter</code> / <code>cup_end</code> — una coppa di lega inizia o finisce (lega, formato, turno raggiunto, vincita);</li>
 				<li><code>rated_end</code> — una partita classificata finisce (risultato, fascia del punteggio);</li>
 				<li><code>daily_bonus</code>, <code>challenge_claim</code> — si riceve un bonus giornaliero (serie) o una sfida (monete);</li>
-				<li><code>shop_buy</code>, <code>iap_buy</code> — un oggetto viene acquistato con monete (oggetto, prezzo), o con denaro (prodotto);</li>
+				<li><code>shop_buy</code> — un oggetto viene acquistato con monete (oggetto, prezzo);</li>
+				<li><code>iap_tap</code>, <code>iap_result</code>, <code>iap_gate</code> — tocchi un prodotto a pagamento, l'esito dell'acquisto (prodotto, riuscito o motivo del fallimento, acquisto di prova o no), la risposta alla domanda per un adulto (giusta, sbagliata o annullata); mai un importo;</li>
 				<li><code>ad_consent</code> — la tua risposta nella finestra «Pubblicità personalizzata» (sì o no);</li>
-				<li><code>ad_offer</code>, <code>ad_rewarded</code>, <code>ad_interstitial</code> — un video viene proposto o guardato, una pubblicità viene mostrata (posizione, risultato);</li>
+				<li><code>ad_offer</code>, <code>ad_start</code>, <code>ad_rewarded</code>, <code>ad_interstitial</code> — un video viene proposto o guardato, una pubblicità viene mostrata (posizione, formato, esito, video di una rete o nostro);</li>
 				<li><code>house_ads_ask</code> — la tua risposta quando un'offerta di video ti propone di attivare la pubblicità (sì o no);</li>
 				<li><code>house_ad</code>, <code>house_ad_open</code> — viene mostrato un video dei nostri altri giochi e app, o apri la sua scheda con «Scopri» (quale, posizione);</li>
 				<li><code>account_gate</code>, <code>sign_in</code>, <code>sign_out</code>, <code>account_delete</code> — viene richiesto l'account, avviene un accesso, un'uscita o un'eliminazione (Google o Apple, riuscita);</li>
 				<li><code>ambience</code> — l'«Atmosfera» scelta nelle Opzioni (luogo, impostazione della modalità scura);</li>
+				<li><code>onboarding</code> — i primi passi di un nuovo giocatore, una volta ciascuno (lezione di lancio, giocatore scelto, mano, «Come si gioca», primo lancio, prima partita e il suo esito), con il tempo dalla prima apertura, per fasce;</li>
+				<li><code>shots_start</code>, <code>shots_end</code> — una serie della sfida di bocciata inizia o finisce (punteggio, carreaux, record del giorno o no, account o no, numero di serie, per fasce);</li>
+				<li><code>result_leave</code> — come lasci la schermata del risultato (rigioca, menu, gioco chiuso);</li>
+				<li><code>coins_short</code> — ti mancano monete (dove, quante, il tuo saldo, per fasce);</li>
+				<li><code>resume</code> — riprendi o no una partita interrotta;</li>
+				<li><code>save_offer</code>, <code>reconnect_offer</code> — il gioco ti propone un account per salvare i progressi, o di accedere di nuovo (numero di partite per fasce, online o no);</li>
+				<li><code>online_invite</code> — la tua risposta all'invito a giocare online;</li>
 				<li><code>reminders</code>, <code>review_ask</code>, <code>howto</code>, <code>update_prompt</code>, <code>update_tapped</code> — la tua risposta sui promemoria, la richiesta di recensione dello store, una pagina di «Come si gioca», la proposta di aggiornamento.</li>
 			</ul>
 			<p>
@@ -314,7 +329,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				dispositivo.
 			</p>
 			<p>
-				Un pacchetto di monete richiede un account: le monete fanno parte dei tuoi progressi. «Senza pubblicità» si acquista anche senza account: lo store lo conserva, e Opzioni › «Ripristina acquisti» te lo restituisce dopo una reinstallazione.
+				I pacchetti di monete e «Senza pubblicità» si possono acquistare anche senza account. Senza account, le monete restano nei progressi del telefono e si perdono se disinstalli il gioco prima di accedere; «Senza pubblicità» è conservato dallo store, e Opzioni › «Ripristina acquisti» lo restituisce dopo una reinstallazione. Dopo un primo acquisto nella giornata, il gioco chiede a un adulto di rispondere a una piccola moltiplicazione prima del successivo; la risposta viene verificata sul telefono (vedi §10).
 			</p>
 		</section>
 
@@ -351,6 +366,8 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li>le impostazioni che restano con il telefono: mano che lancia, lato della pedana, lancio semplice o esperto, visuale di gioco, lingua, tema, audio, promemoria;</li>
 				<li>la tua sessione Unity, se hai fatto l'accesso;</li>
 				<li>la tua risposta nella finestra «Pubblicità personalizzata», il giorno in cui l'hai data e la versione del testo, e, se hai accettato, i dati dei moduli pubblicitari (vedi §6);</li>
+				<li>i tuoi pagamenti con denaro reale delle ultime 24 ore (ora, importo, valuta), per la domanda a un adulto prima di un nuovo acquisto; non lasciano mai il telefono;</li>
+				<li>una partita contro il computer interrotta (una chiamata, il gioco chiuso), per riprenderla dove si era fermata;</li>
 				<li>l'elenco delle nostre pubblicità e le loro immagini, conservati per la volta successiva (vedi §6).</li>
 			</ul>
 			<p>Tutto questo scompare quando disinstalli l'applicazione. Dalla versione 1.0.8, nulla di tutto ciò viene copiato nel backup di Google del tuo telefono Android né trasferito su un nuovo telefono; una versione precedente poteva copiarlo lì, e quel backup ripristinarlo alla reinstallazione.</p>
@@ -379,6 +396,9 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				cancellata da questo pulsante. Scrivici per farla rimuovere: la cancelliamo entro un mese.
 			</p>
 			<p>
+				<strong>Le tue righe nelle classifiche della sfida di bocciata</strong> vengono azzerate, senza nickname, e segnate come eliminate quando elimini il tuo account; queste classifiche ripartono comunque da zero ogni giorno e ogni lunedì.
+			</p>
+			<p>
 				<strong>Senza l'applicazione</strong>: scrivi a
 				<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a> indicando il tuo nickname, il
 				tipo di account (Google o Apple) e, se te la ricordi, la data della tua ultima partita. Cancelliamo i
@@ -397,7 +417,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 		<section class="stack gap-2">
 			<h2>12. Destinatari e trasferimenti al di fuori dell'Unione europea</h2>
 			<p>
-				I nostri unici server sono quello delle statistiche d'uso (vedi §7) e una funzione che revoca l'accesso «Accedi con Apple» quando elimini il tuo account (vedi §11). I tuoi dati non vengono né venduti né ceduti. Sono trattati solo da
+				I nostri unici server sono quello delle statistiche d'uso (vedi §7), una funzione che conta i giocatori collegati in questo momento (vedi §5) e una funzione che revoca l'accesso «Accedi con Apple» quando elimini il tuo account (vedi §11). I tuoi dati non vengono né venduti né ceduti. Sono trattati solo da
 				questi fornitori:
 			</p>
 			<ul>
@@ -406,7 +426,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Google</strong> (Google Ireland Limited, Google LLC) — accesso su Android e su iPhone, Google Play (distribuzione, pagamento, scheda di valutazione).</li>
 				<li><strong>Apple Inc.</strong> — «Accedi con Apple», autorizzazione al tracciamento, App Store (distribuzione, pagamento, scheda di valutazione).</li>
 				<li><strong>Hetzner Online GmbH</strong> (Germania) — hosting del nostro server per le statistiche d'uso (vedi §7).</li>
-				<li><strong>Supabase, Inc.</strong> — hosting della nostra funzione che revoca l'accesso «Accedi con Apple» (vedi §11): riceve il codice di Apple, l'identificativo dell'app e l'indirizzo IP del telefono, e non conserva nulla.</li>
+				<li><strong>Supabase, Inc.</strong> — hosting della nostra funzione che revoca l'accesso «Accedi con Apple» (vedi §11): riceve il codice di Apple, l'identificativo dell'app e l'indirizzo IP del telefono, e non conserva nulla; e di quella che conta i giocatori collegati: riceve il numero estratto a caso all'avvio e l'indirizzo IP del telefono. Non registra questo indirizzo, che può tenere in memoria per qualche minuto per bloccare gli abusi; i log tecnici di Supabase lo conservano per un tempo limitato, secondo le sue condizioni.</li>
 				<li><strong>GitHub, Inc.</strong> — hosting del nostro sito, letto per il controllo degli aggiornamenti (vedi §9) e per le nostre pubblicità (vedi §6); GitHub registra l'indirizzo IP di ogni visita per la sicurezza del suo servizio.</li>
 			</ul>
 			<p>
@@ -422,11 +442,14 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Account e progressi</strong> (Unity Authentication e Cloud Save): finché non elimini il tuo account.</li>
 				<li><strong>Classifica</strong>: il tuo punteggio e il tuo nickname, finché non li fai rimuovere (vedi §11).</li>
 				<li><strong>Partite online</strong>: una partita pubblica esce dall'elenco appena inizia o appena la chiudi; i lanci non vengono conservati dopo la partita.</li>
+				<li><strong>Giocatori collegati in questo momento</strong>: il numero estratto a caso viene cancellato nei minuti successivi alla chiusura del gioco.</li>
 				<li><strong>Statistiche d'uso</strong>: conservate <strong>24 mesi</strong> sul nostro server, poi cancellate; i suoi backup, 14 giorni.</li>
 				<li><strong>Dati pubblicitari</strong>: secondo le regole di Unity e di ironSource.</li>
 				<li><strong>La tua risposta sulla pubblicità</strong>: 182 giorni (6 mesi) sul tuo telefono, poi il gioco te la richiede.</li>
 				<li><strong>Le nostre pubblicità</strong>: il loro elenco e le loro immagini restano sul tuo telefono finché il nostro sito non li sostituisce o finché non disinstalli il gioco.</li>
 				<li><strong>Acquisti</strong>: i numeri di transazione restano nei tuoi progressi, fino all'eliminazione dell'account; Google e Apple conservano le proprie ricevute.</li>
+				<li><strong>I tuoi pagamenti delle ultime 24 ore</strong>: sul telefono, cancellati dopo 24 ore.</li>
+				<li><strong>Una partita interrotta</strong>: sul telefono, 7 giorni al massimo.</li>
 				<li><strong>Sul telefono</strong>: fino alla disinstallazione o all'eliminazione dell'account.</li>
 			</ul>
 		</section>

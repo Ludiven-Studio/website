@@ -30,14 +30,14 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			Cette politique concerne <strong>l'application mobile Pétanque Game</strong>
 			(<code>com.ludivenstudio.petanquegame</code>). Le jeu de pétanque du site
 			(<a href="/jeux/petanque/">ludiven-studio.fr/jeux/petanque</a>) et le reste du site ont leur
-			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 16 novembre 2026 (version 1.0.13&nbsp;: le nombre de joueurs en ligne en ce moment&nbsp;; version 1.0.8&nbsp;: nos propres publicités, nouvelle fenêtre «&nbsp;Publicité personnalisée&nbsp;», plus de sauvegarde Google sur Android).
+			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 17 novembre 2026 (version 1.0.14&nbsp;: le nombre de joueurs en ligne en ce moment, le défi de tir et ses classements, les pièces et les achats sans compte&nbsp;; version 1.0.8&nbsp;: nos propres publicités, nouvelle fenêtre «&nbsp;Publicité personnalisée&nbsp;», plus de sauvegarde Google sur Android).
 		</p>
 
 		<div class="summary">
 			<p><strong>L'essentiel&nbsp;:</strong></p>
 			<ul>
-				<li>Contre l'ordinateur ou à deux sur un téléphone, tu joues <strong>sans compte</strong>, même hors ligne. Quand le téléphone a internet, seules partent la publicité si tu l'as acceptée, des statistiques d'usage anonymes et quelques demandes à notre site (la dernière version du jeu, nos propres publicités) (voir §2).</li>
-				<li>Les pièces, le magasin, les ligues et le jeu en ligne demandent un <strong>compte Google</strong> (Android ou iPhone) <strong>ou Apple</strong> (iPhone). Ta progression est alors sauvegardée chez <strong>Unity</strong>, notre prestataire, pour la retrouver sur tous tes téléphones.</li>
+				<li>Contre l'ordinateur ou à deux sur un téléphone, tu joues <strong>sans compte</strong>, même hors ligne. Quand le téléphone a internet, seules partent la publicité si tu l'as acceptée, des statistiques d'usage anonymes, quelques demandes à notre site (la dernière version du jeu, nos propres publicités) et, une fois par minute pendant que tu joues, un signal sans identifiant qui sert à compter les joueurs en ce moment (voir §2).</li>
+				<li>Le jeu en ligne et les classements demandent un <strong>compte Google</strong> (Android ou iPhone) <strong>ou Apple</strong> (iPhone). Les pièces, le magasin et les ligues marchent aussi sans compte&nbsp;: ta progression reste alors sur ton téléphone. Avec un compte, elle est sauvegardée chez <strong>Unity</strong>, notre prestataire, pour la retrouver sur tous tes téléphones.</li>
 				<li><strong>Ton pseudo est public</strong>&nbsp;: dans la liste des parties publiques, chez ton adversaire et au classement, avec ta note. Il n'y a pas de chat.</li>
 				<li>La publicité des régies ne s'affiche <strong>qu'avec ton accord</strong>, demandé au premier lancement. Sans lui, tu joues normalement, sans publicité entre les parties&nbsp;; seules des vidéos de nos autres jeux et applis peuvent passer, quand tu demandes une récompense. Aucune revente de données.</li>
 				<li>Tu peux <strong>supprimer ton compte</strong> à tout moment&nbsp;: Options › «&nbsp;Supprimer mon compte&nbsp;» (<a href="#suppression">voir §11</a>).</li>
@@ -68,6 +68,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li>la <strong>publicité</strong>, si tu l'as acceptée (voir §6)&nbsp;;</li>
 				<li>des <strong>statistiques d'usage</strong> sans identifiant (voir §7)&nbsp;;</li>
 				<li>la lecture du <strong>numéro de la dernière version</strong> du jeu sur notre site (voir §9)&nbsp;;</li>
+				<li>un <strong>signal de présence</strong>, une fois par minute tant que le jeu est ouvert&nbsp;: un numéro tiré au hasard à chaque lancement, sans compte ni identifiant de joueur, pour afficher combien de joueurs jouent en ce moment (voir §5 et §12)&nbsp;;</li>
 				<li>la lecture de la liste de <strong>nos propres publicités</strong> sur notre site, à chaque lancement, puis de l'image et de la vidéo de celle qui passe (voir §6).</li>
 			</ul>
 			<p>
@@ -80,8 +81,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 		<section class="stack gap-2">
 			<h2>3. Ton compte</h2>
 			<p>
-				Les pièces, le magasin, les ligues, le jeu en ligne et les achats demandent un compte. Le jeu te le
-				propose au moment où tu en as besoin&nbsp;: tu te connectes avec <strong>Google</strong> sur Android&nbsp;; sur iPhone, au choix avec <strong>Apple</strong> («&nbsp;Se connecter avec Apple&nbsp;») ou avec <strong>Google</strong>. Nous ne recevons
+				Le jeu en ligne et les classements demandent un compte. Sans compte, les pièces, le magasin, les défis, les ligues et les achats marchent aussi, gardés sur ton téléphone&nbsp;; le jeu te propose un compte pour sauvegarder ta progression, après ta 3e et ta 15e partie contre l'ordinateur, ou quand tu en as besoin&nbsp;: tu te connectes avec <strong>Google</strong> sur Android&nbsp;; sur iPhone, au choix avec <strong>Apple</strong> («&nbsp;Se connecter avec Apple&nbsp;») ou avec <strong>Google</strong>. Nous ne recevons
 				jamais ton mot de passe.
 			</p>
 			<p>
@@ -102,7 +102,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			<p>
 				Une copie reste sur le téléphone pour jouer hors ligne&nbsp;; elle remonte à la connexion suivante. Si
 				le téléphone et le compte n'ont pas la même progression, le jeu te demande laquelle garder. Te
-				déconnecter (Options › «&nbsp;Compte&nbsp;») laisse ta progression sur ton compte.
+				déconnecter (Options › «&nbsp;Compte&nbsp;») laisse ta progression sur ton compte. À ta première connexion, la progression faite sans compte passe sur ton compte, si ce téléphone n'en a pas encore de copie. Si la session de ton compte se perd (après une mise à jour, par exemple), le jeu garde ta progression et te demande de te reconnecter.
 			</p>
 		</section>
 
@@ -119,6 +119,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li><strong>Partie publique</strong>&nbsp;: ton pseudo, ta note et le format de la partie apparaissent dans la liste des parties publiques, jusqu'à ce qu'un adversaire la rejoigne. Une partie privée, avec un ami par son code, n'y figure pas.</li>
 				<li><strong>Pendant la partie</strong>, ton adversaire reçoit ton pseudo, ta note, ton joueur, ta tenue et ta boule, puis tes lancers (leur vitesse et l'endroit où ta main lâche la boule). Après chaque lancer, le téléphone qui a ouvert la partie envoie l'arbitrage (position des boules, score). Ces messages passent par <strong>Unity Relay</strong>, qui les achemine sans les garder.</li>
 				<li><strong>Classement</strong>&nbsp;: chaque partie publique en tête-à-tête jouée jusqu'au bout fait bouger ta note (une note Elo). Ta note et ton pseudo sont alors envoyés au classement <strong>Unity Leaderboards</strong>, que tous les joueurs du jeu peuvent consulter&nbsp;: les 50 premiers, et chacun sa propre ligne. Les parties avec un ami par code et les parties en équipe ne comptent pas.</li>
+				<li><strong>Défi de tir</strong>&nbsp;: si tu as un compte, le score de chaque série (sur 50) et ton pseudo vont aux classements du jour et de la semaine (<strong>Unity Leaderboards</strong>), que tous les joueurs du jeu peuvent consulter. Sans compte, tes séries restent sur ton téléphone.</li>
 			</ul>
 			<p>
 				Il n'y a <strong>ni chat, ni messages, ni voix</strong>. Pour faire retirer un pseudo, le tien ou celui
@@ -165,8 +166,8 @@ import LangSwitch from '../../components/LangSwitch.astro';
 							<td>Unity (Relay)&nbsp;; ton adversaire</td>
 						</tr>
 						<tr>
-							<td>Note et pseudo</td>
-							<td>Le classement en ligne</td>
+							<td>Note, score du défi de tir et pseudo</td>
+							<td>Le classement en ligne et ceux du défi de tir</td>
 							<td>Exécution du contrat</td>
 							<td>Unity (Leaderboards)&nbsp;; les joueurs du jeu</td>
 						</tr>
@@ -272,18 +273,26 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				actions, avec quelques précisions&nbsp;:
 			</p>
 			<ul>
-				<li><code>app_open</code> — le jeu démarre (avec le fait que la publicité peut s'afficher ou non)&nbsp;;</li>
-				<li><code>match_start</code> / <code>match_end</code> — une partie commence ou finit (mode, niveau, résultat, score)&nbsp;;</li>
+				<li><code>app_open</code> — le jeu démarre (avec le fait que la publicité peut s'afficher ou non, et depuis combien de jours le jeu est sur ce téléphone, en tranches)&nbsp;;</li>
+				<li><code>match_start</code> / <code>match_end</code> — une partie commence ou finit (mode, niveau, résultat, score&nbsp;; ton solde de pièces et ton nombre de parties, en tranches&nbsp;; compte ou non)&nbsp;;</li>
 				<li><code>cup_enter</code> / <code>cup_end</code> — une coupe de ligue commence ou finit (ligue, format, tour atteint, gain)&nbsp;;</li>
 				<li><code>rated_end</code> — une partie classée finit (résultat, palier de la note)&nbsp;;</li>
 				<li><code>daily_bonus</code>, <code>challenge_claim</code> — un bonus du jour (série) ou un défi (pièces) est reçu&nbsp;;</li>
-				<li><code>shop_buy</code>, <code>iap_buy</code> — un objet est acheté avec des pièces (objet, prix), ou avec de l'argent (produit)&nbsp;;</li>
+				<li><code>shop_buy</code> — un objet est acheté avec des pièces (objet, prix)&nbsp;;</li>
+				<li><code>iap_tap</code>, <code>iap_result</code>, <code>iap_gate</code> — tu touches un produit payant, le résultat de l'achat (produit, réussi ou raison de l'échec, achat de test ou non), la réponse à la question posée à un adulte (juste, fausse ou annulée)&nbsp;; jamais de montant&nbsp;;</li>
 				<li><code>ad_consent</code> — ta réponse à la fenêtre «&nbsp;Publicité personnalisée&nbsp;» (oui ou non)&nbsp;;</li>
-				<li><code>ad_offer</code>, <code>ad_rewarded</code>, <code>ad_interstitial</code> — une vidéo est proposée ou regardée, une publicité s'affiche (emplacement, résultat)&nbsp;;</li>
+				<li><code>ad_offer</code>, <code>ad_start</code>, <code>ad_rewarded</code>, <code>ad_interstitial</code> — une vidéo est proposée ou regardée, une publicité s'affiche (emplacement, format, résultat, vidéo d'une régie ou des nôtres)&nbsp;;</li>
 				<li><code>house_ads_ask</code> — ta réponse quand une offre de vidéo te propose d'activer la publicité (oui ou non)&nbsp;;</li>
 				<li><code>house_ad</code>, <code>house_ad_open</code> — une vidéo de nos autres jeux et applis passe, ou tu ouvres sa fiche avec «&nbsp;Découvrir&nbsp;» (laquelle, emplacement)&nbsp;;</li>
 				<li><code>account_gate</code>, <code>sign_in</code>, <code>sign_out</code>, <code>account_delete</code> — le compte est demandé, une connexion, une déconnexion ou une suppression a lieu (Google ou Apple, réussite)&nbsp;;</li>
 				<li><code>ambience</code> — l'«&nbsp;Ambiance&nbsp;» choisie dans Options (lieu, réglage du mode sombre)&nbsp;;</li>
+				<li><code>onboarding</code> — les premiers pas d'un nouveau joueur, une fois chacun (leçon de lancer, choix du joueur, main, «&nbsp;Comment jouer&nbsp;», premier lancer, première partie et son résultat), avec le temps écoulé depuis la première ouverture, en tranches&nbsp;;</li>
+				<li><code>shots_start</code>, <code>shots_end</code> — une série du défi de tir commence ou finit (score, carreaux, record du jour ou non, compte ou non, nombre de séries, en tranches)&nbsp;;</li>
+				<li><code>result_leave</code> — comment tu quittes l'écran de résultat (rejouer, menu, jeu quitté)&nbsp;;</li>
+				<li><code>coins_short</code> — il te manque des pièces (où, combien, ton solde, en tranches)&nbsp;;</li>
+				<li><code>resume</code> — tu reprends ou non une partie coupée&nbsp;;</li>
+				<li><code>save_offer</code>, <code>reconnect_offer</code> — le jeu te propose un compte pour sauvegarder ta progression, ou de te reconnecter (nombre de parties en tranches, en ligne ou non)&nbsp;;</li>
+				<li><code>online_invite</code> — ta réponse à l'invitation à jouer en ligne&nbsp;;</li>
 				<li><code>reminders</code>, <code>review_ask</code>, <code>howto</code>, <code>update_prompt</code>, <code>update_tapped</code> — ta réponse sur les rappels, la demande d'avis du store, une page de «&nbsp;Comment jouer&nbsp;», la proposition de mise à jour.</li>
 			</ul>
 			<p>
@@ -314,7 +323,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				module peut aussi lui transmettre l'historique d'achats et des informations techniques sur l'appareil.
 			</p>
 			<p>
-				Un pack de pièces demande un compte&nbsp;: les pièces vivent dans ta progression. «&nbsp;Sans publicité&nbsp;» s'achète aussi sans compte&nbsp;: le store le garde, et Options › «&nbsp;Restaurer mes achats&nbsp;» le rend après une réinstallation.
+				Les packs de pièces et «&nbsp;Sans publicité&nbsp;» s'achètent aussi sans compte. Sans compte, les pièces restent dans la progression de ton téléphone et disparaissent si tu désinstalles le jeu avant de te connecter&nbsp;; «&nbsp;Sans publicité&nbsp;» est gardé par le store, et Options › «&nbsp;Restaurer mes achats&nbsp;» le rend après une réinstallation. Après un premier achat dans la journée, le jeu demande à un adulte de répondre à une petite multiplication avant le suivant&nbsp;; la réponse est vérifiée sur le téléphone (voir §10).
 			</p>
 		</section>
 
@@ -351,6 +360,8 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li>les réglages qui restent avec le téléphone&nbsp;: main qui lance, côté de la planche, lancer simple ou expert, vue de jeu, langue, thème, son, rappels&nbsp;;</li>
 				<li>ta session Unity, si tu es connecté&nbsp;;</li>
 				<li>ta réponse à la fenêtre «&nbsp;Publicité personnalisée&nbsp;», le jour où tu l'as donnée et la version du texte, et, si tu as accepté, les données des modules publicitaires (voir §6)&nbsp;;</li>
+				<li>tes paiements en argent réel des dernières 24 heures (heure, montant, devise), pour la question posée à un adulte avant un nouvel achat&nbsp;; ils ne quittent pas ton téléphone&nbsp;;</li>
+				<li>une partie contre l'ordinateur coupée (un appel, le jeu fermé), pour la reprendre où elle en était&nbsp;;</li>
 				<li>la liste de nos propres publicités et leurs images, gardées pour la fois suivante (voir §6).</li>
 			</ul>
 			<p>Tout cela disparaît quand tu désinstalles l'application. Depuis la version 1.0.8, rien n'en est copié dans la sauvegarde Google de ton téléphone Android ni transféré vers un nouveau téléphone&nbsp;; une version plus ancienne pouvait l'y copier, et cette sauvegarde le restaurer à la réinstallation.</p>
@@ -381,6 +392,9 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				Écris-nous pour la faire retirer&nbsp;: nous l'effaçons sous un mois.
 			</p>
 			<p>
+				<strong>Tes lignes aux classements du défi de tir</strong> passent à zéro, sans pseudo, et sont marquées comme supprimées quand tu supprimes ton compte&nbsp;; ces classements repartent de toute façon de zéro chaque jour et chaque lundi.
+			</p>
+			<p>
 				<strong>Sans l'application</strong>&nbsp;: écris à
 				<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a> en indiquant ton pseudo, le
 				type de compte (Google ou Apple) et, si tu t'en souviens, la date de ta dernière partie. Nous
@@ -408,7 +422,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li><strong>Google</strong> (Google Ireland Limited, Google LLC) — connexion sur Android et sur iPhone, Google Play (distribution, paiement, fiche de notation).</li>
 				<li><strong>Apple Inc.</strong> — «&nbsp;Se connecter avec Apple&nbsp;», autorisation de suivi, App Store (distribution, paiement, fiche de notation).</li>
 				<li><strong>Hetzner Online GmbH</strong> (Allemagne) — hébergement de notre serveur de statistiques d'usage (voir §7).</li>
-				<li><strong>Supabase, Inc.</strong> — hébergement de notre fonction qui retire l'accès «&nbsp;Se connecter avec Apple&nbsp;» (voir §11)&nbsp;: elle reçoit le code d'Apple, l'identifiant de l'application et l'adresse IP du téléphone, et ne garde rien&nbsp;; et de celle qui compte les joueurs en ligne, qui reçoit le numéro tiré au hasard au lancement et l'adresse IP, sans la garder.</li>
+				<li><strong>Supabase, Inc.</strong> — hébergement de notre fonction qui retire l'accès «&nbsp;Se connecter avec Apple&nbsp;» (voir §11)&nbsp;: elle reçoit le code d'Apple, l'identifiant de l'application et l'adresse IP du téléphone, et ne garde rien&nbsp;; et de celle qui compte les joueurs en ligne&nbsp;: elle reçoit le numéro tiré au hasard au lancement et l'adresse IP du téléphone. Elle n'enregistre pas cette adresse, qu'elle peut garder en mémoire quelques minutes pour bloquer les abus&nbsp;; les journaux techniques de Supabase la gardent un temps limité, selon ses conditions.</li>
 				<li><strong>GitHub, Inc.</strong> — hébergement de notre site, lu pour la vérification de mise à jour (voir §9) et pour nos propres publicités (voir §6)&nbsp;; GitHub enregistre l'adresse IP de chaque visite pour la sécurité de son service.</li>
 			</ul>
 			<p>
@@ -424,12 +438,14 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li><strong>Compte et progression</strong> (Unity Authentication et Cloud Save)&nbsp;: jusqu'à ce que tu supprimes ton compte.</li>
 				<li><strong>Classement</strong>&nbsp;: ta note et ton pseudo, jusqu'à ce que tu les fasses retirer (voir §11).</li>
 				<li><strong>Parties en ligne</strong>&nbsp;: une partie publique quitte la liste dès qu'elle commence ou que tu la fermes&nbsp;; les lancers ne sont pas gardés après la partie.</li>
-				<li><strong>Joueurs en ligne en ce moment</strong>&nbsp;: le numéro tiré au hasard est effacé trois minutes après que le jeu s'est tu.</li>
+				<li><strong>Joueurs en ligne en ce moment</strong>&nbsp;: le numéro tiré au hasard est effacé dans les minutes qui suivent l'arrêt du jeu.</li>
 				<li><strong>Statistiques d'usage</strong>&nbsp;: gardées <strong>24 mois</strong> sur notre serveur, puis effacées&nbsp;; ses sauvegardes, 14 jours.</li>
 				<li><strong>Données publicitaires</strong>&nbsp;: selon les règles de Unity et d'ironSource.</li>
 				<li><strong>Ta réponse sur la publicité</strong>&nbsp;: 182 jours (6 mois) sur ton téléphone, puis le jeu te la redemande.</li>
 				<li><strong>Nos propres publicités</strong>&nbsp;: leur liste et leurs images restent sur ton téléphone jusqu'à ce que notre site les remplace ou que tu désinstalles le jeu.</li>
 				<li><strong>Achats</strong>&nbsp;: les numéros de transaction restent dans ta progression, jusqu'à la suppression du compte&nbsp;; Google et Apple gardent leurs propres justificatifs.</li>
+				<li><strong>Tes paiements des dernières 24 heures</strong>&nbsp;: sur ton téléphone, effacés au bout de 24 heures.</li>
+				<li><strong>Une partie coupée</strong>&nbsp;: sur ton téléphone, 7 jours au plus.</li>
 				<li><strong>Sur le téléphone</strong>&nbsp;: jusqu'à la désinstallation ou à la suppression du compte.</li>
 			</ul>
 		</section>

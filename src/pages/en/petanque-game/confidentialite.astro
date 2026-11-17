@@ -31,7 +31,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			This policy covers <strong>the Pétanque Game mobile app</strong>
 			(<code>com.ludivenstudio.petanquegame</code>). The pétanque game on the website
 			(<a href="/jeux/petanque/">ludiven-studio.fr/jeux/petanque</a>) and the rest of the website have their
-			<a href="/confidentialite/">own policy</a>. Last updated: 16 November 2026 (version 1.0.13: the number of players online right now; version 1.0.8: our own ads, new "Personalised advertising" window, no more Google backup on Android).
+			<a href="/confidentialite/">own policy</a>. Last updated: 17 November 2026 (version 1.0.14: the number of players online right now, the shooting challenge and its rankings, coins and purchases without an account; version 1.0.8: our own ads, new "Personalised advertising" window, no more Google backup on Android).
 		</p>
 		<p class="updated">
 			This is a courtesy translation. In case of discrepancy, the
@@ -41,8 +41,8 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 		<div class="summary">
 			<p><strong>The essentials:</strong></p>
 			<ul>
-				<li>Against the computer or with two players on one phone, you play <strong>without an account</strong>, even offline. When the phone is online, only advertising if you accepted it, anonymous usage statistics and a few requests to our website (the game's latest version, our own ads) leave it (see §2).</li>
-				<li>Coins, the shop, leagues and online play need a <strong>Google account</strong> (Android or iPhone) <strong>or Apple account</strong> (iPhone). Your progress is then saved with <strong>Unity</strong>, our provider, so you can get it back on all your phones.</li>
+				<li>Against the computer or with two players on one phone, you play <strong>without an account</strong>, even offline. When the phone is online, only these leave it: advertising if you accepted it, anonymous usage statistics, a few requests to our website (the game's latest version, our own ads) and, once a minute while you play, a signal with no identifier used to count the players right now (see §2).</li>
+				<li>Online play and the rankings need a <strong>Google account</strong> (Android or iPhone) <strong>or Apple account</strong> (iPhone). Coins, the shop and the leagues also work without one: your progress then stays on your phone. With an account, it is saved with <strong>Unity</strong>, our provider, so you find it on all your phones.</li>
 				<li><strong>Your name is public</strong>: in the list of public games, on your opponent's phone and in the ranking, with your rating. There is no chat.</li>
 				<li>Ads from ad networks are shown <strong>only with your consent</strong>, asked at first launch. Without it, you play as usual, with no ads between games; only videos of our other games and apps may play, when you ask for a reward. No data is resold.</li>
 				<li>You can <strong>delete your account</strong> at any time: Options › "Delete my account" (<a href="#suppression">see §11</a>).</li>
@@ -73,6 +73,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>advertising</strong>, if you accepted it (see §6);</li>
 				<li><strong>usage statistics</strong> with no identifier (see §7);</li>
 				<li>reading the <strong>number of the latest version</strong> of the game on our website (see §9);</li>
+				<li>a <strong>presence signal</strong>, once a minute while the game is open: a number drawn at random at each launch, with no account or player identifier, to show how many are playing right now (see §5 and §12);</li>
 				<li>reading the list of <strong>our own ads</strong> on our website, at each launch, then the picture and the video of the one that plays (see §6).</li>
 			</ul>
 			<p>
@@ -85,8 +86,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 		<section class="stack gap-2">
 			<h2>3. Your account</h2>
 			<p>
-				Coins, the shop, leagues, online play and purchases need an account. The game offers you one when you
-				need it: you sign in with <strong>Google</strong> on Android; on iPhone, with <strong>Apple</strong> ("Sign in with Apple") or <strong>Google</strong>, as you choose. We never receive your password.
+				Online play and the rankings need an account. Without one, coins, the shop, challenges, leagues and purchases work too, kept on your phone; the game offers an account to save your progress, after your 3rd and 15th game against the computer, or when you need one: you sign in with <strong>Google</strong> on Android; on iPhone, with <strong>Apple</strong> ("Sign in with Apple") or <strong>Google</strong>, as you choose. We never receive your password.
 			</p>
 			<p>
 				The phone gives a sign-in token to <strong>Unity Authentication</strong>, which creates your Unity
@@ -106,7 +106,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<p>
 				A copy stays on the phone so you can play offline; it is sent up the next time you connect. If the
 				phone and the account do not have the same progress, the game asks you which one to keep. Signing out
-				(Options › "Account") leaves your progress on your account.
+				(Options › "Account") leaves your progress on your account. At your first sign-in, the progress made without an account moves to your account, if this phone has no copy of it yet. If your account's session is lost (after an update, for example), the game keeps your progress and asks you to sign in again.
 			</p>
 		</section>
 
@@ -123,6 +123,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Public game</strong>: your name, your rating and the game's format appear in the list of public games, until an opponent joins it. A private game, with a friend through its code, is not in that list.</li>
 				<li><strong>During the game</strong>, your opponent receives your name, your rating, your player, your outfit and your boule, then your throws (their speed and where your hand lets go of the boule). After each throw, the phone that opened the game sends the ruling (where the boules lie, the score). These messages go through <strong>Unity Relay</strong>, which passes them on without keeping them.</li>
 				<li><strong>Ranking</strong>: each public singles game played to the end changes your rating (an Elo rating). Your rating and your name are then sent to the <strong>Unity Leaderboards</strong> ranking, which every player of the game can view: the top 50, and each player their own line. Games with a friend by code and team games do not count.</li>
+				<li><strong>Shooting challenge</strong>: if you have an account, the score of each series (out of 50) and your name go to the day's and the week's rankings (<strong>Unity Leaderboards</strong>), which all the game's players can see. Without an account, your series stay on your phone.</li>
 			</ul>
 			<p>
 				There is <strong>no chat, no messages and no voice</strong>. To have a name removed, yours or another
@@ -169,8 +170,8 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 							<td>Unity (Relay); your opponent</td>
 						</tr>
 						<tr>
-							<td>Rating and name</td>
-							<td>The online ranking</td>
+							<td>Rating, shooting challenge score and name</td>
+							<td>The online ranking and the shooting challenge's rankings</td>
 							<td>Performance of the contract</td>
 							<td>Unity (Leaderboards); the game's players</td>
 						</tr>
@@ -272,18 +273,26 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				actions, with a few details:
 			</p>
 			<ul>
-				<li><code>app_open</code> — the game starts (with whether ads can be shown or not);</li>
-				<li><code>match_start</code> / <code>match_end</code> — a game starts or ends (mode, level, result, score);</li>
+				<li><code>app_open</code> — the game starts (with whether ads can be shown or not, and how many days the game has been on this phone, in bands);</li>
+				<li><code>match_start</code> / <code>match_end</code> — a game starts or ends (mode, level, result, score; your coin balance and number of games, in bands; account or not);</li>
 				<li><code>cup_enter</code> / <code>cup_end</code> — a league cup starts or ends (league, format, round reached, winnings);</li>
 				<li><code>rated_end</code> — a ranked game ends (result, rating band);</li>
 				<li><code>daily_bonus</code>, <code>challenge_claim</code> — a daily bonus (streak) or a challenge (coins) is collected;</li>
-				<li><code>shop_buy</code>, <code>iap_buy</code> — an item is bought with coins (item, price), or with money (product);</li>
+				<li><code>shop_buy</code> — an item is bought with coins (item, price);</li>
+				<li><code>iap_tap</code>, <code>iap_result</code>, <code>iap_gate</code> — you tap a paid product, the purchase's outcome (product, success or reason for failure, test purchase or not), the answer to the adult question (right, wrong or cancelled); never an amount;</li>
 				<li><code>ad_consent</code> — your answer in the "Personalised advertising" window (yes or no);</li>
-				<li><code>ad_offer</code>, <code>ad_rewarded</code>, <code>ad_interstitial</code> — a video is offered or watched, an ad is shown (placement, result);</li>
+				<li><code>ad_offer</code>, <code>ad_start</code>, <code>ad_rewarded</code>, <code>ad_interstitial</code> — a video is offered or watched, an ad is shown (placement, format, result, a network's video or ours);</li>
 				<li><code>house_ads_ask</code> — your answer when a video offer asks whether to turn ads on (yes or no);</li>
 				<li><code>house_ad</code>, <code>house_ad_open</code> — a video of our other games and apps plays, or you open its page with "Discover" (which one, placement);</li>
 				<li><code>account_gate</code>, <code>sign_in</code>, <code>sign_out</code>, <code>account_delete</code> — the account is asked for, a sign-in, a sign-out or a deletion takes place (Google or Apple, success);</li>
 				<li><code>ambience</code> — the "Look" chosen in Options (place, dark mode setting);</li>
+				<li><code>onboarding</code> — a new player's first steps, once each (throwing lesson, player chosen, hand, "How to play", first throw, first game and its result), with the time since the app first opened, in bands;</li>
+				<li><code>shots_start</code>, <code>shots_end</code> — a shooting challenge series starts or ends (score, carreaux, day's best or not, account or not, number of series, in bands);</li>
+				<li><code>result_leave</code> — how you leave the result screen (play again, menu, app left);</li>
+				<li><code>coins_short</code> — you are short of coins (where, how many, your balance, in bands);</li>
+				<li><code>resume</code> — you resume an interrupted game or not;</li>
+				<li><code>save_offer</code>, <code>reconnect_offer</code> — the game offers an account to save your progress, or to sign in again (number of games in bands, online or not);</li>
+				<li><code>online_invite</code> — your answer to the invitation to play online;</li>
 				<li><code>reminders</code>, <code>review_ask</code>, <code>howto</code>, <code>update_prompt</code>, <code>update_tapped</code> — your answer about reminders, the store's review request, a "How to play" page, the update offer.</li>
 			</ul>
 			<p>
@@ -313,7 +322,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				information about the device.
 			</p>
 			<p>
-				A coin pack needs an account: coins live in your progress. "No ads" can also be bought without an account: the store keeps it, and Options › "Restore purchases" gives it back after a reinstall.
+				Coin packs and "No ads" can also be bought without an account. Without one, the coins stay in your phone's progress and are lost if you uninstall the game before signing in; "No ads" is kept by the store, and Options › "Restore purchases" brings it back after a reinstall. After a first purchase in a day, the game asks an adult to answer a short multiplication before the next one; the answer is checked on the phone (see §10).
 			</p>
 		</section>
 
@@ -349,6 +358,8 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li>the settings that stay with the phone: throwing hand, side of the pad, simple or expert throwing, game view, language, theme, sound, reminders;</li>
 				<li>your Unity session, if you are signed in;</li>
 				<li>your answer in the "Personalised advertising" window, the day you gave it and the version of the text, and, if you accepted, the ad modules' data (see §6);</li>
+				<li>your real-money payments of the last 24 hours (time, amount, currency), for the question asked to an adult before a new purchase; they never leave your phone;</li>
+				<li>a game against the computer that was cut off (a call, the game closed), to pick it up where it stopped;</li>
 				<li>the list of our own ads and their pictures, kept for next time (see §6).</li>
 			</ul>
 			<p>All of this disappears when you uninstall the app. From version 1.0.8 on, none of it is copied to your Android phone's Google backup or moved to a new phone; an older version could copy it there, and that backup could restore it when you installed the app again.</p>
@@ -375,6 +386,9 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<p>
 				<strong>Your line in the ranking</strong> (your name and your rating) is not erased by this button yet.
 				Write to us to have it removed: we erase it within one month.
+			</p>
+			<p>
+				<strong>Your lines in the shooting challenge rankings</strong> are reset to zero, without your name, and marked as deleted when you delete your account; these rankings start again from zero every day and every Monday anyway.
 			</p>
 			<p>
 				<strong>Without the app</strong>: write to
@@ -404,7 +418,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Google</strong> (Google Ireland Limited, Google LLC) — sign-in on Android and iPhone, Google Play (distribution, payment, rating form).</li>
 				<li><strong>Apple Inc.</strong> — "Sign in with Apple", tracking permission, App Store (distribution, payment, rating form).</li>
 				<li><strong>Hetzner Online GmbH</strong> (Germany) — hosting of our usage statistics server (see §7).</li>
-				<li><strong>Supabase, Inc.</strong> — hosting of our function that removes the "Sign in with Apple" access (see §11): it receives Apple's code, the app's identifier and the phone's IP address, and keeps nothing; and of the one that counts the players online, which receives the random number drawn at launch and the IP address, without keeping it.</li>
+				<li><strong>Supabase, Inc.</strong> — hosting of our function that removes the "Sign in with Apple" access (see §11): it receives Apple's code, the app's identifier and the phone's IP address, and keeps nothing; and of the one that counts the players online: it receives the number drawn at random at launch and the phone's IP address. It does not record that address, which it may keep in memory for a few minutes to block abuse; Supabase's technical logs keep it for a limited time, under its terms.</li>
 				<li><strong>GitHub, Inc.</strong> — hosting of our website, read for the update check (see §9) and for our own ads (see §6); GitHub logs the IP address of each visit for the security of its service.</li>
 			</ul>
 			<p>
@@ -420,12 +434,14 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Account and progress</strong> (Unity Authentication and Cloud Save): until you delete your account.</li>
 				<li><strong>Ranking</strong>: your rating and your name, until you have them removed (see §11).</li>
 				<li><strong>Online games</strong>: a public game leaves the list as soon as it starts or you close it; throws are not kept after the game.</li>
-				<li><strong>Players online right now</strong>: the random number is erased three minutes after the game went quiet.</li>
+				<li><strong>Players online right now</strong>: the random number is erased within minutes after the game stops.</li>
 				<li><strong>Usage statistics</strong>: kept <strong>24 months</strong> on our server, then erased; its backups, 14 days.</li>
 				<li><strong>Advertising data</strong>: according to the rules of Unity and ironSource.</li>
 				<li><strong>Your answer about ads</strong>: 182 days (6 months) on your phone, then the game asks again.</li>
 				<li><strong>Our own ads</strong>: their list and their pictures stay on your phone until our website replaces them or you uninstall the game.</li>
 				<li><strong>Purchases</strong>: the transaction numbers stay in your progress, until the account is deleted; Google and Apple keep their own records.</li>
+				<li><strong>Your payments of the last 24 hours</strong>: on your phone, erased after 24 hours.</li>
+				<li><strong>An interrupted game</strong>: on your phone, 7 days at most.</li>
 				<li><strong>On the phone</strong>: until you uninstall the app or delete the account.</li>
 			</ul>
 		</section>

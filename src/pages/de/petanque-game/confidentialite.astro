@@ -31,7 +31,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			Diese Erklärung betrifft <strong>die mobile App Pétanque Game</strong>
 			(<code>com.ludivenstudio.petanquegame</code>). Das Pétanque-Spiel der Website
 			(<a href="/jeux/petanque/">ludiven-studio.fr/jeux/petanque</a>) und die übrige Website haben eine
-			<a href="/confidentialite/">eigene Datenschutzerklärung</a>. Letzte Aktualisierung: 11. November 2026 (Version 1.0.8: unsere eigene Werbung, neues Fenster „Personalisierte Werbung“, keine Google-Datensicherung mehr auf Android).
+			<a href="/confidentialite/">eigene Datenschutzerklärung</a>. Letzte Aktualisierung: 17. November 2026 (Version 1.0.14: die Zahl der Spieler, die gerade online sind, die Schuss-Challenge und ihre Ranglisten, Münzen und Käufe ohne Konto; Version 1.0.8: unsere eigene Werbung, neues Fenster „Personalisierte Werbung“, keine Google-Datensicherung mehr auf Android).
 		</p>
 		<p class="updated">
 			Dies ist eine Höflichkeitsübersetzung. Bei Abweichungen gilt die
@@ -41,8 +41,8 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 		<div class="summary">
 			<p><strong>Das Wichtigste:</strong></p>
 			<ul>
-				<li>Gegen den Computer oder zu zweit an einem Handy spielst du <strong>ohne Konto</strong>, auch offline. Wenn das Handy Internet hat, verlassen es nur die Werbung, wenn du sie akzeptiert hast, anonyme Nutzungsstatistiken und ein paar Abfragen an unsere Website (die neueste Version des Spiels, unsere eigene Werbung) (siehe §2).</li>
-				<li>Für Münzen, Shop, Ligen und Online-Spiel brauchst du ein <strong>Google-Konto</strong> (Android oder iPhone) <strong>oder Apple-Konto</strong> (iPhone). Dein Spielstand wird dann bei <strong>Unity</strong> gespeichert, unserem Dienstleister, damit du ihn auf all deinen Handys wiederfindest.</li>
+				<li>Gegen den Computer oder zu zweit an einem Handy spielst du <strong>ohne Konto</strong>, auch offline. Wenn das Handy Internet hat, verlassen es nur die Werbung, wenn du sie akzeptiert hast, anonyme Nutzungsstatistiken, ein paar Abfragen an unsere Website (die neueste Version des Spiels, unsere eigene Werbung) und, einmal pro Minute während du spielst, ein Signal ohne Kennung, mit dem wir zählen, wie viele gerade spielen (siehe §2).</li>
+				<li>Für das Online-Spiel und die Ranglisten brauchst du ein <strong>Google-Konto</strong> (Android oder iPhone) <strong>oder Apple-Konto</strong> (iPhone). Münzen, Shop und Ligen funktionieren auch ohne Konto: Dein Spielstand bleibt dann auf deinem Handy. Mit einem Konto wird er bei <strong>Unity</strong>, unserem Dienstleister, gespeichert, damit du ihn auf all deinen Handys wiederfindest.</li>
 				<li><strong>Dein Spitzname ist öffentlich</strong>: in der Liste der öffentlichen Partien, bei deinem Gegner und in der Rangliste, zusammen mit deiner Wertung. Es gibt keinen Chat.</li>
 				<li>Werbung der Werbenetzwerke erscheint <strong>nur mit deiner Einwilligung</strong>, nach der das Spiel beim ersten Start fragt. Ohne sie spielst du ganz normal, ohne Werbung zwischen den Partien; nur Videos zu unseren anderen Spielen und Apps können laufen, wenn du eine Belohnung möchtest. Kein Weiterverkauf von Daten.</li>
 				<li>Du kannst jederzeit <strong>dein Konto löschen</strong>: Optionen › „Mein Konto löschen“ (<a href="#suppression">siehe §11</a>).</li>
@@ -73,6 +73,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li>die <strong>Werbung</strong>, wenn du sie akzeptiert hast (siehe §6);</li>
 				<li><strong>Nutzungsstatistiken</strong> ohne Kennung (siehe §7);</li>
 				<li>das Abrufen der <strong>Nummer der neuesten Version</strong> des Spiels auf unserer Website (siehe §9);</li>
+				<li>ein <strong>Anwesenheitssignal</strong>, einmal pro Minute, solange das Spiel geöffnet ist: eine bei jedem Start zufällig gezogene Nummer, ohne Konto und ohne Spielerkennung, um anzuzeigen, wie viele gerade spielen (siehe §5 und §12);</li>
 				<li>das Abrufen der Liste <strong>unserer eigenen Werbung</strong> auf unserer Website, bei jedem Start, dann von Bild und Video der Werbung, die gezeigt wird (siehe §6).</li>
 			</ul>
 			<p>
@@ -85,8 +86,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 		<section class="stack gap-2">
 			<h2>3. Dein Konto</h2>
 			<p>
-				Für Münzen, Shop, Ligen, Online-Spiel und Käufe brauchst du ein Konto. Das Spiel bietet es dir an, wenn
-				du es brauchst: Du meldest dich unter Android mit <strong>Google</strong> an, auf dem iPhone nach Wahl mit <strong>Apple</strong> („Mit Apple anmelden“) oder mit <strong>Google</strong>. Wir erhalten nie dein Passwort.
+				Für das Online-Spiel und die Ranglisten brauchst du ein Konto. Ohne Konto funktionieren Münzen, Shop, Herausforderungen, Ligen und Käufe auch und bleiben auf deinem Handy; das Spiel bietet dir ein Konto an, um deinen Spielstand zu sichern, nach deiner 3. und 15. Partie gegen den Computer oder wenn du eines brauchst: Du meldest dich unter Android mit <strong>Google</strong> an, auf dem iPhone nach Wahl mit <strong>Apple</strong> („Mit Apple anmelden“) oder mit <strong>Google</strong>. Wir erhalten nie dein Passwort.
 			</p>
 			<p>
 				Das Handy übergibt ein Anmelde-Token an <strong>Unity Authentication</strong>. Unity erstellt damit deine
@@ -107,7 +107,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<p>
 				Eine Kopie bleibt auf dem Handy, damit du offline spielen kannst; sie wird bei der nächsten Verbindung
 				hochgeladen. Haben Handy und Konto nicht denselben Spielstand, fragt dich das Spiel, welchen du behalten
-				willst. Wenn du dich abmeldest (Optionen › „Konto“), bleibt dein Spielstand in deinem Konto.
+				willst. Wenn du dich abmeldest (Optionen › „Konto“), bleibt dein Spielstand in deinem Konto. Bei deiner ersten Anmeldung geht der ohne Konto erspielte Spielstand auf dein Konto über, wenn dieses Handy noch keine Kopie davon hat. Geht die Sitzung deines Kontos verloren (etwa nach einem Update), behält das Spiel deinen Spielstand und bittet dich, dich erneut anzumelden.
 			</p>
 		</section>
 
@@ -124,6 +124,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Öffentliche Partie</strong>: Dein Spitzname, deine Wertung und das Format der Partie stehen in der Liste der öffentlichen Partien, bis ein Gegner beitritt. Eine private Partie mit einem Freund über ihren Code steht nicht darin.</li>
 				<li><strong>Während der Partie</strong> erhält dein Gegner deinen Spitznamen, deine Wertung, deine Figur, dein Trikot und deine Kugel, dann deine Würfe (ihre Geschwindigkeit und die Stelle, an der deine Hand die Kugel loslässt). Nach jedem Wurf sendet das Handy, das die Partie eröffnet hat, die Schiedsrichterentscheidung (Lage der Kugeln, Punktestand). Diese Nachrichten laufen über <strong>Unity Relay</strong>, das sie weiterleitet, ohne sie zu speichern.</li>
 				<li><strong>Rangliste</strong>: Jede öffentliche Partie im Tête-à-tête, die bis zum Ende gespielt wird, verändert deine Wertung (eine Elo-Wertung). Deine Wertung und dein Spitzname werden dann an die Rangliste <strong>Unity Leaderboards</strong> gesendet, die alle Spieler des Spiels ansehen können: die ersten 50, und jeder seine eigene Zeile. Partien mit einem Freund über einen Code und Teampartien zählen nicht.</li>
+				<li><strong>Schuss-Challenge</strong>: Wenn du ein Konto hast, gehen die Punktzahl jeder Serie (von 50) und dein Spitzname in die Tages- und die Wochenrangliste (<strong>Unity Leaderboards</strong>), die alle Spieler des Spiels sehen können. Ohne Konto bleiben deine Serien auf deinem Handy.</li>
 			</ul>
 			<p>
 				Es gibt <strong>keinen Chat, keine Nachrichten und keinen Sprachchat</strong>. Wenn ein Spitzname
@@ -170,8 +171,8 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 							<td>Unity (Relay); dein Gegner</td>
 						</tr>
 						<tr>
-							<td>Wertung und Spitzname</td>
-							<td>Die Online-Rangliste</td>
+							<td>Wertung, Punktzahl der Schuss-Challenge und Spitzname</td>
+							<td>Die Online-Rangliste und die Ranglisten der Schuss-Challenge</td>
 							<td>Vertragserfüllung</td>
 							<td>Unity (Leaderboards); die Spieler des Spiels</td>
 						</tr>
@@ -198,6 +199,12 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 							<td>Dir Videos zu unseren anderen Spielen und Apps zeigen (siehe §6)</td>
 							<td>Berechtigtes Interesse</td>
 							<td>GitHub, Hoster unserer Website</td>
+						</tr>
+						<tr>
+							<td>Eine bei jedem Spielstart zufällig gezogene Nummer, einmal pro Minute gesendet, solange das Spiel geöffnet ist, ohne Konto und ohne Spielerkennung</td>
+							<td>Anzeigen, wie viele gerade spielen</td>
+							<td>Berechtigtes Interesse</td>
+							<td>Unsere Funktion bei Supabase (siehe §12)</td>
 						</tr>
 						<tr>
 							<td>Nutzungsstatistiken, ohne Konto und ohne Kennung (siehe §7)</td>
@@ -271,18 +278,26 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				bestimmter Aktionen, mit einigen Angaben dazu:
 			</p>
 			<ul>
-				<li><code>app_open</code> — das Spiel startet (mit der Angabe, ob Werbung angezeigt werden kann oder nicht);</li>
-				<li><code>match_start</code> / <code>match_end</code> — eine Partie beginnt oder endet (Modus, Stufe, Ergebnis, Punktestand);</li>
+				<li><code>app_open</code> — das Spiel startet (mit der Angabe, ob Werbung angezeigt werden kann oder nicht, und seit wie vielen Tagen das Spiel auf diesem Handy ist, in Stufen);</li>
+				<li><code>match_start</code> / <code>match_end</code> — eine Partie beginnt oder endet (Modus, Stufe, Ergebnis, Punktestand; dein Münzstand und deine Anzahl Partien, in Stufen; Konto oder nicht);</li>
 				<li><code>cup_enter</code> / <code>cup_end</code> — ein Ligapokal beginnt oder endet (Liga, Format, erreichte Runde, Gewinn);</li>
 				<li><code>rated_end</code> — eine gewertete Partie endet (Ergebnis, Stufe der Wertung);</li>
 				<li><code>daily_bonus</code>, <code>challenge_claim</code> — ein Tagesbonus (Serie) oder eine Herausforderung (Münzen) wird abgeholt;</li>
-				<li><code>shop_buy</code>, <code>iap_buy</code> — ein Gegenstand wird mit Münzen gekauft (Gegenstand, Preis) oder mit Geld (Produkt);</li>
+				<li><code>shop_buy</code> — ein Gegenstand wird mit Münzen gekauft (Gegenstand, Preis);</li>
+				<li><code>iap_tap</code>, <code>iap_result</code>, <code>iap_gate</code> — du tippst ein kostenpflichtiges Produkt an, das Ergebnis des Kaufs (Produkt, Erfolg oder Grund des Fehlschlags, Testkauf oder nicht), die Antwort auf die Frage an einen Erwachsenen (richtig, falsch oder abgebrochen); nie ein Betrag;</li>
 				<li><code>ad_consent</code> — deine Antwort im Fenster „Personalisierte Werbung“ (ja oder nein);</li>
-				<li><code>ad_offer</code>, <code>ad_rewarded</code>, <code>ad_interstitial</code> — ein Video wird angeboten oder angesehen, eine Werbung wird angezeigt (Platzierung, Ergebnis);</li>
+				<li><code>ad_offer</code>, <code>ad_start</code>, <code>ad_rewarded</code>, <code>ad_interstitial</code> — ein Video wird angeboten oder angesehen, eine Werbung wird angezeigt (Platzierung, Format, Ergebnis, Video eines Netzwerks oder unseres);</li>
 				<li><code>house_ads_ask</code> — deine Antwort, wenn ein Video-Angebot fragt, ob du Werbung aktivieren möchtest (ja oder nein);</li>
 				<li><code>house_ad</code>, <code>house_ad_open</code> — ein Video zu unseren anderen Spielen und Apps läuft, oder du öffnest seine Seite mit „Entdecken“ (welches, Platzierung);</li>
 				<li><code>account_gate</code>, <code>sign_in</code>, <code>sign_out</code>, <code>account_delete</code> — das Konto wird verlangt, eine Anmeldung, eine Abmeldung oder eine Löschung findet statt (Google oder Apple, Erfolg);</li>
 				<li><code>ambience</code> — die in den Optionen gewählte „Stimmung“ (Ort, Einstellung des Dunkelmodus);</li>
+				<li><code>onboarding</code> — die ersten Schritte eines neuen Spielers, je einmal (Wurflektion, gewählter Spieler, Hand, „So wird gespielt“, erster Wurf, erste Partie und ihr Ergebnis), mit der Zeit seit dem ersten Öffnen, in Stufen;</li>
+				<li><code>shots_start</code>, <code>shots_end</code> — eine Serie der Schuss-Challenge beginnt oder endet (Punktzahl, Carreaux, Tagesbestwert oder nicht, Konto oder nicht, Anzahl Serien, in Stufen);</li>
+				<li><code>result_leave</code> — wie du den Ergebnisbildschirm verlässt (nochmal spielen, Menü, App verlassen);</li>
+				<li><code>coins_short</code> — dir fehlen Münzen (wo, wie viele, dein Münzstand, in Stufen);</li>
+				<li><code>resume</code> — du setzt eine unterbrochene Partie fort oder nicht;</li>
+				<li><code>save_offer</code>, <code>reconnect_offer</code> — das Spiel bietet ein Konto an, um deinen Spielstand zu sichern, oder eine erneute Anmeldung (Anzahl Partien in Stufen, online oder nicht);</li>
+				<li><code>online_invite</code> — deine Antwort auf die Einladung, online zu spielen;</li>
 				<li><code>reminders</code>, <code>review_ask</code>, <code>howto</code>, <code>update_prompt</code>, <code>update_tapped</code> — deine Antwort zu den Erinnerungen, die Bewertungsanfrage des Stores, eine Seite von „So wird gespielt“, das Angebot eines Updates.</li>
 			</ul>
 			<p>
@@ -313,7 +328,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				Kaufverlauf und technische Informationen über das Gerät übermitteln.
 			</p>
 			<p>
-				Für ein Münzpaket brauchst du ein Konto: Die Münzen liegen in deinem Spielstand. „Ohne Werbung“ kannst du auch ohne Konto kaufen: Der Store bewahrt es auf, und Optionen › „Käufe wiederherstellen“ gibt es dir nach einer Neuinstallation zurück.
+				Münzpakete und „Ohne Werbung“ kannst du auch ohne Konto kaufen. Ohne Konto bleiben die Münzen im Spielstand auf deinem Handy und gehen verloren, wenn du das Spiel vor einer Anmeldung deinstallierst; „Ohne Werbung“ bewahrt der Store auf, und Optionen › „Käufe wiederherstellen“ holt es nach einer Neuinstallation zurück. Nach einem ersten Kauf am selben Tag bittet das Spiel vor dem nächsten einen Erwachsenen, eine kleine Multiplikation zu lösen; die Antwort wird auf dem Handy geprüft (siehe §10).
 			</p>
 		</section>
 
@@ -350,6 +365,8 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li>die Einstellungen, die beim Handy bleiben: Wurfhand, Seite des Bretts, Würfe einfach oder Experte, Spielansicht, Sprache, Design, Ton, Erinnerungen;</li>
 				<li>deine Unity-Sitzung, wenn du angemeldet bist;</li>
 				<li>deine Antwort im Fenster „Personalisierte Werbung“, der Tag, an dem du sie gegeben hast, und die Version des Textes, und, wenn du akzeptiert hast, die Daten der Werbemodule (siehe §6);</li>
+				<li>deine Zahlungen mit echtem Geld der letzten 24 Stunden (Uhrzeit, Betrag, Währung), für die Frage an einen Erwachsenen vor einem neuen Kauf; sie verlassen dein Handy nie;</li>
+				<li>eine unterbrochene Partie gegen den Computer (ein Anruf, das Spiel geschlossen), um sie dort fortzusetzen, wo sie stand;</li>
 				<li>die Liste unserer eigenen Werbung und ihre Bilder, für das nächste Mal aufbewahrt (siehe §6).</li>
 			</ul>
 			<p>All das verschwindet, wenn du die App deinstallierst. Ab Version 1.0.8 wird nichts davon in die Google-Datensicherung deines Android-Handys kopiert oder auf ein neues Handy übertragen; eine ältere Version konnte es dorthin kopieren, und diese Sicherung konnte es bei einer Neuinstallation wiederherstellen.</p>
@@ -380,6 +397,9 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				Monats.
 			</p>
 			<p>
+				<strong>Deine Einträge in den Ranglisten der Schuss-Challenge</strong> werden beim Löschen deines Kontos auf null gesetzt, ohne Spitznamen, und als gelöscht markiert; diese Ranglisten beginnen ohnehin jeden Tag und jeden Montag wieder bei null.
+			</p>
+			<p>
 				<strong>Ohne die App</strong>: Schreib an
 				<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a> und gib deinen Spitznamen an,
 				die Art des Kontos (Google oder Apple) und, wenn du dich erinnerst, das Datum deiner letzten Partie. Wir
@@ -398,7 +418,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 		<section class="stack gap-2">
 			<h2>12. Empfänger und Übermittlungen außerhalb der Europäischen Union</h2>
 			<p>
-				Unsere einzigen eigenen Server sind der für die Nutzungsstatistiken (siehe §7) und eine Funktion, die beim Löschen deines Kontos den Zugriff über „Mit Apple anmelden“ entzieht (siehe §11). Deine Daten werden weder verkauft noch weitergegeben. Sie werden nur
+				Unsere einzigen eigenen Server sind der für die Nutzungsstatistiken (siehe §7), eine Funktion, die zählt, wie viele gerade online spielen (siehe §5), und eine Funktion, die beim Löschen deines Kontos den Zugriff über „Mit Apple anmelden“ entzieht (siehe §11). Deine Daten werden weder verkauft noch weitergegeben. Sie werden nur
 				von diesen Dienstleistern verarbeitet:
 			</p>
 			<ul>
@@ -407,7 +427,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Google</strong> (Google Ireland Limited, Google LLC) — Anmeldung unter Android und auf dem iPhone, Google Play (Vertrieb, Zahlung, Bewertungsfenster).</li>
 				<li><strong>Apple Inc.</strong> — „Mit Apple anmelden“, Tracking-Erlaubnis, App Store (Vertrieb, Zahlung, Bewertungsfenster).</li>
 				<li><strong>Hetzner Online GmbH</strong> (Deutschland) — Hosting unseres Servers für die Nutzungsstatistiken (siehe §7).</li>
-				<li><strong>Supabase, Inc.</strong> — Hosting unserer Funktion, die den Zugriff über „Mit Apple anmelden“ entzieht (siehe §11): Sie erhält den Code von Apple, die Kennung der App und die IP-Adresse des Handys und speichert nichts.</li>
+				<li><strong>Supabase, Inc.</strong> — Hosting unserer Funktion, die den Zugriff über „Mit Apple anmelden“ entzieht (siehe §11): Sie erhält den Code von Apple, die Kennung der App und die IP-Adresse des Handys und speichert nichts; sowie der Funktion, die zählt, wie viele online spielen: Sie erhält die beim Start zufällig gezogene Nummer und die IP-Adresse des Handys. Sie speichert diese Adresse nicht, kann sie aber einige Minuten im Arbeitsspeicher behalten, um Missbrauch zu verhindern; die technischen Protokolle von Supabase bewahren sie nach dessen Bedingungen für begrenzte Zeit auf.</li>
 				<li><strong>GitHub, Inc.</strong> — Hosting unserer Website, die für die Update-Prüfung (siehe §9) und für unsere eigene Werbung (siehe §6) gelesen wird; GitHub speichert die IP-Adresse jedes Aufrufs für die Sicherheit seines Dienstes.</li>
 			</ul>
 			<p>
@@ -424,11 +444,14 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Konto und Spielstand</strong> (Unity Authentication und Cloud Save): bis du dein Konto löschst.</li>
 				<li><strong>Rangliste</strong>: deine Wertung und dein Spitzname, bis du sie entfernen lässt (siehe §11).</li>
 				<li><strong>Online-Partien</strong>: Eine öffentliche Partie verschwindet aus der Liste, sobald sie beginnt oder du sie schließt; die Würfe werden nach der Partie nicht aufbewahrt.</li>
+				<li><strong>Gerade online</strong>: Die zufällige Nummer wird in den Minuten nach dem Beenden des Spiels gelöscht.</li>
 				<li><strong>Nutzungsstatistiken</strong>: <strong>24 Monate</strong> auf unserem Server gespeichert, dann gelöscht; seine Sicherungen 14 Tage.</li>
 				<li><strong>Werbedaten</strong>: nach den Regeln von Unity und ironSource.</li>
 				<li><strong>Deine Antwort zur Werbung</strong>: 182 Tage (6 Monate) auf deinem Handy, dann fragt das Spiel erneut.</li>
 				<li><strong>Unsere eigene Werbung</strong>: Ihre Liste und ihre Bilder bleiben auf deinem Handy, bis unsere Website sie ersetzt oder du das Spiel deinstallierst.</li>
 				<li><strong>Käufe</strong>: Die Transaktionsnummern bleiben in deinem Spielstand, bis das Konto gelöscht wird; Google und Apple bewahren ihre eigenen Belege auf.</li>
+				<li><strong>Deine Zahlungen der letzten 24 Stunden</strong>: auf deinem Handy, nach 24 Stunden gelöscht.</li>
+				<li><strong>Eine unterbrochene Partie</strong>: auf deinem Handy, höchstens 7 Tage.</li>
 				<li><strong>Auf dem Handy</strong>: bis zur Deinstallation oder bis zur Löschung des Kontos.</li>
 			</ul>
 		</section>
