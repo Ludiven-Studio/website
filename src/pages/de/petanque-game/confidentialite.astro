@@ -300,6 +300,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><code>ambience</code> — die in den Optionen gewählte „Stimmung“ (Ort, Einstellung des Dunkelmodus);</li>
 				<li><code>onboarding</code> — die ersten Schritte eines neuen Spielers, je einmal (Wurflektion, gewählter Spieler, Hand, „So wird gespielt“, erster Wurf, erste Partie und ihr Ergebnis), mit der Zeit seit dem ersten Öffnen, in Stufen;</li>
 				<li><code>shots_start</code>, <code>shots_end</code> — eine Serie der Schuss-Challenge beginnt oder endet (Punktzahl, Carreaux, Tagesbestwert oder nicht, Konto oder nicht, Anzahl Serien, in Stufen);</li>
+				<li><code>shots_prize</code> — du erhältst in einer Rangliste der Schuss-Challenge gewonnene Münzen (Tag oder Woche, Platz in Stufen, Münzen);</li>
 				<li><code>result_leave</code> — wie du den Ergebnisbildschirm verlässt (nochmal spielen, Menü, App verlassen);</li>
 				<li><code>coins_short</code> — dir fehlen Münzen (wo, wie viele, dein Münzstand, in Stufen);</li>
 				<li><code>resume</code> — du setzt eine unterbrochene Partie fort oder nicht;</li>
@@ -406,7 +407,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<p>
 				<strong>Deine Einträge in den Ranglisten der Schuss-Challenge</strong>: Wenn du dein Konto löschst, sendet das Spiel ihnen eine Punktzahl von null, ohne Spitznamen, als gelöscht markiert; da diese Ranglisten die beste Punktzahl behalten, kann dein Eintrag mit deinem Spitznamen sichtbar bleiben, bis sie zurückgesetzt werden (Mitternacht UTC für die Tagesrangliste, montags für die Wochenrangliste). Schreib uns, wenn er früher entfernt werden soll.
 			</p>
-			<p><strong>Deine von unserem Server festgehaltenen Gewinnplätze</strong> (siehe §13) werden mit deinem Konto gelöscht; klappt das nicht sofort, verschwinden sie nach 30 Tagen von selbst. Sie enthalten deinen Spitznamen nicht.</p>
+			<p><strong>Deine von unserem Server festgehaltenen Gewinnplätze</strong> (siehe §13) werden mit deinem Konto gelöscht; klappt das nicht sofort, verschwinden sie nach 30 Tagen von selbst. Löschst du dein Konto, bevor eine Rangliste endet, in der du auf einem Gewinnplatz stehst, kann dieser Platz noch erfasst werden, ohne Spitznamen, und bleibt höchstens 30 Tage. Sie enthalten deinen Spitznamen nicht.</p>
 			<p>
 				<strong>Ohne die App</strong>: Schreib an
 				<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a> und gib deinen Spitznamen an,
@@ -435,7 +436,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Google</strong> (Google Ireland Limited, Google LLC) — Anmeldung unter Android und auf dem iPhone, Google Play (Vertrieb, Zahlung, Bewertungsfenster).</li>
 				<li><strong>Apple Inc.</strong> — „Mit Apple anmelden“, Tracking-Erlaubnis, App Store (Vertrieb, Zahlung, Bewertungsfenster).</li>
 				<li><strong>Hetzner Online GmbH</strong> (Deutschland) — Hosting unseres Servers für die Nutzungsstatistiken (siehe §7).</li>
-				<li><strong>Supabase, Inc.</strong> — Hosting unserer Funktion, die den Zugriff über „Mit Apple anmelden“ entzieht (siehe §11): Sie erhält den Code von Apple, die Kennung der App und die IP-Adresse des Handys und speichert nichts; sowie der Funktion, die zählt, wie viele online spielen: Sie erhält die beim Start zufällig gezogene Nummer und die IP-Adresse des Handys. Sie speichert diese Adresse nicht, kann sie aber einige Minuten im Arbeitsspeicher behalten, um Missbrauch zu verhindern; die technischen Protokolle von Supabase bewahren sie nach dessen Bedingungen für begrenzte Zeit auf. Die Funktion für die Münzen der Schuss-Challenge erhält von Unity die IDs der Spieler auf den Gewinnplätzen und von deinem Telefon dein Unity-Anmeldetoken; sie speichert ID, Platz, Punktzahl und Münzen 30 Tage lang, ohne Spitznamen (siehe §13).</li>
+				<li><strong>Supabase, Inc.</strong> — Hosting unserer Funktion, die den Zugriff über „Mit Apple anmelden“ entzieht (siehe §11): Sie erhält den Code von Apple, die Kennung der App und die IP-Adresse des Handys und speichert nichts; sowie der Funktion, die zählt, wie viele online spielen: Sie erhält die beim Start zufällig gezogene Nummer und die IP-Adresse des Handys. Sie speichert diese Adresse nicht, kann sie aber einige Minuten im Arbeitsspeicher behalten, um Missbrauch zu verhindern; die technischen Protokolle von Supabase bewahren sie nach dessen Bedingungen für begrenzte Zeit auf. Die Funktion für die Münzen der Schuss-Challenge erhält von Unity die IDs der Spieler auf den Gewinnplätzen und von deinem Telefon dein Unity-Anmeldetoken und seine IP-Adresse, die sie nicht speichert (die technischen Protokolle von Supabase bewahren sie eine begrenzte Zeit auf); das Token speichert sie nicht; sie speichert ID, Platz, Punktzahl und Münzen 30 Tage lang, ohne Spitznamen (siehe §13).</li>
 				<li><strong>GitHub, Inc.</strong> — Hosting unserer Website, die für die Update-Prüfung (siehe §9) und für unsere eigene Werbung (siehe §6) gelesen wird; GitHub speichert die IP-Adresse jedes Aufrufs für die Sicherheit seines Dienstes.</li>
 			</ul>
 			<p>
@@ -452,7 +453,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Konto und Spielstand</strong> (Unity Authentication und Cloud Save): bis du dein Konto löschst.</li>
 				<li><strong>Rangliste</strong>: deine Wertung und dein Spitzname, bis du sie entfernen lässt (siehe §11).</li>
 				<li><strong>Ranglisten der Schuss-Challenge</strong>: deine beste Punktzahl und dein Spitzname, bis sie zurückgesetzt werden, jeden Tag um Mitternacht (UTC) und jeden Montag.</li>
-				<li><strong>Münzen der Schuss-Challenge</strong>: für jeden Gewinnplatz deine Unity-ID, die Rangliste, der Platz, die Punktzahl und die Münzen, ohne Spitznamen, 30 Tage auf unserem Server, danach gelöscht; früher, wenn du dein Konto löschst. Unity bewahrt keine Archive abgeschlossener Ranglisten auf.</li>
+				<li><strong>Münzen der Schuss-Challenge</strong>: für jeden Gewinnplatz deine Unity-ID, die Rangliste, der Platz, die Punktzahl und die Münzen, ohne Spitznamen, 30 Tage auf unserem Server, danach gelöscht; früher, wenn du dein Konto löschst (ein nach der Löschung erfasster Platz bleibt höchstens 30 Tage). Unity bewahrt keine Archive abgeschlossener Ranglisten auf.</li>
 				<li><strong>Online-Partien</strong>: Eine öffentliche Partie verschwindet aus der Liste, sobald sie beginnt oder du sie schließt; die Würfe werden nach der Partie nicht aufbewahrt.</li>
 				<li><strong>Gerade online</strong>: Die zufällige Nummer wird in den Minuten nach dem Beenden des Spiels gelöscht.</li>
 				<li><strong>Nutzungsstatistiken</strong>: <strong>24 Monate</strong> auf unserem Server gespeichert, dann gelöscht; seine Sicherungen 14 Tage.</li>

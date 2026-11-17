@@ -295,6 +295,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li><code>ambience</code> — l'«&nbsp;Ambiance&nbsp;» choisie dans Options (lieu, réglage du mode sombre)&nbsp;;</li>
 				<li><code>onboarding</code> — les premiers pas d'un nouveau joueur, une fois chacun (leçon de lancer, choix du joueur, main, «&nbsp;Comment jouer&nbsp;», premier lancer, première partie et son résultat), avec le temps écoulé depuis la première ouverture, en tranches&nbsp;;</li>
 				<li><code>shots_start</code>, <code>shots_end</code> — une série du défi de tir commence ou finit (score, carreaux, record du jour ou non, compte ou non, nombre de séries, en tranches)&nbsp;;</li>
+				<li><code>shots_prize</code> — tu reçois des pièces gagnées à un classement du défi de tir (jour ou semaine, place en tranches, pièces)&nbsp;;</li>
 				<li><code>result_leave</code> — comment tu quittes l'écran de résultat (rejouer, menu, jeu quitté)&nbsp;;</li>
 				<li><code>coins_short</code> — il te manque des pièces (où, combien, ton solde, en tranches)&nbsp;;</li>
 				<li><code>resume</code> — tu reprends ou non une partie coupée&nbsp;;</li>
@@ -400,7 +401,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			<p>
 				<strong>Tes lignes aux classements du défi de tir</strong>&nbsp;: quand tu supprimes ton compte, le jeu leur envoie un score nul, sans pseudo, marqué comme supprimé&nbsp;; ces classements gardant le meilleur score, ta ligne peut rester visible, avec ton pseudo, jusqu'à leur remise à zéro (minuit UTC pour celui du jour, le lundi pour celui de la semaine). Écris-nous pour la faire retirer plus tôt.
 			</p>
-			<p><strong>Tes places gagnantes relevées par notre serveur</strong> (voir §13) sont effacées avec ton compte&nbsp;; si ce n'est pas possible sur le moment, elles disparaissent d'elles-mêmes au bout de 30 jours. Elles ne portent pas ton pseudo.</p>
+			<p><strong>Tes places gagnantes relevées par notre serveur</strong> (voir §13) sont effacées avec ton compte&nbsp;; si ce n'est pas possible sur le moment, elles disparaissent d'elles-mêmes au bout de 30 jours. Si tu supprimes ton compte avant la fin d'un classement où tu es à une place gagnante, cette place peut encore être relevée, sans pseudo, et reste 30 jours au plus. Elles ne portent pas ton pseudo.</p>
 			<p>
 				<strong>Sans l'application</strong>&nbsp;: écris à
 				<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a> en indiquant ton pseudo, le
@@ -429,7 +430,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li><strong>Google</strong> (Google Ireland Limited, Google LLC) — connexion sur Android et sur iPhone, Google Play (distribution, paiement, fiche de notation).</li>
 				<li><strong>Apple Inc.</strong> — «&nbsp;Se connecter avec Apple&nbsp;», autorisation de suivi, App Store (distribution, paiement, fiche de notation).</li>
 				<li><strong>Hetzner Online GmbH</strong> (Allemagne) — hébergement de notre serveur de statistiques d'usage (voir §7).</li>
-				<li><strong>Supabase, Inc.</strong> — hébergement de notre fonction qui retire l'accès «&nbsp;Se connecter avec Apple&nbsp;» (voir §11)&nbsp;: elle reçoit le code d'Apple, l'identifiant de l'application et l'adresse IP du téléphone, et ne garde rien&nbsp;; et de celle qui compte les joueurs en ligne&nbsp;: elle reçoit le numéro tiré au hasard au lancement et l'adresse IP du téléphone. Elle n'enregistre pas cette adresse, qu'elle peut garder en mémoire quelques minutes pour bloquer les abus&nbsp;; les journaux techniques de Supabase la gardent un temps limité, selon ses conditions. Celle des pièces du défi de tir reçoit de Unity l'identifiant des joueurs aux places gagnantes et de ton téléphone ton jeton de connexion Unity&nbsp;; elle garde 30 jours l'identifiant, la place, le score et les pièces, sans pseudo (voir §13).</li>
+				<li><strong>Supabase, Inc.</strong> — hébergement de notre fonction qui retire l'accès «&nbsp;Se connecter avec Apple&nbsp;» (voir §11)&nbsp;: elle reçoit le code d'Apple, l'identifiant de l'application et l'adresse IP du téléphone, et ne garde rien&nbsp;; et de celle qui compte les joueurs en ligne&nbsp;: elle reçoit le numéro tiré au hasard au lancement et l'adresse IP du téléphone. Elle n'enregistre pas cette adresse, qu'elle peut garder en mémoire quelques minutes pour bloquer les abus&nbsp;; les journaux techniques de Supabase la gardent un temps limité, selon ses conditions. Celle des pièces du défi de tir reçoit de Unity l'identifiant des joueurs aux places gagnantes et de ton téléphone ton jeton de connexion Unity et son adresse IP, qu'elle n'enregistre pas (les journaux techniques de Supabase la gardent un temps limité)&nbsp;; elle ne garde pas le jeton&nbsp;; elle garde 30 jours l'identifiant, la place, le score et les pièces, sans pseudo (voir §13).</li>
 				<li><strong>GitHub, Inc.</strong> — hébergement de notre site, lu pour la vérification de mise à jour (voir §9) et pour nos propres publicités (voir §6)&nbsp;; GitHub enregistre l'adresse IP de chaque visite pour la sécurité de son service.</li>
 			</ul>
 			<p>
@@ -445,7 +446,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li><strong>Compte et progression</strong> (Unity Authentication et Cloud Save)&nbsp;: jusqu'à ce que tu supprimes ton compte.</li>
 				<li><strong>Classement</strong>&nbsp;: ta note et ton pseudo, jusqu'à ce que tu les fasses retirer (voir §11).</li>
 				<li><strong>Classements du défi de tir</strong>&nbsp;: ton meilleur score et ton pseudo, jusqu'à leur remise à zéro, chaque jour à minuit (UTC) et chaque lundi.</li>
-				<li><strong>Pièces du défi de tir</strong>&nbsp;: pour chaque place gagnante, ton identifiant Unity, le classement, la place, le score et les pièces, sans pseudo, 30 jours sur notre serveur, puis effacés&nbsp;; plus tôt si tu supprimes ton compte. Unity ne garde aucune archive des classements terminés.</li>
+				<li><strong>Pièces du défi de tir</strong>&nbsp;: pour chaque place gagnante, ton identifiant Unity, le classement, la place, le score et les pièces, sans pseudo, 30 jours sur notre serveur, puis effacés&nbsp;; plus tôt si tu supprimes ton compte (une place relevée après la suppression reste 30 jours au plus). Unity ne garde aucune archive des classements terminés.</li>
 				<li><strong>Parties en ligne</strong>&nbsp;: une partie publique quitte la liste dès qu'elle commence ou que tu la fermes&nbsp;; les lancers ne sont pas gardés après la partie.</li>
 				<li><strong>Joueurs en ligne en ce moment</strong>&nbsp;: le numéro tiré au hasard est effacé dans les minutes qui suivent l'arrêt du jeu.</li>
 				<li><strong>Statistiques d'usage</strong>&nbsp;: gardées <strong>24 mois</strong> sur notre serveur, puis effacées&nbsp;; ses sauvegardes, 14 jours.</li>

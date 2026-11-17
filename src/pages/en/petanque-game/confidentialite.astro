@@ -295,6 +295,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><code>ambience</code> — the "Look" chosen in Options (place, dark mode setting);</li>
 				<li><code>onboarding</code> — a new player's first steps, once each (throwing lesson, player chosen, hand, "How to play", first throw, first game and its result), with the time since the app first opened, in bands;</li>
 				<li><code>shots_start</code>, <code>shots_end</code> — a shooting challenge series starts or ends (score, carreaux, day's best or not, account or not, number of series, in bands);</li>
+				<li><code>shots_prize</code> — you receive coins won in a shooting challenge ranking (day or week, place in bands, coins);</li>
 				<li><code>result_leave</code> — how you leave the result screen (play again, menu, app left);</li>
 				<li><code>coins_short</code> — you are short of coins (where, how many, your balance, in bands);</li>
 				<li><code>resume</code> — you resume an interrupted game or not;</li>
@@ -396,7 +397,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<p>
 				<strong>Your lines in the shooting challenge rankings</strong>: when you delete your account, the game sends them a zero score, without your name, marked as deleted; as these rankings keep the best score, your line may stay visible, with your name, until they reset (midnight UTC for the day's, Monday for the week's). Write to us to have it removed sooner.
 			</p>
-			<p><strong>Your winning places kept by our server</strong> (see §13) are deleted with your account; if that fails at the time, they go by themselves after 30 days. They do not carry your name.</p>
+			<p><strong>Your winning places kept by our server</strong> (see §13) are deleted with your account; if that fails at the time, they go by themselves after 30 days. If you delete your account before a ranking ends while you hold a winning place, that place may still be recorded, without your name, and is kept 30 days at most. They do not carry your name.</p>
 			<p>
 				<strong>Without the app</strong>: write to
 				<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a> giving your name, the type of
@@ -425,7 +426,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Google</strong> (Google Ireland Limited, Google LLC) — sign-in on Android and iPhone, Google Play (distribution, payment, rating form).</li>
 				<li><strong>Apple Inc.</strong> — "Sign in with Apple", tracking permission, App Store (distribution, payment, rating form).</li>
 				<li><strong>Hetzner Online GmbH</strong> (Germany) — hosting of our usage statistics server (see §7).</li>
-				<li><strong>Supabase, Inc.</strong> — hosting of our function that removes the "Sign in with Apple" access (see §11): it receives Apple's code, the app's identifier and the phone's IP address, and keeps nothing; and of the one that counts the players online: it receives the number drawn at random at launch and the phone's IP address. It does not record that address, which it may keep in memory for a few minutes to block abuse; Supabase's technical logs keep it for a limited time, under its terms. The shooting challenge coins function receives from Unity the ids of the players in the winning places and from your phone your Unity sign-in token; it keeps the id, place, score and coins for 30 days, without a name (see §13).</li>
+				<li><strong>Supabase, Inc.</strong> — hosting of our function that removes the "Sign in with Apple" access (see §11): it receives Apple's code, the app's identifier and the phone's IP address, and keeps nothing; and of the one that counts the players online: it receives the number drawn at random at launch and the phone's IP address. It does not record that address, which it may keep in memory for a few minutes to block abuse; Supabase's technical logs keep it for a limited time, under its terms. The shooting challenge coins function receives from Unity the ids of the players in the winning places and from your phone your Unity sign-in token and its IP address, which it does not record (Supabase's technical logs keep it for a limited time); it does not keep the token; it keeps the id, place, score and coins for 30 days, without a name (see §13).</li>
 				<li><strong>GitHub, Inc.</strong> — hosting of our website, read for the update check (see §9) and for our own ads (see §6); GitHub logs the IP address of each visit for the security of its service.</li>
 			</ul>
 			<p>
@@ -441,7 +442,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Account and progress</strong> (Unity Authentication and Cloud Save): until you delete your account.</li>
 				<li><strong>Ranking</strong>: your rating and your name, until you have them removed (see §11).</li>
 				<li><strong>Shooting challenge rankings</strong>: your best score and your name, until they reset, every day at midnight (UTC) and every Monday.</li>
-				<li><strong>Shooting challenge coins</strong>: for each winning place, your Unity id, the ranking, the place, the score and the coins, without your name, 30 days on our server, then deleted; sooner if you delete your account. Unity keeps no archive of finished rankings.</li>
+				<li><strong>Shooting challenge coins</strong>: for each winning place, your Unity id, the ranking, the place, the score and the coins, without your name, 30 days on our server, then deleted; sooner if you delete your account (a place recorded after the deletion is kept 30 days at most). Unity keeps no archive of finished rankings.</li>
 				<li><strong>Online games</strong>: a public game leaves the list as soon as it starts or you close it; throws are not kept after the game.</li>
 				<li><strong>Players online right now</strong>: the random number is erased within minutes after the game stops.</li>
 				<li><strong>Usage statistics</strong>: kept <strong>24 months</strong> on our server, then erased; its backups, 14 days.</li>

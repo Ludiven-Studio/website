@@ -300,6 +300,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><code>ambience</code> — l'«Atmosfera» scelta nelle Opzioni (luogo, impostazione della modalità scura);</li>
 				<li><code>onboarding</code> — i primi passi di un nuovo giocatore, una volta ciascuno (lezione di lancio, giocatore scelto, mano, «Come si gioca», primo lancio, prima partita e il suo esito), con il tempo dalla prima apertura, per fasce;</li>
 				<li><code>shots_start</code>, <code>shots_end</code> — una serie della sfida di bocciata inizia o finisce (punteggio, carreaux, record del giorno o no, account o no, numero di serie, per fasce);</li>
+				<li><code>shots_prize</code> — ricevi monete vinte in una classifica della sfida di bocciata (giorno o settimana, posto per fasce, monete);</li>
 				<li><code>result_leave</code> — come lasci la schermata del risultato (rigioca, menu, gioco chiuso);</li>
 				<li><code>coins_short</code> — ti mancano monete (dove, quante, il tuo saldo, per fasce);</li>
 				<li><code>resume</code> — riprendi o no una partita interrotta;</li>
@@ -405,7 +406,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<p>
 				<strong>Le tue righe nelle classifiche della sfida di bocciata</strong>: quando elimini il tuo account, il gioco invia loro un punteggio zero, senza nickname, segnato come eliminato; poiché queste classifiche tengono il punteggio migliore, la tua riga può restare visibile, con il tuo nickname, fino al loro azzeramento (mezzanotte UTC per quella del giorno, il lunedì per quella della settimana). Scrivici per farla rimuovere prima.
 			</p>
-			<p><strong>I tuoi posti premiati conservati dal nostro server</strong> (vedi §13) vengono cancellati con il tuo account; se non è possibile sul momento, spariscono da soli dopo 30 giorni. Non contengono il tuo nickname.</p>
+			<p><strong>I tuoi posti premiati conservati dal nostro server</strong> (vedi §13) vengono cancellati con il tuo account; se non è possibile sul momento, spariscono da soli dopo 30 giorni. Se elimini il tuo account prima della fine di una classifica in cui occupi un posto premiato, quel posto può ancora essere registrato, senza nickname, e resta al massimo 30 giorni. Non contengono il tuo nickname.</p>
 			<p>
 				<strong>Senza l'applicazione</strong>: scrivi a
 				<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a> indicando il tuo nickname, il
@@ -434,7 +435,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Google</strong> (Google Ireland Limited, Google LLC) — accesso su Android e su iPhone, Google Play (distribuzione, pagamento, scheda di valutazione).</li>
 				<li><strong>Apple Inc.</strong> — «Accedi con Apple», autorizzazione al tracciamento, App Store (distribuzione, pagamento, scheda di valutazione).</li>
 				<li><strong>Hetzner Online GmbH</strong> (Germania) — hosting del nostro server per le statistiche d'uso (vedi §7).</li>
-				<li><strong>Supabase, Inc.</strong> — hosting della nostra funzione che revoca l'accesso «Accedi con Apple» (vedi §11): riceve il codice di Apple, l'identificativo dell'app e l'indirizzo IP del telefono, e non conserva nulla; e di quella che conta i giocatori collegati: riceve il numero estratto a caso all'avvio e l'indirizzo IP del telefono. Non registra questo indirizzo, che può tenere in memoria per qualche minuto per bloccare gli abusi; i log tecnici di Supabase lo conservano per un tempo limitato, secondo le sue condizioni. Quella delle monete della sfida di bocciata riceve da Unity l'ID dei giocatori nei posti premiati e dal tuo telefono il tuo token di accesso Unity; conserva per 30 giorni ID, posto, punteggio e monete, senza nickname (vedi §13).</li>
+				<li><strong>Supabase, Inc.</strong> — hosting della nostra funzione che revoca l'accesso «Accedi con Apple» (vedi §11): riceve il codice di Apple, l'identificativo dell'app e l'indirizzo IP del telefono, e non conserva nulla; e di quella che conta i giocatori collegati: riceve il numero estratto a caso all'avvio e l'indirizzo IP del telefono. Non registra questo indirizzo, che può tenere in memoria per qualche minuto per bloccare gli abusi; i log tecnici di Supabase lo conservano per un tempo limitato, secondo le sue condizioni. Quella delle monete della sfida di bocciata riceve da Unity l'ID dei giocatori nei posti premiati e dal tuo telefono il tuo token di accesso Unity e il suo indirizzo IP, che non registra (i log tecnici di Supabase lo conservano per un tempo limitato); non conserva il token; conserva per 30 giorni ID, posto, punteggio e monete, senza nickname (vedi §13).</li>
 				<li><strong>GitHub, Inc.</strong> — hosting del nostro sito, letto per il controllo degli aggiornamenti (vedi §9) e per le nostre pubblicità (vedi §6); GitHub registra l'indirizzo IP di ogni visita per la sicurezza del suo servizio.</li>
 			</ul>
 			<p>
@@ -450,7 +451,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Account e progressi</strong> (Unity Authentication e Cloud Save): finché non elimini il tuo account.</li>
 				<li><strong>Classifica</strong>: il tuo punteggio e il tuo nickname, finché non li fai rimuovere (vedi §11).</li>
 				<li><strong>Classifiche della sfida di bocciata</strong>: il tuo punteggio migliore e il tuo nickname, fino al loro azzeramento, ogni giorno a mezzanotte (UTC) e ogni lunedì.</li>
-				<li><strong>Monete della sfida di bocciata</strong>: per ogni posto premiato, il tuo ID Unity, la classifica, il posto, il punteggio e le monete, senza nickname, 30 giorni sul nostro server, poi cancellati; prima se elimini il tuo account. Unity non conserva archivi delle classifiche concluse.</li>
+				<li><strong>Monete della sfida di bocciata</strong>: per ogni posto premiato, il tuo ID Unity, la classifica, il posto, il punteggio e le monete, senza nickname, 30 giorni sul nostro server, poi cancellati; prima se elimini il tuo account (un posto registrato dopo l'eliminazione resta al massimo 30 giorni). Unity non conserva archivi delle classifiche concluse.</li>
 				<li><strong>Partite online</strong>: una partita pubblica esce dall'elenco appena inizia o appena la chiudi; i lanci non vengono conservati dopo la partita.</li>
 				<li><strong>Giocatori collegati in questo momento</strong>: il numero estratto a caso viene cancellato nei minuti successivi alla chiusura del gioco.</li>
 				<li><strong>Statistiche d'uso</strong>: conservate <strong>24 mesi</strong> sul nostro server, poi cancellate; i suoi backup, 14 giorni.</li>

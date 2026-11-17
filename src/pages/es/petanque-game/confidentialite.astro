@@ -297,6 +297,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><code>ambience</code> — el «Ambiente» elegido en Opciones (lugar, ajuste del modo oscuro);</li>
 				<li><code>onboarding</code> — los primeros pasos de un jugador nuevo, una vez cada uno (lección de lanzamiento, jugador elegido, mano, «Cómo se juega», primer lanzamiento, primera partida y su resultado), con el tiempo desde la primera apertura, por tramos;</li>
 				<li><code>shots_start</code>, <code>shots_end</code> — una serie del desafío de tiro empieza o termina (puntuación, carreaux, récord del día o no, cuenta o no, número de series, por tramos);</li>
+				<li><code>shots_prize</code> — recibes monedas ganadas en una clasificación del desafío de tiro (día o semana, puesto por tramos, monedas);</li>
 				<li><code>result_leave</code> — cómo sales de la pantalla de resultado (volver a jugar, menú, juego cerrado);</li>
 				<li><code>coins_short</code> — te faltan monedas (dónde, cuántas, tu saldo, por tramos);</li>
 				<li><code>resume</code> — retomas o no una partida interrumpida;</li>
@@ -401,7 +402,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<p>
 				<strong>Tus líneas en las clasificaciones del desafío de tiro</strong>: cuando eliminas tu cuenta, el juego les envía una puntuación de cero, sin apodo, marcada como eliminada; como esas clasificaciones guardan la mejor puntuación, tu línea puede seguir visible, con tu apodo, hasta que se reinicien (medianoche UTC la del día, el lunes la de la semana). Escríbenos para que la retiremos antes.
 			</p>
-			<p><strong>Tus puestos premiados guardados por nuestro servidor</strong> (ver §13) se borran con tu cuenta; si no es posible en ese momento, desaparecen solos a los 30 días. No llevan tu apodo.</p>
+			<p><strong>Tus puestos premiados guardados por nuestro servidor</strong> (ver §13) se borran con tu cuenta; si no es posible en ese momento, desaparecen solos a los 30 días. Si eliminas tu cuenta antes de que termine una clasificación en la que ocupas un puesto premiado, ese puesto aún puede registrarse, sin apodo, y se guarda 30 días como máximo. No llevan tu apodo.</p>
 			<p>
 				<strong>Sin la aplicación</strong>: escribe a
 				<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a> indicando tu apodo, el tipo
@@ -429,7 +430,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Google</strong> (Google Ireland Limited, Google LLC) — inicio de sesión en Android y en iPhone, Google Play (distribución, pago, ventana de valoración).</li>
 				<li><strong>Apple Inc.</strong> — «Iniciar sesión con Apple», permiso de seguimiento, App Store (distribución, pago, ventana de valoración).</li>
 				<li><strong>Hetzner Online GmbH</strong> (Alemania) — alojamiento de nuestro servidor de estadísticas de uso (ver §7).</li>
-				<li><strong>Supabase, Inc.</strong> — alojamiento de nuestra función que retira el acceso «Iniciar sesión con Apple» (ver §11): recibe el código de Apple, el identificador de la aplicación y la dirección IP del teléfono, y no guarda nada; y de la que cuenta los jugadores conectados: recibe el número sacado al azar al iniciar y la dirección IP del teléfono. No registra esa dirección, que puede guardar en memoria unos minutos para bloquear abusos; los registros técnicos de Supabase la guardan durante un tiempo limitado, según sus condiciones. La de las monedas del desafío de tiro recibe de Unity el identificador de los jugadores en los puestos premiados y de tu teléfono tu token de sesión de Unity; guarda 30 días el identificador, el puesto, la puntuación y las monedas, sin apodo (ver §13).</li>
+				<li><strong>Supabase, Inc.</strong> — alojamiento de nuestra función que retira el acceso «Iniciar sesión con Apple» (ver §11): recibe el código de Apple, el identificador de la aplicación y la dirección IP del teléfono, y no guarda nada; y de la que cuenta los jugadores conectados: recibe el número sacado al azar al iniciar y la dirección IP del teléfono. No registra esa dirección, que puede guardar en memoria unos minutos para bloquear abusos; los registros técnicos de Supabase la guardan durante un tiempo limitado, según sus condiciones. La de las monedas del desafío de tiro recibe de Unity el identificador de los jugadores en los puestos premiados y de tu teléfono tu token de sesión de Unity y su dirección IP, que no registra (los registros técnicos de Supabase la guardan un tiempo limitado); no guarda el token; guarda 30 días el identificador, el puesto, la puntuación y las monedas, sin apodo (ver §13).</li>
 				<li><strong>GitHub, Inc.</strong> — alojamiento de nuestro sitio web, consultado para comprobar si hay actualizaciones (ver §9) y para nuestros propios anuncios (ver §6); GitHub registra la dirección IP de cada visita para la seguridad de su servicio.</li>
 			</ul>
 			<p>
@@ -445,7 +446,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Cuenta y progreso</strong> (Unity Authentication y Cloud Save): hasta que elimines tu cuenta.</li>
 				<li><strong>Clasificación</strong>: tu puntuación y tu apodo, hasta que pidas que se retiren (ver §11).</li>
 				<li><strong>Clasificaciones del desafío de tiro</strong>: tu mejor puntuación y tu apodo, hasta que se reinician, cada día a medianoche (UTC) y cada lunes.</li>
-				<li><strong>Monedas del desafío de tiro</strong>: por cada puesto premiado, tu identificador Unity, la clasificación, el puesto, la puntuación y las monedas, sin apodo, 30 días en nuestro servidor, y después se borran; antes si eliminas tu cuenta. Unity no guarda ningún archivo de las clasificaciones terminadas.</li>
+				<li><strong>Monedas del desafío de tiro</strong>: por cada puesto premiado, tu identificador Unity, la clasificación, el puesto, la puntuación y las monedas, sin apodo, 30 días en nuestro servidor, y después se borran; antes si eliminas tu cuenta (un puesto registrado después de la eliminación se guarda 30 días como máximo). Unity no guarda ningún archivo de las clasificaciones terminadas.</li>
 				<li><strong>Partidas en línea</strong>: una partida pública sale de la lista en cuanto empieza o la cierras; los lanzamientos no se guardan después de la partida.</li>
 				<li><strong>Jugadores conectados en este momento</strong>: el número sacado al azar se borra en los minutos siguientes a que el juego se detenga.</li>
 				<li><strong>Estadísticas de uso</strong>: se guardan <strong>24 meses</strong> en nuestro servidor y luego se borran; sus copias de seguridad, 14 días.</li>
