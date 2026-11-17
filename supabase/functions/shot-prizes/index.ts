@@ -9,6 +9,7 @@
 // POST { action: 'snapshot', day: 'YYYY-MM-DD' }  header x-cron-key   -> { kept, closed }
 // POST { action: 'mine' }                         header x-unity-token -> { prizes: [{ board, period, rank, score, coins }] }
 // POST { action: 'forget' }                       header x-unity-token -> { ok }
+// POST { action: 'check' }                        header x-cron-key   -> lines read from Unity, nothing written
 //
 // Deploy:  supabase functions deploy shot-prizes --no-verify-jwt   (the game holds no Supabase session)
 // Table:   migrations/20261118120000_shot_prizes.sql (shot_prizes, shot_prizes_closed, the cron jobs)
@@ -18,7 +19,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2.117.0';
 import { createRemoteJWKSet, jwtVerify } from 'jsr:@panva/jose@6.1.0';
-import { closing, paidPlaces, rowsFrom, SPARE_LINES, type UnityScore } from '../_shared/shotPrizes.ts';
+import { closing, DAY_BOARD, paidPlaces, rowsFrom, SPARE_LINES, type UnityScore, WEEK_BOARD } from '../_shared/shotPrizes.ts';
 
 const CORS = {
 	'Access-Control-Allow-Origin': '*',
@@ -122,9 +123,13 @@ Deno.serve(async (req) => {
 	const action = String(body.action ?? '');
 
 	try {
-		if (action === 'snapshot') {
+		if (action === 'snapshot' || action === 'check') {
 			if (!sameSecret(req.headers.get('x-cron-key') ?? '', env('SHOT_PRIZES_CRON_KEY'))) return json({ error: 'forbidden' }, 403);
-			return await snapshot(String(body.day ?? ''));
+			if (action === 'snapshot') return await snapshot(String(body.day ?? ''));
+			// The snapshot's reading without writing or closing anything: a deploy checks Unity answers mid-day.
+			const day = await topScores(DAY_BOARD, paidPlaces(false) + SPARE_LINES);
+			const week = await topScores(WEEK_BOARD, paidPlaces(true) + SPARE_LINES);
+			return json({ day: day.length, week: week.length, dayPaid: rowsFrom(day, DAY_BOARD, false, 'check').length, weekPaid: rowsFrom(week, WEEK_BOARD, true, 'check').length });
 		}
 		if (action !== 'mine' && action !== 'forget') return json({ error: 'unknown action' }, 400);
 		const player = await playerOf(req.headers.get('x-unity-token') ?? '');
