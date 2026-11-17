@@ -19,11 +19,11 @@ export interface Limits {
 	/** New sessions one IP may bring in a window: a club's wifi or a carrier's NAT puts many phones behind one. */
 	sessionsPerIp: number;
 	sessionWindowMs: number;
-	/** Beats one IP may send a minute, its sessions together (a phone beats once a minute). */
+	/** Beats one IP may send a minute, its sessions together (a phone beats once a minute, every 15 s while it looks for an opponent). */
 	beatsPerMinute: number;
 }
 
-export const LIMITS: Limits = { sessionsPerIp: 20, sessionWindowMs: 10 * 60_000, beatsPerMinute: 60 };
+export const LIMITS: Limits = { sessionsPerIp: 20, sessionWindowMs: 10 * 60_000, beatsPerMinute: 120 };
 
 /**
  * Per-IP limits in memory: what this function's instance has heard in the last minutes, nothing written.
