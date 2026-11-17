@@ -1,13 +1,14 @@
 // shot-prizes' rules, apart so they are tested without a database or Unity (shotPrizes_test.ts).
-// Pétanque Game's shooting challenge pays the best places of its Unity Leaderboards rankings: the day's
-// best ten, the week's best fifty. The same table as the game's ShotChallenge.DayPrizes / WeekPrizes.
+// Pétanque Game's shooting challenge pays the best places of its Unity Leaderboards rankings: the day's and the
+// week's first three (owner's call, 2026-11-17: few players yet). The same table as the game's
+// ShotChallenge.DayPrizes / WeekPrizes.
 
 export const DAY_BOARD = 'shots_day';
 export const WEEK_BOARD = 'shots_week';
 
 /** (last rank, coins), best first. */
-export const DAY_PRIZES: readonly [number, number][] = [[1, 300], [3, 150], [10, 75]];
-export const WEEK_PRIZES: readonly [number, number][] = [[1, 1500], [3, 800], [10, 300], [50, 100]];
+export const DAY_PRIZES: readonly [number, number][] = [[1, 300], [3, 150]];
+export const WEEK_PRIZES: readonly [number, number][] = [[1, 1500], [3, 800]];
 
 /** Rows older than this go (pg_cron's own purge, apart from the snapshots): the game claims within days. */
 export const KEEP_DAYS = 30;
