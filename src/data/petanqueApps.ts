@@ -30,6 +30,8 @@ export interface AppCopy
 	soonShort?: string;
 	/** What each store visual shows, in `screens` order (the Scanner's are decorative). */
 	screensAlt?: string[];
+	/** What the latest version brings, shown first under the hero. */
+	news?: { title: string; intro?: string; items: { title: string; body: string }[] };
 }
 
 export interface AppDownloadCopy extends Optional<scanner.DownloadCopy, 'videoTitle'> {

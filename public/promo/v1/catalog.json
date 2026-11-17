@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated": "2026-11-14T07:59:00Z",
+  "updated": "2026-11-17T14:45:36Z",
   "rotationSeconds": 30,
   "defaultLanguage": "fr",
   "entries": [
@@ -54,11 +54,11 @@
         "it": "Pétanque Game"
       },
       "text": {
-        "fr": "La pétanque en 3D, en ligne ou à deux",
-        "en": "Pétanque in 3D, online or with a friend",
-        "es": "La petanca en 3D, en línea o entre dos",
-        "de": "Boule in 3D, online oder zu zweit",
-        "it": "La pétanque in 3D, online o in due"
+        "fr": "Pétanque en 3D et défi de tir du jour",
+        "en": "3D pétanque: today's shooting challenge",
+        "es": "Petanca en 3D y desafío de tiro del día",
+        "de": "Boule in 3D: Schuss-Challenge des Tages",
+        "it": "Bocce 3D e sfida di bocciata del giorno"
       },
       "image": "img/petanque-game.png",
       "clips": {
