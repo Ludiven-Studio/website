@@ -2,37 +2,39 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 
 // Unlisted: noindex, out of the sitemap and of the offline precache (BaseLayout, astro.config.mjs's /beta- rules).
-// The next version, built from DragonsGemsSwipe's main (14318bc) as com.ludivenstudio.dragonsgems.beta
+// The next version, built from DragonsGemsSwipe's main (3c989b9) as com.ludivenstudio.dragonsgems.beta
 // (Profile_Android_Beta, APP_BETA), signed with the dev key, ARM64 only, on a prerelease of this repo.
 const APK = {
-	url: 'https://github.com/Ludiven-Studio/website/releases/download/dragons-gems-beta/dragonsgems-beta-v1.1.4.apk',
-	version: '1.1.4',
-	code: 101004,
-	size: 76551071,
-	sha256: '1959c79bff281fd11b84e22dfddd3ca52d75206a37622e7304a359407da618f8',
-	commit: 'd450cda',
+	url: 'https://github.com/Ludiven-Studio/website/releases/download/dragons-gems-beta/dragonsgems-beta-v1.1.5.apk',
+	version: '1.1.5',
+	code: 101005,
+	size: 76560879,
+	sha256: '8e24cf261b95ed4a2e4486f4e358b5056e4c2f30230ef2be5d69b63b7cdd5687',
+	commit: '3c989b9',
 };
 ---
 
 <BaseLayout
-	title="Dragon Gems Swipe — bêta 1.1.4 | Ludiven Studio"
-	description="La version 1.1.4 de Dragon Gems Swipe, à essayer avant son envoi aux stores."
+	title="Dragon Gems Swipe — bêta 1.1.5 | Ludiven Studio"
+	description="La version 1.1.5 de Dragon Gems Swipe, à essayer avant son envoi aux stores."
 	noindex
 >
 	<div class="wrapper beta-page stack gap-6">
 		<header class="stack gap-2">
-			<h1>Dragon Gems Swipe — bêta 1.1.4</h1>
+			<h1>Dragon Gems Swipe — bêta 1.1.5</h1>
 			<p class="lead">La prochaine version, à essayer avant son envoi aux stores. Elle s'installe à côté de l'appli du Play Store, sous le nom « Dragon Gems β », avec sa propre partie.</p>
 		</header>
 
 		<section class="card stack gap-3">
 			<h2>Quoi de neuf à tester</h2>
 			<ul>
+				<li><strong>Glisser et tenir</strong> : les blocs se penchent d'un quart de case, dans une seule direction à la fois. Un rond apparaît là où ton doigt a touché : ramène le doigt dedans pour annuler le coup, rien ne bouge.</li>
+				<li><strong>Le souffle de Perle</strong> : avant la fusion, Perle souffle un nuage de glace qui cristallise tout le plateau, puis la glace craque.</li>
 				<li><strong>Tout débloquer (test)</strong>, dans Réglages › Jeu : ouvre tous les niveaux de la carte, des profondeurs et de la nuit, pour tout essayer tout de suite. Tu joues alors une copie de ta partie ; ta vraie partie revient telle quelle quand tu l'éteins.</li>
 				<li><strong>Les clés</strong> (dès le 2e pays) : un coffre cadenassé ne s'ouvre qu'avec une clé. Fais exploser des gemmes à côté d'une clé pour la ramasser : elle file dans ta réserve, puis va tourner dans le cadenas. Bijou montre comment la première fois.</li>
 				<li><strong>Les coffres de couleur</strong> (à partir du niveau 61) : ils ne s'ouvrent qu'avec une explosion de leur couleur juste à côté. Les boules de feu, les comètes et les bonus ouvrent tous les coffres.</li>
 				<li><strong>La 3e étoile</strong> se gagne plus rarement : elle récompense une vraie bonne partie.</li>
-				<li><strong>Garder le doigt appuyé</strong> à la fin d'un glissement montre en doré les coffres que le coup ouvre, et chaque gemme qui va entrer en petit dans la case où elle arrivera.</li>
+				<li><strong>Garder le doigt appuyé</strong> à la fin d'un glissement montre en doré les coffres que le coup ouvre, et les gemmes qui vont entrer, juste au bord de la grille, du côté où elles arrivent.</li>
 				<li><strong>L'Ouvre-tout</strong> : le bonus clé change de nom. Il ouvre n'importe quel coffre, même cadenassé, gelé ou de couleur.</li>
 				<li><strong>Les thèmes</strong> (Améthyste, Saphir, Émeraude, Rubis, Turquoise) et le mode sombre colorent maintenant toute l'appli : à choisir dans les options.</li>
 				<li><strong>Les pièces</strong> : moins de pièces gagnées, et continuer une partie coûte plus cher à chaque fois (500, 1000, puis 2000).</li>
