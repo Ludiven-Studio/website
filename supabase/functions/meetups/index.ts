@@ -26,6 +26,7 @@ import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2.1
 import { ipKey, ipQuotaEnabled } from '../_shared/ipKey.ts';
 import { deleteAccount } from '../_shared/account.ts';
 import { appleOf } from '../_shared/apple.ts';
+import { createKeyOf, isTwinInsert } from '../_shared/createOnce.ts';
 import { dropPosters, thumbOf } from '../_shared/posters.ts';
 import {
 	P_CONTACTS_PER_DAY, P_CONTACTS_PER_IP_DAY, P_HIDE_IPS, P_HIDE_REPORTERS, P_MAX_OPEN, P_REASON_LABEL, P_REASONS,
@@ -658,6 +659,15 @@ async function activeEvents(db: SupabaseClient, ids: string[], nowIso: string): 
 	return count ?? 0;
 }
 
+/** The game this organizer already made with this create key, as create_event first answered. */
+async function createdWithKey(db: SupabaseClient, organizer: string, key: string | null): Promise<{ id: string; secret: string } | null> {
+	if (!key) return null;
+	const { data, error } = await db.from('meetup_events').select('id, secret')
+		.eq('organizer_id', organizer).eq('create_key', key).maybeSingle();
+	if (error) throw error;
+	return data ? { id: data.id as string, secret: data.secret as string } : null;
+}
+
 /** The account, plus the device uuid it used before accounts: games and signups
  *  made then still belong to the same person. */
 const identities = (uid: string | null, legacy: unknown): string[] =>
@@ -867,6 +877,10 @@ Deno.serve(async (req) => {
 			case 'create_event': {
 				const playerId = await whoAmI();
 				if (!playerId) return bad(LOGIN, 401);
+				// Sent again after a lost answer: the first game, before any cap counts it twice.
+				const createKey = createKeyOf(body);
+				const madeBefore = await createdWithKey(db, playerId, createKey);
+				if (madeBefore) return json(madeBefore);
 				const slotError = validateSlot(body.startsAt, body.endsAt, nowMs);
 				if (slotError) return bad(slotError);
 				if (!isFormat(body.format)) return bad('Format inconnu.');
@@ -915,9 +929,14 @@ Deno.serve(async (req) => {
 					organizer_name: name,
 					organizer_seats: body.organizerSeats,
 					organizer_ip: createIp,
+					create_key: createKey,
 				}).select('id, secret').single();
-				if (error) throw error;
-				// The one and only time `secret` leaves the database.
+				if (error) {
+					const twin = isTwinInsert(error) ? await createdWithKey(db, playerId, createKey) : null;
+					if (twin) return json(twin);
+					throw error;
+				}
+				// `secret` leaves the database only here, to the organizer who made the game.
 				return json({ id: created.id, secret: created.secret });
 			}
 
