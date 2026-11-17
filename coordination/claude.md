@@ -3405,3 +3405,38 @@
 - 15:00 : à la demande de Raphaël (« intègre-la dans main et pousse »), cette section commitée et poussée à part, faute
   de l'avoir jointe à e6bdf2e ; pas de build complet, le site ne lit pas supabase/. Statut : terminé. Réservations
   libérées.
+
+## 2026-11-17 — Pétanque Game : prix du défi de tir, déploiement (session PetanqueGame)
+- Statut : en cours (2026-11-17T18:47+01:00). Demande de l'utilisateur : Déploie les prix du défi de tir de Pétanque
+  Game sur le serveur : intègre pg-shot-prizes dans main et pousse (politique comprise), applique la migration
+  20261118120000_shot_prizes en production, mets ses secrets et déploie la fonction shot-prizes, puis vérifie un
+  relevé. (Raphaël, 18:05)
+- Réservations actives : `supabase/functions/shot-prizes/`, `supabase/functions/_shared/shotPrizes*.ts`,
+  `supabase/migrations/20261118120000_shot_prizes.sql`, pages `confidentialite` de Pétanque Game (5 langues).
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 18:47 : branche pg-shot-prizes recalée sur origin/main (746a60f) ; deno test 5/5, deno check et eslint OK. Lancement
+  du build complet (écrit dist/, .astro/, public/vendor/) dans le worktree pg-shot-prizes…
+- 18:50 : build complet OK (235 pages). Secrets UNITY_SERVICE_KEY_ID et UNITY_SERVICE_SECRET présents (noms vérifiés) ;
+  mis : UNITY_PROJECT_ID, UNITY_ENVIRONMENT_ID, SHOT_PRIZES_CRON_KEY (tirée au hasard, jamais affichée) et la même dans
+  le vault (shot_prizes_cron_key) ; migration 20261118120000_shot_prizes appliquée en production (seule en attente) ;
+  fonction shot-prizes déployée (--no-verify-jwt). Vérifié : mine sans jeton 401 ; check avec la clé : Unity lu par le
+  compte de service, jour 1 ligne, semaine 1 ligne, une place payée chacun, rien écrit ; relevé d'hier refusé 409 ;
+  cron shot-prizes-snapshot 59 23 * * * et shot-prizes-purge 17 3 * * * actifs ; table vide, anon sans lecture. Pas de
+  relevé réel en journée : il figerait la journée avant 23:59.
+- 18:50 : commité et poussé sur main à la demande de Raphaël (« intègre pg-shot-prizes dans main et pousse ») : la
+  fonction, la migration, la politique en 5 langues et cette section. À vérifier demain matin : net._http_response du
+  relevé de 23:59 et les lignes de shot_prizes. Statut : terminé. Réservations libérées.
+
+## 2026-11-17 — Pétanque Game : prix des classements du défi de tir (serveur) (session PetanqueGame)
+- Statut : en cours (2026-11-17T15:21+01:00). Demande de l'utilisateur : Copie côté serveur des classements du défi de
+  tir pour payer les prix (décision de Raphaël au Producer, 15:20, relayée) ; préparé dans un worktree, rien de déployé
+  ni poussé sur main sans sa phrase
+- Réservations actives : `supabase/functions/shot-prizes/`, `supabase/functions/_shared/shotPrizes*.ts`,
+  `supabase/migrations/20261118120000_shot_prizes.sql`, pages `confidentialite` de Pétanque Game (5 langues).
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 15:28 : branche pg-shot-prizes (worktree), commit bee874e, poussée en branche seulement : fonction shot-prizes,
+  _shared/shotPrizes.ts (deno test 3/3, deno check OK), migration 20261118120000_shot_prizes (table + cron 23:59 UTC
+  via pg_net, clé dans le vault), politique de confidentialité §4, §5, §11, §12, §13 dans les 5 langues (eslint et
+  astro check OK). Rien de déployé, main intact : la mise en ligne attend la phrase de Raphaël.
+- 18:50 : remplacée par la section « prix du défi de tir, déploiement » : tout y est commité et déployé. Statut :
+  terminé. Réservations libérées.
