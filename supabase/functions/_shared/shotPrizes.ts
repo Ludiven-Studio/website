@@ -7,8 +7,8 @@ export const DAY_BOARD = 'shots_day';
 export const WEEK_BOARD = 'shots_week';
 
 /** (last rank, coins), best first. */
-export const DAY_PRIZES: readonly [number, number][] = [[1, 300], [3, 150]];
-export const WEEK_PRIZES: readonly [number, number][] = [[1, 1500], [3, 800]];
+export const DAY_PRIZES: readonly [number, number][] = [[1, 500], [3, 250]];
+export const WEEK_PRIZES: readonly [number, number][] = [[1, 2000], [3, 1000]];
 
 /** Rows older than this go (pg_cron's own purge, apart from the snapshots): the game claims within days. */
 export const KEEP_DAYS = 30;
