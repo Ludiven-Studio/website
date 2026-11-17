@@ -100,7 +100,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				deine Münzen, die gekauften Gegenstände und die, die du gerade benutzt (Kugeln, Zielkugeln, Wurfkreise,
 				Spielorte, Trikots), dein Tagesbonus und deine Serie, deine Herausforderungen und Erfolge, deine Siege
 				und Niederlagen, deine Ligen, dein laufender Pokal und deine Trophäen, deine Online-Wertung, deine
-				Spieleinstellungen, dein Spitzname, die Figur, die du gewählt hast, die Option „Ohne Werbung“, falls du
+				Spieleinstellungen, dein Spitzname, die Figur, die du gewählt hast, deine Bestwerte der Schuss-Challenge, die Option „Ohne Werbung“, falls du
 				sie gekauft hast, und die Nummern der bereits gutgeschriebenen Käufe (damit dieselbe Zahlung nie zweimal
 				gutgeschrieben wird).
 			</p>
@@ -388,7 +388,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<p>
 				Deine Münzen, deine Kugeln, deine Gegenstände und deine Trophäen sind verloren, auf all deinen Handys.
 				„Ohne Werbung“ bleibt an dein Google-Play- oder App-Store-Konto gebunden: „Käufe wiederherstellen“ gibt
-				es dir zurück. Ohne Verbindung sagt das Spiel „Gerade nicht möglich“, und nichts wird nur halb gelöscht.
+				es dir zurück. Kann das Löschen nicht abgeschlossen werden (keine Verbindung, Server nicht erreichbar), sagt dir das Spiel Bescheid und schließt es beim nächsten Start oder bei deiner nächsten Anmeldung mit diesem Konto von selbst ab; bis dahin wird nichts mehr an dieses Konto gesendet, und der Startbildschirm sagt dir, wenn es erledigt ist. In diesem Fall öffnet sich das Fenster von Apple nicht: Hast du dich mit Apple angemeldet, entziehe den Zugriff selbst (siehe unten).
 			</p>
 			{/* TODO legal: the in-app deletion does not erase the « elo » leaderboard entry yet (docs/store.md, contradiction 6). Once it does, say it is erased with the account. */}
 			<p>
@@ -397,7 +397,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				Monats.
 			</p>
 			<p>
-				<strong>Deine Einträge in den Ranglisten der Schuss-Challenge</strong> werden beim Löschen deines Kontos auf null gesetzt, ohne Spitznamen, und als gelöscht markiert; diese Ranglisten beginnen ohnehin jeden Tag und jeden Montag wieder bei null.
+				<strong>Deine Einträge in den Ranglisten der Schuss-Challenge</strong>: Wenn du dein Konto löschst, sendet das Spiel ihnen eine Punktzahl von null, ohne Spitznamen, als gelöscht markiert; da diese Ranglisten die beste Punktzahl behalten, kann dein Eintrag mit deinem Spitznamen sichtbar bleiben, bis sie zurückgesetzt werden (Mitternacht UTC für die Tagesrangliste, montags für die Wochenrangliste). Schreib uns, wenn er früher entfernt werden soll.
 			</p>
 			<p>
 				<strong>Ohne die App</strong>: Schreib an
@@ -443,6 +443,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<ul>
 				<li><strong>Konto und Spielstand</strong> (Unity Authentication und Cloud Save): bis du dein Konto löschst.</li>
 				<li><strong>Rangliste</strong>: deine Wertung und dein Spitzname, bis du sie entfernen lässt (siehe §11).</li>
+				<li><strong>Ranglisten der Schuss-Challenge</strong>: deine beste Punktzahl und dein Spitzname, bis sie zurückgesetzt werden, jeden Tag um Mitternacht (UTC) und jeden Montag.</li>
 				<li><strong>Online-Partien</strong>: Eine öffentliche Partie verschwindet aus der Liste, sobald sie beginnt oder du sie schließt; die Würfe werden nach der Partie nicht aufbewahrt.</li>
 				<li><strong>Gerade online</strong>: Die zufällige Nummer wird in den Minuten nach dem Beenden des Spiels gelöscht.</li>
 				<li><strong>Nutzungsstatistiken</strong>: <strong>24 Monate</strong> auf unserem Server gespeichert, dann gelöscht; seine Sicherungen 14 Tage.</li>

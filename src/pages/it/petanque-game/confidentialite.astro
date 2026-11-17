@@ -100,7 +100,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				giocatore: le tue monete, gli oggetti acquistati e quelli che usi (bocce, pallini, cerchi,
 				ambientazioni, divise), il tuo bonus giornaliero e la tua serie, le tue sfide e i tuoi traguardi, le
 				tue vittorie e le tue sconfitte, le tue leghe, la tua coppa in corso e i tuoi trofei, il tuo punteggio
-				online, le tue impostazioni di gioco, il tuo nickname, il giocatore che hai scelto, l'opzione «Senza
+				online, le tue impostazioni di gioco, il tuo nickname, il giocatore che hai scelto, i tuoi record della sfida di bocciata, l'opzione «Senza
 				pubblicità» se l'hai acquistata, e i numeri degli acquisti già accreditati (per non accreditare mai due
 				volte lo stesso pagamento).
 			</p>
@@ -388,7 +388,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<p>
 				Le tue monete, le tue bocce, i tuoi oggetti e i tuoi trofei vanno persi, su tutti i tuoi telefoni.
 				«Senza pubblicità» resta legato al tuo account Google Play o App Store: «Ripristina acquisti» te lo
-				restituisce. Senza connessione, il gioco dice «Non è possibile ora» e nulla viene cancellato a metà.
+				restituisce. Se l'eliminazione non può andare fino in fondo (nessuna connessione, server non disponibile), il gioco te lo dice e la completa da solo alla prossima apertura o al prossimo accesso con quell'account; fino ad allora non viene più inviato nulla a quell'account, e la schermata iniziale ti avvisa quando è fatto. In questo caso la finestra di Apple non si apre: se avevi fatto l'accesso con Apple, revoca tu l'accesso (vedi sotto).
 			</p>
 			{/* TODO legal: the in-app deletion does not erase the « elo » leaderboard entry yet (docs/store.md, contradiction 6). Once it does, say it is erased with the account. */}
 			<p>
@@ -396,7 +396,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				cancellata da questo pulsante. Scrivici per farla rimuovere: la cancelliamo entro un mese.
 			</p>
 			<p>
-				<strong>Le tue righe nelle classifiche della sfida di bocciata</strong> vengono azzerate, senza nickname, e segnate come eliminate quando elimini il tuo account; queste classifiche ripartono comunque da zero ogni giorno e ogni lunedì.
+				<strong>Le tue righe nelle classifiche della sfida di bocciata</strong>: quando elimini il tuo account, il gioco invia loro un punteggio zero, senza nickname, segnato come eliminato; poiché queste classifiche tengono il punteggio migliore, la tua riga può restare visibile, con il tuo nickname, fino al loro azzeramento (mezzanotte UTC per quella del giorno, il lunedì per quella della settimana). Scrivici per farla rimuovere prima.
 			</p>
 			<p>
 				<strong>Senza l'applicazione</strong>: scrivi a
@@ -441,6 +441,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<ul>
 				<li><strong>Account e progressi</strong> (Unity Authentication e Cloud Save): finché non elimini il tuo account.</li>
 				<li><strong>Classifica</strong>: il tuo punteggio e il tuo nickname, finché non li fai rimuovere (vedi §11).</li>
+				<li><strong>Classifiche della sfida di bocciata</strong>: il tuo punteggio migliore e il tuo nickname, fino al loro azzeramento, ogni giorno a mezzanotte (UTC) e ogni lunedì.</li>
 				<li><strong>Partite online</strong>: una partita pubblica esce dall'elenco appena inizia o appena la chiudi; i lanci non vengono conservati dopo la partita.</li>
 				<li><strong>Giocatori collegati in questo momento</strong>: il numero estratto a caso viene cancellato nei minuti successivi alla chiusura del gioco.</li>
 				<li><strong>Statistiche d'uso</strong>: conservate <strong>24 mesi</strong> sul nostro server, poi cancellate; i suoi backup, 14 giorni.</li>

@@ -96,7 +96,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				joueur&nbsp;: tes pièces, les objets achetés et ceux que tu portes (boules, bouchons, cercles, décors,
 				tenues), ton bonus du jour et ta série, tes défis et tes succès, tes victoires et tes défaites, tes
 				ligues, ta coupe en cours et tes trophées, ta note en ligne, tes réglages de jeu, ton pseudo, le joueur
-				que tu as choisi, l'option «&nbsp;Sans publicité&nbsp;» si tu l'as achetée, et les numéros des achats
+				que tu as choisi, tes records du défi de tir, l'option «&nbsp;Sans publicité&nbsp;» si tu l'as achetée, et les numéros des achats
 				déjà crédités (pour ne jamais créditer deux fois le même paiement).
 			</p>
 			<p>
@@ -383,8 +383,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			<p>
 				Tes pièces, tes boules, tes objets et tes trophées sont perdus, sur tous tes téléphones.
 				«&nbsp;Sans publicité&nbsp;» reste attaché à ton compte Google Play ou App Store&nbsp;: «&nbsp;Restaurer
-				mes achats&nbsp;» le rend. Sans connexion, le jeu dit «&nbsp;Impossible pour l'instant&nbsp;» et rien
-				n'est effacé à moitié.
+				mes achats&nbsp;» le rend. Si la suppression ne peut pas aller au bout (pas de connexion, serveur indisponible), le jeu te le dit et la termine tout seul au prochain lancement ou à ta prochaine connexion à ce compte&nbsp;; d'ici là, plus rien n'est envoyé vers ce compte, et l'écran d'accueil te dit quand c'est fait. Dans ce cas, la fenêtre d'Apple ne s'ouvre pas&nbsp;: si tu t'étais connecté avec Apple, retire l'accès toi-même (voir plus bas).
 			</p>
 			{/* TODO legal: the in-app deletion does not erase the « elo » leaderboard entry yet (docs/store.md, contradiction 6). Once it does, say it is erased with the account. */}
 			<p>
@@ -392,7 +391,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				Écris-nous pour la faire retirer&nbsp;: nous l'effaçons sous un mois.
 			</p>
 			<p>
-				<strong>Tes lignes aux classements du défi de tir</strong> passent à zéro, sans pseudo, et sont marquées comme supprimées quand tu supprimes ton compte&nbsp;; ces classements repartent de toute façon de zéro chaque jour et chaque lundi.
+				<strong>Tes lignes aux classements du défi de tir</strong>&nbsp;: quand tu supprimes ton compte, le jeu leur envoie un score nul, sans pseudo, marqué comme supprimé&nbsp;; ces classements gardant le meilleur score, ta ligne peut rester visible, avec ton pseudo, jusqu'à leur remise à zéro (minuit UTC pour celui du jour, le lundi pour celui de la semaine). Écris-nous pour la faire retirer plus tôt.
 			</p>
 			<p>
 				<strong>Sans l'application</strong>&nbsp;: écris à
@@ -437,6 +436,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			<ul>
 				<li><strong>Compte et progression</strong> (Unity Authentication et Cloud Save)&nbsp;: jusqu'à ce que tu supprimes ton compte.</li>
 				<li><strong>Classement</strong>&nbsp;: ta note et ton pseudo, jusqu'à ce que tu les fasses retirer (voir §11).</li>
+				<li><strong>Classements du défi de tir</strong>&nbsp;: ton meilleur score et ton pseudo, jusqu'à leur remise à zéro, chaque jour à minuit (UTC) et chaque lundi.</li>
 				<li><strong>Parties en ligne</strong>&nbsp;: une partie publique quitte la liste dès qu'elle commence ou que tu la fermes&nbsp;; les lancers ne sont pas gardés après la partie.</li>
 				<li><strong>Joueurs en ligne en ce moment</strong>&nbsp;: le numéro tiré au hasard est effacé dans les minutes qui suivent l'arrêt du jeu.</li>
 				<li><strong>Statistiques d'usage</strong>&nbsp;: gardées <strong>24 mois</strong> sur notre serveur, puis effacées&nbsp;; ses sauvegardes, 14 jours.</li>

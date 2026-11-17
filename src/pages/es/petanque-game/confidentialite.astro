@@ -100,7 +100,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				tus monedas, los objetos comprados y los que llevas (bolas, boliches, círculos, escenarios,
 				equipaciones), tu bono diario y tu racha, tus desafíos y tus logros, tus victorias y tus derrotas, tus
 				ligas, tu copa en curso y tus trofeos, tu puntuación en línea, tus ajustes de juego, tu apodo, el
-				jugador que has elegido, la opción «Sin anuncios» si la has comprado, y los números de las compras ya
+				jugador que has elegido, tus récords del desafío de tiro, la opción «Sin anuncios» si la has comprado, y los números de las compras ya
 				acreditadas (para no acreditar nunca dos veces el mismo pago).
 			</p>
 			<p>
@@ -384,8 +384,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			</ul>
 			<p>
 				Tus monedas, tus bolas, tus objetos y tus trofeos se pierden, en todos tus teléfonos. «Sin anuncios»
-				sigue vinculado a tu cuenta de Google Play o App Store: «Restaurar mis compras» te lo devuelve. Sin
-				conexión, el juego dice «No es posible ahora» y no se borra nada a medias.
+				sigue vinculado a tu cuenta de Google Play o App Store: «Restaurar mis compras» te lo devuelve. Si la eliminación no puede completarse (sin conexión, servidor no disponible), el juego te lo dice y la termina solo la próxima vez que lo abras o que inicies sesión con esa cuenta; mientras tanto, ya no se envía nada a esa cuenta, y la pantalla de inicio te avisa cuando está hecho. En ese caso no se abre la ventana de Apple: si te conectaste con Apple, retira tú el acceso (ver más abajo).
 			</p>
 			{/* TODO legal: the in-app deletion does not erase the « elo » leaderboard entry yet (docs/store.md, contradiction 6). Once it does, say it is erased with the account. */}
 			<p>
@@ -393,7 +392,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				botón. Escríbenos para que la retiremos: la borramos en el plazo de un mes.
 			</p>
 			<p>
-				<strong>Tus líneas en las clasificaciones del desafío de tiro</strong> pasan a cero, sin apodo, y se marcan como eliminadas cuando eliminas tu cuenta; de todos modos, esas clasificaciones vuelven a empezar de cero cada día y cada lunes.
+				<strong>Tus líneas en las clasificaciones del desafío de tiro</strong>: cuando eliminas tu cuenta, el juego les envía una puntuación de cero, sin apodo, marcada como eliminada; como esas clasificaciones guardan la mejor puntuación, tu línea puede seguir visible, con tu apodo, hasta que se reinicien (medianoche UTC la del día, el lunes la de la semana). Escríbenos para que la retiremos antes.
 			</p>
 			<p>
 				<strong>Sin la aplicación</strong>: escribe a
@@ -437,6 +436,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<ul>
 				<li><strong>Cuenta y progreso</strong> (Unity Authentication y Cloud Save): hasta que elimines tu cuenta.</li>
 				<li><strong>Clasificación</strong>: tu puntuación y tu apodo, hasta que pidas que se retiren (ver §11).</li>
+				<li><strong>Clasificaciones del desafío de tiro</strong>: tu mejor puntuación y tu apodo, hasta que se reinician, cada día a medianoche (UTC) y cada lunes.</li>
 				<li><strong>Partidas en línea</strong>: una partida pública sale de la lista en cuanto empieza o la cierras; los lanzamientos no se guardan después de la partida.</li>
 				<li><strong>Jugadores conectados en este momento</strong>: el número sacado al azar se borra en los minutos siguientes a que el juego se detenga.</li>
 				<li><strong>Estadísticas de uso</strong>: se guardan <strong>24 meses</strong> en nuestro servidor y luego se borran; sus copias de seguridad, 14 días.</li>

@@ -3340,3 +3340,16 @@
 - Ressources : eslint, `astro check`. Build annoncé ici avant.
 - 20:10 : commité et poussé à la demande de l'utilisateur : la page bêta (1.1.4, Tout débloquer) et cette section
   seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-17 — Pétanque Game : confidentialité 1.0.14, corrections (session PetanqueGame)
+- Statut : en cours (2026-11-17T11:01+01:00). Demande de l'utilisateur : Oui, corriger (décision de Raphaël relayée par
+  le Producer, 11:00) : §11 suppression qui reprend et accès Apple, §11 classements du défi de tir, §13 durée, §3
+  records, 5 langues
+- Réservations actives : `src/pages{,/en,/es,/de,/it}/petanque-game/confidentialite.astro`.
+- Ressources : serveur de dev sur le port 4391 ; eslint, `astro check`. Build annoncé ici avant.
+- 11:06 : 4 corrections faites dans les 5 langues (§3 records du défi, §11 suppression qui reprend et accès Apple, §11
+  classements du défi, §13 durée) ; eslint OK, astro check 0 erreur, captures FR/EN vues. Lancement du build complet
+  (écrit dist/, .astro/, public/vendor/) dans le worktree pg-privacy-fix…
+- 11:08 : build complet OK (235 pages, 0 erreur, precache et liens OK) ; commité et poussé sur la décision de Raphaël
+  relayée par le Producer (« Oui, corriger », 11:00) : mes 5 fichiers et cette section seulement. Statut : terminé.
+  Réservations libérées.

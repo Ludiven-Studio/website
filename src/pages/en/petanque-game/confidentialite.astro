@@ -100,7 +100,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				items you bought and the ones you use (boules, jacks, throwing circles, scenery, outfits), your daily
 				bonus and your streak, your challenges and your achievements, your wins and your losses, your leagues,
 				your current cup and your trophies, your online rating, your game settings, your name, the player you
-				chose, the "No ads" option if you bought it, and the numbers of the purchases already credited (so the
+				chose, your shooting challenge bests, the "No ads" option if you bought it, and the numbers of the purchases already credited (so the
 				same payment is never credited twice).
 			</p>
 			<p>
@@ -379,8 +379,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			</ul>
 			<p>
 				Your coins, your boules, your items and your trophies are lost, on all your phones. "No ads" stays tied
-				to your Google Play or App Store account: "Restore purchases" gives it back. Without a connection, the
-				game says "Not possible right now" and nothing is half erased.
+				to your Google Play or App Store account: "Restore purchases" gives it back. If the deletion cannot go through (no connection, server unavailable), the game tells you and finishes it by itself the next time you open it or sign in to that account; until then nothing more is sent to that account, and the home screen tells you when it is done. In that case Apple's window does not open: if you signed in with Apple, remove the access yourself (see below).
 			</p>
 			{/* TODO legal: the in-app deletion does not erase the « elo » leaderboard entry yet (docs/store.md, contradiction 6). Once it does, say it is erased with the account. */}
 			<p>
@@ -388,7 +387,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				Write to us to have it removed: we erase it within one month.
 			</p>
 			<p>
-				<strong>Your lines in the shooting challenge rankings</strong> are reset to zero, without your name, and marked as deleted when you delete your account; these rankings start again from zero every day and every Monday anyway.
+				<strong>Your lines in the shooting challenge rankings</strong>: when you delete your account, the game sends them a zero score, without your name, marked as deleted; as these rankings keep the best score, your line may stay visible, with your name, until they reset (midnight UTC for the day's, Monday for the week's). Write to us to have it removed sooner.
 			</p>
 			<p>
 				<strong>Without the app</strong>: write to
@@ -433,6 +432,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<ul>
 				<li><strong>Account and progress</strong> (Unity Authentication and Cloud Save): until you delete your account.</li>
 				<li><strong>Ranking</strong>: your rating and your name, until you have them removed (see §11).</li>
+				<li><strong>Shooting challenge rankings</strong>: your best score and your name, until they reset, every day at midnight (UTC) and every Monday.</li>
 				<li><strong>Online games</strong>: a public game leaves the list as soon as it starts or you close it; throws are not kept after the game.</li>
 				<li><strong>Players online right now</strong>: the random number is erased within minutes after the game stops.</li>
 				<li><strong>Usage statistics</strong>: kept <strong>24 months</strong> on our server, then erased; its backups, 14 days.</li>
