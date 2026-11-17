@@ -44,6 +44,8 @@ export async function deleteAccount(
 	if (pErr) throw pErr;
 	const { error: pcErr } = await db.from('meetup_partner_contacts').delete().eq('player_id', uid);
 	if (pcErr) throw pcErr;
+	const { error: pqErr } = await db.from('meetup_partner_contact_quota').delete().eq('player_id', uid);
+	if (pqErr) throw pqErr;
 	await db.from('meetup_partner_reports').delete().eq('reporter_id', uid);
 	// A claim holds the name and phone the claimer typed, and no foreign key removes it.
 	const { error: cErr } = await db.from('meetup_tournament_claims').delete().eq('player_id', uid);

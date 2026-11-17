@@ -102,3 +102,26 @@ export function shapePartnerSearch(row: Record<string, unknown>, uid: string | n
 	if (mine) shaped.contacts = contacts ?? 0;
 	return shaped;
 }
+
+/** Message of the trigger that refuses a search past P_MAX_OPEN (migration 20261117010000). */
+export const P_OPEN_CAP_ERROR = 'partner_open_cap';
+
+/** Searches show, and give numbers, only while their tournament is open and not hidden. */
+export function partnerTournamentOpen(t: { status?: unknown; hidden?: unknown } | null | undefined): boolean {
+	return Boolean(t) && !t!.hidden && t!.status === 'open';
+}
+
+/** What partner_contact_take answered, as the refusal to show; null when the number may be given. */
+export function contactRefusal(taken: unknown): { error: string; status: number } | null {
+	switch (taken) {
+		case 'ok': return null;
+		case 'player_cap': return { error: 'Tu as demandé assez de numéros pour aujourd’hui. Réessaie demain.', status: 429 };
+		case 'ip_cap': return { error: 'Trop de numéros demandés aujourd’hui. Réessaie demain.', status: 429 };
+		default: return { error: 'Cette annonce n’est plus en ligne.', status: 409 };
+	}
+}
+
+/** The open-search cap's trigger refused the insert. */
+export function isOpenCapError(error: unknown): boolean {
+	return String((error as { message?: unknown } | null)?.message ?? '').includes(P_OPEN_CAP_ERROR);
+}
