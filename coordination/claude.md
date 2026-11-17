@@ -3451,3 +3451,13 @@
   pg-beta-1014d…
 - 19:02 : build complet OK (235 pages, 0 erreur) ; commité et poussé à la demande de Raphaël (« envoie-la et pousse sa
   page », 18:51) : la page bêta et cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-17 — Pétanque Game : barème dégressif du défi de tir (session PetanqueGame)
+- Statut : en cours (2026-11-17T23:18+01:00). Demande de l'utilisateur : Raphaël, tapé dans la session PG : « Le
+  redéploiement du barème dégressif, ce soir avant 0 h 59 si possible. »
+- Réservations actives : `supabase/functions/_shared/shotPrizes*.ts`,
+  `src/pages/**/petanque-game/confidentialite.astro`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 23:18 : intégré dans main et poussé, puis shot-prizes déployée, à la demande de Raphaël : jour
+  500/300/200/150/125/100/90/80/70/60, semaine 2000/1200/800/400 (4-10)/200 (11-20)/100 (21-50) ; politique §4 top 10 /
+  top 50 et §7 noms communs des événements. Statut : terminé. Réservations libérées.
