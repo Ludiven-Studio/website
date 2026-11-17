@@ -3,8 +3,8 @@ import { assertEquals } from 'jsr:@std/assert@1';
 import { closing, paidPlaces, prize, rowsFrom } from './shotPrizes.ts';
 
 Deno.test('the prizes are the game\'s table', () => {
-	assertEquals([1, 2, 3, 4, 10].map((r) => prize(false, r)), [500, 250, 250, 0, 0]);
-	assertEquals([1, 3, 4, 50].map((r) => prize(true, r)), [2000, 1000, 0, 0]);
+	assertEquals([1, 2, 3, 4, 10].map((r) => prize(false, r)), [500, 300, 200, 0, 0]);
+	assertEquals([1, 3, 4, 50].map((r) => prize(true, r)), [2000, 800, 0, 0]);
 	assertEquals(prize(false, 0), 0);
 	assertEquals([paidPlaces(false), paidPlaces(true)], [3, 3]);
 });
@@ -28,7 +28,7 @@ Deno.test('only paid places with points are kept, and no name', () => {
 	lines[2].score = 0; // a series of 0 wins nothing
 	lines[3].playerId = ''; // no id: skipped
 	const rows = rowsFrom(lines, 'shots_day', false, '2026-11-18');
-	assertEquals(rows.map((r) => [r.player_id, r.rank, r.score, r.coins]), [['p0', 1, 46, 500], ['p1', 2, 45, 250]]);
+	assertEquals(rows.map((r) => [r.player_id, r.rank, r.score, r.coins]), [['p0', 1, 46, 500], ['p1', 2, 45, 300]]);
 	assertEquals(Object.keys(rows[0]).sort(), ['board', 'coins', 'period', 'player_id', 'rank', 'score']);
 });
 
@@ -38,5 +38,5 @@ Deno.test('a deleted account\'s line is skipped and the places below move up', (
 		{ playerId: 'a', rank: 1, score: 40, metadata: '{"nick":"Marcel"}' },
 		{ playerId: 'b', rank: 2, score: 30 },
 	], 'shots_day', false, '2026-11-18');
-	assertEquals(rows.map((r) => [r.player_id, r.rank, r.coins]), [['a', 1, 500], ['b', 2, 250]]);
+	assertEquals(rows.map((r) => [r.player_id, r.rank, r.coins]), [['a', 1, 500], ['b', 2, 300]]);
 });
