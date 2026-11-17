@@ -3,10 +3,10 @@ import { assertEquals } from 'jsr:@std/assert@1';
 import { closing, paidPlaces, prize, rowsFrom } from './shotPrizes.ts';
 
 Deno.test('the prizes are the game\'s table', () => {
-	assertEquals([1, 2, 3, 4, 10].map((r) => prize(false, r)), [500, 300, 200, 0, 0]);
-	assertEquals([1, 3, 4, 50].map((r) => prize(true, r)), [2000, 800, 0, 0]);
+	assertEquals([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((r) => prize(false, r)), [500, 300, 200, 150, 125, 100, 90, 80, 70, 60, 0]);
+	assertEquals([1, 2, 3, 4, 10, 11, 20, 21, 50, 51].map((r) => prize(true, r)), [2000, 1200, 800, 400, 400, 200, 200, 100, 100, 0]);
 	assertEquals(prize(false, 0), 0);
-	assertEquals([paidPlaces(false), paidPlaces(true)], [3, 3]);
+	assertEquals([paidPlaces(false), paidPlaces(true)], [10, 50]);
 });
 
 Deno.test('the cron\'s day closes the day, and the week on a Sunday', () => {
@@ -28,7 +28,10 @@ Deno.test('only paid places with points are kept, and no name', () => {
 	lines[2].score = 0; // a series of 0 wins nothing
 	lines[3].playerId = ''; // no id: skipped
 	const rows = rowsFrom(lines, 'shots_day', false, '2026-11-18');
-	assertEquals(rows.map((r) => [r.player_id, r.rank, r.score, r.coins]), [['p0', 1, 46, 500], ['p1', 2, 45, 300]]);
+	assertEquals(rows.map((r) => [r.player_id, r.rank, r.score, r.coins]), [
+		['p0', 1, 46, 500], ['p1', 2, 45, 300], ['p4', 4, 42, 150], ['p5', 5, 41, 125], ['p6', 6, 40, 100],
+		['p7', 7, 39, 90], ['p8', 8, 38, 80], ['p9', 9, 37, 70], ['p10', 10, 36, 60],
+	]);
 	assertEquals(Object.keys(rows[0]).sort(), ['board', 'coins', 'period', 'player_id', 'rank', 'score']);
 });
 
