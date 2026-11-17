@@ -2,15 +2,15 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 
 // Unlisted: noindex, out of the sitemap and of the offline precache (astro.config.mjs).
-// The next store version, built from the game's main (3f1803d) under the .beta id, signed with the dev key,
+// The next store version, built from the game's main (c359ab1) under the .beta id, signed with the dev key,
 // ARM64 only, on a prerelease of this repo (the earlier betas' APKs stay there).
 const BETA = {
 	version: '1.0.14',
 	date: '2026-11-17',
-	size: 99609911,
+	size: 99618095,
 	android: '7.1',
-	sha256: '2ce52e9c39dd1a30c734a92d8590e4695fa62e768ef89bba39c0262df5c4943e',
-	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-game-beta/petanque-game-1.0.14-beta.apk',
+	sha256: '45f176116be6854699546832ba55e74f5073c584b41a4a3acb616bfe6dd99bc6',
+	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-game-beta/petanque-game-1.0.14-beta2.apk',
 };
 const date = new Date(BETA.date).toLocaleDateString('fr-FR', { dateStyle: 'medium' });
 const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
@@ -99,6 +99,20 @@ const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 					<strong>Corrigé dans la 1.0.14</strong>&nbsp;: les parties en ligne restent en phase jusqu'au bout&nbsp;; une vidéo dont la
 					récompense arrive en retard paie quand même&nbsp;; une suppression de compte coupée en route se termine toute seule au
 					lancement suivant.
+				</li>
+				<li>
+					<strong>2e bêta 1.0.14&nbsp;: ton compte revient tout seul au lancement</strong>, même après Options › Repartir de zéro&nbsp;:
+					si le téléphone a déjà connecté ton compte Google au jeu, il se reconnecte sans rien demander et la leçon est sautée si
+					tu l'as déjà faite. Sinon, «&nbsp;Tu as déjà un compte&nbsp;?&nbsp;» passe avant la leçon.
+				</li>
+				<li>
+					<strong>2e bêta 1.0.14&nbsp;: le défi de tir montre d'abord le cercle de près</strong>, 2,5 secondes avant chaque boule&nbsp;;
+					touche la planche pour viser tout de suite.
+				</li>
+				<li>
+					<strong>Corrigé dans la 2e bêta</strong>&nbsp;: plus de carrés blancs avant la leçon&nbsp;; la planche attend que ton joueur
+					soit dans le cercle, et le texte du bas n'en parle que quand elle est là&nbsp;; dans «&nbsp;Comment jouer&nbsp;», la planche
+					reste dans son image.
 				</li>
 			</ul>
 		</section>
