@@ -31,7 +31,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			Questa informativa riguarda <strong>l'app mobile Pétanque Game</strong>
 			(<code>com.ludivenstudio.petanquegame</code>). Il gioco di pétanque del sito
 			(<a href="/jeux/petanque/">ludiven-studio.fr/jeux/petanque</a>) e il resto del sito hanno una
-			<a href="/confidentialite/">propria informativa</a>. Ultimo aggiornamento: 17 novembre 2026 (versione 1.0.14: il numero di giocatori collegati in questo momento, la sfida di bocciata e le sue classifiche, monete e acquisti senza account; versione 1.0.8: le nostre pubblicità, nuova finestra «Pubblicità personalizzata», niente più backup di Google su Android).
+			<a href="/confidentialite/">propria informativa</a>. Ultimo aggiornamento: 17 novembre 2026 (versione 1.0.15: monete in palio nelle classifiche della sfida di bocciata; versione 1.0.14: il numero di giocatori collegati in questo momento, la sfida di bocciata e le sue classifiche, monete e acquisti senza account; versione 1.0.8: le nostre pubblicità, nuova finestra «Pubblicità personalizzata», niente più backup di Google su Android).
 		</p>
 		<p class="updated">
 			Questa è una traduzione di cortesia. In caso di discordanza, prevale la
@@ -125,6 +125,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Durante la partita</strong>, il tuo avversario riceve il tuo nickname, il tuo punteggio, il tuo giocatore, la tua divisa e la tua boccia, poi i tuoi lanci (la loro velocità e il punto in cui la tua mano lascia la boccia). Dopo ogni lancio, il telefono che ha aperto la partita invia l'arbitraggio (posizione delle bocce, punteggio della partita). Questi messaggi passano da <strong>Unity Relay</strong>, che li inoltra senza conservarli.</li>
 				<li><strong>Classifica</strong>: ogni partita pubblica individuale giocata fino alla fine fa variare il tuo punteggio (un punteggio Elo). Il tuo punteggio e il tuo nickname vengono allora inviati alla classifica <strong>Unity Leaderboards</strong>, che tutti i giocatori del gioco possono consultare: i primi 50, e ognuno la propria riga. Le partite con un amico tramite codice e le partite a squadre non contano.</li>
 				<li><strong>Sfida di bocciata</strong>: se hai un account, il punteggio di ogni serie (su 50) e il tuo nickname vanno alle classifiche del giorno e della settimana (<strong>Unity Leaderboards</strong>), consultabili da tutti i giocatori del gioco. Senza account, le tue serie restano sul telefono.</li>
+				<li><strong>Monete della sfida di bocciata</strong>: i primi 10 della classifica del giorno e i primi 50 di quella della settimana vincono monete. Un minuto prima di ogni azzeramento, il nostro server legge questi posti presso Unity, con l'ID Unity di ogni giocatore ma senza il suo nickname, e il tuo telefono va a prendere i tuoi con il tuo token di accesso Unity (vedi §13).</li>
 			</ul>
 			<p>
 				Non ci sono <strong>né chat, né messaggi, né voce</strong>. Per far rimuovere un nickname, il tuo o
@@ -175,6 +176,12 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 							<td>La classifica online e quelle della sfida di bocciata</td>
 							<td>Esecuzione del contratto</td>
 							<td>Unity (Leaderboards); i giocatori del gioco</td>
+						</tr>
+						<tr>
+							<td>ID Unity, classifica, posto, punteggio e monete vinte, senza nickname; il tuo token di accesso Unity quando il telefono chiede le tue monete</td>
+							<td>Versarti una sola volta le monete vinte nelle classifiche della sfida di bocciata</td>
+							<td>Esecuzione del contratto</td>
+							<td>La nostra funzione presso Supabase (vedi §12)</td>
 						</tr>
 						<tr>
 							<td>Prodotto acquistato, ricevuta dello store, numero di transazione</td>
@@ -398,6 +405,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<p>
 				<strong>Le tue righe nelle classifiche della sfida di bocciata</strong>: quando elimini il tuo account, il gioco invia loro un punteggio zero, senza nickname, segnato come eliminato; poiché queste classifiche tengono il punteggio migliore, la tua riga può restare visibile, con il tuo nickname, fino al loro azzeramento (mezzanotte UTC per quella del giorno, il lunedì per quella della settimana). Scrivici per farla rimuovere prima.
 			</p>
+			<p><strong>I tuoi posti premiati conservati dal nostro server</strong> (vedi §13) vengono cancellati con il tuo account; se non è possibile sul momento, spariscono da soli dopo 30 giorni. Non contengono il tuo nickname.</p>
 			<p>
 				<strong>Senza l'applicazione</strong>: scrivi a
 				<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a> indicando il tuo nickname, il
@@ -417,7 +425,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 		<section class="stack gap-2">
 			<h2>12. Destinatari e trasferimenti al di fuori dell'Unione europea</h2>
 			<p>
-				I nostri unici server sono quello delle statistiche d'uso (vedi §7), una funzione che conta i giocatori collegati in questo momento (vedi §5) e una funzione che revoca l'accesso «Accedi con Apple» quando elimini il tuo account (vedi §11). I tuoi dati non vengono né venduti né ceduti. Sono trattati solo da
+				I nostri unici server sono quello delle statistiche d'uso (vedi §7), una funzione che conta i giocatori collegati in questo momento (vedi §5), una funzione che conserva i posti premiati delle classifiche della sfida di bocciata (vedi §13) e una funzione che revoca l'accesso «Accedi con Apple» quando elimini il tuo account (vedi §11). I tuoi dati non vengono né venduti né ceduti. Sono trattati solo da
 				questi fornitori:
 			</p>
 			<ul>
@@ -426,7 +434,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Google</strong> (Google Ireland Limited, Google LLC) — accesso su Android e su iPhone, Google Play (distribuzione, pagamento, scheda di valutazione).</li>
 				<li><strong>Apple Inc.</strong> — «Accedi con Apple», autorizzazione al tracciamento, App Store (distribuzione, pagamento, scheda di valutazione).</li>
 				<li><strong>Hetzner Online GmbH</strong> (Germania) — hosting del nostro server per le statistiche d'uso (vedi §7).</li>
-				<li><strong>Supabase, Inc.</strong> — hosting della nostra funzione che revoca l'accesso «Accedi con Apple» (vedi §11): riceve il codice di Apple, l'identificativo dell'app e l'indirizzo IP del telefono, e non conserva nulla; e di quella che conta i giocatori collegati: riceve il numero estratto a caso all'avvio e l'indirizzo IP del telefono. Non registra questo indirizzo, che può tenere in memoria per qualche minuto per bloccare gli abusi; i log tecnici di Supabase lo conservano per un tempo limitato, secondo le sue condizioni.</li>
+				<li><strong>Supabase, Inc.</strong> — hosting della nostra funzione che revoca l'accesso «Accedi con Apple» (vedi §11): riceve il codice di Apple, l'identificativo dell'app e l'indirizzo IP del telefono, e non conserva nulla; e di quella che conta i giocatori collegati: riceve il numero estratto a caso all'avvio e l'indirizzo IP del telefono. Non registra questo indirizzo, che può tenere in memoria per qualche minuto per bloccare gli abusi; i log tecnici di Supabase lo conservano per un tempo limitato, secondo le sue condizioni. Quella delle monete della sfida di bocciata riceve da Unity l'ID dei giocatori nei posti premiati e dal tuo telefono il tuo token di accesso Unity; conserva per 30 giorni ID, posto, punteggio e monete, senza nickname (vedi §13).</li>
 				<li><strong>GitHub, Inc.</strong> — hosting del nostro sito, letto per il controllo degli aggiornamenti (vedi §9) e per le nostre pubblicità (vedi §6); GitHub registra l'indirizzo IP di ogni visita per la sicurezza del suo servizio.</li>
 			</ul>
 			<p>
@@ -442,6 +450,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Account e progressi</strong> (Unity Authentication e Cloud Save): finché non elimini il tuo account.</li>
 				<li><strong>Classifica</strong>: il tuo punteggio e il tuo nickname, finché non li fai rimuovere (vedi §11).</li>
 				<li><strong>Classifiche della sfida di bocciata</strong>: il tuo punteggio migliore e il tuo nickname, fino al loro azzeramento, ogni giorno a mezzanotte (UTC) e ogni lunedì.</li>
+				<li><strong>Monete della sfida di bocciata</strong>: per ogni posto premiato, il tuo ID Unity, la classifica, il posto, il punteggio e le monete, senza nickname, 30 giorni sul nostro server, poi cancellati; prima se elimini il tuo account. Unity non conserva archivi delle classifiche concluse.</li>
 				<li><strong>Partite online</strong>: una partita pubblica esce dall'elenco appena inizia o appena la chiudi; i lanci non vengono conservati dopo la partita.</li>
 				<li><strong>Giocatori collegati in questo momento</strong>: il numero estratto a caso viene cancellato nei minuti successivi alla chiusura del gioco.</li>
 				<li><strong>Statistiche d'uso</strong>: conservate <strong>24 mesi</strong> sul nostro server, poi cancellate; i suoi backup, 14 giorni.</li>

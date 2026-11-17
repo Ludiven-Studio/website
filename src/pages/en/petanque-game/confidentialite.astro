@@ -31,7 +31,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			This policy covers <strong>the Pétanque Game mobile app</strong>
 			(<code>com.ludivenstudio.petanquegame</code>). The pétanque game on the website
 			(<a href="/jeux/petanque/">ludiven-studio.fr/jeux/petanque</a>) and the rest of the website have their
-			<a href="/confidentialite/">own policy</a>. Last updated: 17 November 2026 (version 1.0.14: the number of players online right now, the shooting challenge and its rankings, coins and purchases without an account; version 1.0.8: our own ads, new "Personalised advertising" window, no more Google backup on Android).
+			<a href="/confidentialite/">own policy</a>. Last updated: 17 November 2026 (version 1.0.15: coins to win in the shooting challenge rankings; version 1.0.14: the number of players online right now, the shooting challenge and its rankings, coins and purchases without an account; version 1.0.8: our own ads, new "Personalised advertising" window, no more Google backup on Android).
 		</p>
 		<p class="updated">
 			This is a courtesy translation. In case of discrepancy, the
@@ -124,6 +124,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>During the game</strong>, your opponent receives your name, your rating, your player, your outfit and your boule, then your throws (their speed and where your hand lets go of the boule). After each throw, the phone that opened the game sends the ruling (where the boules lie, the score). These messages go through <strong>Unity Relay</strong>, which passes them on without keeping them.</li>
 				<li><strong>Ranking</strong>: each public singles game played to the end changes your rating (an Elo rating). Your rating and your name are then sent to the <strong>Unity Leaderboards</strong> ranking, which every player of the game can view: the top 50, and each player their own line. Games with a friend by code and team games do not count.</li>
 				<li><strong>Shooting challenge</strong>: if you have an account, the score of each series (out of 50) and your name go to the day's and the week's rankings (<strong>Unity Leaderboards</strong>), which all the game's players can see. Without an account, your series stay on your phone.</li>
+				<li><strong>Shooting challenge coins</strong>: the top 10 of the day's ranking and the top 50 of the week's win coins. A minute before each reset, our server reads these places from Unity, with each player's Unity id but without their name, and your phone fetches yours there with your Unity sign-in token (see §13).</li>
 			</ul>
 			<p>
 				There is <strong>no chat, no messages and no voice</strong>. To have a name removed, yours or another
@@ -174,6 +175,12 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 							<td>The online ranking and the shooting challenge's rankings</td>
 							<td>Performance of the contract</td>
 							<td>Unity (Leaderboards); the game's players</td>
+						</tr>
+						<tr>
+							<td>Unity id, ranking, place, score and coins won, without your name; your Unity sign-in token when your phone asks for your coins</td>
+							<td>Paying you, once, the coins won in the shooting challenge rankings</td>
+							<td>Performance of the contract</td>
+							<td>Our function at Supabase (see §12)</td>
 						</tr>
 						<tr>
 							<td>Product bought, store receipt, transaction number</td>
@@ -389,6 +396,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<p>
 				<strong>Your lines in the shooting challenge rankings</strong>: when you delete your account, the game sends them a zero score, without your name, marked as deleted; as these rankings keep the best score, your line may stay visible, with your name, until they reset (midnight UTC for the day's, Monday for the week's). Write to us to have it removed sooner.
 			</p>
+			<p><strong>Your winning places kept by our server</strong> (see §13) are deleted with your account; if that fails at the time, they go by themselves after 30 days. They do not carry your name.</p>
 			<p>
 				<strong>Without the app</strong>: write to
 				<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a> giving your name, the type of
@@ -408,7 +416,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 		<section class="stack gap-2">
 			<h2>12. Recipients and transfers outside the European Union</h2>
 			<p>
-				Our only servers are the usage statistics server (see §7), a function that counts the players online right now (see §5) and a function that removes the "Sign in with Apple" access when you delete your account (see §11). Your data is neither sold nor passed on. It is processed only by these
+				Our only servers are the usage statistics server (see §7), a function that counts the players online right now (see §5), a function that keeps the winning places of the shooting challenge rankings (see §13) and a function that removes the "Sign in with Apple" access when you delete your account (see §11). Your data is neither sold nor passed on. It is processed only by these
 				providers:
 			</p>
 			<ul>
@@ -417,7 +425,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Google</strong> (Google Ireland Limited, Google LLC) — sign-in on Android and iPhone, Google Play (distribution, payment, rating form).</li>
 				<li><strong>Apple Inc.</strong> — "Sign in with Apple", tracking permission, App Store (distribution, payment, rating form).</li>
 				<li><strong>Hetzner Online GmbH</strong> (Germany) — hosting of our usage statistics server (see §7).</li>
-				<li><strong>Supabase, Inc.</strong> — hosting of our function that removes the "Sign in with Apple" access (see §11): it receives Apple's code, the app's identifier and the phone's IP address, and keeps nothing; and of the one that counts the players online: it receives the number drawn at random at launch and the phone's IP address. It does not record that address, which it may keep in memory for a few minutes to block abuse; Supabase's technical logs keep it for a limited time, under its terms.</li>
+				<li><strong>Supabase, Inc.</strong> — hosting of our function that removes the "Sign in with Apple" access (see §11): it receives Apple's code, the app's identifier and the phone's IP address, and keeps nothing; and of the one that counts the players online: it receives the number drawn at random at launch and the phone's IP address. It does not record that address, which it may keep in memory for a few minutes to block abuse; Supabase's technical logs keep it for a limited time, under its terms. The shooting challenge coins function receives from Unity the ids of the players in the winning places and from your phone your Unity sign-in token; it keeps the id, place, score and coins for 30 days, without a name (see §13).</li>
 				<li><strong>GitHub, Inc.</strong> — hosting of our website, read for the update check (see §9) and for our own ads (see §6); GitHub logs the IP address of each visit for the security of its service.</li>
 			</ul>
 			<p>
@@ -433,6 +441,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Account and progress</strong> (Unity Authentication and Cloud Save): until you delete your account.</li>
 				<li><strong>Ranking</strong>: your rating and your name, until you have them removed (see §11).</li>
 				<li><strong>Shooting challenge rankings</strong>: your best score and your name, until they reset, every day at midnight (UTC) and every Monday.</li>
+				<li><strong>Shooting challenge coins</strong>: for each winning place, your Unity id, the ranking, the place, the score and the coins, without your name, 30 days on our server, then deleted; sooner if you delete your account. Unity keeps no archive of finished rankings.</li>
 				<li><strong>Online games</strong>: a public game leaves the list as soon as it starts or you close it; throws are not kept after the game.</li>
 				<li><strong>Players online right now</strong>: the random number is erased within minutes after the game stops.</li>
 				<li><strong>Usage statistics</strong>: kept <strong>24 months</strong> on our server, then erased; its backups, 14 days.</li>

@@ -30,7 +30,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			Cette politique concerne <strong>l'application mobile Pétanque Game</strong>
 			(<code>com.ludivenstudio.petanquegame</code>). Le jeu de pétanque du site
 			(<a href="/jeux/petanque/">ludiven-studio.fr/jeux/petanque</a>) et le reste du site ont leur
-			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 17 novembre 2026 (version 1.0.14&nbsp;: le nombre de joueurs en ligne en ce moment, le défi de tir et ses classements, les pièces et les achats sans compte&nbsp;; version 1.0.8&nbsp;: nos propres publicités, nouvelle fenêtre «&nbsp;Publicité personnalisée&nbsp;», plus de sauvegarde Google sur Android).
+			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 17 novembre 2026 (version 1.0.15&nbsp;: les pièces à gagner aux classements du défi de tir&nbsp;; version 1.0.14&nbsp;: le nombre de joueurs en ligne en ce moment, le défi de tir et ses classements, les pièces et les achats sans compte&nbsp;; version 1.0.8&nbsp;: nos propres publicités, nouvelle fenêtre «&nbsp;Publicité personnalisée&nbsp;», plus de sauvegarde Google sur Android).
 		</p>
 
 		<div class="summary">
@@ -120,6 +120,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li><strong>Pendant la partie</strong>, ton adversaire reçoit ton pseudo, ta note, ton joueur, ta tenue et ta boule, puis tes lancers (leur vitesse et l'endroit où ta main lâche la boule). Après chaque lancer, le téléphone qui a ouvert la partie envoie l'arbitrage (position des boules, score). Ces messages passent par <strong>Unity Relay</strong>, qui les achemine sans les garder.</li>
 				<li><strong>Classement</strong>&nbsp;: chaque partie publique en tête-à-tête jouée jusqu'au bout fait bouger ta note (une note Elo). Ta note et ton pseudo sont alors envoyés au classement <strong>Unity Leaderboards</strong>, que tous les joueurs du jeu peuvent consulter&nbsp;: les 50 premiers, et chacun sa propre ligne. Les parties avec un ami par code et les parties en équipe ne comptent pas.</li>
 				<li><strong>Défi de tir</strong>&nbsp;: si tu as un compte, le score de chaque série (sur 50) et ton pseudo vont aux classements du jour et de la semaine (<strong>Unity Leaderboards</strong>), que tous les joueurs du jeu peuvent consulter. Sans compte, tes séries restent sur ton téléphone.</li>
+				<li><strong>Pièces du défi de tir</strong>&nbsp;: les 10 premiers du classement du jour et les 50 premiers de celui de la semaine gagnent des pièces. Une minute avant chaque remise à zéro, notre serveur relève ces places chez Unity, avec l'identifiant Unity de chaque joueur mais sans son pseudo, et ton téléphone vient y chercher les tiennes avec ton jeton de connexion Unity (voir §13).</li>
 			</ul>
 			<p>
 				Il n'y a <strong>ni chat, ni messages, ni voix</strong>. Pour faire retirer un pseudo, le tien ou celui
@@ -170,6 +171,12 @@ import LangSwitch from '../../components/LangSwitch.astro';
 							<td>Le classement en ligne et ceux du défi de tir</td>
 							<td>Exécution du contrat</td>
 							<td>Unity (Leaderboards)&nbsp;; les joueurs du jeu</td>
+						</tr>
+						<tr>
+							<td>Identifiant Unity, classement, place, score et pièces gagnées, sans pseudo&nbsp;; ton jeton de connexion Unity quand ton téléphone demande tes pièces</td>
+							<td>Te verser une seule fois les pièces gagnées aux classements du défi de tir</td>
+							<td>Exécution du contrat</td>
+							<td>Notre fonction chez Supabase (voir §12)</td>
 						</tr>
 						<tr>
 							<td>Produit acheté, reçu du store, numéro de transaction</td>
@@ -393,6 +400,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			<p>
 				<strong>Tes lignes aux classements du défi de tir</strong>&nbsp;: quand tu supprimes ton compte, le jeu leur envoie un score nul, sans pseudo, marqué comme supprimé&nbsp;; ces classements gardant le meilleur score, ta ligne peut rester visible, avec ton pseudo, jusqu'à leur remise à zéro (minuit UTC pour celui du jour, le lundi pour celui de la semaine). Écris-nous pour la faire retirer plus tôt.
 			</p>
+			<p><strong>Tes places gagnantes relevées par notre serveur</strong> (voir §13) sont effacées avec ton compte&nbsp;; si ce n'est pas possible sur le moment, elles disparaissent d'elles-mêmes au bout de 30 jours. Elles ne portent pas ton pseudo.</p>
 			<p>
 				<strong>Sans l'application</strong>&nbsp;: écris à
 				<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a> en indiquant ton pseudo, le
@@ -412,7 +420,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 		<section class="stack gap-2">
 			<h2>12. Destinataires et transferts hors Union européenne</h2>
 			<p>
-				Nos seuls serveurs sont celui des statistiques d'usage (voir §7), une fonction qui compte les joueurs en ligne en ce moment (voir §5) et une fonction qui retire l'accès «&nbsp;Se connecter avec Apple&nbsp;» quand tu supprimes ton compte (voir §11). Tes données ne sont ni vendues ni cédées. Elles ne sont traitées
+				Nos seuls serveurs sont celui des statistiques d'usage (voir §7), une fonction qui compte les joueurs en ligne en ce moment (voir §5), une fonction qui garde les places gagnantes des classements du défi de tir (voir §13) et une fonction qui retire l'accès «&nbsp;Se connecter avec Apple&nbsp;» quand tu supprimes ton compte (voir §11). Tes données ne sont ni vendues ni cédées. Elles ne sont traitées
 				que par ces prestataires&nbsp;:
 			</p>
 			<ul>
@@ -421,7 +429,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li><strong>Google</strong> (Google Ireland Limited, Google LLC) — connexion sur Android et sur iPhone, Google Play (distribution, paiement, fiche de notation).</li>
 				<li><strong>Apple Inc.</strong> — «&nbsp;Se connecter avec Apple&nbsp;», autorisation de suivi, App Store (distribution, paiement, fiche de notation).</li>
 				<li><strong>Hetzner Online GmbH</strong> (Allemagne) — hébergement de notre serveur de statistiques d'usage (voir §7).</li>
-				<li><strong>Supabase, Inc.</strong> — hébergement de notre fonction qui retire l'accès «&nbsp;Se connecter avec Apple&nbsp;» (voir §11)&nbsp;: elle reçoit le code d'Apple, l'identifiant de l'application et l'adresse IP du téléphone, et ne garde rien&nbsp;; et de celle qui compte les joueurs en ligne&nbsp;: elle reçoit le numéro tiré au hasard au lancement et l'adresse IP du téléphone. Elle n'enregistre pas cette adresse, qu'elle peut garder en mémoire quelques minutes pour bloquer les abus&nbsp;; les journaux techniques de Supabase la gardent un temps limité, selon ses conditions.</li>
+				<li><strong>Supabase, Inc.</strong> — hébergement de notre fonction qui retire l'accès «&nbsp;Se connecter avec Apple&nbsp;» (voir §11)&nbsp;: elle reçoit le code d'Apple, l'identifiant de l'application et l'adresse IP du téléphone, et ne garde rien&nbsp;; et de celle qui compte les joueurs en ligne&nbsp;: elle reçoit le numéro tiré au hasard au lancement et l'adresse IP du téléphone. Elle n'enregistre pas cette adresse, qu'elle peut garder en mémoire quelques minutes pour bloquer les abus&nbsp;; les journaux techniques de Supabase la gardent un temps limité, selon ses conditions. Celle des pièces du défi de tir reçoit de Unity l'identifiant des joueurs aux places gagnantes et de ton téléphone ton jeton de connexion Unity&nbsp;; elle garde 30 jours l'identifiant, la place, le score et les pièces, sans pseudo (voir §13).</li>
 				<li><strong>GitHub, Inc.</strong> — hébergement de notre site, lu pour la vérification de mise à jour (voir §9) et pour nos propres publicités (voir §6)&nbsp;; GitHub enregistre l'adresse IP de chaque visite pour la sécurité de son service.</li>
 			</ul>
 			<p>
@@ -437,6 +445,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li><strong>Compte et progression</strong> (Unity Authentication et Cloud Save)&nbsp;: jusqu'à ce que tu supprimes ton compte.</li>
 				<li><strong>Classement</strong>&nbsp;: ta note et ton pseudo, jusqu'à ce que tu les fasses retirer (voir §11).</li>
 				<li><strong>Classements du défi de tir</strong>&nbsp;: ton meilleur score et ton pseudo, jusqu'à leur remise à zéro, chaque jour à minuit (UTC) et chaque lundi.</li>
+				<li><strong>Pièces du défi de tir</strong>&nbsp;: pour chaque place gagnante, ton identifiant Unity, le classement, la place, le score et les pièces, sans pseudo, 30 jours sur notre serveur, puis effacés&nbsp;; plus tôt si tu supprimes ton compte. Unity ne garde aucune archive des classements terminés.</li>
 				<li><strong>Parties en ligne</strong>&nbsp;: une partie publique quitte la liste dès qu'elle commence ou que tu la fermes&nbsp;; les lancers ne sont pas gardés après la partie.</li>
 				<li><strong>Joueurs en ligne en ce moment</strong>&nbsp;: le numéro tiré au hasard est effacé dans les minutes qui suivent l'arrêt du jeu.</li>
 				<li><strong>Statistiques d'usage</strong>&nbsp;: gardées <strong>24 mois</strong> sur notre serveur, puis effacées&nbsp;; ses sauvegardes, 14 jours.</li>

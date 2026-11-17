@@ -31,7 +31,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			Esta política se refiere a <strong>la aplicación móvil Pétanque Game</strong>
 			(<code>com.ludivenstudio.petanquegame</code>). El juego de petanca del sitio web
 			(<a href="/jeux/petanque/">ludiven-studio.fr/jeux/petanque</a>) y el resto del sitio tienen su
-			<a href="/confidentialite/">propia política</a>. Última actualización: 17 de noviembre de 2026 (versión 1.0.14: el número de jugadores conectados en este momento, el desafío de tiro y sus clasificaciones, monedas y compras sin cuenta; versión 1.0.8: nuestros propios anuncios, nueva ventana «Publicidad personalizada», ya sin copia de seguridad de Google en Android).
+			<a href="/confidentialite/">propia política</a>. Última actualización: 17 de noviembre de 2026 (versión 1.0.15: monedas en juego en las clasificaciones del desafío de tiro; versión 1.0.14: el número de jugadores conectados en este momento, el desafío de tiro y sus clasificaciones, monedas y compras sin cuenta; versión 1.0.8: nuestros propios anuncios, nueva ventana «Publicidad personalizada», ya sin copia de seguridad de Google en Android).
 		</p>
 		<p class="updated">
 			Esta es una traducción de cortesía. En caso de discrepancia, prevalece la
@@ -124,6 +124,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Durante la partida</strong>, tu rival recibe tu apodo, tu puntuación, tu jugador, tu equipación y tu bola, y luego tus lanzamientos (su velocidad y el punto donde tu mano suelta la bola). Después de cada lanzamiento, el teléfono que abrió la partida envía el arbitraje (posición de las bolas, marcador). Estos mensajes pasan por <strong>Unity Relay</strong>, que los transmite sin guardarlos.</li>
 				<li><strong>Clasificación</strong>: cada partida pública individual jugada hasta el final hace variar tu puntuación (una puntuación Elo). Tu puntuación y tu apodo se envían entonces a la clasificación <strong>Unity Leaderboards</strong>, que todos los jugadores del juego pueden consultar: los 50 primeros, y cada uno su propia línea. Las partidas con un amigo mediante código y las partidas por equipos no cuentan.</li>
 				<li><strong>Desafío de tiro</strong>: si tienes cuenta, la puntuación de cada serie (sobre 50) y tu apodo van a las clasificaciones del día y de la semana (<strong>Unity Leaderboards</strong>), que todos los jugadores del juego pueden consultar. Sin cuenta, tus series se quedan en tu teléfono.</li>
+				<li><strong>Monedas del desafío de tiro</strong>: los 10 primeros de la clasificación del día y los 50 primeros de la de la semana ganan monedas. Un minuto antes de cada reinicio, nuestro servidor lee esos puestos en Unity, con el identificador Unity de cada jugador pero sin su apodo, y tu teléfono recoge los tuyos con tu token de sesión de Unity (ver §13).</li>
 			</ul>
 			<p>
 				No hay <strong>ni chat, ni mensajes, ni voz</strong>. Para que se retire un apodo, el tuyo o el de
@@ -174,6 +175,12 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 							<td>La clasificación en línea y las del desafío de tiro</td>
 							<td>Ejecución del contrato</td>
 							<td>Unity (Leaderboards); los jugadores del juego</td>
+						</tr>
+						<tr>
+							<td>Identificador Unity, clasificación, puesto, puntuación y monedas ganadas, sin apodo; tu token de sesión de Unity cuando tu teléfono pide tus monedas</td>
+							<td>Pagarte una sola vez las monedas ganadas en las clasificaciones del desafío de tiro</td>
+							<td>Ejecución del contrato</td>
+							<td>Nuestra función en Supabase (ver §12)</td>
 						</tr>
 						<tr>
 							<td>Producto comprado, recibo de la tienda, número de transacción</td>
@@ -394,6 +401,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<p>
 				<strong>Tus líneas en las clasificaciones del desafío de tiro</strong>: cuando eliminas tu cuenta, el juego les envía una puntuación de cero, sin apodo, marcada como eliminada; como esas clasificaciones guardan la mejor puntuación, tu línea puede seguir visible, con tu apodo, hasta que se reinicien (medianoche UTC la del día, el lunes la de la semana). Escríbenos para que la retiremos antes.
 			</p>
+			<p><strong>Tus puestos premiados guardados por nuestro servidor</strong> (ver §13) se borran con tu cuenta; si no es posible en ese momento, desaparecen solos a los 30 días. No llevan tu apodo.</p>
 			<p>
 				<strong>Sin la aplicación</strong>: escribe a
 				<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a> indicando tu apodo, el tipo
@@ -413,7 +421,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 		<section class="stack gap-2">
 			<h2>12. Destinatarios y transferencias fuera de la Unión Europea</h2>
 			<p>
-				Nuestros únicos servidores son el de las estadísticas de uso (ver §7), una función que cuenta los jugadores conectados en este momento (ver §5) y una función que retira el acceso «Iniciar sesión con Apple» cuando eliminas tu cuenta (ver §11). Tus datos no se venden ni se ceden. Solo los tratan estos proveedores:
+				Nuestros únicos servidores son el de las estadísticas de uso (ver §7), una función que cuenta los jugadores conectados en este momento (ver §5), una función que guarda los puestos premiados de las clasificaciones del desafío de tiro (ver §13) y una función que retira el acceso «Iniciar sesión con Apple» cuando eliminas tu cuenta (ver §11). Tus datos no se venden ni se ceden. Solo los tratan estos proveedores:
 			</p>
 			<ul>
 				<li><strong>Unity Technologies</strong> — cuentas (Authentication), guardado del progreso (Cloud Save), partidas en línea (Multiplayer y Relay), clasificación (Leaderboards), módulo de compra (In-App Purchasing) y, si la has aceptado, publicidad (Unity LevelPlay, Unity Ads).</li>
@@ -421,7 +429,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Google</strong> (Google Ireland Limited, Google LLC) — inicio de sesión en Android y en iPhone, Google Play (distribución, pago, ventana de valoración).</li>
 				<li><strong>Apple Inc.</strong> — «Iniciar sesión con Apple», permiso de seguimiento, App Store (distribución, pago, ventana de valoración).</li>
 				<li><strong>Hetzner Online GmbH</strong> (Alemania) — alojamiento de nuestro servidor de estadísticas de uso (ver §7).</li>
-				<li><strong>Supabase, Inc.</strong> — alojamiento de nuestra función que retira el acceso «Iniciar sesión con Apple» (ver §11): recibe el código de Apple, el identificador de la aplicación y la dirección IP del teléfono, y no guarda nada; y de la que cuenta los jugadores conectados: recibe el número sacado al azar al iniciar y la dirección IP del teléfono. No registra esa dirección, que puede guardar en memoria unos minutos para bloquear abusos; los registros técnicos de Supabase la guardan durante un tiempo limitado, según sus condiciones.</li>
+				<li><strong>Supabase, Inc.</strong> — alojamiento de nuestra función que retira el acceso «Iniciar sesión con Apple» (ver §11): recibe el código de Apple, el identificador de la aplicación y la dirección IP del teléfono, y no guarda nada; y de la que cuenta los jugadores conectados: recibe el número sacado al azar al iniciar y la dirección IP del teléfono. No registra esa dirección, que puede guardar en memoria unos minutos para bloquear abusos; los registros técnicos de Supabase la guardan durante un tiempo limitado, según sus condiciones. La de las monedas del desafío de tiro recibe de Unity el identificador de los jugadores en los puestos premiados y de tu teléfono tu token de sesión de Unity; guarda 30 días el identificador, el puesto, la puntuación y las monedas, sin apodo (ver §13).</li>
 				<li><strong>GitHub, Inc.</strong> — alojamiento de nuestro sitio web, consultado para comprobar si hay actualizaciones (ver §9) y para nuestros propios anuncios (ver §6); GitHub registra la dirección IP de cada visita para la seguridad de su servicio.</li>
 			</ul>
 			<p>
@@ -437,6 +445,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Cuenta y progreso</strong> (Unity Authentication y Cloud Save): hasta que elimines tu cuenta.</li>
 				<li><strong>Clasificación</strong>: tu puntuación y tu apodo, hasta que pidas que se retiren (ver §11).</li>
 				<li><strong>Clasificaciones del desafío de tiro</strong>: tu mejor puntuación y tu apodo, hasta que se reinician, cada día a medianoche (UTC) y cada lunes.</li>
+				<li><strong>Monedas del desafío de tiro</strong>: por cada puesto premiado, tu identificador Unity, la clasificación, el puesto, la puntuación y las monedas, sin apodo, 30 días en nuestro servidor, y después se borran; antes si eliminas tu cuenta. Unity no guarda ningún archivo de las clasificaciones terminadas.</li>
 				<li><strong>Partidas en línea</strong>: una partida pública sale de la lista en cuanto empieza o la cierras; los lanzamientos no se guardan después de la partida.</li>
 				<li><strong>Jugadores conectados en este momento</strong>: el número sacado al azar se borra en los minutos siguientes a que el juego se detenga.</li>
 				<li><strong>Estadísticas de uso</strong>: se guardan <strong>24 meses</strong> en nuestro servidor y luego se borran; sus copias de seguridad, 14 días.</li>

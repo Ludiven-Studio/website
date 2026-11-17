@@ -31,7 +31,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			Diese Erklärung betrifft <strong>die mobile App Pétanque Game</strong>
 			(<code>com.ludivenstudio.petanquegame</code>). Das Pétanque-Spiel der Website
 			(<a href="/jeux/petanque/">ludiven-studio.fr/jeux/petanque</a>) und die übrige Website haben eine
-			<a href="/confidentialite/">eigene Datenschutzerklärung</a>. Letzte Aktualisierung: 17. November 2026 (Version 1.0.14: die Zahl der Spieler, die gerade online sind, die Schuss-Challenge und ihre Ranglisten, Münzen und Käufe ohne Konto; Version 1.0.8: unsere eigene Werbung, neues Fenster „Personalisierte Werbung“, keine Google-Datensicherung mehr auf Android).
+			<a href="/confidentialite/">eigene Datenschutzerklärung</a>. Letzte Aktualisierung: 17. November 2026 (Version 1.0.15: Münzen zu gewinnen in den Ranglisten der Schuss-Challenge; Version 1.0.14: die Zahl der Spieler, die gerade online sind, die Schuss-Challenge und ihre Ranglisten, Münzen und Käufe ohne Konto; Version 1.0.8: unsere eigene Werbung, neues Fenster „Personalisierte Werbung“, keine Google-Datensicherung mehr auf Android).
 		</p>
 		<p class="updated">
 			Dies ist eine Höflichkeitsübersetzung. Bei Abweichungen gilt die
@@ -125,6 +125,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Während der Partie</strong> erhält dein Gegner deinen Spitznamen, deine Wertung, deine Figur, dein Trikot und deine Kugel, dann deine Würfe (ihre Geschwindigkeit und die Stelle, an der deine Hand die Kugel loslässt). Nach jedem Wurf sendet das Handy, das die Partie eröffnet hat, die Schiedsrichterentscheidung (Lage der Kugeln, Punktestand). Diese Nachrichten laufen über <strong>Unity Relay</strong>, das sie weiterleitet, ohne sie zu speichern.</li>
 				<li><strong>Rangliste</strong>: Jede öffentliche Partie im Tête-à-tête, die bis zum Ende gespielt wird, verändert deine Wertung (eine Elo-Wertung). Deine Wertung und dein Spitzname werden dann an die Rangliste <strong>Unity Leaderboards</strong> gesendet, die alle Spieler des Spiels ansehen können: die ersten 50, und jeder seine eigene Zeile. Partien mit einem Freund über einen Code und Teampartien zählen nicht.</li>
 				<li><strong>Schuss-Challenge</strong>: Wenn du ein Konto hast, gehen die Punktzahl jeder Serie (von 50) und dein Spitzname in die Tages- und die Wochenrangliste (<strong>Unity Leaderboards</strong>), die alle Spieler des Spiels sehen können. Ohne Konto bleiben deine Serien auf deinem Handy.</li>
+				<li><strong>Münzen der Schuss-Challenge</strong>: Die besten 10 der Tagesrangliste und die besten 50 der Wochenrangliste gewinnen Münzen. Eine Minute vor jedem Zurücksetzen liest unser Server diese Plätze bei Unity aus, mit der Unity-ID jedes Spielers, aber ohne seinen Spitznamen, und dein Telefon holt dort deine mit deinem Unity-Anmeldetoken ab (siehe §13).</li>
 			</ul>
 			<p>
 				Es gibt <strong>keinen Chat, keine Nachrichten und keinen Sprachchat</strong>. Wenn ein Spitzname
@@ -175,6 +176,12 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 							<td>Die Online-Rangliste und die Ranglisten der Schuss-Challenge</td>
 							<td>Vertragserfüllung</td>
 							<td>Unity (Leaderboards); die Spieler des Spiels</td>
+						</tr>
+						<tr>
+							<td>Unity-ID, Rangliste, Platz, Punktzahl und gewonnene Münzen, ohne Spitznamen; dein Unity-Anmeldetoken, wenn dein Telefon deine Münzen abfragt</td>
+							<td>Dir die in den Ranglisten der Schuss-Challenge gewonnenen Münzen einmal auszuzahlen</td>
+							<td>Vertragserfüllung</td>
+							<td>Unsere Funktion bei Supabase (siehe §12)</td>
 						</tr>
 						<tr>
 							<td>Gekauftes Produkt, Kaufbeleg des Stores, Transaktionsnummer</td>
@@ -399,6 +406,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<p>
 				<strong>Deine Einträge in den Ranglisten der Schuss-Challenge</strong>: Wenn du dein Konto löschst, sendet das Spiel ihnen eine Punktzahl von null, ohne Spitznamen, als gelöscht markiert; da diese Ranglisten die beste Punktzahl behalten, kann dein Eintrag mit deinem Spitznamen sichtbar bleiben, bis sie zurückgesetzt werden (Mitternacht UTC für die Tagesrangliste, montags für die Wochenrangliste). Schreib uns, wenn er früher entfernt werden soll.
 			</p>
+			<p><strong>Deine von unserem Server festgehaltenen Gewinnplätze</strong> (siehe §13) werden mit deinem Konto gelöscht; klappt das nicht sofort, verschwinden sie nach 30 Tagen von selbst. Sie enthalten deinen Spitznamen nicht.</p>
 			<p>
 				<strong>Ohne die App</strong>: Schreib an
 				<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a> und gib deinen Spitznamen an,
@@ -418,7 +426,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 		<section class="stack gap-2">
 			<h2>12. Empfänger und Übermittlungen außerhalb der Europäischen Union</h2>
 			<p>
-				Unsere einzigen eigenen Server sind der für die Nutzungsstatistiken (siehe §7), eine Funktion, die zählt, wie viele gerade online spielen (siehe §5), und eine Funktion, die beim Löschen deines Kontos den Zugriff über „Mit Apple anmelden“ entzieht (siehe §11). Deine Daten werden weder verkauft noch weitergegeben. Sie werden nur
+				Unsere einzigen eigenen Server sind der für die Nutzungsstatistiken (siehe §7), eine Funktion, die zählt, wie viele gerade online spielen (siehe §5), eine Funktion, die die Gewinnplätze der Ranglisten der Schuss-Challenge festhält (siehe §13), und eine Funktion, die beim Löschen deines Kontos den Zugriff über „Mit Apple anmelden“ entzieht (siehe §11). Deine Daten werden weder verkauft noch weitergegeben. Sie werden nur
 				von diesen Dienstleistern verarbeitet:
 			</p>
 			<ul>
@@ -427,7 +435,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Google</strong> (Google Ireland Limited, Google LLC) — Anmeldung unter Android und auf dem iPhone, Google Play (Vertrieb, Zahlung, Bewertungsfenster).</li>
 				<li><strong>Apple Inc.</strong> — „Mit Apple anmelden“, Tracking-Erlaubnis, App Store (Vertrieb, Zahlung, Bewertungsfenster).</li>
 				<li><strong>Hetzner Online GmbH</strong> (Deutschland) — Hosting unseres Servers für die Nutzungsstatistiken (siehe §7).</li>
-				<li><strong>Supabase, Inc.</strong> — Hosting unserer Funktion, die den Zugriff über „Mit Apple anmelden“ entzieht (siehe §11): Sie erhält den Code von Apple, die Kennung der App und die IP-Adresse des Handys und speichert nichts; sowie der Funktion, die zählt, wie viele online spielen: Sie erhält die beim Start zufällig gezogene Nummer und die IP-Adresse des Handys. Sie speichert diese Adresse nicht, kann sie aber einige Minuten im Arbeitsspeicher behalten, um Missbrauch zu verhindern; die technischen Protokolle von Supabase bewahren sie nach dessen Bedingungen für begrenzte Zeit auf.</li>
+				<li><strong>Supabase, Inc.</strong> — Hosting unserer Funktion, die den Zugriff über „Mit Apple anmelden“ entzieht (siehe §11): Sie erhält den Code von Apple, die Kennung der App und die IP-Adresse des Handys und speichert nichts; sowie der Funktion, die zählt, wie viele online spielen: Sie erhält die beim Start zufällig gezogene Nummer und die IP-Adresse des Handys. Sie speichert diese Adresse nicht, kann sie aber einige Minuten im Arbeitsspeicher behalten, um Missbrauch zu verhindern; die technischen Protokolle von Supabase bewahren sie nach dessen Bedingungen für begrenzte Zeit auf. Die Funktion für die Münzen der Schuss-Challenge erhält von Unity die IDs der Spieler auf den Gewinnplätzen und von deinem Telefon dein Unity-Anmeldetoken; sie speichert ID, Platz, Punktzahl und Münzen 30 Tage lang, ohne Spitznamen (siehe §13).</li>
 				<li><strong>GitHub, Inc.</strong> — Hosting unserer Website, die für die Update-Prüfung (siehe §9) und für unsere eigene Werbung (siehe §6) gelesen wird; GitHub speichert die IP-Adresse jedes Aufrufs für die Sicherheit seines Dienstes.</li>
 			</ul>
 			<p>
@@ -444,6 +452,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Konto und Spielstand</strong> (Unity Authentication und Cloud Save): bis du dein Konto löschst.</li>
 				<li><strong>Rangliste</strong>: deine Wertung und dein Spitzname, bis du sie entfernen lässt (siehe §11).</li>
 				<li><strong>Ranglisten der Schuss-Challenge</strong>: deine beste Punktzahl und dein Spitzname, bis sie zurückgesetzt werden, jeden Tag um Mitternacht (UTC) und jeden Montag.</li>
+				<li><strong>Münzen der Schuss-Challenge</strong>: für jeden Gewinnplatz deine Unity-ID, die Rangliste, der Platz, die Punktzahl und die Münzen, ohne Spitznamen, 30 Tage auf unserem Server, danach gelöscht; früher, wenn du dein Konto löschst. Unity bewahrt keine Archive abgeschlossener Ranglisten auf.</li>
 				<li><strong>Online-Partien</strong>: Eine öffentliche Partie verschwindet aus der Liste, sobald sie beginnt oder du sie schließt; die Würfe werden nach der Partie nicht aufbewahrt.</li>
 				<li><strong>Gerade online</strong>: Die zufällige Nummer wird in den Minuten nach dem Beenden des Spiels gelöscht.</li>
 				<li><strong>Nutzungsstatistiken</strong>: <strong>24 Monate</strong> auf unserem Server gespeichert, dann gelöscht; seine Sicherungen 14 Tage.</li>
