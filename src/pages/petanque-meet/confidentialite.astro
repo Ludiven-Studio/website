@@ -7,11 +7,19 @@ import LangSwitch from '../../components/LangSwitch.astro';
 <BaseLayout
 	title="Confidentialité de l'application Pétanque Meet | Ludiven Studio"
 	description="Politique de confidentialité de l'application mobile Pétanque Meet : compte Google ou Apple, parties publiées sur la carte, concours, publicité, modération, droits RGPD."
-	alternates={{ fr: '/petanque-meet/confidentialite/', en: '/en/petanque-meet/confidentialite/' }}
+	alternates={{ fr: '/petanque-meet/confidentialite/', en: '/en/petanque-meet/confidentialite/', es: '/es/petanque-meet/confidentialite/', de: '/de/petanque-meet/confidentialite/', it: '/it/petanque-meet/confidentialite/' }}
 >
 	<div class="wrapper stack gap-12 legal">
 		<div class="stack gap-8">
-			<LangSwitch lang="fr" links={[{ lang: 'en', href: '/en/petanque-meet/confidentialite/' }]} />
+			<LangSwitch
+				lang="fr"
+				links={[
+					{ lang: 'en', href: '/en/petanque-meet/confidentialite/' },
+					{ lang: 'es', href: '/es/petanque-meet/confidentialite/' },
+					{ lang: 'de', href: '/de/petanque-meet/confidentialite/' },
+					{ lang: 'it', href: '/it/petanque-meet/confidentialite/' },
+				]}
+			/>
 			<Hero
 				title="Confidentialité — Pétanque Meet"
 				tagline="Ce que tu publies sur la carte est public. Le reste n'est ni vendu ni cédé."

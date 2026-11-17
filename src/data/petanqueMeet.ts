@@ -137,8 +137,8 @@ export const MEET_DOWNLOAD = {
 		closing: '¿Jugamos?',
 		browser: { before: '¿No estás en el móvil? El mapa también se abre ', link: 'en tu navegador', after: ' (en inglés).', href: '/en/petanque-meet/' },
 		legal: [
-			{ label: 'Lo que se guarda', href: '/petanque-meet/confidentialite/' },
-			{ label: 'Condiciones', href: '/petanque-meet/cgu/' },
+			{ label: 'Lo que se guarda', href: '/es/petanque-meet/confidentialite/' },
+			{ label: 'Condiciones', href: '/es/petanque-meet/cgu/' },
 		],
 		legalNote: '(en francés)',
 	},
@@ -172,8 +172,8 @@ export const MEET_DOWNLOAD = {
 		closing: 'Bereit zum Spielen?',
 		browser: { before: 'Nicht am Handy? Die Karte gibt es auch ', link: 'im Browser', after: ' (auf Englisch).', href: '/en/petanque-meet/' },
 		legal: [
-			{ label: 'Was gespeichert wird', href: '/petanque-meet/confidentialite/' },
-			{ label: 'Nutzungsbedingungen', href: '/petanque-meet/cgu/' },
+			{ label: 'Was gespeichert wird', href: '/de/petanque-meet/confidentialite/' },
+			{ label: 'Nutzungsbedingungen', href: '/de/petanque-meet/cgu/' },
 		],
 		legalNote: '(auf Französisch)',
 	},
@@ -207,8 +207,8 @@ export const MEET_DOWNLOAD = {
 		closing: 'Giochiamo?',
 		browser: { before: 'Non sei sul telefono? La mappa si apre anche ', link: 'nel browser', after: ' (in inglese).', href: '/en/petanque-meet/' },
 		legal: [
-			{ label: 'Cosa viene salvato', href: '/petanque-meet/confidentialite/' },
-			{ label: 'Condizioni', href: '/petanque-meet/cgu/' },
+			{ label: 'Cosa viene salvato', href: '/it/petanque-meet/confidentialite/' },
+			{ label: 'Condizioni', href: '/it/petanque-meet/cgu/' },
 		],
 		legalNote: '(in francese)',
 	},

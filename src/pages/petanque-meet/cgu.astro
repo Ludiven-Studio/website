@@ -7,11 +7,19 @@ import LangSwitch from '../../components/LangSwitch.astro';
 <BaseLayout
 	title="Conditions d'utilisation de l'application Pétanque Meet | Ludiven Studio"
 	description="Conditions générales d'utilisation de l'application Pétanque Meet : compte, parties et concours publiés, règles de conduite, modération, responsabilité."
-	alternates={{ fr: '/petanque-meet/cgu/', en: '/en/petanque-meet/cgu/' }}
+	alternates={{ fr: '/petanque-meet/cgu/', en: '/en/petanque-meet/cgu/', es: '/es/petanque-meet/cgu/', de: '/de/petanque-meet/cgu/', it: '/it/petanque-meet/cgu/' }}
 >
 	<div class="wrapper stack gap-12 legal">
 		<div class="stack gap-8">
-			<LangSwitch lang="fr" links={[{ lang: 'en', href: '/en/petanque-meet/cgu/' }]} />
+			<LangSwitch
+				lang="fr"
+				links={[
+					{ lang: 'en', href: '/en/petanque-meet/cgu/' },
+					{ lang: 'es', href: '/es/petanque-meet/cgu/' },
+					{ lang: 'de', href: '/de/petanque-meet/cgu/' },
+					{ lang: 'it', href: '/it/petanque-meet/cgu/' },
+				]}
+			/>
 			<Hero
 				title="Conditions d'utilisation — Pétanque Meet"
 				tagline="De vraies parties, de vrais prénoms, du respect."

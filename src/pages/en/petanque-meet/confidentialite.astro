@@ -8,11 +8,19 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 	title="Privacy policy of the Pétanque Meet app | Ludiven Studio"
 	description="Privacy policy of the Pétanque Meet mobile app: Google or Apple account, games published on the map, tournaments, advertising, moderation, GDPR rights."
 	lang="en"
-	alternates={{ fr: '/petanque-meet/confidentialite/', en: '/en/petanque-meet/confidentialite/' }}
+	alternates={{ fr: '/petanque-meet/confidentialite/', en: '/en/petanque-meet/confidentialite/', es: '/es/petanque-meet/confidentialite/', de: '/de/petanque-meet/confidentialite/', it: '/it/petanque-meet/confidentialite/' }}
 >
 	<div class="wrapper stack gap-12 legal">
 		<div class="stack gap-8">
-			<LangSwitch lang="en" links={[{ lang: 'fr', href: '/petanque-meet/confidentialite/' }]} />
+			<LangSwitch
+				lang="en"
+				links={[
+					{ lang: 'fr', href: '/petanque-meet/confidentialite/' },
+					{ lang: 'es', href: '/es/petanque-meet/confidentialite/' },
+					{ lang: 'de', href: '/de/petanque-meet/confidentialite/' },
+					{ lang: 'it', href: '/it/petanque-meet/confidentialite/' },
+				]}
+			/>
 			<Hero
 				title="Privacy — Pétanque Meet"
 				tagline="What you publish on the map is public. The rest is neither sold nor handed over."

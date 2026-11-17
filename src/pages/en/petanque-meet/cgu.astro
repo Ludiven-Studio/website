@@ -8,11 +8,19 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 	title="Terms of use of the Pétanque Meet app | Ludiven Studio"
 	description="General terms of use of the Pétanque Meet app: account, published games and tournaments, rules of conduct, moderation, liability."
 	lang="en"
-	alternates={{ fr: '/petanque-meet/cgu/', en: '/en/petanque-meet/cgu/' }}
+	alternates={{ fr: '/petanque-meet/cgu/', en: '/en/petanque-meet/cgu/', es: '/es/petanque-meet/cgu/', de: '/de/petanque-meet/cgu/', it: '/it/petanque-meet/cgu/' }}
 >
 	<div class="wrapper stack gap-12 legal">
 		<div class="stack gap-8">
-			<LangSwitch lang="en" links={[{ lang: 'fr', href: '/petanque-meet/cgu/' }]} />
+			<LangSwitch
+				lang="en"
+				links={[
+					{ lang: 'fr', href: '/petanque-meet/cgu/' },
+					{ lang: 'es', href: '/es/petanque-meet/cgu/' },
+					{ lang: 'de', href: '/de/petanque-meet/cgu/' },
+					{ lang: 'it', href: '/it/petanque-meet/cgu/' },
+				]}
+			/>
 			<Hero
 				title="Terms of use — Pétanque Meet"
 				tagline="Real games, real first names, respect."

@@ -1,0 +1,335 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import Hero from '../../../components/Hero.astro';
+import LangSwitch from '../../../components/LangSwitch.astro';
+---
+
+<BaseLayout
+	title="Nutzungsbedingungen der App Pétanque Meet | Ludiven Studio"
+	description="Allgemeine Nutzungsbedingungen der App Pétanque Meet: Konto, veröffentlichte Spiele und Turniere, Verhaltensregeln, Moderation, Haftung."
+	lang="de"
+	alternates={{ fr: '/petanque-meet/cgu/', en: '/en/petanque-meet/cgu/', es: '/es/petanque-meet/cgu/', de: '/de/petanque-meet/cgu/', it: '/it/petanque-meet/cgu/' }}
+>
+	<div class="wrapper stack gap-12 legal">
+		<div class="stack gap-8">
+			<LangSwitch
+				lang="de"
+				links={[
+					{ lang: 'fr', href: '/petanque-meet/cgu/' },
+					{ lang: 'en', href: '/en/petanque-meet/cgu/' },
+					{ lang: 'es', href: '/es/petanque-meet/cgu/' },
+					{ lang: 'it', href: '/it/petanque-meet/cgu/' },
+				]}
+			/>
+			<Hero
+				title="Nutzungsbedingungen — Pétanque Meet"
+				tagline="Echte Spiele, echte Vornamen, Respekt."
+			/>
+		</div>
+
+		<p class="updated">
+			App <strong>Pétanque Meet</strong> (<code>com.ludivenstudio.petanquemeet</code>) und die Treffpunkt-Karte
+			der Website — letzte Aktualisierung: 17. November 2026.
+		</p>
+		<p class="updated">
+			Dies ist eine Höflichkeitsübersetzung. Bei Abweichungen gilt die
+			<a href="/petanque-meet/cgu/" hreflang="fr">französische Originalfassung</a>.
+		</p>
+
+		<div class="summary">
+			<p><strong>Vor dem Spielen solltest du wissen:</strong></p>
+			<ul>
+				<li>Die App ist <strong>kostenlos</strong> und ohne Käufe. Ein Werbebanner finanziert ihren Betrieb.</li>
+				<li>Was du veröffentlichst, ist <strong>öffentlich</strong>. Schreib nur hinein, was du allen zeigen willst.</li>
+				<li>Die Spiele werden <strong>von den Spielern organisiert, nicht von uns</strong>. Wir garantieren nicht, dass ein Spiel stattfindet, und auch nicht, wer kommt.</li>
+				<li>Eine falsche, beleidigende oder kommerzielle Anzeige wird entfernt, und ihr Konto kann gesperrt werden.</li>
+			</ul>
+		</div>
+
+		<section class="stack gap-2">
+			<h2>1. Gegenstand und Annahme</h2>
+			<p>
+				Diese Bedingungen regeln die Nutzung der mobilen App Pétanque Meet und der Treffpunkt-Karte der Website
+				ludiven-studio.fr (zusammen „der Dienst“). Indem du ein Konto erstellst oder auf der Karte
+				veröffentlichst, akzeptierst du sie. Wenn du sie ablehnst, nutze den Dienst nicht.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>2. Herausgeber</h2>
+			<ul>
+				<li>Firmenname: <strong>Ludiven Studio</strong></li>
+				<li>Rechtsform: EURL (französische Einpersonengesellschaft mit beschränkter Haftung) mit einem Stammkapital von 1&nbsp;000&nbsp;€</li>
+				<li>Registereintrag: 999&nbsp;253&nbsp;586 R.C.S. Vienne — SIRET 999&nbsp;253&nbsp;586&nbsp;00013</li>
+				<li>Sitz: 1166 route de la Ranche, 38440 Châtonnay, Frankreich</li>
+				<li>Verantwortlich für die Veröffentlichung: Ludiven Studio</li>
+				<li>Kontakt: <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a></li>
+			</ul>
+			<p>Siehe auch das <a href="/mentions-legales/">Impressum</a> (auf Französisch).</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>3. Der Dienst</h2>
+			<p>
+				Pétanque Meet ist eine Karte der Pétanque-Spiele. Ein Spieler veröffentlicht dort ein Spiel (einen Platz,
+				eine Uhrzeit, die Zahl der Spieler, die er sucht), und andere Spieler tragen sich dafür ein. Ein Verein
+				oder eine Vereinigung kann dort auch ein Turnier ankündigen.
+			</p>
+			<p>
+				Der Dienst bringt Spieler zusammen, mehr nicht. Ludiven Studio organisiert weder die Spiele noch die
+				Turniere, nimmt nicht daran teil und ist nicht Partei der Absprachen zwischen Spielern.
+			</p>
+			<p>
+				Der Dienst ist <strong>kostenlos</strong>. Die Karte deckt die ganze Welt ab: Ihre Kartengrundlagen stammen
+				von OpenFreeMap, im Format OpenMapTiles, mit den Daten von OpenStreetMap (© OpenStreetMap-Mitwirkende,
+				Lizenz ODbL), und die App schreibt die Ortsnamen in ihrer Sprache darauf. Wenn OpenFreeMap nicht antwortet,
+				und in den Versionen der App bis 1.0.3, stammen sie vom BKG, dem Bundesamt für Kartographie und Geodäsie
+				(TopPlusOpen, © BKG, Lizenz dl-de/by-2-0). Die App zeigt ein Werbebanner, ausgeliefert über Unity LevelPlay
+				(ironSource Ads und Unity Ads), bis Version 0.1.6 über Google AdMob: Die dabei verwendeten Daten sind in der
+				<a href="/de/petanque-meet/confidentialite/">Datenschutzerklärung</a> (§9) beschrieben.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>4. Konto</h2>
+			<p>
+				Um die Karte anzusehen, brauchst du kein Konto. Um zu veröffentlichen, dich einzutragen oder zu melden,
+				meldest du dich mit Google oder Apple an. Der Dienst richtet sich an Personen ab <strong>15 Jahren</strong>;
+				Minderjährige brauchen die Zustimmung ihrer Eltern.
+			</p>
+			<p>
+				Du bist verantwortlich für das, was über dein Konto veröffentlicht wird. Ein Konto pro Person: Konten zu
+				erstellen, um eine Grenze oder eine Sperre zu umgehen, ist verboten.
+			</p>
+			<p>
+				Du kannst dein Konto jederzeit in der App löschen: „Konto und Hilfe“ → „Mein Konto löschen“. Was gelöscht
+				wird, steht in der <a href="/de/petanque-meet/confidentialite/">Datenschutzerklärung</a>.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>5. Verhaltensregeln</h2>
+			<p>Wenn du den Dienst nutzt, verpflichtest du dich:</p>
+			<ul>
+				<li><strong>echte Spiele zu veröffentlichen</strong>, die du spielen willst, und sie abzusagen, wenn du nicht mehr kommen kannst;</li>
+				<li><strong>zu kommen, wenn du dich einträgst</strong>, oder dich rechtzeitig wieder auszutragen;</li>
+				<li>deinen <strong>echten Vornamen</strong> oder einen Spitznamen zu verwenden, nie den eines anderen;</li>
+				<li>nichts Beleidigendes, Hasserfülltes, Diskriminierendes, Sexuelles oder Rechtswidriges zu veröffentlichen;</li>
+				<li>keine personenbezogenen Daten Dritter (Name, Telefonnummer, Adresse) ohne deren Zustimmung zu veröffentlichen;</li>
+				<li>keine Werbung zu machen und niemanden anzuwerben: Zugelassen sind nur Turniere, die ihr Verein oder ihr Veranstalter ankündigt;</li>
+				<li>die Stecknadel an einen Ort zu setzen, an dem man spielen kann, und nicht bei einer Privatperson;</li>
+				<li>den Dienst nicht zu stören: keine Bots, keine Massenveröffentlichungen, kein Umgehen der Grenzen, keine falschen Meldungen.</li>
+			</ul>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>6. Turniere</h2>
+			<p>
+				Ein Turnier anzukündigen ist seinem Verein, seiner Vereinigung oder seinem Veranstalter vorbehalten. Wer es
+				ankündigt, garantiert, dass die Angaben (Datum, Ort, Startgeld, Kategorie) stimmen, und aktualisiert sie,
+				wenn sich etwas ändert oder das Turnier abgesagt wird.
+			</p>
+			<p>
+				Telefonnummer und Plakat sind freiwillig und werden <strong>öffentlich</strong>. Wenn du ein Plakat
+				sendest, garantierst du, dass du es verbreiten darfst, auch die Fotos und Logos darauf, und du erlaubst
+				Ludiven Studio, es im Dienst anzuzeigen, bis es gelöscht wird. Jedes Plakat wird vom Herausgeber geprüft,
+				bevor es sichtbar wird, und kann ohne Begründung abgelehnt werden.
+			</p>
+			<p>
+				Das Startgeld wird direkt an den Veranstalter gezahlt. Ludiven Studio nimmt nichts ein und ist nicht für
+				den Ablauf des Turniers verantwortlich.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>7. Mitspielersuche</h2>
+			<p>
+				Bei einem Teamturnier kann ein angemeldeter Spieler eine Anzeige veröffentlichen, um einen Mitspieler zu
+				finden, oder einen dritten Spieler, wenn er für eine Triplette schon zu zweit ist. Jedes Konto kann eine
+				Anzeige pro Turnier haben, und höchstens fünf laufende Anzeigen, über alle Turniere hinweg. Die Anzeige
+				zeigt deinen Vornamen, den Wettbewerb, ob du allein oder zu zweit bist, dein Niveau und eine kurze Notiz
+				(120 Zeichen, ohne Link).
+			</p>
+			<p>
+				Deine Telefonnummer ist Pflicht: eine französische Nummer oder eine andere mit Ländervorwahl (+32…). Sie
+				erscheint nie in der Liste. Ein angemeldeter Spieler erhält sie, wenn er auf „Kontaktieren“ tippt, und
+				jedes Konto kann höchstens 10 neue Nummern pro 24 Stunden abfragen. Du siehst, wie viele Spieler nach
+				deiner gefragt haben. Veröffentliche nur deine eigene Nummer. Indem du sie veröffentlichst, akzeptierst du,
+				dass diese Spieler dich wegen dieses Turniers anrufen oder dir schreiben. Wer eine Nummer erhält, nutzt sie
+				nur für dieses Turnier: keine Anwerbung, keine Weitergabe.
+			</p>
+			<p>
+				Eine Anzeige, die von zwei Spielern über zwei verschiedene Verbindungen gemeldet wird, wird sofort
+				ausgeblendet, bis der Herausgeber sie geprüft hat. Die Anzeige und ihre Nummer werden gelöscht, sobald der
+				Wettbewerb beginnt (spätestens zehn Minuten danach), wenn du sie schließt („Gefunden“), wenn das Turnier
+				abgesagt wird oder wenn du dein Konto löschst.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>8. Meldungen, Moderation und Sanktionen</h2>
+			<p>
+				Jeder kann eine Anzeige oder einen Spieler, der nicht gekommen ist, melden. Die Texte laufen durch einen
+				automatischen Filter, und eine Anzeige, die von mehreren Spielern gemeldet wird, wird bis zu einer Prüfung
+				ausgeblendet.
+			</p>
+			<p>
+				Der Herausgeber kann ohne Vorankündigung eine Anzeige, eine Teilnahme oder ein Plakat entfernen, die diese
+				Bedingungen nicht einhalten, und <strong>ein Konto sperren</strong>: bei einem schweren Verstoß oder bei
+				wiederholten Verstößen (falsche Spiele, Nichterscheinen, Missbrauch von Meldungen). Um eine Entscheidung
+				anzufechten, schreib an <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>.
+			</p>
+			<p>
+				Um einen rechtswidrigen Inhalt zu melden, nutze die Schaltfläche „Melden“ der Anzeige oder schreib uns.
+				Wir bearbeiten die Meldung so schnell wie möglich.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>9. Andere Spieler treffen</h2>
+			<p>
+				Bei den Spielen treffen sich Menschen, die sich oft nicht kennen. Ludiven Studio prüft die Identität der
+				Spieler nicht und kann ihr Verhalten nicht garantieren. Ein paar gute Gewohnheiten:
+			</p>
+			<ul>
+				<li>triff dich auf einem öffentlichen Platz, zu Zeiten, in denen Leute da sind;</li>
+				<li>sag einer nahestehenden Person, wohin du gehst;</li>
+				<li>melde jedes unangemessene Verhalten, und ruf bei Gefahr die 17 oder die 112 an.</li>
+			</ul>
+			<p>
+				Jeder Spieler bleibt für sein Handeln, seine Wege und seine Ausrüstung verantwortlich. Ein Streit zwischen
+				Spielern wird unter ihnen geregelt.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>10. Geistiges Eigentum</h2>
+			<p>
+				Die App, ihr Code, ihre Oberflächen, ihre Texte und ihre grafischen Elemente gehören Ludiven Studio. Sie
+				sind durch das Recht des geistigen Eigentums geschützt. Du erhältst ein persönliches und nicht
+				ausschließliches Nutzungsrecht. Die Kartengrundlagen gehören OpenFreeMap, OpenMapTiles, dem BKG und den
+				OpenStreetMap-Mitwirkenden, und die Ortsnamen stammen von OpenStreetMap (© OpenStreetMap-Mitwirkende).
+				„Pétanque“ ist ein Gattungsbegriff: Der Dienst ist mit keinem Verband verbunden.
+			</p>
+			<p>
+				Was du veröffentlichst, bleibt dein Eigentum. Du erlaubst Ludiven Studio, es im Dienst anzuzeigen, auf der
+				Karte und in den Links zum Teilen, solange die Anzeige online ist.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>11. Weiterentwicklung und Einstellung des Dienstes</h2>
+			<p>
+				Der Herausgeber kann den Dienst weiterentwickeln, Funktionen hinzufügen oder entfernen und die Grenzen
+				ändern (Zahl der Spiele online, der Eintragungen pro Tag …). Er kann ihn für Wartungsarbeiten unterbrechen
+				oder endgültig einstellen. In diesem Fall informiert er die Nutzer in der App, mit angemessener
+				Vorankündigung.
+			</p>
+			<p>
+				Diese Bedingungen können sich ändern. Das Datum der Aktualisierung steht oben auf der Seite. Bei einer
+				wichtigen Änderung weist dich die App darauf hin; wenn du sie weiter nutzt, gilt das als Annahme.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>12. Haftung</h2>
+			<p>
+				Der Dienst wird so bereitgestellt, wie er ist, und kostenlos. Der Herausgeber garantiert nicht, dass er
+				ohne Unterbrechung funktioniert, und auch nicht, dass die Anzeigen richtig, aktuell oder eingehalten sind.
+				Er haftet nicht für die von Nutzern veröffentlichten Inhalte, die er entfernt, sobald er von ihnen erfährt,
+				wenn sie rechtswidrig sind. Die Werbeanzeigen werden von ironSource Ads, Unity Ads und den Käufern ihrer
+				Auktionen (bis Version 0.1.6 von Google) ausgewählt und geliefert: Der Herausgeber kontrolliert ihren
+				Inhalt nicht und haftet nicht für die Produkte oder Dienstleistungen, die sie zeigen.
+			</p>
+			<p>
+				Der Herausgeber haftet nur bei nachgewiesenem Verschulden, und die Haftung ist auf unmittelbare Schäden
+				beschränkt. Sie umfasst keinen umsonst gemachten Weg, kein abgesagtes Spiel, kein geändertes Turnier und
+				keinen Streit zwischen Spielern. Nichts hier schließt seine Haftung bei grobem Verschulden oder bei
+				Verletzung der körperlichen Unversehrtheit aus oder beschränkt deine zwingenden Verbraucherrechte.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>13. Personenbezogene Daten</h2>
+			<p>
+				Die Verarbeitung deiner Daten ist in der
+				<a href="/de/petanque-meet/confidentialite/">Datenschutzerklärung von Pétanque Meet</a> beschrieben, die
+				Bestandteil dieser Bedingungen ist.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>14. Anwendbares Recht und Streitbeilegung</h2>
+			<p>
+				Diese Bedingungen unterliegen <strong>französischem Recht</strong>. Wenn du Verbraucher bist und in einem
+				anderen Staat der Europäischen Union wohnst, behältst du den zwingenden Schutz deines Landes.
+			</p>
+			{/* TODO legal: replace with the mediator's name, address and website once adhesion is signed (art. L612-1). */}
+			<p>
+				Bei Schwierigkeiten schreib uns bitte zuerst: Wir suchen eine gütliche Lösung. Gibt es innerhalb eines
+				Monats keine Lösung, kannst du kostenlos einen Verbraucherschlichter anrufen (Artikel L612-1 des
+				französischen Verbrauchergesetzbuchs). Seine Kontaktdaten werden auf einfache Anfrage an
+				<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a> mitgeteilt. Kommt keine Einigung
+				zustande, wird der Streit vor die zuständigen Gerichte gebracht.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>15. Kontakt</h2>
+			<p>
+				Bei Fragen oder um ein Problem zu melden:
+				<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>.
+			</p>
+		</section>
+	</div>
+</BaseLayout>
+
+<style>
+	.legal {
+		max-width: 68ch;
+		margin-inline: auto;
+		color: var(--sc-ink-2);
+		font-size: var(--text-md);
+		line-height: 1.6;
+	}
+	.legal h2 {
+		font-size: var(--text-xl);
+		color: var(--sc-ink);
+	}
+	.legal ul {
+		padding-left: 1.2rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+	.legal a {
+		color: var(--sc-link);
+		text-decoration: 1px solid underline transparent;
+		text-underline-offset: 0.25em;
+		transition: text-decoration-color var(--theme-transition);
+	}
+	.legal a:hover,
+	.legal a:focus {
+		text-decoration-color: currentColor;
+	}
+	.updated {
+		font-size: var(--text-sm);
+		color: var(--sc-muted);
+	}
+	.summary {
+		border: 1px solid var(--sc-line);
+		border-left: 3px solid var(--sc-accent);
+		border-radius: 0.5rem;
+		padding: 1rem 1.25rem;
+		background: var(--sc-surface);
+	}
+	.summary p {
+		margin-bottom: 0.5rem;
+	}
+	code {
+		font-size: 0.9em;
+		background: var(--sc-surface);
+		padding: 0.1em 0.35em;
+		border-radius: 0.25em;
+	}
+</style>
