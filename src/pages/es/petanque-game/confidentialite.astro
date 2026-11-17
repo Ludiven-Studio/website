@@ -74,6 +74,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li>unas <strong>estadísticas de uso</strong> sin identificador (ver §7);</li>
 				<li>la lectura del <strong>número de la última versión</strong> del juego en nuestro sitio web (ver §9);</li>
 				<li>una <strong>señal de presencia</strong>, una vez por minuto mientras el juego está abierto: un número sacado al azar en cada inicio, sin cuenta ni identificador de jugador, para mostrar cuántos juegan en este momento (ver §5 y §12);</li>
+				<li>cuando <strong>buscas un rival</strong> en línea, esta señal sale cada 15 segundos con tu apodo, el formato de la partida y su identificador en Unity: se muestran a los jugadores que tienen el juego abierto («Bébert busca un rival») mientras buscas, para que puedan unirse;</li>
 				<li>la lectura de la lista de <strong>nuestros propios anuncios</strong> en nuestro sitio web, en cada inicio, y luego de la imagen y el vídeo del que se muestra (ver §6).</li>
 			</ul>
 			<p>
@@ -450,6 +451,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Monedas del desafío de tiro</strong>: por cada puesto premiado, tu identificador Unity, la clasificación, el puesto, la puntuación y las monedas, sin apodo, 30 días en nuestro servidor, y después se borran; antes si eliminas tu cuenta (un puesto registrado después de la eliminación se guarda 30 días como máximo). Unity no guarda ningún archivo de las clasificaciones terminadas.</li>
 				<li><strong>Partidas en línea</strong>: una partida pública sale de la lista en cuanto empieza o la cierras; los lanzamientos no se guardan después de la partida.</li>
 				<li><strong>Jugadores conectados en este momento</strong>: el número sacado al azar se borra en los minutos siguientes a que el juego se detenga.</li>
+				<li><strong>Búsqueda de un rival</strong>: tu apodo, el formato y el identificador de la partida se borran en cuanto dejas de buscar, como mucho unos minutos después.</li>
 				<li><strong>Estadísticas de uso</strong>: se guardan <strong>24 meses</strong> en nuestro servidor y luego se borran; sus copias de seguridad, 14 días.</li>
 				<li><strong>Datos publicitarios</strong>: según las normas de Unity y de ironSource.</li>
 				<li><strong>Tu respuesta sobre la publicidad</strong>: 182 días (6 meses) en tu teléfono; después, el juego te vuelve a preguntar.</li>

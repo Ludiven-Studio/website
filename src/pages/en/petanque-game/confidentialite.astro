@@ -74,6 +74,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>usage statistics</strong> with no identifier (see §7);</li>
 				<li>reading the <strong>number of the latest version</strong> of the game on our website (see §9);</li>
 				<li>a <strong>presence signal</strong>, once a minute while the game is open: a number drawn at random at each launch, with no account or player identifier, to show how many are playing right now (see §5 and §12);</li>
+				<li>when you <strong>look for an opponent</strong> online, this signal goes every 15 seconds with your nickname, the game's format and its Unity id: they are shown to the players who have the game open ("Bébert is looking for an opponent") while you search, so they can join you;</li>
 				<li>reading the list of <strong>our own ads</strong> on our website, at each launch, then the picture and the video of the one that plays (see §6).</li>
 			</ul>
 			<p>
@@ -446,6 +447,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Shooting challenge coins</strong>: for each winning place, your Unity id, the ranking, the place, the score and the coins, without your name, 30 days on our server, then deleted; sooner if you delete your account (a place recorded after the deletion is kept 30 days at most). Unity keeps no archive of finished rankings.</li>
 				<li><strong>Online games</strong>: a public game leaves the list as soon as it starts or you close it; throws are not kept after the game.</li>
 				<li><strong>Players online right now</strong>: the random number is erased within minutes after the game stops.</li>
+				<li><strong>Looking for an opponent</strong>: your nickname, the format and the game's id are erased as soon as you stop searching, a few minutes later at most.</li>
 				<li><strong>Usage statistics</strong>: kept <strong>24 months</strong> on our server, then erased; its backups, 14 days.</li>
 				<li><strong>Advertising data</strong>: according to the rules of Unity and ironSource.</li>
 				<li><strong>Your answer about ads</strong>: 182 days (6 months) on your phone, then the game asks again.</li>

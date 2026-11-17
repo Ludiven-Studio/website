@@ -69,6 +69,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li>des <strong>statistiques d'usage</strong> sans identifiant (voir §7)&nbsp;;</li>
 				<li>la lecture du <strong>numéro de la dernière version</strong> du jeu sur notre site (voir §9)&nbsp;;</li>
 				<li>un <strong>signal de présence</strong>, une fois par minute tant que le jeu est ouvert&nbsp;: un numéro tiré au hasard à chaque lancement, sans compte ni identifiant de joueur, pour afficher combien de joueurs jouent en ce moment (voir §5 et §12)&nbsp;;</li>
+				<li>quand tu <strong>cherches un adversaire</strong> en ligne, ce signal part toutes les 15 secondes avec ton pseudo, le format de la partie et son identifiant chez Unity&nbsp;: ils sont montrés aux joueurs qui ont le jeu ouvert («&nbsp;Bébert cherche un adversaire&nbsp;»), le temps de ta recherche, pour qu'ils puissent te rejoindre&nbsp;;</li>
 				<li>la lecture de la liste de <strong>nos propres publicités</strong> sur notre site, à chaque lancement, puis de l'image et de la vidéo de celle qui passe (voir §6).</li>
 			</ul>
 			<p>
@@ -450,6 +451,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li><strong>Pièces du défi de tir</strong>&nbsp;: pour chaque place gagnante, ton identifiant Unity, le classement, la place, le score et les pièces, sans pseudo, 30 jours sur notre serveur, puis effacés&nbsp;; plus tôt si tu supprimes ton compte (une place relevée après la suppression reste 30 jours au plus). Unity ne garde aucune archive des classements terminés.</li>
 				<li><strong>Parties en ligne</strong>&nbsp;: une partie publique quitte la liste dès qu'elle commence ou que tu la fermes&nbsp;; les lancers ne sont pas gardés après la partie.</li>
 				<li><strong>Joueurs en ligne en ce moment</strong>&nbsp;: le numéro tiré au hasard est effacé dans les minutes qui suivent l'arrêt du jeu.</li>
+				<li><strong>Recherche d'un adversaire</strong>&nbsp;: ton pseudo, le format et l'identifiant de la partie sont effacés dès que tu ne cherches plus, au plus tard quelques minutes après.</li>
 				<li><strong>Statistiques d'usage</strong>&nbsp;: gardées <strong>24 mois</strong> sur notre serveur, puis effacées&nbsp;; ses sauvegardes, 14 jours.</li>
 				<li><strong>Données publicitaires</strong>&nbsp;: selon les règles de Unity et d'ironSource.</li>
 				<li><strong>Ta réponse sur la publicité</strong>&nbsp;: 182 jours (6 mois) sur ton téléphone, puis le jeu te la redemande.</li>

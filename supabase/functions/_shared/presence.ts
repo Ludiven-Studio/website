@@ -64,3 +64,28 @@ export class BeatLimiter {
 		}
 	}
 }
+
+/** A search for an opponent, as a beat carries it: the name played under, the format, the Unity session to join. */
+export interface Seek {
+	nick: string;
+	players: number;
+	game: string;
+}
+
+/** Unity's session ids: letters, digits, dashes. */
+const GAME_RE = /^[A-Za-z0-9_-]{1,64}$/;
+
+/**
+ * The beat's search, or null for none or a malformed one. The name is shown to other players: kept to 20
+ * characters, without control characters or the angle brackets of the game's rich text. The game still passes
+ * it through its own name filter before showing it.
+ */
+export function parseSeek(raw: unknown): Seek | null {
+	if (raw === null || typeof raw !== 'object') return null;
+	const r = raw as Record<string, unknown>;
+	const nick = String(r.nick ?? '').replace(/[\p{Cc}\p{Cf}<>]/gu, '').trim().slice(0, 20).trim();
+	const players = Number(r.players);
+	const game = String(r.game ?? '');
+	if (!nick || !Number.isInteger(players) || players < 1 || players > 3 || !GAME_RE.test(game)) return null;
+	return { nick, players, game };
+}

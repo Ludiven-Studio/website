@@ -74,6 +74,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>statistiche d'uso</strong> senza identificativo (vedi §7);</li>
 				<li>la lettura del <strong>numero dell'ultima versione</strong> del gioco sul nostro sito (vedi §9);</li>
 				<li>un <strong>segnale di presenza</strong>, una volta al minuto finché il gioco è aperto: un numero estratto a caso a ogni avvio, senza account né identificativo del giocatore, per mostrare quanti giocano in questo momento (vedi §5 e §12);</li>
+				<li>quando <strong>cerchi un avversario</strong> online, questo segnale parte ogni 15 secondi con il tuo nickname, il formato della partita e il suo identificativo presso Unity: vengono mostrati ai giocatori che hanno il gioco aperto («Bébert cerca un avversario») finché cerchi, perché possano raggiungerti;</li>
 				<li>la lettura dell'elenco delle <strong>nostre pubblicità</strong> sul nostro sito, a ogni avvio, poi dell'immagine e del video di quella che viene mostrata (vedi §6).</li>
 			</ul>
 			<p>
@@ -455,6 +456,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Monete della sfida di bocciata</strong>: per ogni posto premiato, il tuo ID Unity, la classifica, il posto, il punteggio e le monete, senza nickname, 30 giorni sul nostro server, poi cancellati; prima se elimini il tuo account (un posto registrato dopo l'eliminazione resta al massimo 30 giorni). Unity non conserva archivi delle classifiche concluse.</li>
 				<li><strong>Partite online</strong>: una partita pubblica esce dall'elenco appena inizia o appena la chiudi; i lanci non vengono conservati dopo la partita.</li>
 				<li><strong>Giocatori collegati in questo momento</strong>: il numero estratto a caso viene cancellato nei minuti successivi alla chiusura del gioco.</li>
+				<li><strong>Ricerca di un avversario</strong>: il tuo nickname, il formato e l'identificativo della partita vengono cancellati appena smetti di cercare, al più tardi qualche minuto dopo.</li>
 				<li><strong>Statistiche d'uso</strong>: conservate <strong>24 mesi</strong> sul nostro server, poi cancellate; i suoi backup, 14 giorni.</li>
 				<li><strong>Dati pubblicitari</strong>: secondo le regole di Unity e di ironSource.</li>
 				<li><strong>La tua risposta sulla pubblicità</strong>: 182 giorni (6 mesi) sul tuo telefono, poi il gioco te la richiede.</li>
