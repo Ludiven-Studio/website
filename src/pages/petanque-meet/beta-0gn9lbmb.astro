@@ -30,6 +30,12 @@ const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 			</p>
 		</header>
 
+		<section class="card stack gap-3">
+			<a class="download" href={BETA.url}>Télécharger Pétanque Meet&nbsp;β&nbsp;{BETA.version}</a>
+			<p class="muted">{date} · {size} · Android {BETA.android} ou plus récent</p>
+			<p class="muted sha">SHA-256 : <code>{BETA.sha256}</code></p>
+		</section>
+
 		<section class="card notice stack gap-3">
 			<h2>À savoir avant d'installer</h2>
 			<ul>
@@ -54,12 +60,6 @@ const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 				Nouveau dans la {BETA.version} : la carte écrit les noms des lieux dans la langue de l'appli, et se dézoome jusqu'au monde
 				entier. Le reste marche comme dans l'appli du store : les rappels de parties, le partage et les affiches.
 			</p>
-		</section>
-
-		<section class="card stack gap-3">
-			<a class="download" href={BETA.url}>Télécharger Pétanque Meet&nbsp;β&nbsp;{BETA.version}</a>
-			<p class="muted">{date} · {size} · Android {BETA.android} ou plus récent</p>
-			<p class="muted sha">SHA-256 : <code>{BETA.sha256}</code></p>
 		</section>
 
 		<section class="stack gap-2">

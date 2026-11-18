@@ -29,6 +29,12 @@ const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 			</p>
 		</header>
 
+		<section class="card stack gap-3">
+			<a class="download" href={BETA.url}>Télécharger Pétanque Scan β {BETA.version}</a>
+			<p class="muted">{date} · {size} · Android {BETA.android} ou plus récent, 64 bits</p>
+			<p class="muted sha">SHA-256 : <code>{BETA.sha256}</code></p>
+		</section>
+
 		<section class="card notice stack gap-3">
 			<h2>À savoir avant d'installer</h2>
 			<ul>
@@ -51,12 +57,6 @@ const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 				Le reste marche comme dans l'appli du store : le scan 3D, le mode photo et les mesures. Sur un téléphone sans ARCore, l'appli
 				passe en mode photo.
 			</p>
-		</section>
-
-		<section class="card stack gap-3">
-			<a class="download" href={BETA.url}>Télécharger Pétanque Scan β {BETA.version}</a>
-			<p class="muted">{date} · {size} · Android {BETA.android} ou plus récent, 64 bits</p>
-			<p class="muted sha">SHA-256 : <code>{BETA.sha256}</code></p>
 		</section>
 
 		<section class="stack gap-2">

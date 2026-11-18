@@ -26,6 +26,12 @@ const APK = {
 		</header>
 
 		<section class="card stack gap-3">
+			<a class="download" href={APK.url}>Télécharger la bêta {APK.version}</a>
+			<p class="muted">{(APK.size / 1e6).toFixed(1).replace('.', ',')} Mo · version {APK.version} (code {APK.code}) · commit <code>{APK.commit}</code></p>
+			<p class="muted sha">SHA-256 : <code>{APK.sha256}</code></p>
+		</section>
+
+		<section class="card stack gap-3">
 			<h2>Quoi de neuf à tester</h2>
 			<ul>
 				<li><strong>La partie en ligne</strong> : jouée sur deux téléphones (ou la bêta et l'appli du store) avec le même compte, les pièces gagnées et dépensées de chaque côté s'additionnent. Aucun pack payé n'est perdu, rien de dépensé ne revient.</li>
@@ -57,12 +63,6 @@ const APK = {
 				<li>Tes scores du défi du jour et du mode infini entrent dans le classement, celui du site.</li>
 				<li>Connectée au même compte Google que l'appli du store, la bêta partage sa partie en ligne : ce que tu y fais compte aussi dans l'autre, sauf pendant « Tout débloquer (test) ».</li>
 			</ul>
-		</section>
-
-		<section class="card stack gap-3">
-			<a class="download" href={APK.url}>Télécharger la bêta {APK.version}</a>
-			<p class="muted">{(APK.size / 1e6).toFixed(1).replace('.', ',')} Mo · version {APK.version} (code {APK.code}) · commit <code>{APK.commit}</code></p>
-			<p class="muted sha">SHA-256 : <code>{APK.sha256}</code></p>
 		</section>
 
 		<section class="stack gap-2">

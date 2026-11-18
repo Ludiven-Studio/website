@@ -31,6 +31,12 @@ const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 		</header>
 
 		<section class="card stack gap-3">
+			<a class="download" href={BETA.url}>Télécharger Pétanque Game β {BETA.version}</a>
+			<p class="muted">{date} · {size} · Android {BETA.android} ou plus récent</p>
+			<p class="muted sha">SHA-256 : <code>{BETA.sha256}</code></p>
+		</section>
+
+		<section class="card stack gap-3">
 			<h2>Quoi de neuf à tester</h2>
 			<ul>
 				<li><strong>Sans compte</strong> : les pièces, le magasin, les défis, le bonus du jour et les ligues marchent aussi.</li>
@@ -210,12 +216,6 @@ const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 				Le reste marche comme dans le jeu du store : les parties contre l'ordinateur, à deux, en ligne, les ligues, les défis et
 				les rappels.
 			</p>
-		</section>
-
-		<section class="card stack gap-3">
-			<a class="download" href={BETA.url}>Télécharger Pétanque Game β {BETA.version}</a>
-			<p class="muted">{date} · {size} · Android {BETA.android} ou plus récent</p>
-			<p class="muted sha">SHA-256 : <code>{BETA.sha256}</code></p>
 		</section>
 
 		<section class="stack gap-2">
