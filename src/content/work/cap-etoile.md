@@ -14,7 +14,7 @@ tags:
   - .NET
   - Avalonia
   - Chiffrement
-  - Données de santé
+  - Données sensibles
 galleryTitle: Le logiciel en images
 galleryLayout: wide
 gallery:

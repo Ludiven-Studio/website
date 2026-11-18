@@ -3579,3 +3579,13 @@
   astro check 0 erreur. Lancement du build complet (dist/, .astro/, public/vendor/ du worktree cap-etoile-generique)…
 - 17:09 : commité et poussé à la demande de l'utilisateur : mes 2 fichiers et cette section seulement. Statut :
   terminé. Réservations libérées.
+
+## 2026-11-18 — Cap Étoile : étiquette « Données sensibles » (session SuiviFamilial)
+- Statut : en cours (2026-11-18T17:23+01:00). Demande de l'utilisateur : je changerais données de santé par données
+  sensibles
+- Réservations actives : `src/content/work/cap-etoile.md`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 17:25 : Étiquette « Données sensibles » au lieu de « Données de santé » ; astro check 0 erreur. Lancement du build
+  complet (dist/, .astro/, public/vendor/ du worktree cap-etoile-tag)…
+- 17:27 : commité et poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé.
+  Réservations libérées.
