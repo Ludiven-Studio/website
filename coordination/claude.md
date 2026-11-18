@@ -3470,3 +3470,14 @@
 - 08:14 : APK petanque-game-1.0.14-beta5.apk (main 04f0b25, 99,6 Mo, sha256 dfa0679e…) sur la préversion
   petanque-game-beta, lien vérifié ; page à jour (nouvelle boutique, gains et ligues, barème du tir) ; commitée et
   poussée à la demande de Raphaël. Statut : terminé. Réservations libérées.
+
+## 2026-11-17 — Pétanque Game : présence v4 (qui cherche un adversaire) (session PetanqueGame)
+- Statut : en cours (2026-11-17T23:17+01:00). Demande de l'utilisateur : Raphaël (Producer, 00:30) : bandeau « X
+  cherche un adversaire », app-presence v4 et politique
+- Réservations actives : `supabase/functions/app-presence/`, `supabase/functions/_shared/presence*.ts`,
+  `supabase/migrations/2026111812*`, `src/pages/**/petanque-game/confidentialite.astro`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 09:32 : intégré dans main et poussé (politique : la recherche d'un adversaire, 5 langues), migration
+  20261118130000_app_presence_seek appliquée en production (seule en attente d'après migration list), fonction
+  app-presence déployée, à la demande de Raphaël tapée dans la session PG. Statut : terminé. Réservations libérées.
+
