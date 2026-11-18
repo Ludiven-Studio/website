@@ -3607,3 +3607,12 @@
 - 21:29 : APK petanque-game-1.0.14-beta9.apk (main 429dba9, 90,9 Mo, sha256 2e66c049…) sur la préversion
   petanque-game-beta, lien vérifié ; page à jour (un soleil, transitions en fondu, appli plus légère) ; commitée et
   poussée à la demande de Raphaël. Statut : terminé. Réservations libérées.
+
+## 2026-11-18 — Pétanque Game : page de la 10e bêta 1.0.14 (session PetanqueGame)
+- Statut : en cours (2026-11-18T23:18+01:00). Demande de l'utilisateur : Raphaël, tapé dans la session PG : « Envoie la
+  10e bêta et pousse sa page. »
+- Réservations actives : `src/pages/petanque-game/beta-drm50otf.astro`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 23:18 : APK petanque-game-1.0.14-beta10.apk (main f190ba1, 90,9 Mo, sha256 74254c04…) sur la préversion
+  petanque-game-beta, lien vérifié ; page à jour (pièces sur une ligne, recherche en ligne protégée) ; commitée et
+  poussée à la demande de Raphaël. Statut : terminé. Réservations libérées.
