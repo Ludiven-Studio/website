@@ -3589,3 +3589,12 @@
   complet (dist/, .astro/, public/vendor/ du worktree cap-etoile-tag)…
 - 17:27 : commité et poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé.
   Réservations libérées.
+
+## 2026-11-18 — Pétanque Game : page de la 8e bêta 1.0.14 (session PetanqueGame)
+- Statut : en cours (2026-11-18T19:07+01:00). Demande de l'utilisateur : Raphaël, tapé dans la session PG : « Construis
+  la 8e bêta 1.0.14 de Pétanque Game depuis main, envoie-la et pousse sa page. »
+- Réservations actives : `src/pages/petanque-game/beta-drm50otf.astro`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 19:07 : APK petanque-game-1.0.14-beta8.apk (main 9ab5c79, 100,7 Mo, sha256 0ceaf174…) sur la préversion
+  petanque-game-beta, lien vérifié ; page à jour (retours de Raphaël : son et fond de la crique, planche du défi de
+  tir, ligues) ; commitée et poussée à la demande de Raphaël. Statut : terminé. Réservations libérées.
