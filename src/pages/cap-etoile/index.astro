@@ -12,7 +12,7 @@ import familles from '../../assets/cap-etoile/09-familles.png';
 
 // Until online sign-up exists, a trial is asked for by e-mail and the key is sent by hand.
 const trial = `mailto:contact@ludiven-studio.fr?subject=${encodeURIComponent('Essai gratuit de Cap Étoile')}&body=${encodeURIComponent(
-	"Bonjour,\n\nJe souhaite essayer Cap Étoile gratuitement pendant 30 jours.\n\nMon prénom et mon nom :\nMon métier :\n\nMerci !",
+	"Bonjour,\n\nJe souhaite essayer Cap Étoile gratuitement pendant 15 jours.\n\nMon prénom et mon nom :\nMon métier :\n\nMerci !",
 )}`;
 
 const features = [
@@ -46,7 +46,7 @@ const faq = [
 
 <BaseLayout
 	title="Cap Étoile — le suivi des enfants et des familles | Ludiven Studio"
-	description="Logiciel Windows simple pour suivre les enfants et les familles que vous accompagnez (TDAH, TSA) : dossiers, séances, documents et consentements, protégés sur votre ordinateur. Essai gratuit de 30 jours."
+	description="Logiciel Windows simple pour suivre les enfants et les familles que vous accompagnez (TDAH, TSA) : dossiers, séances, documents et consentements, protégés sur votre ordinateur. Essai gratuit de 15 jours."
 	image="/cap-etoile/og-fr.jpg"
 >
 	<div class="wrapper ce stack gap-10">
@@ -62,7 +62,7 @@ const faq = [
 					documents et consentements au même endroit, sur votre ordinateur.
 				</p>
 				<div class="actions">
-					<a class="btn primary" href={trial}>Essayer gratuitement 30 jours</a>
+					<a class="btn primary" href={trial}>Essayer gratuitement 15 jours</a>
 					<a class="btn ghost" href="#ecrans">Voir les écrans</a>
 				</div>
 				<p class="muted small">Windows 10 et 11 · sans carte bancaire · sans engagement</p>
@@ -145,16 +145,16 @@ const faq = [
 					<p class="muted small">2 mois offerts, soit 6,67 € par mois</p>
 				</div>
 			</div>
-			<p class="launch"><strong>Offre de lancement :</strong> 6 € TTC par mois au lieu de 8 € pendant la première année, pour les 5 premiers abonnés.</p>
+			<p class="launch"><strong>Offre de lancement :</strong> pour les 5 premiers abonnés, 6,50 € TTC par mois au lieu de 8 €, ou 65 € TTC l'année au lieu de 80 €, pendant la première année.</p>
 			<ul class="checks">
-				<li>30 jours d'essai gratuit, sans carte bancaire.</li>
+				<li>15 jours d'essai gratuit, sans carte bancaire.</li>
 				<li>Sur 2 ordinateurs, mises à jour comprises.</li>
 				<li>
 					Parrainage : 2 mois offerts pour vous et pour la personne que vous recommandez. Ils repoussent votre prochain paiement, que vous
 					payiez au mois ou à l'année, jusqu'à 12 mois offerts par an.
 				</li>
 			</ul>
-			<div><a class="btn primary" href={trial}>Essayer gratuitement 30 jours</a></div>
+			<div><a class="btn primary" href={trial}>Essayer gratuitement 15 jours</a></div>
 			<p class="muted small">Pour l'instant, l'essai se demande par e-mail : nous vous envoyons le lien de téléchargement et votre clé, en général dans la journée.</p>
 		</section>
 
@@ -174,8 +174,8 @@ const faq = [
 
 		<section class="card end stack gap-3">
 			<h2>Envie d'essayer ?</h2>
-			<p>30 jours gratuits, sans carte bancaire. Une question ? Écrivez-nous à <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>.</p>
-			<div><a class="btn primary" href={trial}>Essayer gratuitement 30 jours</a></div>
+			<p>15 jours gratuits, sans carte bancaire. Une question ? Écrivez-nous à <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>.</p>
+			<div><a class="btn primary" href={trial}>Essayer gratuitement 15 jours</a></div>
 			<p class="muted small">Cap Étoile est un logiciel de Ludiven Studio.</p>
 		</section>
 	</div>

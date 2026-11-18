@@ -3525,3 +3525,14 @@
   cap-etoile-parrainage)…
 - 16:29 : commité et poussé à la demande de l'utilisateur (« Oui et ok pour le plafond 12 mois ») : mon fichier et
   cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-18 — Cap Étoile : essai de 15 jours et offre de lancement (session SuiviFamilial)
+- Statut : en cours (2026-11-18T16:36+01:00). Demande de l'utilisateur : peut etre passer a 6.5 pour les 5 premiers
+  clients par mois ou 65 l'année / et 15 jours d'essai au lieu de 30 jours
+- Réservations actives : `src/pages/cap-etoile/`, `public/cap-etoile/og-fr.jpg`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 16:38 : Essai de 15 jours (page, page de test, image de partage) et offre de lancement à 6,50 €/mois ou 65 €/an la
+  première année. eslint et astro check 0 erreur. Lancement du build complet (dist/, .astro/, public/vendor/ du
+  worktree cap-etoile-parrainage)…
+- 16:39 : commité et poussé à la demande de l'utilisateur : mes fichiers et cette section seulement. Statut : terminé.
+  Réservations libérées.
