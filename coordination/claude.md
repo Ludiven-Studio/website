@@ -3515,3 +3515,13 @@
   (dist/, .astro/, public/vendor/ du worktree cap-etoile-landing)…
 - 16:03 : commité et poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé.
   Réservations libérées.
+
+## 2026-11-18 — Cap Étoile : règle du parrainage (session SuiviFamilial)
+- Statut : en cours (2026-11-18T16:27+01:00). Demande de l'utilisateur : Oui et ok pour le plafond 12 mois
+- Réservations actives : `src/pages/cap-etoile/index.astro`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 16:28 : Phrase ajoutée : les 2 mois repoussent le prochain paiement, au mois ou à l'année, 12 mois offerts au plus
+  par an. eslint et astro check 0 erreur. Lancement du build complet (dist/, .astro/, public/vendor/ du worktree
+  cap-etoile-parrainage)…
+- 16:29 : commité et poussé à la demande de l'utilisateur (« Oui et ok pour le plafond 12 mois ») : mon fichier et
+  cette section seulement. Statut : terminé. Réservations libérées.
