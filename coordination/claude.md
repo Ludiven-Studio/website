@@ -3505,3 +3505,13 @@
   Nouveau build complet (dist/, .astro/, public/vendor/ du worktree)…
 - 15:59 : commité et poussé à la demande de l'utilisateur (« Ok pour l'option C ») : mes fichiers et cette section
   seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-18 — Cap Étoile : durée de l'offre de lancement (session SuiviFamilial)
+- Statut : en cours (2026-11-18T16:00+01:00). Demande de l'utilisateur : Les 6€ par mois la première année pour les 5
+  premiers clients
+- Réservations actives : `src/pages/cap-etoile/index.astro`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 16:01 : Offre de lancement précisée : la première année. eslint et astro check 0 erreur. Lancement du build complet
+  (dist/, .astro/, public/vendor/ du worktree cap-etoile-landing)…
+- 16:03 : commité et poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé.
+  Réservations libérées.
