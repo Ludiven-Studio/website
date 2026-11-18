@@ -3569,3 +3569,13 @@
 - 17:06 : APK petanque-game-1.0.14-beta7.apk (main 550b338, 100,7 Mo, sha256 bb91ab54…) sur la préversion
   petanque-game-beta, lien vérifié ; page à jour (packs de pièces de test, +50 000 pièces) ; commitée et poussée à la
   demande de Raphaël. Statut : terminé. Réservations libérées.
+
+## 2026-11-18 — Cap Étoile : positionnement pour tous les accompagnements (session SuiviFamilial)
+- Statut : en cours (2026-11-18T17:06+01:00). Demande de l'utilisateur : trop réducteur ... le but est d'en faire un
+  logiciel générique pour tous les accompagnements
+- Réservations actives : `src/pages/cap-etoile/index.astro`, `src/content/work/cap-etoile.md`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 17:08 : Public élargi : tous les professionnels de l'accompagnement (page, description, fiche Projets). eslint et
+  astro check 0 erreur. Lancement du build complet (dist/, .astro/, public/vendor/ du worktree cap-etoile-generique)…
+- 17:09 : commité et poussé à la demande de l'utilisateur : mes 2 fichiers et cette section seulement. Statut :
+  terminé. Réservations libérées.

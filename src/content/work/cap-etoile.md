@@ -8,7 +8,7 @@ org: Ludiven Studio
 appPage: /cap-etoile/
 appPageLabel: Découvrir le logiciel
 description: |
-  Un logiciel Windows pour les professionnelles qui accompagnent des enfants et leur famille (TDAH, TSA) : dossiers, séances, documents et consentements, chiffrés et rangés sur l'ordinateur, sans rien envoyer en ligne.
+  Un logiciel Windows pour tous les professionnels de l'accompagnement (éducation, parentalité, soutien scolaire, handicap, TDAH, TSA…) : dossiers, séances, documents et consentements, chiffrés et rangés sur l'ordinateur, sans rien envoyer en ligne.
 tags:
   - Logiciel Windows
   - .NET
@@ -34,7 +34,8 @@ gallery:
 
 <h2>Le besoin</h2>
 <p>
-  Une référente familiale accompagne des enfants avec un TDAH ou un TSA, et leur famille. Elle doit retrouver vite
+  Le logiciel est né du besoin d'une référente familiale, puis a été pensé pour tous les accompagnements&nbsp;: éducation,
+  parentalité, soutien scolaire, handicap. Le professionnel accompagne des enfants et leur famille. Il doit retrouver vite
   le parcours d'un enfant, ce qui a été dit à la dernière séance et les documents des parents, sans mélanger les
   frères et sœurs ni les parents séparés. Ces informations sont sensibles&nbsp;: elles ne doivent pas quitter son
   ordinateur.
