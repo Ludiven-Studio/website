@@ -12,7 +12,7 @@
 //
 // Deploy:  supabase functions deploy app-presence
 // Table:   migrations/20261114120000_app_presence.sql, 20261117120000_app_presence_confirmed.sql,
-//          20261118120000_app_presence_seek.sql (presence_beat_seek)
+//          20261118130000_app_presence_seek.sql (presence_beat_seek)
 
 import { createClient } from 'jsr:@supabase/supabase-js@2.117.0';
 import { BeatLimiter, clientIp, isSession, parseSeek } from '../_shared/presence.ts';
