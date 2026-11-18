@@ -80,7 +80,7 @@ gallery:
 <h2>A generated interface</h2>
 <p>
   The app is built with Unity 6 (URP), on the studio's app template. Its screens are <strong>never edited by
-  hand</strong>: editor scripts generate them, with <a href="/en/prefab-fusion/">Prefab Fusion</a>, the
+  hand</strong>: editor scripts generate them, with Prefab Fusion, the
   studio's tool to build and change prefabs from a description. A screen is rebuilt by running its script
   again, in the game's five languages.
 </p>

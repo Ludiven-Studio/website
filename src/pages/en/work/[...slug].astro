@@ -30,6 +30,7 @@ const { Content } = await entry.render();
 	description={entry.data.description}
 	lang="en"
 	altLang={`/work/${entry.slug}/`}
+	noindex={entry.data.hidden}
 >
 	<div class="stack gap-20">
 		<div class="stack gap-15">

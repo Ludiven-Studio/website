@@ -1,4 +1,5 @@
 ---
+hidden: true
 title: Prefab Fusion - Unity tool - 2026
 publishDate: 2026-10-22 00:00:00
 img: /assets/prefab-fusion/cover.webp

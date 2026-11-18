@@ -68,6 +68,7 @@ export default defineConfig({
                 !page.includes('/cap-etoile/test-') &&
                 !page.includes('/jeux/eclats/nuit') &&
                 !page.includes('/beta-') &&
+                !page.includes('/prefab-fusion') &&
                 !page.includes('/admin/'),
         }),
         AstroPWA({

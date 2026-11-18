@@ -84,7 +84,7 @@ gallery:
 <p>
   L'appli est faite avec Unity&nbsp;6 (URP), sur le gabarit des applis du studio. Ses écrans ne sont
   <strong>jamais retouchés à la main</strong>&nbsp;: des scripts d'éditeur les génèrent, avec
-  <a href="/prefab-fusion/">Prefab Fusion</a>, l'outil du studio pour construire et modifier des prefabs
+  Prefab Fusion, l'outil du studio pour construire et modifier des prefabs
   par description. Un écran se refait donc en relançant son script, dans les cinq langues du jeu.
 </p>
 

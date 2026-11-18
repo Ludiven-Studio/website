@@ -22,6 +22,8 @@ const workSchema = z.object({
 	/** The same service in the browser, shown as a second button. */
 	webApp: z.string().optional(),
 	webAppLabel: z.string().optional(),
+	/** Not released yet: out of the Projects list and of search engines, its page still answers. */
+	hidden: z.boolean().optional(),
 });
 
 export const collections = {
