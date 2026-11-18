@@ -3481,3 +3481,12 @@
   20261118130000_app_presence_seek appliquée en production (seule en attente d'après migration list), fonction
   app-presence déployée, à la demande de Raphaël tapée dans la session PG. Statut : terminé. Réservations libérées.
 
+
+## 2026-11-18 — Pétanque Game : page de la 6e bêta 1.0.14 (session PetanqueGame)
+- Statut : en cours (2026-11-18T10:26+01:00). Demande de l'utilisateur : Raphaël, tapé dans la session PG : « Construis
+  la 6e bêta 1.0.14 de Pétanque Game depuis main, envoie-la et pousse sa page. »
+- Réservations actives : `src/pages/petanque-game/beta-drm50otf.astro`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 10:26 : APK petanque-game-1.0.14-beta6.apk (main 69e73ba, 100,7 Mo, sha256 11aa7dac…) sur la préversion
+  petanque-game-beta, lien vérifié ; page à jour (la crique au couchant, le multi mis en avant) ; commitée et poussée à
+  la demande de Raphaël. Statut : terminé. Réservations libérées.

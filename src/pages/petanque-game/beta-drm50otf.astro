@@ -2,15 +2,15 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 
 // Unlisted: noindex, out of the sitemap and of the offline precache (astro.config.mjs).
-// The next store version, built from the game's main (04f0b25) under the .beta id, signed with the dev key,
+// The next store version, built from the game's main (69e73ba) under the .beta id, signed with the dev key,
 // ARM64 only, on a prerelease of this repo (the earlier betas' APKs stay there).
 const BETA = {
 	version: '1.0.14',
 	date: '2026-11-18',
-	size: 99640799,
+	size: 100673560,
 	android: '7.1',
-	sha256: 'dfa0679e120837450e79f615ff8c2e10ce573cdffa0d3738d60295084acfcac9',
-	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-game-beta/petanque-game-1.0.14-beta5.apk',
+	sha256: '11aa7dacc4bd225501215446210d00c724130cf32c9fd392957e3db4fef99367',
+	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-game-beta/petanque-game-1.0.14-beta6.apk',
 };
 const date = new Date(BETA.date).toLocaleDateString('fr-FR', { dateStyle: 'medium' });
 const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
@@ -117,7 +117,7 @@ const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 				<li>
 					<strong>3e bêta 1.0.14&nbsp;: la règle du tir qui ne laisse aucune boule en jeu</strong>&nbsp;: c'est le tireur qui
 					rejoue, puis chaque équipe à son tour tant qu'aucune boule n'est en jeu (règlement FIPJP, articles 15 et 28). En
-					ligne, cette bêta ne joue qu'avec une autre 3e, 4e ou 5e bêta.
+					ligne, cette bêta ne joue qu'avec une autre 3e, 4e, 5e ou 6e bêta.
 				</li>
 				<li>
 					<strong>4e bêta 1.0.14&nbsp;: des pièces à gagner au défi de tir</strong>&nbsp;: chaque jour, les 10 premiers du classement
@@ -145,6 +145,17 @@ const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 					succès arrondis vers le haut&nbsp;; des inscriptions rondes, nettement plus chères en National et en Professionnel&nbsp;; la
 					coupe Bronze gratuite de la semaine va jusqu'au niveau Régional. Au défi de tir, le jour paie 500, 300, 200 puis de 150 à
 					60 pièces jusqu'au 10e, la semaine 2 000, 1 200, 800 puis 400, 200 et 100 jusqu'au 50e.
+				</li>
+				<li>
+					<strong>6e bêta 1.0.14&nbsp;: un nouveau décor, la crique au couchant</strong>&nbsp;: le terrain longe une plage de
+					Méditerranée, le soleil se couche sur la mer, des voiliers passent au large, les vagues viennent mourir sur le sable,
+					et des amis prennent l'apéro autour d'un feu devant leur caravane. Dans la collection prestige du magasin, à
+					30 000 pièces.
+				</li>
+				<li>
+					<strong>6e bêta 1.0.14&nbsp;: le multi mis en avant</strong>&nbsp;: «&nbsp;Jouer en ligne&nbsp;» à l'accueil avec le nombre
+					de joueurs connectés, une pastille verte sur l'onglet Multi, et un bandeau quand quelqu'un cherche un adversaire
+					(«&nbsp;Bébert cherche un adversaire · Jouer&nbsp;»). Le bandeau se coupe dans Options, «&nbsp;Alertes multi&nbsp;».
 				</li>
 			</ul>
 		</section>
