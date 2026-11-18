@@ -3536,3 +3536,13 @@
   worktree cap-etoile-parrainage)…
 - 16:39 : commité et poussé à la demande de l'utilisateur : mes fichiers et cette section seulement. Statut : terminé.
   Réservations libérées.
+
+## 2026-11-18 — Cap Étoile : offre de lancement à -20 % (session SuiviFamilial)
+- Statut : en cours (2026-11-18T16:43+01:00). Demande de l'utilisateur : on peut dire 20% offert pour les 5 premiers
+  clients (6.40 et 64 euros) c est plus vendeur non ?
+- Réservations actives : `src/pages/cap-etoile/index.astro`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 16:44 : Offre de lancement : 20 % offerts la première année (6,40 €/mois ou 64 €/an). eslint et astro check 0 erreur.
+  Lancement du build complet (dist/, .astro/, public/vendor/ du worktree cap-etoile-parrainage)…
+- 16:46 : commité et poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé.
+  Réservations libérées.
