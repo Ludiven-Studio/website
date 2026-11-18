@@ -2,15 +2,15 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 
 // Unlisted: noindex, out of the sitemap and of the offline precache (astro.config.mjs).
-// The next store version, built from the game's main (69e73ba) under the .beta id, signed with the dev key,
+// The next store version, built from the game's main (550b338) under the .beta id, signed with the dev key,
 // ARM64 only, on a prerelease of this repo (the earlier betas' APKs stay there).
 const BETA = {
 	version: '1.0.14',
 	date: '2026-11-18',
-	size: 100673560,
+	size: 100672376,
 	android: '7.1',
-	sha256: '11aa7dacc4bd225501215446210d00c724130cf32c9fd392957e3db4fef99367',
-	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-game-beta/petanque-game-1.0.14-beta6.apk',
+	sha256: 'bb91ab546cbbb39e779acef571caa2ac68d07a19db305b9f6c018f8ed2191af1',
+	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-game-beta/petanque-game-1.0.14-beta7.apk',
 };
 const date = new Date(BETA.date).toLocaleDateString('fr-FR', { dateStyle: 'medium' });
 const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
@@ -117,7 +117,7 @@ const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 				<li>
 					<strong>3e bêta 1.0.14&nbsp;: la règle du tir qui ne laisse aucune boule en jeu</strong>&nbsp;: c'est le tireur qui
 					rejoue, puis chaque équipe à son tour tant qu'aucune boule n'est en jeu (règlement FIPJP, articles 15 et 28). En
-					ligne, cette bêta ne joue qu'avec une autre 3e, 4e, 5e ou 6e bêta.
+					ligne, cette bêta ne joue qu'avec une autre bêta 1.0.14, de la 3e à la 7e.
 				</li>
 				<li>
 					<strong>4e bêta 1.0.14&nbsp;: des pièces à gagner au défi de tir</strong>&nbsp;: chaque jour, les 10 premiers du classement
@@ -156,6 +156,11 @@ const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 					<strong>6e bêta 1.0.14&nbsp;: le multi mis en avant</strong>&nbsp;: «&nbsp;Jouer en ligne&nbsp;» à l'accueil avec le nombre
 					de joueurs connectés, une pastille verte sur l'onglet Multi, et un bandeau quand quelqu'un cherche un adversaire
 					(«&nbsp;Bébert cherche un adversaire · Jouer&nbsp;»). Le bandeau se coupe dans Options, «&nbsp;Alertes multi&nbsp;».
+				</li>
+				<li>
+					<strong>7e bêta 1.0.14&nbsp;: les packs de pièces dans la bêta</strong>&nbsp;: la bêta n'est pas sur le Play Store, elle
+					ne vendait donc aucun pack. Ils créditent maintenant tes pièces tout de suite, sans paiement, et Options a une ligne
+					«&nbsp;+50 000 pièces (test)&nbsp;» pour essayer la crique et le prestige.
 				</li>
 			</ul>
 		</section>

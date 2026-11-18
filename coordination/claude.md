@@ -3560,3 +3560,12 @@
 - 16:50 : Build complet OK. En attente du feu vert.
 - 16:56 : commité et poussé à la demande de l'utilisateur (« oui vas y ») : mes fichiers et cette section seulement.
   Statut : terminé. Réservations libérées.
+
+## 2026-11-18 — Pétanque Game : page de la 7e bêta 1.0.14 (session PetanqueGame)
+- Statut : en cours (2026-11-18T17:06+01:00). Demande de l'utilisateur : Raphaël, tapé dans la session PG : « Construis
+  la 7e bêta 1.0.14 de Pétanque Game depuis main, envoie-la et pousse sa page. »
+- Réservations actives : `src/pages/petanque-game/beta-drm50otf.astro`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 17:06 : APK petanque-game-1.0.14-beta7.apk (main 550b338, 100,7 Mo, sha256 bb91ab54…) sur la préversion
+  petanque-game-beta, lien vérifié ; page à jour (packs de pièces de test, +50 000 pièces) ; commitée et poussée à la
+  demande de Raphaël. Statut : terminé. Réservations libérées.
