@@ -3490,3 +3490,18 @@
 - 10:26 : APK petanque-game-1.0.14-beta6.apk (main 69e73ba, 100,7 Mo, sha256 11aa7dac…) sur la préversion
   petanque-game-beta, lien vérifié ; page à jour (la crique au couchant, le multi mis en avant) ; commitée et poussée à
   la demande de Raphaël. Statut : terminé. Réservations libérées.
+
+## 2026-11-18 — Cap Étoile : page de présentation (session SuiviFamilial)
+- Statut : en cours (2026-11-18T14:34+01:00). Demande de l'utilisateur : Est-ce que l'on peut faire une landing page
+  avec des captures d'écran en mode démo pour que je puisse partager
+- Réservations actives : `src/pages/cap-etoile/index.astro`, `src/assets/cap-etoile/`, `public/cap-etoile/`.
+- Ressources : serveur de dev sur le port 4496 ; eslint, `astro check`. Build annoncé ici avant.
+- 14:39 : Page /cap-etoile/ (captures de la démo, fonctions, confidentialité, tarifs proposés, FAQ, demande d'essai par
+  e-mail) et image de partage ; eslint et astro check 0 erreur ; captures bureau et téléphone vues. Lancement du build
+  complet (écrit dist/, .astro/, public/vendor/ du worktree cap-etoile-landing)…
+- 14:41 : Build complet OK : 236 pages, précache 397, liens OK ; /cap-etoile/ dans le sitemap, la page de test non. En
+  attente du feu vert (prix à confirmer).
+- 15:58 : Tarifs de l'option C (8 €/mois, 80 €/an), offre de lancement à 6 € pour les 5 premiers, parrainage 2 mois.
+  Nouveau build complet (dist/, .astro/, public/vendor/ du worktree)…
+- 15:59 : commité et poussé à la demande de l'utilisateur (« Ok pour l'option C ») : mes fichiers et cette section
+  seulement. Statut : terminé. Réservations libérées.

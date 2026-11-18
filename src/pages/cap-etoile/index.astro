@@ -1,0 +1,365 @@
+---
+import { Image } from 'astro:assets';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import fiche from '../../assets/cap-etoile/03-fiche-trois-colonnes.png';
+import dossiers from '../../assets/cap-etoile/02-dossiers.png';
+import seances from '../../assets/cap-etoile/20-page-seances.png';
+import frise from '../../assets/cap-etoile/15-frise.png';
+import consentement from '../../assets/cap-etoile/18-fiche-consentement.png';
+import sauvegardes from '../../assets/cap-etoile/26-sauvegardes.png';
+import visite from '../../assets/cap-etoile/31-visite-guidee.png';
+import familles from '../../assets/cap-etoile/09-familles.png';
+
+// Until online sign-up exists, a trial is asked for by e-mail and the key is sent by hand.
+const trial = `mailto:contact@ludiven-studio.fr?subject=${encodeURIComponent('Essai gratuit de Cap Étoile')}&body=${encodeURIComponent(
+	"Bonjour,\n\nJe souhaite essayer Cap Étoile gratuitement pendant 30 jours.\n\nMon prénom et mon nom :\nMon métier :\n\nMerci !",
+)}`;
+
+const features = [
+	{ title: 'Une fiche claire, en trois colonnes', text: "L'identité et la famille, le parcours et les documents, les séances : tout le dossier d'un enfant sous les yeux, sans chercher." },
+	{ title: 'Les familles et les fratries', text: "Frères et sœurs, parents séparés, responsables légaux et personnes autorisées : chaque information reste dans le bon dossier." },
+	{ title: 'Les séances et la suivante', text: 'Le compte rendu de chaque séance, les objectifs suivis et ce qui est prévu pour la prochaine fois.' },
+	{ title: 'Les documents rangés', text: 'Bilans, bulletins, questionnaires : glissez un fichier, il est classé par catégorie et protégé avec le dossier.' },
+	{ title: 'Les consentements prêts à signer', text: 'Une fiche de consentement claire pour les parents, préparée en quelques clics et prête à imprimer.' },
+	{ title: 'Des sauvegardes simples', text: "Une sauvegarde protégée sur un disque externe en un clic, et un transfert guidé pour changer d'ordinateur." },
+];
+
+const shots = [
+	{ src: dossiers, alt: 'Liste des dossiers', caption: 'Tous vos dossiers, avec la dernière séance de chacun.' },
+	{ src: seances, alt: 'Page des séances', caption: 'Les séances de toutes les familles, de la plus récente à la plus ancienne.' },
+	{ src: frise, alt: "Frise du parcours d'un enfant", caption: "La frise du parcours d'un enfant, en un coup d'œil." },
+	{ src: familles, alt: 'Page des familles', caption: 'Les familles et leurs membres.' },
+	{ src: consentement, alt: 'Fiche de consentement', caption: 'La fiche de consentement à faire signer aux parents.' },
+	{ src: sauvegardes, alt: 'Page des sauvegardes', caption: 'Sauvegarder, changer d’ordinateur, récupérer ses dossiers.' },
+];
+
+const faq = [
+	{ q: "Faut-il être à l'aise avec l'informatique ?", a: "Non. Une visite guidée montre chaque écran au premier lancement, avec un dossier d'exemple. Les boutons disent ce qu'ils font, et rien d'important ne se fait sans vous demander confirmation." },
+	{ q: 'Où sont mes dossiers ?', a: "Sur votre ordinateur, et nulle part ailleurs. Ils sont chiffrés et ne s'ouvrent qu'avec votre phrase secrète. Ludiven Studio n'y a jamais accès." },
+	{ q: "Et si j'oublie ma phrase secrète ?", a: "Personne ne peut la retrouver, pas même nous : c'est ce qui protège vos dossiers. Notez-la sur papier et rangez-la en lieu sûr, le logiciel vous le rappelle." },
+	{ q: 'Faut-il une connexion Internet ?', a: "Non pour travailler. Le logiciel se connecte seulement pour vérifier votre licence : il envoie la clé, le numéro de version et un numéro tiré au hasard pour l'ordinateur, jamais le contenu de vos dossiers." },
+	{ q: "Que se passe-t-il si j'arrête l'abonnement ?", a: 'Rien ne se perd : vos dossiers restent consultables, et vous pouvez toujours les sauvegarder et les exporter. Seuls la création et les modifications sont bloquées.' },
+	{ q: 'Est-ce un logiciel médical ?', a: "Non. Cap Étoile sert à organiser l'accompagnement : il ne pose pas de diagnostic et ne propose pas de traitement." },
+	{ q: 'Sur quel ordinateur ?', a: 'Windows 10 et 11 pour le moment. La version Mac est en préparation.' },
+];
+---
+
+<BaseLayout
+	title="Cap Étoile — le suivi des enfants et des familles | Ludiven Studio"
+	description="Logiciel Windows simple pour suivre les enfants et les familles que vous accompagnez (TDAH, TSA) : dossiers, séances, documents et consentements, protégés sur votre ordinateur. Essai gratuit de 30 jours."
+	image="/cap-etoile/og-fr.jpg"
+>
+	<div class="wrapper ce stack gap-10">
+		<header class="hero">
+			<div class="hero-text stack gap-4">
+				<div class="brand">
+					<img src="/cap-etoile/cap-etoile.png" width="64" height="64" alt="" />
+					<p class="brand-name">Cap Étoile</p>
+				</div>
+				<h1>Le suivi des enfants et des familles que vous accompagnez, simple et protégé.</h1>
+				<p class="lead">
+					Pour les référentes familiales et les professionnelles de l'accompagnement (TDAH, TSA) : dossiers, séances,
+					documents et consentements au même endroit, sur votre ordinateur.
+				</p>
+				<div class="actions">
+					<a class="btn primary" href={trial}>Essayer gratuitement 30 jours</a>
+					<a class="btn ghost" href="#ecrans">Voir les écrans</a>
+				</div>
+				<p class="muted small">Windows 10 et 11 · sans carte bancaire · sans engagement</p>
+			</div>
+			<figure class="hero-shot shot">
+				<Image src={fiche} alt="La fiche d'un enfant en trois colonnes" widths={[700, 1366]} sizes="(min-width: 64em) 44rem, 100vw" loading="eager" />
+			</figure>
+		</header>
+
+		<section class="stack gap-6" aria-labelledby="fonctions">
+			<h2 id="fonctions">Tout le dossier, sans chercher</h2>
+			<ul class="features">
+				{
+					features.map((f) => (
+						<li class="card">
+							<h3>{f.title}</h3>
+							<p>{f.text}</p>
+						</li>
+					))
+				}
+			</ul>
+		</section>
+
+		<section class="split" aria-labelledby="simple">
+			<div class="stack gap-3">
+				<h2 id="simple">Pensé pour être simple</h2>
+				<ul class="checks">
+					<li>Une visite guidée au premier lancement, sur un dossier d'exemple.</li>
+					<li>De gros boutons qui disent ce qu'ils font, sans jargon.</li>
+					<li>« Tout est enregistré » toujours visible : rien à penser.</li>
+					<li>Une confirmation avant toute action qui ne se rattrape pas.</li>
+					<li>Une aide sur chaque écran, d'un clic sur le point d'interrogation.</li>
+				</ul>
+			</div>
+			<figure class="shot">
+				<Image src={visite} alt="Visite guidée du logiciel" widths={[600, 1366]} sizes="(min-width: 64em) 36rem, 100vw" />
+			</figure>
+		</section>
+
+		<section class="stack gap-6" id="ecrans" aria-labelledby="ecrans-titre">
+			<div class="stack gap-2">
+				<h2 id="ecrans-titre">Les écrans</h2>
+				<p class="muted">Captures de la démonstration : les familles sont inventées.</p>
+			</div>
+			<div class="gallery">
+				{
+					shots.map((s) => (
+						<figure class="stack gap-2">
+							<a class="shot" href={s.src.src} aria-label={`${s.alt}, en grand`}>
+								<Image src={s.src} alt={s.alt} widths={[560, 1100]} sizes="(min-width: 64em) 30rem, 100vw" />
+							</a>
+							<figcaption>{s.caption}</figcaption>
+						</figure>
+					))
+				}
+			</div>
+		</section>
+
+		<section class="card privacy stack gap-3" aria-labelledby="confidentialite">
+			<h2 id="confidentialite">Vos dossiers restent chez vous</h2>
+			<ul class="checks">
+				<li>Les dossiers sont rangés sur votre ordinateur, chiffrés, et ne s'ouvrent qu'avec votre phrase secrète.</li>
+				<li>Aucun dossier n'est envoyé sur Internet, ni à Ludiven Studio, ni à personne.</li>
+				<li>Seule la licence est vérifiée en ligne : la clé, le numéro de version et un numéro tiré au hasard pour l'ordinateur.</li>
+				<li>Les sauvegardes sont chiffrées elles aussi, sur le disque externe de votre choix.</li>
+			</ul>
+		</section>
+
+		<section class="stack gap-6" id="tarifs" aria-labelledby="tarifs-titre">
+			<h2 id="tarifs-titre">Tarifs</h2>
+			<div class="prices">
+				<div class="card price stack gap-2">
+					<p class="plan">Au mois</p>
+					<p class="amount">8 € <span>TTC / mois</span></p>
+					<p class="muted small">sans engagement</p>
+				</div>
+				<div class="card price stack gap-2">
+					<p class="plan">À l'année</p>
+					<p class="amount">80 € <span>TTC / an</span></p>
+					<p class="muted small">2 mois offerts, soit 6,67 € par mois</p>
+				</div>
+			</div>
+			<p class="launch"><strong>Offre de lancement :</strong> 6 € TTC par mois au lieu de 8 € pour les 5 premiers abonnés.</p>
+			<ul class="checks">
+				<li>30 jours d'essai gratuit, sans carte bancaire.</li>
+				<li>Sur 2 ordinateurs, mises à jour comprises.</li>
+				<li>Parrainage : 2 mois offerts pour vous et pour la personne que vous recommandez.</li>
+			</ul>
+			<div><a class="btn primary" href={trial}>Essayer gratuitement 30 jours</a></div>
+			<p class="muted small">Pour l'instant, l'essai se demande par e-mail : nous vous envoyons le lien de téléchargement et votre clé, en général dans la journée.</p>
+		</section>
+
+		<section class="stack gap-4" aria-labelledby="faq">
+			<h2 id="faq">Questions fréquentes</h2>
+			<div class="stack gap-2">
+				{
+					faq.map((f) => (
+						<details class="card qa">
+							<summary>{f.q}</summary>
+							<p>{f.a}</p>
+						</details>
+					))
+				}
+			</div>
+		</section>
+
+		<section class="card end stack gap-3">
+			<h2>Envie d'essayer ?</h2>
+			<p>30 jours gratuits, sans carte bancaire. Une question ? Écrivez-nous à <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>.</p>
+			<div><a class="btn primary" href={trial}>Essayer gratuitement 30 jours</a></div>
+			<p class="muted small">Cap Étoile est un logiciel de Ludiven Studio.</p>
+		</section>
+	</div>
+</BaseLayout>
+
+<style>
+	.ce {
+		max-width: 72rem;
+		margin-inline: auto;
+		padding-block: 2rem 4rem;
+	}
+	.hero {
+		display: grid;
+		gap: 2rem;
+		align-items: center;
+	}
+	@media (min-width: 64em) {
+		.hero {
+			grid-template-columns: 1fr 1.3fr;
+		}
+	}
+	.brand {
+		display: flex;
+		gap: 0.8rem;
+		align-items: center;
+	}
+	.brand img {
+		border-radius: 0.9rem;
+	}
+	.brand-name {
+		font-size: var(--text-2xl);
+		font-weight: 700;
+	}
+	.ce h1 {
+		font-size: clamp(2rem, 1.2rem + 3vw, var(--text-3xl));
+		line-height: 1.15;
+	}
+	.ce h2 {
+		font-size: var(--text-2xl);
+	}
+	.ce h3 {
+		font-size: var(--text-lg);
+		margin-bottom: 0.4rem;
+	}
+	.lead {
+		font-size: var(--text-lg);
+		color: var(--gray-200);
+	}
+	.muted {
+		color: var(--gray-300);
+	}
+	.small {
+		font-size: var(--text-sm);
+	}
+	.actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.8rem;
+	}
+	.btn {
+		display: inline-block;
+		padding: 0.9rem 1.4rem;
+		border-radius: 999px;
+		font-weight: 600;
+		text-decoration: none;
+		text-align: center;
+	}
+	.btn.primary {
+		background: var(--accent-regular);
+		color: var(--accent-text-over);
+	}
+	.btn.primary:hover,
+	.btn.primary:focus-visible {
+		background: var(--accent-dark);
+	}
+	.btn.ghost {
+		border: 1px solid var(--gray-700);
+		color: var(--gray-0);
+	}
+	.shot {
+		display: block;
+		margin: 0;
+	}
+	.ce :global(*) {
+		min-width: 0;
+	}
+	.ce {
+		overflow-wrap: break-word;
+	}
+	.shot :global(img) {
+		display: block;
+		width: 100%;
+		height: auto;
+		border-radius: 0.8rem;
+		border: 1px solid var(--gray-800);
+		box-shadow: 0 0.6rem 2rem rgb(0 0 0 / 0.18);
+	}
+	.card {
+		padding: 1.4rem;
+		border: 1px solid var(--gray-800);
+		border-radius: 1rem;
+		background: var(--gray-999_40);
+	}
+	.features {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+		gap: 1rem;
+		padding: 0;
+		list-style: none;
+	}
+	.features p {
+		color: var(--gray-200);
+	}
+	.split {
+		display: grid;
+		gap: 2rem;
+		align-items: center;
+	}
+	@media (min-width: 64em) {
+		.split {
+			grid-template-columns: 1fr 1.2fr;
+		}
+	}
+	.checks {
+		padding: 0;
+		list-style: none;
+	}
+	.checks li {
+		position: relative;
+		padding-inline-start: 1.8rem;
+	}
+	.checks li + li {
+		margin-top: 0.6rem;
+	}
+	.checks li::before {
+		content: '✓';
+		position: absolute;
+		inset-inline-start: 0;
+		color: var(--accent-regular);
+		font-weight: 700;
+	}
+	.gallery {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+		gap: 1.6rem;
+	}
+	.gallery figure {
+		margin: 0;
+	}
+	.gallery figcaption {
+		color: var(--gray-200);
+	}
+	.prices {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+		gap: 1rem;
+		max-width: 36rem;
+	}
+	.plan {
+		font-weight: 600;
+		color: var(--gray-200);
+	}
+	.amount {
+		font-size: var(--text-3xl);
+		font-weight: 700;
+	}
+	.amount span {
+		font-size: var(--text-base);
+		font-weight: 400;
+		color: var(--gray-300);
+	}
+	.launch {
+		max-width: 36rem;
+		padding: 0.9rem 1.2rem;
+		border-radius: 0.8rem;
+		border: 1px solid var(--accent-regular);
+	}
+	.qa summary {
+		cursor: pointer;
+		font-weight: 600;
+	}
+	.qa p {
+		margin-top: 0.6rem;
+		color: var(--gray-200);
+	}
+	.end {
+		text-align: center;
+		align-items: center;
+	}
+</style>
