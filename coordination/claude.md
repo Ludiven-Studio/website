@@ -3461,3 +3461,12 @@
 - 23:18 : intégré dans main et poussé, puis shot-prizes déployée, à la demande de Raphaël : jour
   500/300/200/150/125/100/90/80/70/60, semaine 2000/1200/800/400 (4-10)/200 (11-20)/100 (21-50) ; politique §4 top 10 /
   top 50 et §7 noms communs des événements. Statut : terminé. Réservations libérées.
+
+## 2026-11-18 — Pétanque Game : page de la 5e bêta 1.0.14 (session PetanqueGame)
+- Statut : en cours (2026-11-18T08:14+01:00). Demande de l'utilisateur : Raphaël, tapé dans la session PG : « Construis
+  la 5e bêta 1.0.14 de Pétanque Game depuis main, envoie-la et pousse sa page. »
+- Réservations actives : `src/pages/petanque-game/beta-drm50otf.astro`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 08:14 : APK petanque-game-1.0.14-beta5.apk (main 04f0b25, 99,6 Mo, sha256 dfa0679e…) sur la préversion
+  petanque-game-beta, lien vérifié ; page à jour (nouvelle boutique, gains et ligues, barème du tir) ; commitée et
+  poussée à la demande de Raphaël. Statut : terminé. Réservations libérées.
