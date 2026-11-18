@@ -3546,3 +3546,17 @@
   Lancement du build complet (dist/, .astro/, public/vendor/ du worktree cap-etoile-parrainage)…
 - 16:46 : commité et poussé à la demande de l'utilisateur : mon fichier et cette section seulement. Statut : terminé.
   Réservations libérées.
+
+## 2026-11-18 — Cap Étoile : accès depuis Projets (session SuiviFamilial)
+- Statut : en cours (2026-11-18T16:47+01:00). Demande de l'utilisateur : la landing page, est-ce qu'elle peut etre
+  accessible depuis une navigation de mon site (dans tous les services par exemple ou dans projets ...) ou bien il faut
+  un nouvel onglet
+- Réservations actives : `src/content/work/cap-etoile.md`, `public/assets/cap-etoile/`, `src/data/siteNav.ts` (lien
+  Projets allumé sur /cap-etoile/).
+- Ressources : serveur de dev sur le port 4497 ; eslint, `astro check`. Build annoncé ici avant.
+- 16:49 : Fiche Projets /work/cap-etoile/ (lien vers la page), onglet Projets allumé sur /cap-etoile/ ; eslint et astro
+  check 0 erreur ; captures vues. Lancement du build complet (dist/, .astro/, public/vendor/ du worktree
+  cap-etoile-parrainage)…
+- 16:50 : Build complet OK. En attente du feu vert.
+- 16:56 : commité et poussé à la demande de l'utilisateur (« oui vas y ») : mes fichiers et cette section seulement.
+  Statut : terminé. Réservations libérées.

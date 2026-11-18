@@ -37,7 +37,7 @@ export const NAV: Record<Lang, NavText> = {
 			{ label: 'Jeux', href: '/', also: APPS },
 			{ label: 'Mini-jeux', href: '/jeux/', also: /^\/jeux\// },
 			{ label: 'Le studio', href: '/prestations/', also: /^\/(?:prestations|services|partenariats|contact|labo)\// },
-			{ label: 'Projets', href: '/work/', also: /^\/work\// },
+			{ label: 'Projets', href: '/work/', also: /^\/(?:work|cap-etoile)\// },
 			{ label: 'À propos', href: '/about/' },
 		],
 		footer: [
