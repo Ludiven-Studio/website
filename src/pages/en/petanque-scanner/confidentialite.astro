@@ -18,7 +18,7 @@ import Hero from '../../../components/Hero.astro';
 		<p class="updated">
 			This policy covers <strong>the Pétanque Scan mobile app</strong>
 			(formerly Pétanque Scanner, <code>com.raphbenpro.petanquear</code>), not the ludiven-studio.fr website, which has its
-			<a href="/confidentialite/">own policy</a>. Last updated: 19 November 2026 (the screens opened, in the statistics; version 1.2.14: our house ads, read from our website, replace the Pétanque Meet strip and video; after a refusal, "Turn ads on?" is offered once per session when you ask for a video; advertising moves from Google AdMob to Unity LevelPlay, with our own consent window; on iPhone, without Apple's tracking permission, ads are not personalised; withdrawing your consent is passed on to the ad networks; Google Firebase is removed; 10 free scans a day instead of 3).
+			<a href="/confidentialite/">own policy</a>. Last updated: 19 November 2026 (the screens opened and your choice about ads, counted in the statistics; version 1.2.14: our house ads, read from our website, replace the Pétanque Meet strip and video; after a refusal, "Turn ads on?" is offered once per session when you ask for a video; advertising moves from Google AdMob to Unity LevelPlay, with our own consent window; on iPhone, without Apple's tracking permission, ads are not personalised; withdrawing your consent is passed on to the ad networks; Google Firebase is removed; 10 free scans a day instead of 3).
 		</p>
 		<p class="updated">
 			This is a courtesy translation. In case of discrepancy, the
@@ -172,10 +172,10 @@ import Hero from '../../../components/Hero.astro';
 				<li><strong>If you accept</strong>: Unity LevelPlay starts and shows the banner and the videos. When it has no ad to show, our house ads take its place, for the banner as for the video.</li>
 				<li><strong>If you refuse</strong>: no advertising module starts. The app works just the same, without our partners' ads: in their place, a strip shows our house ads in turn, for our other apps (today Pétanque Meet and, on Android, Pétanque Game), and a short video of one of them also recharges your scans. Our house ads go through no ad network and do not track you (see §5 and §8).</li>
 				<li><strong>After a refusal</strong>, when you ask for a video to recharge your scans, the app offers once per session to turn advertising on: "Turn ads on" counts as an "Accept" (on iPhone, Apple's tracking permission is then requested if it has not been yet), "Watch a video of our apps" keeps your refusal and shows one of our videos.</li>
-				<li><strong>Your answer</strong>, its date and the version of the text stay on your phone. The app asks you again after 6 months, whether you accepted or refused, or sooner if our ad partners change.</li>
+				<li><strong>Your answer</strong>, its date and the version of the text stay on your phone. The app asks you again after 6 months, whether you accepted or refused, or sooner if our ad partners change. Your choice (yes or no) is also counted, with no identifier, in our usage statistics, at each launch (see §5).</li>
 				<li><strong>If you withdraw your consent</strong> in the app's settings (see §12): our partners' advertising stops at once, and the app reports the withdrawal to Unity LevelPlay, which passes it on to the ad networks.</li>
 				<li><strong>On iOS</strong>, Apple's tracking permission (<em>App Tracking Transparency</em>) is only requested after an "Accept", and only serves advertising. If you refuse it, or turn it off later in the iPhone's settings (the app takes this into account the next time it starts), ads still show, but they are <strong>not personalised</strong>: the app tells Unity LevelPlay that you refuse personalised advertising, LevelPlay passes this on to the ad networks, and the iPhone's advertising identifier is not shared with them.</li>
-				<li><strong>Usage statistics</strong> (see §5) do not depend on your answer: they hold no advertising identifier, no cookie and no device identifier.</li>
+				<li><strong>Usage statistics</strong> (see §5) are sent whether you accept or not: they hold no advertising identifier, no cookie and no device identifier.</li>
 				<li><strong>If you buy Premium</strong>: advertising disappears and the advertising module is no longer started.</li>
 			</ul>
 			<p>
@@ -241,7 +241,7 @@ import Hero from '../../../components/Hero.astro';
 				<li><code>premium_revoked</code> — the store no longer recognises a Premium (after a refund, for example)</li>
 				<li><code>iap_receipt_invalid</code> — a proof of purchase could not be validated</li>
 				<li><code>update_prompt</code> / <code>update_tapped</code> — an update is offered to you (recommended or required), or you tap the update button</li>
-				<li><code>consent_accepted</code> / <code>consent_declined</code> — your consent choice</li>
+				<li><code>consent_accepted</code> / <code>consent_declined</code> — your consent choice, sent at each launch</li>
 			</ul>
 			<p>
 				In addition to these events, the app sends the name of each screen you open (home, scan, result, settings…), and nothing else.

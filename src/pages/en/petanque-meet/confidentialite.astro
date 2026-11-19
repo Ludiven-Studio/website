@@ -193,7 +193,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			</div>
 			<p>
 				The app does <strong>not</strong> collect your contacts or your photos (apart from the poster you
-				choose to send). Your GPS location is never sent to us (see §5). Your surname is only asked for in a
+				choose to send). As an option, a button under a tournament's approved poster saves that poster to your photos, in the "Pétanque Meet" album: nothing is sent. For this, the app asks on iPhone for permission to add photos, and on Android, up to version 9 only, for permission to write to storage. Your GPS location is never sent to us (see §5). Your surname is only asked for in a
 				"This is my club" request, and only the publisher sees it. Your phone's advertising identifier is only
 				read by the ironSource and Unity Ads advertising modules, and only with your consent (see §9): we do
 				not receive it.
@@ -262,7 +262,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<p>
 				The app sends to <strong>Umami</strong>, a cookie-free statistics tool installed on our own server, the
 				name of the screens opened and of the actions taken (opening the app, opening a game, signing up, publishing, signing in,
-				sharing, reporting, seeing or tapping one of our house ads, with the name of the app shown…), together
+				sharing, reporting, answering the questions about ads and reminders, tapping a reminder, seeing or tapping one of our house ads, with the name of the app shown…), together
 				with the platform, the app and system version, the language, the screen size and the phone model.
 			</p>
 			<p>
@@ -298,8 +298,8 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			</p>
 			<p>
 				<strong>Your consent.</strong> At first launch, the app asks whether you accept advertising from these
-				partners, with two identical buttons, "Accept" and "Refuse". Your choice stays on your phone and you are
-				asked again after 6 months. <strong>If you refuse, no advertising module is started</strong> and
+				partners, with two identical buttons, "Accept" and "Refuse". Your choice is kept on your phone and you are
+				asked again after 6 months. Since versions 1.0.6 (beta) and 1.1.0, it is also counted, with no identifier, in our usage statistics (see §8). <strong>If you refuse, no advertising module is started</strong> and
 				nothing is sent to them: only our banner for our other apps is shown. You can change your mind at any
 				time: "Account and help" → "Ad choices". If you withdraw your consent, our partners' banner disappears
 				at once and the app reports the withdrawal to Unity LevelPlay. On iPhone, after an "Accept", the app
@@ -344,8 +344,15 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				All of this stays on the device and disappears when you uninstall the app.
 			</p>
 			<p>
-				<strong>Reminders.</strong> If you accept it, the app schedules a reminder on your phone one hour
-				before your games. These are local notifications: no server sends you a message.
+				<strong>Reminders.</strong> These are local notifications, scheduled by your phone: no server sends you a message.
+			</p>
+			<ul>
+				<li>If you accept it, a reminder one hour before your games.</li>
+				<li>For the tournaments you follow, a reminder the day before at 7 pm and another 2 hours before the first event, for the 10 nearest ones. They are on by default; you can turn them off in "Account and help".</li>
+				<li>The Thursday round-up: on Thursday at 7 pm, the number of tournaments on the following Saturday and Sunday, within the radius you set around your saved places. It stays off until you say yes, to the question asked only once, when you save your first place. The count is made on your phone, from the tournaments the app already has: your saved places are never sent to our server.</li>
+			</ul>
+			<p>
+				Your answer about the round-up and tapping a reminder are counted, with no identifier, in the usage statistics (see §8).
 			</p>
 		</section>
 

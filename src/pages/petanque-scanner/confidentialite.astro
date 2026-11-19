@@ -17,7 +17,7 @@ import Hero from '../../components/Hero.astro';
 		<p class="updated">
 			Cette politique concerne <strong>l'application mobile Pétanque Scan</strong>
 			(anciennement Pétanque Scanner, <code>com.raphbenpro.petanquear</code>), et non le site ludiven-studio.fr, qui dispose de sa
-			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 19 novembre 2026 (les écrans ouverts dans les statistiques&nbsp;; version 1.2.14&nbsp;: nos annonces maison, lues sur notre site, remplacent le bandeau et la vidéo de Pétanque Meet&nbsp;; après un refus, «&nbsp;Activer les pubs&nbsp;?&nbsp;» est proposé une fois par session quand vous demandez une vidéo&nbsp;; la publicité passe de Google AdMob à Unity LevelPlay, avec notre propre fenêtre de consentement&nbsp;; sur iPhone, sans l'autorisation de suivi d'Apple, la publicité n'est pas personnalisée&nbsp;; un retrait de votre accord est transmis aux régies&nbsp;; Google Firebase est retiré&nbsp;; 10 scans gratuits par jour au lieu de 3).
+			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 19 novembre 2026 (les écrans ouverts et votre choix sur la publicité, comptés dans les statistiques&nbsp;; version 1.2.14&nbsp;: nos annonces maison, lues sur notre site, remplacent le bandeau et la vidéo de Pétanque Meet&nbsp;; après un refus, «&nbsp;Activer les pubs&nbsp;?&nbsp;» est proposé une fois par session quand vous demandez une vidéo&nbsp;; la publicité passe de Google AdMob à Unity LevelPlay, avec notre propre fenêtre de consentement&nbsp;; sur iPhone, sans l'autorisation de suivi d'Apple, la publicité n'est pas personnalisée&nbsp;; un retrait de votre accord est transmis aux régies&nbsp;; Google Firebase est retiré&nbsp;; 10 scans gratuits par jour au lieu de 3).
 		</p>
 
 		<div class="summary">
@@ -171,10 +171,10 @@ import Hero from '../../components/Hero.astro';
 				<li><strong>Si vous acceptez</strong>&nbsp;: Unity LevelPlay démarre et affiche la bannière et les vidéos. Quand il n'a pas d'annonce à montrer, nos annonces maison prennent sa place, pour la bannière comme pour la vidéo.</li>
 				<li><strong>Si vous refusez</strong>&nbsp;: aucun module publicitaire ne démarre. L'application marche pareil, sans les publicités de nos partenaires&nbsp;: à leur place, un bandeau présente à tour de rôle nos annonces maison, pour nos autres applications (aujourd'hui Pétanque Meet et, sur Android, Pétanque Game), et une courte vidéo de l'une d'elles recharge aussi vos scans. Nos annonces maison ne passent par aucune régie et ne vous suivent pas (voir §5 et §8).</li>
 				<li><strong>Après un refus</strong>, quand vous demandez une vidéo pour recharger vos scans, l'application vous propose une fois par session d'activer la publicité&nbsp;: «&nbsp;Activer les pubs&nbsp;» vaut un «&nbsp;Accepter&nbsp;» (sur iPhone, l'autorisation de suivi d'Apple vous est alors demandée si elle ne l'a pas encore été), «&nbsp;Voir une vidéo de nos applis&nbsp;» garde votre refus et montre l'une de nos vidéos.</li>
-				<li><strong>Votre réponse</strong>, sa date et la version du texte restent sur votre téléphone. L'application vous la redemande au bout de 6 mois, que vous ayez accepté ou refusé, ou plus tôt si nos partenaires publicitaires changent.</li>
+				<li><strong>Votre réponse</strong>, sa date et la version du texte restent sur votre téléphone. L'application vous la redemande au bout de 6 mois, que vous ayez accepté ou refusé, ou plus tôt si nos partenaires publicitaires changent. Votre choix (oui ou non) est aussi compté, sans identifiant, dans nos statistiques d'usage, à chaque lancement (voir §5).</li>
 				<li><strong>Si vous retirez votre accord</strong> dans les réglages de l'application (voir §12)&nbsp;: la publicité de nos partenaires s'arrête aussitôt, et l'application signale ce retrait à Unity LevelPlay, qui le transmet aux régies.</li>
 				<li><strong>Sur iOS</strong>, l'autorisation de suivi d'Apple (<em>App Tracking Transparency</em>) ne vous est demandée qu'après un «&nbsp;Accepter&nbsp;» et ne sert qu'à la publicité. Si vous la refusez, ou si vous la coupez plus tard dans les réglages de l'iPhone (l'application en tient compte à son lancement suivant), les publicités s'affichent quand même, mais elles ne sont <strong>pas personnalisées</strong>&nbsp;: l'application indique à Unity LevelPlay que vous refusez la publicité personnalisée, LevelPlay le transmet aux régies, et l'identifiant publicitaire de l'iPhone ne leur est pas communiqué.</li>
-				<li><strong>Les statistiques d'usage</strong> (voir §5) ne dépendent pas de votre réponse&nbsp;: elles ne contiennent ni identifiant publicitaire, ni cookie, ni identifiant d'appareil.</li>
+				<li><strong>Les statistiques d'usage</strong> (voir §5) sont envoyées que vous acceptiez ou non&nbsp;: elles ne contiennent ni identifiant publicitaire, ni cookie, ni identifiant d'appareil.</li>
 				<li><strong>Si vous achetez le Premium</strong>&nbsp;: la publicité disparaît et le module publicitaire n'est plus démarré.</li>
 			</ul>
 			<p>
@@ -242,7 +242,7 @@ import Hero from '../../components/Hero.astro';
 				<li><code>premium_revoked</code> — le store ne reconnaît plus un Premium (après un remboursement, par exemple)</li>
 				<li><code>iap_receipt_invalid</code> — une preuve d'achat n'a pas pu être validée</li>
 				<li><code>update_prompt</code> / <code>update_tapped</code> — une mise à jour vous est proposée (conseillée ou obligatoire), ou vous touchez le bouton de mise à jour</li>
-				<li><code>consent_accepted</code> / <code>consent_declined</code> — votre choix de consentement</li>
+				<li><code>consent_accepted</code> / <code>consent_declined</code> — votre choix de consentement, envoyé à chaque lancement</li>
 			</ul>
 			<p>
 				En plus de ces événements, l'application envoie le nom de chaque écran ouvert (l'accueil, le scan, le résultat, les réglages…), sans rien d'autre.

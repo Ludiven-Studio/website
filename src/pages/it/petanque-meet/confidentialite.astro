@@ -193,7 +193,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			</div>
 			<p>
 				L'app <strong>non</strong> raccoglie i tuoi contatti, né le tue foto (a parte la locandina che scegli di
-				inviare). La tua posizione GPS non ci viene mai inviata (vedi §5). Il tuo cognome viene chiesto solo per
+				inviare). Come opzione, un pulsante sotto la locandina approvata di un torneo salva questa locandina nelle tue foto, nell'album «Pétanque Meet»: non viene inviato nulla. Per questo, l'app chiede su iPhone il permesso di aggiungere foto e su Android, solo fino alla versione 9, quello di scrivere nella memoria. La tua posizione GPS non ci viene mai inviata (vedi §5). Il tuo cognome viene chiesto solo per
 				una richiesta «È il mio club», e solo l'editore lo vede. L'identificativo pubblicitario del tuo telefono
 				viene letto solo dai moduli pubblicitari di ironSource e di Unity Ads, e solo con il tuo consenso (vedi §9): noi
 				non lo riceviamo.
@@ -262,7 +262,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<p>
 				L'app invia a <strong>Umami</strong>, uno strumento di statistiche senza cookie installato sul nostro server, il nome
 				delle schermate aperte e delle azioni compiute (aprire l'app, aprire una partita, iscriversi, pubblicare, accedere, condividere,
-				segnalare, vedere o toccare una delle nostre pubblicità, con il nome dell'app presentata…), insieme
+				segnalare, rispondere alle domande sulla pubblicità e sui promemoria, toccare un promemoria, vedere o toccare una delle nostre pubblicità, con il nome dell'app presentata…), insieme
 				alla piattaforma, alla versione dell'app e del sistema, alla lingua, alla dimensione dello schermo e al
 				modello del telefono.
 			</p>
@@ -300,8 +300,8 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			</p>
 			<p>
 				<strong>Il tuo consenso.</strong> Al primo avvio, l'app ti chiede se accetti la pubblicità di questi
-				partner, con due pulsanti identici, «Accetta» e «Rifiuta». La tua scelta resta sul tuo telefono e ti
-				viene richiesta dopo 6 mesi. <strong>Se rifiuti, non si avvia nessun modulo pubblicitario</strong> e
+				partner, con due pulsanti identici, «Accetta» e «Rifiuta». La tua scelta viene conservata sul tuo telefono e ti
+				viene richiesta dopo 6 mesi. Dalle versioni 1.0.6 (beta) e 1.1.0 viene anche contata, senza identificativo, nelle nostre statistiche d'uso (vedi §8). <strong>Se rifiuti, non si avvia nessun modulo pubblicitario</strong> e
 				non gli viene inviato nulla: viene mostrato solo il nostro banner per le nostre altre app. Puoi cambiare
 				idea in qualsiasi momento: «Account e aiuto» → «Scelte pubblicitarie». Se revochi il consenso, il
 				banner dei nostri partner scompare subito e l'app segnala questa revoca a Unity LevelPlay. Su iPhone,
@@ -348,8 +348,15 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				Tutto questo resta sul dispositivo e scompare quando disinstalli l'app.
 			</p>
 			<p>
-				<strong>Promemoria.</strong> Se lo accetti, l'app programma sul tuo telefono un promemoria un'ora
-				prima delle tue partite. Sono notifiche locali: nessun server ti invia messaggi.
+				<strong>Promemoria.</strong> Sono notifiche locali, programmate dal tuo telefono: nessun server ti invia messaggi.
+			</p>
+			<ul>
+				<li>Se lo accetti, un promemoria un'ora prima delle tue partite.</li>
+				<li>Per i tornei che segui, un promemoria il giorno prima alle 19 e un altro 2 ore prima della prima gara, per i 10 più vicini. Sono attivi fin dall'inizio; puoi disattivarli in «Account e aiuto».</li>
+				<li>Il riepilogo del giovedì: il giovedì alle 19, il numero di tornei del sabato e della domenica successivi, nel raggio che hai impostato intorno ai tuoi luoghi salvati. Resta disattivato finché non dici di sì, alla domanda posta una sola volta, quando salvi il tuo primo luogo. Il conteggio avviene sul tuo telefono, con i tornei che l'app ha già: i tuoi luoghi salvati non vengono mai inviati al nostro server.</li>
+			</ul>
+			<p>
+				La tua risposta sul riepilogo e il tocco su un promemoria vengono contati, senza identificativo, nelle statistiche d'uso (vedi §8).
 			</p>
 		</section>
 

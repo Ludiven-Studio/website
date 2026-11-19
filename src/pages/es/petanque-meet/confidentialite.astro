@@ -193,7 +193,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			</div>
 			<p>
 				La aplicación <strong>no</strong> recoge tus contactos ni tus fotos (salvo el cartel que decides
-				enviar). Tu posición GPS nunca se nos envía (ver §5). Tus apellidos solo se piden en una solicitud
+				enviar). Como opción, un botón bajo el cartel validado de un torneo guarda ese cartel en tus fotos, en el álbum «Pétanque Meet»: no se envía nada. Para ello, la aplicación pide en iPhone permiso para añadir fotos y en Android, solo hasta la versión 9, permiso para escribir en el almacenamiento. Tu posición GPS nunca se nos envía (ver §5). Tus apellidos solo se piden en una solicitud
 				«Es mi club», y solo los ve el editor. El identificador publicitario de tu teléfono
 				solo lo leen los módulos publicitarios de ironSource y de Unity Ads, y solo con tu consentimiento (ver §9):
 				nosotros no lo recibimos.
@@ -262,7 +262,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<p>
 				La aplicación envía a <strong>Umami</strong>, una herramienta de estadísticas sin cookies instalada en nuestro propio servidor, el
 				nombre de las pantallas abiertas y de las acciones realizadas (abrir la aplicación, abrir una partida, apuntarse, publicar, iniciar
-				sesión, compartir, denunciar, ver o tocar uno de nuestros anuncios propios, con el nombre de la
+				sesión, compartir, denunciar, responder a las preguntas sobre la publicidad y los recordatorios, tocar un recordatorio, ver o tocar uno de nuestros anuncios propios, con el nombre de la
 				aplicación presentada…), junto con la plataforma, la versión de la aplicación y del sistema, el idioma,
 				el tamaño de la pantalla y el modelo de teléfono.
 			</p>
@@ -301,8 +301,8 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			</p>
 			<p>
 				<strong>Tu consentimiento.</strong> En el primer inicio, la aplicación te pregunta si aceptas la
-				publicidad de estos socios, con dos botones idénticos, «Aceptar» y «Rechazar». Tu elección se queda en
-				tu teléfono y se te vuelve a preguntar al cabo de 6 meses. <strong>Si rechazas, no se inicia ningún
+				publicidad de estos socios, con dos botones idénticos, «Aceptar» y «Rechazar». Tu elección se guarda en
+				tu teléfono y se te vuelve a preguntar al cabo de 6 meses. Desde las versiones 1.0.6 (beta) y 1.1.0, también se cuenta, sin identificador, en nuestras estadísticas de uso (ver §8). <strong>Si rechazas, no se inicia ningún
 				módulo publicitario</strong> y no se les envía nada: solo se muestra nuestro banner de nuestras
 				otras aplicaciones. Puedes cambiar de opinión en cualquier momento: «Cuenta y ayuda» →
 				«Opciones de anuncios». Si retiras tu consentimiento, el banner de nuestros socios desaparece en el acto y
@@ -349,8 +349,15 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				Todo esto se queda en el dispositivo y desaparece cuando desinstalas la aplicación.
 			</p>
 			<p>
-				<strong>Recordatorios.</strong> Si lo aceptas, la aplicación programa en tu teléfono un recordatorio una
-				hora antes de tus partidas. Son notificaciones locales: ningún servidor te envía mensajes.
+				<strong>Recordatorios.</strong> Son notificaciones locales, programadas por tu teléfono: ningún servidor te envía mensajes.
+			</p>
+			<ul>
+				<li>Si lo aceptas, un recordatorio una hora antes de tus partidas.</li>
+				<li>Para los torneos que sigues, un recordatorio la víspera a las 19:00 y otro 2 horas antes de la primera prueba, para los 10 más próximos. Están activados por defecto; puedes desactivarlos en «Cuenta y ayuda».</li>
+				<li>El resumen del jueves: el jueves a las 19:00, el número de torneos del sábado y el domingo siguientes, dentro del radio que has fijado alrededor de tus lugares guardados. Sigue desactivado mientras no digas que sí, a la pregunta que se hace una sola vez, cuando guardas tu primer lugar. El recuento se hace en tu teléfono, con los torneos que la aplicación ya tiene: tus lugares guardados nunca se envían a nuestro servidor.</li>
+			</ul>
+			<p>
+				Tu respuesta sobre el resumen y tocar un recordatorio se cuentan, sin identificador, en las estadísticas de uso (ver §8).
 			</p>
 		</section>
 

@@ -192,7 +192,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			</div>
 			<p>
 				Die App erhebt <strong>nicht</strong> deine Kontakte und nicht deine Fotos (außer dem Plakat, das du
-				senden willst). Dein GPS-Standort wird nie an uns gesendet (siehe §5). Deinen Nachnamen fragen wir nur bei
+				senden willst). Als Option speichert eine Schaltfläche unter dem freigegebenen Plakat eines Turniers dieses Plakat in deinen Fotos, im Album „Pétanque Meet“: Es wird nichts gesendet. Dafür fragt die App auf dem iPhone nach der Erlaubnis, Fotos hinzuzufügen, und unter Android, nur bis Version 9, nach der Erlaubnis, in den Speicher zu schreiben. Dein GPS-Standort wird nie an uns gesendet (siehe §5). Deinen Nachnamen fragen wir nur bei
 				einer Anfrage „Das ist mein Verein“ ab, und nur der Herausgeber sieht ihn. Die Werbe-ID deines Handys wird
 				nur von den Werbemodulen von ironSource und Unity Ads gelesen, und nur mit deiner Einwilligung (siehe §9):
 				Wir erhalten sie nicht.
@@ -262,7 +262,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<p>
 				Die App sendet an <strong>Umami</strong>, ein Statistikwerkzeug ohne Cookies auf unserem eigenen Server, den
 				Namen der geöffneten Bildschirme und der ausgeführten Aktionen (die App öffnen, ein Spiel öffnen, sich eintragen, veröffentlichen, sich
-				anmelden, teilen, melden, eine unserer eigenen Anzeigen sehen oder antippen, mit dem Namen der gezeigten
+				anmelden, teilen, melden, die Fragen zu Werbung und Erinnerungen beantworten, eine Erinnerung antippen, eine unserer eigenen Anzeigen sehen oder antippen, mit dem Namen der gezeigten
 				App …), zusammen mit der Plattform, der Version der App und des Systems, der Sprache, der Bildschirmgröße
 				und dem Handymodell.
 			</p>
@@ -301,8 +301,8 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			</p>
 			<p>
 				<strong>Deine Einwilligung.</strong> Beim ersten Start fragt dich die App, ob du die Werbung dieser Partner
-				akzeptierst, mit zwei gleichwertigen Schaltflächen, „Akzeptieren“ und „Ablehnen“. Deine Wahl bleibt auf
-				deinem Handy, und nach 6 Monaten wirst du erneut gefragt. <strong>Wenn du ablehnst, startet kein
+				akzeptierst, mit zwei gleichwertigen Schaltflächen, „Akzeptieren“ und „Ablehnen“. Deine Wahl wird auf
+				deinem Handy gespeichert, und nach 6 Monaten wirst du erneut gefragt. Seit den Versionen 1.0.6 (Beta) und 1.1.0 wird sie außerdem ohne Kennung in unserer Nutzungsstatistik gezählt (siehe §8). <strong>Wenn du ablehnst, startet kein
 				Werbemodul</strong> und es wird ihnen nichts gesendet: Es erscheint nur unser Banner für unsere anderen
 				Apps. Du kannst deine Meinung jederzeit ändern: „Konto und Hilfe“ → „Werbeeinstellungen“. Widerrufst du
 				deine Einwilligung, verschwindet das Banner unserer Partner sofort, und die App teilt den Widerruf Unity
@@ -347,8 +347,15 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				All das bleibt auf dem Gerät und verschwindet, wenn du die App deinstallierst.
 			</p>
 			<p>
-				<strong>Erinnerungen.</strong> Wenn du zustimmst, plant die App auf deinem Handy eine Erinnerung eine
-				Stunde vor deinen Spielen. Es sind lokale Benachrichtigungen: Kein Server schickt dir eine Nachricht.
+				<strong>Erinnerungen.</strong> Es sind lokale Benachrichtigungen, die dein Handy plant: Kein Server schickt dir eine Nachricht.
+			</p>
+			<ul>
+				<li>Wenn du zustimmst, eine Erinnerung eine Stunde vor deinen Spielen.</li>
+				<li>Für die Turniere, denen du folgst, eine Erinnerung am Vortag um 19 Uhr und eine weitere 2 Stunden vor dem ersten Wettbewerb, für die 10 nächsten. Sie sind von Anfang an eingeschaltet; du kannst sie unter „Konto und Hilfe“ ausschalten.</li>
+				<li>Die Donnerstagsübersicht: donnerstags um 19 Uhr die Zahl der Turniere am folgenden Samstag und Sonntag, im Umkreis, den du um deine gespeicherten Orte eingestellt hast. Sie bleibt aus, bis du Ja sagst, auf die Frage, die nur einmal gestellt wird, wenn du deinen ersten Ort speicherst. Gezählt wird auf deinem Handy, mit den Turnieren, die die App schon hat: Deine gespeicherten Orte werden nie an unseren Server gesendet.</li>
+			</ul>
+			<p>
+				Deine Antwort zur Übersicht und das Antippen einer Erinnerung werden ohne Kennung in der Nutzungsstatistik gezählt (siehe §8).
 			</p>
 		</section>
 
