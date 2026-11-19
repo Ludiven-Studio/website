@@ -3655,3 +3655,18 @@
 - 09:19 : build complet OK (240 pages, 0 erreur, précache et liens OK).
 - 09:19 : commité et poussé sous le « publie » de Raphaël pour la bêta 11 (relayé par le Producer) : ma page et cette
   section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-19 — Pétanque Meet : bêta 1.0.5 (session release-publisher)
+- Statut : en cours (2026-11-19T09:17+01:00). Demande de l'utilisateur : (relayé par le Producer, Raphaël vers 09:40) «
+  publie » la bêta 1.0.5 de Pétanque Meet ; APK sur la prerelease GitHub petanque-meet-beta (« GitHub, comme les autres
+  »)
+- Réservations actives : `src/pages/petanque-meet/beta-0gn9lbmb.astro`.
+- Ressources : serveur de dev sur le port 4393 ; eslint, `astro check`. Build annoncé ici avant.
+- 09:19 : APK envoyé sur la prerelease petanque-meet-beta sous petanque-meet-beta-1.0.5.apk ; le lien sert sha256
+  93ce24ef… (35 642 483 octets). Page : constante (1.0.5, 19/11, taille, sha, url GitHub) et les notes de la session
+  Meet ; eslint et astro check OK.
+- 09:20 : Lancement du build complet (écrit dist/, .astro/, public/vendor/ du worktree site-publish-meet-beta105)…
+- 09:22 : build complet OK (240 pages, 0 erreur, précache et liens OK) ; page vue en téléphone et bureau sombre, sans
+  erreur console.
+- 09:22 : commité et poussé à la demande de l'utilisateur (« publie » de Raphaël relayé par le Producer) : ma page et
+  cette section seulement. Statut : terminé. Réservations libérées.
