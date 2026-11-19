@@ -1,6 +1,6 @@
 // deno test supabase/functions/_shared/shotPrizes_test.ts
 import { assertEquals } from 'jsr:@std/assert@1';
-import { bounds, closing, LAST_READ_MS, paidPlaces, prize, readable, rowsFrom } from './shotPrizes.ts';
+import { bounds, closing, endedPeriods, LAST_READ_MS, openPeriods, paidPlaces, prize, readable, rowsFrom } from './shotPrizes.ts';
 
 Deno.test('the prizes are the game\'s table', () => {
 	assertEquals([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((r) => prize(false, r)), [500, 300, 200, 150, 125, 100, 90, 80, 70, 60, 0]);
@@ -55,4 +55,26 @@ Deno.test('the last reading is 10 s before the reset, and none past it stands fo
 	assertEquals(readable(false, '2026-11-22', t('2026-11-22T23:59:58Z')), false, 'too near the reset');
 	assertEquals(readable(false, '2026-11-22', t('2026-11-23T00:00:01Z')), false, 'after the reset');
 	assertEquals(readable(false, '2026-11-22', t('2026-11-21T23:59:59Z')), false, 'before the day');
+	assertEquals(readable(false, '2026-11-23', t('2026-11-23T00:03:00Z')), false, 'Unity may not have reset yet');
+	assertEquals(readable(true, '2026-11-23', t('2026-11-23T00:07:00Z')), true);
+});
+
+Deno.test('the drafts read the running day and week', () => {
+	const at = (s: string) => openPeriods(new Date(s)).map((p) => `${p.board}:${p.period}`);
+	assertEquals(at('2026-11-19T10:07:00Z'), ['shots_day:2026-11-19', 'shots_week:2026-11-16']);
+	assertEquals(at('2026-11-22T23:52:00Z'), ['shots_day:2026-11-22', 'shots_week:2026-11-16'], 'Sunday ends the week');
+	assertEquals(at('2026-11-23T00:07:00Z'), ['shots_day:2026-11-23', 'shots_week:2026-11-23']);
+});
+
+Deno.test('a run catches up every period that ended in the last 8 days, each board on its own', () => {
+	const ended = (s: string) => endedPeriods(new Date(s)).map((p) => `${p.board}:${p.period}`);
+	// Monday 00:07 after a lost Sunday snapshot: the day and the week both come back.
+	const monday = ended('2026-11-23T00:07:00Z');
+	assertEquals(monday.includes('shots_day:2026-11-22') && monday.includes('shots_week:2026-11-16'), true);
+	assertEquals(monday.includes('shots_day:2026-11-23') || monday.includes('shots_week:2026-11-23'), false, 'nothing still running');
+	assertEquals(monday.filter((p) => p.startsWith('shots_day'))[0], 'shots_day:2026-11-17', 'nothing before the first snapshot');
+	const later = ended('2026-12-10T12:00:00Z');
+	assertEquals(later.filter((p) => p.startsWith('shots_day')).length, 8);
+	assertEquals(later.filter((p) => p.startsWith('shots_week')), ['shots_week:2026-11-30']);
+	assertEquals(ended('2026-11-17T12:00:00Z'), []);
 });

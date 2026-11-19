@@ -61,10 +61,48 @@ export const LAST_READ_MS = 10_000;
 /** No reading of a period starts later than this before its end: it could come back from the reset ranking. */
 export const READ_MARGIN_MS = 2_000;
 
-/** Whether a reading started at `startedAt` may stand for the period: before the reset, with some margin. */
+/** Nor sooner than this after its start: Unity resets « to the minute », so the last period may still be there. */
+export const READ_AFTER_START_MS = 5 * 60_000;
+
+/** Whether a reading started at `startedAt` may stand for the period: after its start and before the reset, with margins. */
 export function readable(week: boolean, period: string, startedAt: number): boolean {
 	const { start, end } = bounds(week, period);
-	return startedAt >= start && startedAt < end - READ_MARGIN_MS;
+	return startedAt >= start + READ_AFTER_START_MS && startedAt < end - READ_MARGIN_MS;
+}
+
+export interface Period {
+	board: string;
+	week: boolean;
+	period: string;
+}
+
+/** The periods running at `now`: the day, and the week from its Monday. */
+export function openPeriods(now: Date): Period[] {
+	const day = iso(now);
+	const monday = new Date(Date.parse(day + 'T00:00:00Z') - ((now.getUTCDay() + 6) % 7) * DAY_MS);
+	return [{ board: DAY_BOARD, week: false, period: day }, { board: WEEK_BOARD, week: true, period: iso(monday) }];
+}
+
+/** How far back a run looks for a period left unclosed. */
+export const CATCH_UP_DAYS = 8;
+
+/** The first reset the server snapshotted (2026-11-17's day): earlier periods were never kept. */
+export const FIRST_END = Date.parse('2026-11-18T00:00:00Z');
+
+/** The periods that ended in the last `CATCH_UP_DAYS` days (none before `FIRST_END`), by start. */
+export function endedPeriods(now: Date): Period[] {
+	const from = Math.max(now.getTime() - CATCH_UP_DAYS * DAY_MS, FIRST_END);
+	const today = Date.parse(iso(now) + 'T00:00:00Z');
+	const out: Period[] = [];
+	for (let start = today - (CATCH_UP_DAYS + 7) * DAY_MS; start < today; start += DAY_MS) {
+		const period = iso(new Date(start));
+		for (const week of [false, true]) {
+			if (week && new Date(start).getUTCDay() !== 1) continue;
+			const { end } = bounds(week, period);
+			if (end >= from && end <= now.getTime()) out.push({ board: week ? WEEK_BOARD : DAY_BOARD, week, period });
+		}
+	}
+	return out;
 }
 
 /** One line of Unity's Leaderboards Admin API « Get Scores ». */

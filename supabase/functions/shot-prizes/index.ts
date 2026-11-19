@@ -7,14 +7,17 @@
 // each prize once on its side; « forget » deletes a player's rows as their account is deleted. pg_cron
 // purges the rows after 30 days on its own. Unity keeps no archive of the rankings.
 //
-// POST { action: 'snapshot', day: 'YYYY-MM-DD' }  header x-cron-key   -> { kept, closed }
+// POST { action: 'snapshot', day: 'YYYY-MM-DD' }  header x-cron-key   -> { kept, closed, late, caughtUp }
+// POST { action: 'draft' }                        header x-cron-key   -> { kept, caughtUp } (every 15 minutes)
 // POST { action: 'mine' }                         header x-unity-token -> { prizes: [{ board, period, rank, score, coins }] }
 // POST { action: 'forget' }                       header x-unity-token -> { ok }
 // POST { action: 'check' }                        header x-cron-key   -> lines read from Unity, nothing written
 //
 // Deploy:  supabase functions deploy shot-prizes --no-verify-jwt   (the game holds no Supabase session)
 // Tables:  migrations/20261118120000_shot_prizes.sql (shot_prizes, shot_prizes_closed, the cron jobs),
-//          20261119100000_shot_prizes_settle.sql (the drafts, shot_prizes_draft_save, shot_prizes_settle)
+//          20261119100000_shot_prizes_settle.sql (the drafts, shot_prizes_draft_save, shot_prizes_settle),
+//          20261119100200_shot_prizes_catch_up.sql (shot_prizes_alerts, the draft cron job)
+// Alerts:  a period lost or closed late is a row of shot_prizes_alerts and an « ALERT shot-prizes » error line.
 // Secrets: UNITY_SERVICE_KEY_ID, UNITY_SERVICE_SECRET (a Unity service account allowed to list leaderboard
 //          scores), UNITY_PROJECT_ID, UNITY_ENVIRONMENT_ID (production), SHOT_PRIZES_CRON_KEY (also in the
 //          vault as « shot_prizes_cron_key », read by the cron job: set it before the first night)
@@ -25,8 +28,11 @@ import {
 	bounds,
 	closing,
 	DAY_BOARD,
+	endedPeriods,
 	LAST_READ_MS,
+	openPeriods,
 	paidPlaces,
+	type Period,
 	READ_MARGIN_MS,
 	readable,
 	rowsFrom,
@@ -130,40 +136,88 @@ async function settle(board: string, period: string): Promise<number> {
 	return Number(data);
 }
 
-/**
- * Closes the periods ending on `day` (called at 23:59 UTC): each ranking read at once and kept as its draft, read
- * again 10 s before Unity's reset (kept only if it has as many lines), then closed from the draft in one transaction.
- */
-async function snapshot(day: string): Promise<Response> {
-	const periods = closing(day, new Date());
-	if (!periods) return json({ error: 'not today: the rankings may have reset' }, 409);
-	const limit = (week: boolean) => paidPlaces(week) + SPARE_LINES;
-	for (const { board, week, period } of periods) {
+/** Says what went wrong with a period, once per kind: a row in shot_prizes_alerts and an « ALERT » line in the logs. */
+async function alert(board: string, period: string, kind: string, detail: string): Promise<void> {
+	const { data, error } = await db.from('shot_prizes_alerts')
+		.upsert({ board, period, kind, detail }, { onConflict: 'board,period,kind', ignoreDuplicates: true })
+		.select('kind');
+	if (error || (data?.length ?? 0) > 0) console.error(`ALERT shot-prizes ${kind} ${board}:${period}: ${detail}`, error?.message ?? '');
+}
+
+const message = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+const limit = (week: boolean): number => paidPlaces(week) + SPARE_LINES;
+
+/** Closes each period that ended unclosed (a cron call lost, late or failed) from its last reading before the
+ * reset, each on its own. A period with no reading cannot be read any more: Unity has reset it. */
+async function catchUp(now: Date): Promise<string[]> {
+	const done: string[] = [];
+	for (const { board, period } of endedPeriods(now)) {
 		try {
-			await saveDraft(board, week, period, await topScores(board, limit(week)));
+			const paid = await settle(board, period);
+			if (paid === -1) continue;
+			if (paid >= 0) {
+				done.push(`${board}:${period}`);
+				await alert(board, period, 'caught_up', `closed late from its last reading before the reset, ${paid} prizes`);
+			} else await alert(board, period, 'missed', 'no reading kept before the reset: nothing can be paid');
 		} catch (e) {
-			console.warn('shot-prizes first reading', board, e instanceof Error ? e.message : e);
+			await alert(board, period, 'failed', 'catch-up: ' + message(e));
 		}
 	}
+	return done;
+}
+
+/** Keeps a reading of each running period (every 15 minutes), the fallback if the 23:59 snapshot is lost. */
+async function drafts(): Promise<Response> {
+	const kept: string[] = [];
+	for (const { board, week, period } of openPeriods(new Date())) {
+		try {
+			if (await saveDraft(board, week, period, await topScores(board, limit(week)))) kept.push(board);
+		} catch (e) {
+			console.warn('shot-prizes draft', board, message(e));
+		}
+	}
+	return json({ kept, caughtUp: await catchUp(new Date()) });
+}
+
+/**
+ * Closes the periods ending on `day` (called at 23:59 UTC): each ranking read at once and kept as its draft, read
+ * again 10 s before Unity's reset (kept only if it has as many lines), then closed from the draft in one transaction,
+ * each board on its own. Periods left unclosed before are caught up first.
+ */
+async function snapshot(day: string): Promise<Response> {
+	const caughtUp = await catchUp(new Date());
+	const periods = closing(day, new Date());
+	if (!periods) {
+		await alert(DAY_BOARD, /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : '1970-01-01', 'late_call', `snapshot of ${day} called at ${new Date().toISOString()}`);
+		return json({ error: 'not today: the rankings may have reset', caughtUp }, 409);
+	}
+	const read = async (p: Period, stopAt?: number, pauseMs?: number): Promise<boolean> => {
+		try {
+			return await saveDraft(p.board, p.week, p.period, await topScores(p.board, limit(p.week), stopAt, pauseMs));
+		} catch (e) {
+			console.warn('shot-prizes reading', p.board, message(e));
+			return false;
+		}
+	};
+	for (const p of periods) await read(p);
 	const end = bounds(false, day).end; // the week ends with its last day
 	await sleep(end - LAST_READ_MS - Date.now());
 	const late: string[] = [];
-	for (const { board, week, period } of periods) {
-		try {
-			if (await saveDraft(board, week, period, await topScores(board, limit(week), end - READ_MARGIN_MS, 1000))) late.push(board);
-		} catch (e) {
-			console.warn('shot-prizes last reading', board, e instanceof Error ? e.message : e);
-		}
-	}
+	for (const p of periods) if (await read(p, end - READ_MARGIN_MS, 1000)) late.push(p.board);
 	let kept = 0;
 	const closed: string[] = [];
 	for (const { board, period } of periods) {
-		const paid = await settle(board, period);
-		if (paid < 0) continue;
-		kept += paid;
-		closed.push(`${board}:${period}`);
+		try {
+			const paid = await settle(board, period);
+			if (paid === -2) await alert(board, period, 'failed', 'no reading of Unity before the reset');
+			if (paid < 0) continue;
+			kept += paid;
+			closed.push(`${board}:${period}`);
+		} catch (e) {
+			await alert(board, period, 'failed', 'snapshot: ' + message(e) + ' (the next run closes it from its reading)');
+		}
 	}
-	return json({ kept, closed, late });
+	return json({ kept, closed, late, caughtUp });
 }
 
 Deno.serve(async (req) => {
@@ -179,9 +233,10 @@ Deno.serve(async (req) => {
 	const action = String(body.action ?? '');
 
 	try {
-		if (action === 'snapshot' || action === 'check') {
+		if (action === 'snapshot' || action === 'draft' || action === 'check') {
 			if (!sameSecret(req.headers.get('x-cron-key') ?? '', env('SHOT_PRIZES_CRON_KEY'))) return json({ error: 'forbidden' }, 403);
 			if (action === 'snapshot') return await snapshot(String(body.day ?? ''));
+			if (action === 'draft') return await drafts();
 			// The snapshot's reading without writing or closing anything: a deploy checks Unity answers mid-day.
 			const day = (await topScores(DAY_BOARD, paidPlaces(false) + SPARE_LINES)).results;
 			const week = (await topScores(WEEK_BOARD, paidPlaces(true) + SPARE_LINES)).results;
