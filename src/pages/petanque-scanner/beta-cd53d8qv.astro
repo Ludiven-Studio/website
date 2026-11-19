@@ -2,14 +2,16 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 
 // Unlisted: noindex, out of the sitemap and of the offline precache (astro.config.mjs).
-// The next store build, from main, under the .beta id. Over 50 MB, so the APK is a GitHub prerelease asset.
+// The next store build, from main (f6e2724), under the .beta id. Over 50 MB, so the APK is a GitHub prerelease asset
+// (the earlier builds' APKs stay there).
 const BETA = {
 	version: '1.2.15',
-	date: '2026-11-16',
-	size: 109981001,
+	label: 'n°2',
+	date: '2026-11-19',
+	size: 110016753,
 	android: '7.1',
-	sha256: '0fe7a1ea4bf74390c5a11fc690bbf28e6f5dd82414b0cc0ec883454d4b98d5ee',
-	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-scanner-beta/petanque-scan-beta-1.2.15.apk',
+	sha256: '63ea138c572125f968c0771d68eeb45e268d294b6c77a3ae33f97924044befbb',
+	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-scanner-beta/petanque-scan-beta-1.2.15-n2.apk',
 };
 const date = new Date(BETA.date).toLocaleDateString('fr-FR', { dateStyle: 'medium' });
 const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
@@ -30,9 +32,29 @@ const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 		</header>
 
 		<section class="card stack gap-3">
-			<a class="download" href={BETA.url}>Télécharger Pétanque Scan β {BETA.version}</a>
+			<a class="download" href={BETA.url}>Télécharger Pétanque Scan β {BETA.version} {BETA.label}</a>
 			<p class="muted">{date} · {size} · Android {BETA.android} ou plus récent, 64 bits</p>
 			<p class="muted sha">SHA-256 : <code>{BETA.sha256}</code></p>
+		</section>
+
+		<section class="card stack gap-3">
+			<h2>Quoi de neuf</h2>
+			<p>Bêta 1.2.15 (n°2, 19/11). Nouveau depuis le 16/11&nbsp;:</p>
+			<ul>
+				<li>
+					une légère vibration à chaque verrouillage du cochonnet et des boules, une seule si plusieurs se verrouillent
+					ensemble&nbsp;; elle suit le réglage « vibration au toucher » du téléphone&nbsp;;
+				</li>
+				<li>
+					si l'installation d'ARCore est refusée, un écran propose « Passer en mode photo », et « Scan 3D » la redemande&nbsp;;
+				</li>
+				<li>mode photo&nbsp;: plus de « NaN cm », et une nouvelle visée reste gratuite pendant le délai de grâce&nbsp;;</li>
+				<li>classement&nbsp;: le cochonnet verrouillé garde sa place, un caillou ne peut plus la prendre.</li>
+			</ul>
+			<p class="muted">
+				Rappel&nbsp;: dans la bêta, pas d'achat ni de restauration Premium, pas de vraies pubs (bannière et vidéo de Pétanque Meet),
+				et des données séparées de l'appli du store.
+			</p>
 		</section>
 
 		<section class="card notice stack gap-3">
