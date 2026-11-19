@@ -18,7 +18,7 @@ import Hero from '../../../components/Hero.astro';
 		<p class="updated">
 			This policy covers <strong>the Pétanque Scan mobile app</strong>
 			(formerly Pétanque Scanner, <code>com.raphbenpro.petanquear</code>), not the ludiven-studio.fr website, which has its
-			<a href="/confidentialite/">own policy</a>. Last updated: 11 November 2026 (version 1.2.14: our house ads, read from our website, replace the Pétanque Meet strip and video; after a refusal, "Turn ads on?" is offered once per session when you ask for a video; advertising moves from Google AdMob to Unity LevelPlay, with our own consent window; on iPhone, without Apple's tracking permission, ads are not personalised; withdrawing your consent is passed on to the ad networks; Google Firebase is removed; 10 free scans a day instead of 3).
+			<a href="/confidentialite/">own policy</a>. Last updated: 19 November 2026 (the screens opened, in the statistics; version 1.2.14: our house ads, read from our website, replace the Pétanque Meet strip and video; after a refusal, "Turn ads on?" is offered once per session when you ask for a video; advertising moves from Google AdMob to Unity LevelPlay, with our own consent window; on iPhone, without Apple's tracking permission, ads are not personalised; withdrawing your consent is passed on to the ad networks; Google Firebase is removed; 10 free scans a day instead of 3).
 		</p>
 		<p class="updated">
 			This is a courtesy translation. In case of discrepancy, the
@@ -102,7 +102,7 @@ import Hero from '../../../components/Hero.astro';
 							<td>Unity Technologies and its subsidiary ironSource (Unity LevelPlay, ironSource Ads, Unity Ads); through their auctions, other ad buyers (see §4)</td>
 						</tr>
 						<tr>
-							<td>App usage events (see §5), together with: platform (Android or iOS), app and system version, device model, phone language, screen resolution</td>
+							<td>App usage events and screens opened (see §5), together with: platform (Android or iOS), app and system version, device model, phone language, screen resolution</td>
 							<td>Analytics: understanding which features are used and improving the app</td>
 							<td>Legitimate interest (no cookie, no identifier, see §5)</td>
 							<td>Umami, on our own server (Hetzner Online GmbH, Germany)</td>
@@ -244,9 +244,12 @@ import Hero from '../../../components/Hero.astro';
 				<li><code>consent_accepted</code> / <code>consent_declined</code> — your consent choice</li>
 			</ul>
 			<p>
-				<strong>What Umami receives, precisely.</strong> Each event is sent to
+				In addition to these events, the app sends the name of each screen you open (home, scan, result, settings…), and nothing else.
+			</p>
+			<p>
+				<strong>What Umami receives, precisely.</strong> Each event or screen opened is sent to
 				<code>stats.ludiven-studio.fr</code>, our server, with the following, and nothing more: the event
-				name and its detail if any (for example the number of scans that day), a site identifier that
+				name (or the screen's name) and its detail if any (for example the number of scans that day), a site identifier that
 				belongs to us, the platform (<code>android</code> or <code>ios</code>), the app version, the system
 				version, the phone model, the phone language and the screen resolution. <strong>No advertising
 				identifier, no device number, no cookie and no persistent identifier</strong> is included. As with

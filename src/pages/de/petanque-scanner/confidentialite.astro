@@ -18,7 +18,7 @@ import Hero from '../../../components/Hero.astro';
 		<p class="updated">
 			Diese Erklärung betrifft <strong>die mobile App Pétanque Scan</strong>
 			(früher Pétanque Scanner, <code>com.raphbenpro.petanquear</code>) und nicht die Website ludiven-studio.fr, die über eine
-			<a href="/confidentialite/">eigene Datenschutzerklärung</a> verfügt. Letzte Aktualisierung: 11. November 2026 (Version 1.2.14: Unsere eigenen Anzeigen, von unserer Website geladen, ersetzen das Banner und das Video von Pétanque Meet; nach einer Ablehnung wird „Werbung aktivieren?“ einmal pro Sitzung angeboten, wenn du ein Video anforderst; die Werbung wechselt von Google AdMob zu Unity LevelPlay, mit unserem eigenen Einwilligungsfenster; auf dem iPhone ist die Werbung ohne Apples Tracking-Erlaubnis nicht personalisiert; ein Widerruf deiner Einwilligung wird an die Werbenetzwerke weitergegeben; Google Firebase entfällt; 10 kostenlose Scans pro Tag statt 3).
+			<a href="/confidentialite/">eigene Datenschutzerklärung</a> verfügt. Letzte Aktualisierung: 19. November 2026 (die geöffneten Bildschirme in den Statistiken; Version 1.2.14: Unsere eigenen Anzeigen, von unserer Website geladen, ersetzen das Banner und das Video von Pétanque Meet; nach einer Ablehnung wird „Werbung aktivieren?“ einmal pro Sitzung angeboten, wenn du ein Video anforderst; die Werbung wechselt von Google AdMob zu Unity LevelPlay, mit unserem eigenen Einwilligungsfenster; auf dem iPhone ist die Werbung ohne Apples Tracking-Erlaubnis nicht personalisiert; ein Widerruf deiner Einwilligung wird an die Werbenetzwerke weitergegeben; Google Firebase entfällt; 10 kostenlose Scans pro Tag statt 3).
 		</p>
 		<p class="updated">
 			Dies ist eine Höflichkeitsübersetzung. Bei Abweichungen gilt die
@@ -104,7 +104,7 @@ import Hero from '../../../components/Hero.astro';
 							<td>Unity Technologies und seine Tochtergesellschaft ironSource (Unity LevelPlay, ironSource Ads, Unity Ads); über deren Auktionen weitere Werbekäufer (siehe §4)</td>
 						</tr>
 						<tr>
-							<td>Nutzungsereignisse der App (siehe §5), zusammen mit: Plattform (Android oder iOS), App- und Systemversion, Gerätemodell, Sprache des Handys, Bildschirmauflösung</td>
+							<td>Nutzungsereignisse der App und geöffnete Bildschirme (siehe §5), zusammen mit: Plattform (Android oder iOS), App- und Systemversion, Gerätemodell, Sprache des Handys, Bildschirmauflösung</td>
 							<td>Reichweitenmessung: verstehen, welche Funktionen genutzt werden, und die App verbessern</td>
 							<td>Berechtigtes Interesse (ohne Cookie und ohne Kennung, siehe §5)</td>
 							<td>Umami, auf unserem eigenen Server (Hetzner Online GmbH, Deutschland)</td>
@@ -248,9 +248,12 @@ import Hero from '../../../components/Hero.astro';
 				<li><code>consent_accepted</code> / <code>consent_declined</code> — deine Einwilligungsentscheidung</li>
 			</ul>
 			<p>
-				<strong>Was Umami genau erhält.</strong> Jedes Ereignis wird an
+				Zusätzlich zu diesen Ereignissen sendet die App den Namen jedes geöffneten Bildschirms (Start, Scan, Ergebnis, Einstellungen …), und nichts weiter.
+			</p>
+			<p>
+				<strong>Was Umami genau erhält.</strong> Jedes Ereignis und jeder geöffnete Bildschirm werden an
 				<code>stats.ludiven-studio.fr</code>, unseren Server, gesendet, mit Folgendem und nichts weiter: dem
-				Namen des Ereignisses und gegebenenfalls seiner Angabe (zum Beispiel der Zahl der Scans des Tages),
+				Namen des Ereignisses (oder des Bildschirms) und gegebenenfalls seiner Angabe (zum Beispiel der Zahl der Scans des Tages),
 				einer Website-Kennung, die uns gehört, der Plattform (<code>android</code> oder <code>ios</code>),
 				der App-Version, der Systemversion, dem Handymodell, der Sprache des Handys und der
 				Bildschirmauflösung. <strong>Keine Werbe-ID, keine Gerätenummer, kein Cookie und keine dauerhafte
