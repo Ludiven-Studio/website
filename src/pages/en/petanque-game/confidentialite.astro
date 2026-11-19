@@ -31,7 +31,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			This policy covers <strong>the Pétanque Game mobile app</strong>
 			(<code>com.ludivenstudio.petanquegame</code>). The pétanque game on the website
 			(<a href="/jeux/petanque/">ludiven-studio.fr/jeux/petanque</a>) and the rest of the website have their
-			<a href="/confidentialite/">own policy</a>. Last updated: 17 November 2026 (version 1.0.14: coins to win in the shooting challenge rankings, the number of players online right now, the shooting challenge and its rankings, coins and purchases without an account; version 1.0.8: our own ads, new "Personalised advertising" window, no more Google backup on Android).
+			<a href="/confidentialite/">own policy</a>. Last updated: 19 November 2026 (version 1.0.14: the opponent search shown to the other players, coins to win in the shooting challenge rankings, the number of players online right now, the shooting challenge and its rankings, coins and purchases without an account; version 1.0.8: our own ads, new "Personalised advertising" window, no more Google backup on Android).
 		</p>
 		<p class="updated">
 			This is a courtesy translation. In case of discrepancy, the
@@ -43,7 +43,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<ul>
 				<li>Against the computer or with two players on one phone, you play <strong>without an account</strong>, even offline. When the phone is online, only these leave it: advertising if you accepted it, anonymous usage statistics, a few requests to our website (the game's latest version, our own ads) and, once a minute while you play, a signal with no identifier used to count the players right now (see §2).</li>
 				<li>Online play and the rankings need a <strong>Google account</strong> (Android or iPhone) <strong>or Apple account</strong> (iPhone). Coins, the shop and the leagues also work without one: your progress then stays on your phone. With an account, it is saved with <strong>Unity</strong>, our provider, so you find it on all your phones.</li>
-				<li><strong>Your name is public</strong>: in the list of public games, on your opponent's phone and in the ranking, with your rating. There is no chat.</li>
+				<li><strong>Your name is public</strong>: in the list of public games, on your opponent's phone and in the ranking, with your rating, and, while you look for an opponent, in a banner on the phones of players who have the game open. There is no chat.</li>
 				<li>Ads from ad networks are shown <strong>only with your consent</strong>, asked at first launch. Without it, you play as usual, with no ads between games; only videos of our other games and apps may play, when you ask for a reward. No data is resold.</li>
 				<li>You can <strong>delete your account</strong> at any time: Options › "Delete my account" (<a href="#suppression">see §11</a>).</li>
 			</ul>
@@ -74,7 +74,6 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>usage statistics</strong> with no identifier (see §7);</li>
 				<li>reading the <strong>number of the latest version</strong> of the game on our website (see §9);</li>
 				<li>a <strong>presence signal</strong>, once a minute while the game is open: a number drawn at random at each launch, with no account or player identifier, to show how many are playing right now (see §5 and §12);</li>
-				<li>when you <strong>look for an opponent</strong> online, this signal goes every 15 seconds with your nickname, the game's format and its Unity id: they are shown to the players who have the game open ("Bébert is looking for an opponent") while you search, so they can join you;</li>
 				<li>reading the list of <strong>our own ads</strong> on our website, at each launch, then the picture and the video of the one that plays (see §6).</li>
 			</ul>
 			<p>
@@ -122,6 +121,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<p><strong>What other players see:</strong></p>
 			<ul>
 				<li><strong>Public game</strong>: your name, your rating and the game's format appear in the list of public games, until an opponent joins it. A private game, with a friend through its code, is not in that list.</li>
+				<li><strong>Looking for an opponent</strong>: while you wait for an opponent in a public game, your phone sends your nickname, the game's format and its Unity id to our function every 15 seconds (see §12); the players who have the game open see "Bébert is looking for an opponent" and can join you. A private game, with a friend by its code, is never announced.</li>
 				<li><strong>During the game</strong>, your opponent receives your name, your rating, your player, your outfit and your boule, then your throws (their speed and where your hand lets go of the boule). After each throw, the phone that opened the game sends the ruling (where the boules lie, the score). These messages go through <strong>Unity Relay</strong>, which passes them on without keeping them.</li>
 				<li><strong>Ranking</strong>: each public singles game played to the end changes your rating (an Elo rating). Your rating and your name are then sent to the <strong>Unity Leaderboards</strong> ranking, which every player of the game can view: the top 50, and each player their own line. Games with a friend by code and team games do not count.</li>
 				<li><strong>Shooting challenge</strong>: if you have an account, the score of each series (out of 50) and your name go to the day's and the week's rankings (<strong>Unity Leaderboards</strong>), which all the game's players can see. Without an account, your series stay on your phone.</li>
@@ -212,6 +212,12 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 							<td>Show how many players are playing right now</td>
 							<td>Legitimate interest</td>
 							<td>Our function at Supabase (see §12)</td>
+						</tr>
+						<tr>
+							<td>While you look for an opponent: your nickname, the game's format and its Unity id</td>
+							<td>Tell the other players you are waiting for an opponent, so they can join you</td>
+							<td>Performance of the contract</td>
+							<td>Our function at Supabase (see §12); the game's players</td>
 						</tr>
 						<tr>
 							<td>Usage statistics, with no account or identifier (see §7)</td>
@@ -428,7 +434,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Google</strong> (Google Ireland Limited, Google LLC) — sign-in on Android and iPhone, Google Play (distribution, payment, rating form).</li>
 				<li><strong>Apple Inc.</strong> — "Sign in with Apple", tracking permission, App Store (distribution, payment, rating form).</li>
 				<li><strong>Hetzner Online GmbH</strong> (Germany) — hosting of our usage statistics server (see §7).</li>
-				<li><strong>Supabase, Inc.</strong> — hosting of our function that removes the "Sign in with Apple" access (see §11): it receives Apple's code, the app's identifier and the phone's IP address, and keeps nothing; and of the one that counts the players online: it receives the number drawn at random at launch and the phone's IP address. It does not record that address, which it may keep in memory for a few minutes to block abuse; Supabase's technical logs keep it for a limited time, under its terms. The shooting challenge coins function receives from Unity the ids of the players in the winning places and from your phone your Unity sign-in token and its IP address, which it does not record (Supabase's technical logs keep it for a limited time); it does not keep the token; it keeps the id, place, score and coins for 30 days, without a name (see §13).</li>
+				<li><strong>Supabase, Inc.</strong> — hosting of our function that removes the "Sign in with Apple" access (see §11): it receives Apple's code, the app's identifier and the phone's IP address, and keeps nothing; and of the one that counts the players online: it receives the number drawn at random at launch and the phone's IP address, and, while you look for an opponent, your nickname, the game's format and its id, kept while you search. It does not record that address, which it may keep in memory for a few minutes to block abuse; Supabase's technical logs keep it for a limited time, under its terms. The shooting challenge coins function receives from Unity the ids of the players in the winning places and from your phone your Unity sign-in token and its IP address, which it does not record (Supabase's technical logs keep it for a limited time); it does not keep the token; it keeps the id, place, score and coins for 30 days, without a name (see §13).</li>
 				<li><strong>GitHub, Inc.</strong> — hosting of our website, read for the update check (see §9) and for our own ads (see §6); GitHub logs the IP address of each visit for the security of its service.</li>
 			</ul>
 			<p>

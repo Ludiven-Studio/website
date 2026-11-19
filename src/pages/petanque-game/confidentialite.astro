@@ -30,7 +30,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			Cette politique concerne <strong>l'application mobile Pétanque Game</strong>
 			(<code>com.ludivenstudio.petanquegame</code>). Le jeu de pétanque du site
 			(<a href="/jeux/petanque/">ludiven-studio.fr/jeux/petanque</a>) et le reste du site ont leur
-			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 17 novembre 2026 (version 1.0.14&nbsp;: les pièces à gagner aux classements du défi de tir, le nombre de joueurs en ligne en ce moment, le défi de tir et ses classements, les pièces et les achats sans compte&nbsp;; version 1.0.8&nbsp;: nos propres publicités, nouvelle fenêtre «&nbsp;Publicité personnalisée&nbsp;», plus de sauvegarde Google sur Android).
+			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 19 novembre 2026 (version 1.0.14&nbsp;: la recherche d'un adversaire annoncée aux autres joueurs, les pièces à gagner aux classements du défi de tir, le nombre de joueurs en ligne en ce moment, le défi de tir et ses classements, les pièces et les achats sans compte&nbsp;; version 1.0.8&nbsp;: nos propres publicités, nouvelle fenêtre «&nbsp;Publicité personnalisée&nbsp;», plus de sauvegarde Google sur Android).
 		</p>
 
 		<div class="summary">
@@ -38,7 +38,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			<ul>
 				<li>Contre l'ordinateur ou à deux sur un téléphone, tu joues <strong>sans compte</strong>, même hors ligne. Quand le téléphone a internet, seules partent la publicité si tu l'as acceptée, des statistiques d'usage anonymes, quelques demandes à notre site (la dernière version du jeu, nos propres publicités) et, une fois par minute pendant que tu joues, un signal sans identifiant qui sert à compter les joueurs en ce moment (voir §2).</li>
 				<li>Le jeu en ligne et les classements demandent un <strong>compte Google</strong> (Android ou iPhone) <strong>ou Apple</strong> (iPhone). Les pièces, le magasin et les ligues marchent aussi sans compte&nbsp;: ta progression reste alors sur ton téléphone. Avec un compte, elle est sauvegardée chez <strong>Unity</strong>, notre prestataire, pour la retrouver sur tous tes téléphones.</li>
-				<li><strong>Ton pseudo est public</strong>&nbsp;: dans la liste des parties publiques, chez ton adversaire et au classement, avec ta note. Il n'y a pas de chat.</li>
+				<li><strong>Ton pseudo est public</strong>&nbsp;: dans la liste des parties publiques, chez ton adversaire et au classement, avec ta note, et, le temps que tu cherches un adversaire, dans un bandeau chez les joueurs qui ont le jeu ouvert. Il n'y a pas de chat.</li>
 				<li>La publicité des régies ne s'affiche <strong>qu'avec ton accord</strong>, demandé au premier lancement. Sans lui, tu joues normalement, sans publicité entre les parties&nbsp;; seules des vidéos de nos autres jeux et applis peuvent passer, quand tu demandes une récompense. Aucune revente de données.</li>
 				<li>Tu peux <strong>supprimer ton compte</strong> à tout moment&nbsp;: Options › «&nbsp;Supprimer mon compte&nbsp;» (<a href="#suppression">voir §11</a>).</li>
 			</ul>
@@ -69,7 +69,6 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li>des <strong>statistiques d'usage</strong> sans identifiant (voir §7)&nbsp;;</li>
 				<li>la lecture du <strong>numéro de la dernière version</strong> du jeu sur notre site (voir §9)&nbsp;;</li>
 				<li>un <strong>signal de présence</strong>, une fois par minute tant que le jeu est ouvert&nbsp;: un numéro tiré au hasard à chaque lancement, sans compte ni identifiant de joueur, pour afficher combien de joueurs jouent en ce moment (voir §5 et §12)&nbsp;;</li>
-				<li>quand tu <strong>cherches un adversaire</strong> en ligne, ce signal part toutes les 15 secondes avec ton pseudo, le format de la partie et son identifiant chez Unity&nbsp;: ils sont montrés aux joueurs qui ont le jeu ouvert («&nbsp;Bébert cherche un adversaire&nbsp;»), le temps de ta recherche, pour qu'ils puissent te rejoindre&nbsp;;</li>
 				<li>la lecture de la liste de <strong>nos propres publicités</strong> sur notre site, à chaque lancement, puis de l'image et de la vidéo de celle qui passe (voir §6).</li>
 			</ul>
 			<p>
@@ -118,6 +117,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			<p><strong>Ce que voient les autres joueurs&nbsp;:</strong></p>
 			<ul>
 				<li><strong>Partie publique</strong>&nbsp;: ton pseudo, ta note et le format de la partie apparaissent dans la liste des parties publiques, jusqu'à ce qu'un adversaire la rejoigne. Une partie privée, avec un ami par son code, n'y figure pas.</li>
+				<li><strong>Recherche d'un adversaire</strong>&nbsp;: tant que tu attends un adversaire dans une partie publique, ton téléphone envoie toutes les 15 secondes ton pseudo, le format et l'identifiant de la partie chez Unity à notre fonction (voir §12)&nbsp;; les joueurs qui ont le jeu ouvert voient «&nbsp;Bébert cherche un adversaire&nbsp;» et peuvent te rejoindre. Une partie privée, avec un ami par son code, n'est jamais annoncée.</li>
 				<li><strong>Pendant la partie</strong>, ton adversaire reçoit ton pseudo, ta note, ton joueur, ta tenue et ta boule, puis tes lancers (leur vitesse et l'endroit où ta main lâche la boule). Après chaque lancer, le téléphone qui a ouvert la partie envoie l'arbitrage (position des boules, score). Ces messages passent par <strong>Unity Relay</strong>, qui les achemine sans les garder.</li>
 				<li><strong>Classement</strong>&nbsp;: chaque partie publique en tête-à-tête jouée jusqu'au bout fait bouger ta note (une note Elo). Ta note et ton pseudo sont alors envoyés au classement <strong>Unity Leaderboards</strong>, que tous les joueurs du jeu peuvent consulter&nbsp;: les 50 premiers, et chacun sa propre ligne. Les parties avec un ami par code et les parties en équipe ne comptent pas.</li>
 				<li><strong>Défi de tir</strong>&nbsp;: si tu as un compte, le score de chaque série (sur 50) et ton pseudo vont aux classements du jour et de la semaine (<strong>Unity Leaderboards</strong>), que tous les joueurs du jeu peuvent consulter. Sans compte, tes séries restent sur ton téléphone.</li>
@@ -208,6 +208,12 @@ import LangSwitch from '../../components/LangSwitch.astro';
 							<td>Afficher combien de joueurs jouent en ce moment</td>
 							<td>Intérêt légitime</td>
 							<td>Notre fonction chez Supabase (voir §12)</td>
+						</tr>
+						<tr>
+							<td>Pendant ta recherche d'un adversaire&nbsp;: ton pseudo, le format et l'identifiant de la partie chez Unity</td>
+							<td>Dire aux autres joueurs que tu attends un adversaire, pour qu'ils te rejoignent</td>
+							<td>Exécution du contrat</td>
+							<td>Notre fonction chez Supabase (voir §12)&nbsp;; les joueurs du jeu</td>
 						</tr>
 						<tr>
 							<td>Statistiques d'usage, sans compte ni identifiant (voir §7)</td>
@@ -432,7 +438,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li><strong>Google</strong> (Google Ireland Limited, Google LLC) — connexion sur Android et sur iPhone, Google Play (distribution, paiement, fiche de notation).</li>
 				<li><strong>Apple Inc.</strong> — «&nbsp;Se connecter avec Apple&nbsp;», autorisation de suivi, App Store (distribution, paiement, fiche de notation).</li>
 				<li><strong>Hetzner Online GmbH</strong> (Allemagne) — hébergement de notre serveur de statistiques d'usage (voir §7).</li>
-				<li><strong>Supabase, Inc.</strong> — hébergement de notre fonction qui retire l'accès «&nbsp;Se connecter avec Apple&nbsp;» (voir §11)&nbsp;: elle reçoit le code d'Apple, l'identifiant de l'application et l'adresse IP du téléphone, et ne garde rien&nbsp;; et de celle qui compte les joueurs en ligne&nbsp;: elle reçoit le numéro tiré au hasard au lancement et l'adresse IP du téléphone. Elle n'enregistre pas cette adresse, qu'elle peut garder en mémoire quelques minutes pour bloquer les abus&nbsp;; les journaux techniques de Supabase la gardent un temps limité, selon ses conditions. Celle des pièces du défi de tir reçoit de Unity l'identifiant des joueurs aux places gagnantes et de ton téléphone ton jeton de connexion Unity et son adresse IP, qu'elle n'enregistre pas (les journaux techniques de Supabase la gardent un temps limité)&nbsp;; elle ne garde pas le jeton&nbsp;; elle garde 30 jours l'identifiant, la place, le score et les pièces, sans pseudo (voir §13).</li>
+				<li><strong>Supabase, Inc.</strong> — hébergement de notre fonction qui retire l'accès «&nbsp;Se connecter avec Apple&nbsp;» (voir §11)&nbsp;: elle reçoit le code d'Apple, l'identifiant de l'application et l'adresse IP du téléphone, et ne garde rien&nbsp;; et de celle qui compte les joueurs en ligne&nbsp;: elle reçoit le numéro tiré au hasard au lancement et l'adresse IP du téléphone, et, pendant que tu cherches un adversaire, ton pseudo, le format et l'identifiant de la partie, gardés le temps de ta recherche. Elle n'enregistre pas cette adresse, qu'elle peut garder en mémoire quelques minutes pour bloquer les abus&nbsp;; les journaux techniques de Supabase la gardent un temps limité, selon ses conditions. Celle des pièces du défi de tir reçoit de Unity l'identifiant des joueurs aux places gagnantes et de ton téléphone ton jeton de connexion Unity et son adresse IP, qu'elle n'enregistre pas (les journaux techniques de Supabase la gardent un temps limité)&nbsp;; elle ne garde pas le jeton&nbsp;; elle garde 30 jours l'identifiant, la place, le score et les pièces, sans pseudo (voir §13).</li>
 				<li><strong>GitHub, Inc.</strong> — hébergement de notre site, lu pour la vérification de mise à jour (voir §9) et pour nos propres publicités (voir §6)&nbsp;; GitHub enregistre l'adresse IP de chaque visite pour la sécurité de son service.</li>
 			</ul>
 			<p>

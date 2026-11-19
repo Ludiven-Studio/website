@@ -31,7 +31,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			Esta política se refiere a <strong>la aplicación móvil Pétanque Game</strong>
 			(<code>com.ludivenstudio.petanquegame</code>). El juego de petanca del sitio web
 			(<a href="/jeux/petanque/">ludiven-studio.fr/jeux/petanque</a>) y el resto del sitio tienen su
-			<a href="/confidentialite/">propia política</a>. Última actualización: 17 de noviembre de 2026 (versión 1.0.14: monedas en juego en las clasificaciones del desafío de tiro, el número de jugadores conectados en este momento, el desafío de tiro y sus clasificaciones, monedas y compras sin cuenta; versión 1.0.8: nuestros propios anuncios, nueva ventana «Publicidad personalizada», ya sin copia de seguridad de Google en Android).
+			<a href="/confidentialite/">propia política</a>. Última actualización: 19 de noviembre de 2026 (versión 1.0.14: la búsqueda de rival anunciada a los demás jugadores, monedas en juego en las clasificaciones del desafío de tiro, el número de jugadores conectados en este momento, el desafío de tiro y sus clasificaciones, monedas y compras sin cuenta; versión 1.0.8: nuestros propios anuncios, nueva ventana «Publicidad personalizada», ya sin copia de seguridad de Google en Android).
 		</p>
 		<p class="updated">
 			Esta es una traducción de cortesía. En caso de discrepancia, prevalece la
@@ -43,7 +43,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<ul>
 				<li>Contra la máquina o entre dos en un teléfono, juegas <strong>sin cuenta</strong>, incluso sin conexión. Cuando el teléfono tiene internet, solo salen de él la publicidad si la has aceptado, unas estadísticas de uso anónimas, algunas solicitudes a nuestro sitio web (la última versión del juego, nuestros propios anuncios) y, una vez por minuto mientras juegas, una señal sin identificador que sirve para contar los jugadores conectados en este momento (ver §2).</li>
 				<li>El juego en línea y las clasificaciones necesitan una <strong>cuenta de Google</strong> (Android o iPhone) <strong>o de Apple</strong> (iPhone). Las monedas, la tienda y las ligas funcionan también sin cuenta: tu progreso se queda entonces en tu teléfono. Con una cuenta, se guarda en <strong>Unity</strong>, nuestro proveedor, para encontrarlo en todos tus teléfonos.</li>
-				<li><strong>Tu apodo es público</strong>: aparece en la lista de partidas públicas, lo ve tu rival y figura en la clasificación, con tu puntuación. No hay chat.</li>
+				<li><strong>Tu apodo es público</strong>: aparece en la lista de partidas públicas, lo ve tu rival y figura en la clasificación, con tu puntuación, y, mientras buscas un rival, en un aviso en los teléfonos de los jugadores que tienen el juego abierto. No hay chat.</li>
 				<li>La publicidad de las redes publicitarias <strong>solo se muestra con tu acuerdo</strong>, pedido en el primer inicio. Sin él, juegas igual, sin anuncios entre partidas; solo pueden aparecer vídeos de nuestros otros juegos y apps, cuando pides una recompensa. No se revende ningún dato.</li>
 				<li>Puedes <strong>eliminar tu cuenta</strong> en cualquier momento: Opciones › «Eliminar mi cuenta» (<a href="#suppression">ver §11</a>).</li>
 			</ul>
@@ -74,7 +74,6 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li>unas <strong>estadísticas de uso</strong> sin identificador (ver §7);</li>
 				<li>la lectura del <strong>número de la última versión</strong> del juego en nuestro sitio web (ver §9);</li>
 				<li>una <strong>señal de presencia</strong>, una vez por minuto mientras el juego está abierto: un número sacado al azar en cada inicio, sin cuenta ni identificador de jugador, para mostrar cuántos juegan en este momento (ver §5 y §12);</li>
-				<li>cuando <strong>buscas un rival</strong> en línea, esta señal sale cada 15 segundos con tu apodo, el formato de la partida y su identificador en Unity: se muestran a los jugadores que tienen el juego abierto («Bébert busca un rival») mientras buscas, para que puedan unirse;</li>
 				<li>la lectura de la lista de <strong>nuestros propios anuncios</strong> en nuestro sitio web, en cada inicio, y luego de la imagen y el vídeo del que se muestra (ver §6).</li>
 			</ul>
 			<p>
@@ -122,6 +121,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<p><strong>Lo que ven los demás jugadores:</strong></p>
 			<ul>
 				<li><strong>Partida pública</strong>: tu apodo, tu puntuación y la modalidad de la partida aparecen en la lista de partidas públicas, hasta que un rival se una a ella. Una partida privada, con un amigo mediante su código, no figura en ella.</li>
+				<li><strong>Búsqueda de rival</strong>: mientras esperas un rival en una partida pública, tu teléfono envía cada 15 segundos tu apodo, el formato y el identificador de la partida en Unity a nuestra función (ver §12); los jugadores que tienen el juego abierto ven «Bébert busca un rival» y pueden unirse. Una partida privada, con un amigo mediante su código, nunca se anuncia.</li>
 				<li><strong>Durante la partida</strong>, tu rival recibe tu apodo, tu puntuación, tu jugador, tu equipación y tu bola, y luego tus lanzamientos (su velocidad y el punto donde tu mano suelta la bola). Después de cada lanzamiento, el teléfono que abrió la partida envía el arbitraje (posición de las bolas, marcador). Estos mensajes pasan por <strong>Unity Relay</strong>, que los transmite sin guardarlos.</li>
 				<li><strong>Clasificación</strong>: cada partida pública individual jugada hasta el final hace variar tu puntuación (una puntuación Elo). Tu puntuación y tu apodo se envían entonces a la clasificación <strong>Unity Leaderboards</strong>, que todos los jugadores del juego pueden consultar: los 50 primeros, y cada uno su propia línea. Las partidas con un amigo mediante código y las partidas por equipos no cuentan.</li>
 				<li><strong>Desafío de tiro</strong>: si tienes cuenta, la puntuación de cada serie (sobre 50) y tu apodo van a las clasificaciones del día y de la semana (<strong>Unity Leaderboards</strong>), que todos los jugadores del juego pueden consultar. Sin cuenta, tus series se quedan en tu teléfono.</li>
@@ -212,6 +212,12 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 							<td>Mostrar cuántos jugadores juegan en este momento</td>
 							<td>Interés legítimo</td>
 							<td>Nuestra función en Supabase (ver §12)</td>
+						</tr>
+						<tr>
+							<td>Mientras buscas un rival: tu apodo, el formato y el identificador de la partida en Unity</td>
+							<td>Avisar a los demás jugadores de que esperas un rival, para que se unan</td>
+							<td>Ejecución del contrato</td>
+							<td>Nuestra función en Supabase (ver §12); los jugadores del juego</td>
 						</tr>
 						<tr>
 							<td>Estadísticas de uso, sin cuenta ni identificador (ver §7)</td>
@@ -432,7 +438,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Google</strong> (Google Ireland Limited, Google LLC) — inicio de sesión en Android y en iPhone, Google Play (distribución, pago, ventana de valoración).</li>
 				<li><strong>Apple Inc.</strong> — «Iniciar sesión con Apple», permiso de seguimiento, App Store (distribución, pago, ventana de valoración).</li>
 				<li><strong>Hetzner Online GmbH</strong> (Alemania) — alojamiento de nuestro servidor de estadísticas de uso (ver §7).</li>
-				<li><strong>Supabase, Inc.</strong> — alojamiento de nuestra función que retira el acceso «Iniciar sesión con Apple» (ver §11): recibe el código de Apple, el identificador de la aplicación y la dirección IP del teléfono, y no guarda nada; y de la que cuenta los jugadores conectados: recibe el número sacado al azar al iniciar y la dirección IP del teléfono. No registra esa dirección, que puede guardar en memoria unos minutos para bloquear abusos; los registros técnicos de Supabase la guardan durante un tiempo limitado, según sus condiciones. La de las monedas del desafío de tiro recibe de Unity el identificador de los jugadores en los puestos premiados y de tu teléfono tu token de sesión de Unity y su dirección IP, que no registra (los registros técnicos de Supabase la guardan un tiempo limitado); no guarda el token; guarda 30 días el identificador, el puesto, la puntuación y las monedas, sin apodo (ver §13).</li>
+				<li><strong>Supabase, Inc.</strong> — alojamiento de nuestra función que retira el acceso «Iniciar sesión con Apple» (ver §11): recibe el código de Apple, el identificador de la aplicación y la dirección IP del teléfono, y no guarda nada; y de la que cuenta los jugadores conectados: recibe el número sacado al azar al iniciar y la dirección IP del teléfono, y, mientras buscas un rival, tu apodo, el formato y el identificador de la partida, guardados mientras dura la búsqueda. No registra esa dirección, que puede guardar en memoria unos minutos para bloquear abusos; los registros técnicos de Supabase la guardan durante un tiempo limitado, según sus condiciones. La de las monedas del desafío de tiro recibe de Unity el identificador de los jugadores en los puestos premiados y de tu teléfono tu token de sesión de Unity y su dirección IP, que no registra (los registros técnicos de Supabase la guardan un tiempo limitado); no guarda el token; guarda 30 días el identificador, el puesto, la puntuación y las monedas, sin apodo (ver §13).</li>
 				<li><strong>GitHub, Inc.</strong> — alojamiento de nuestro sitio web, consultado para comprobar si hay actualizaciones (ver §9) y para nuestros propios anuncios (ver §6); GitHub registra la dirección IP de cada visita para la seguridad de su servicio.</li>
 			</ul>
 			<p>

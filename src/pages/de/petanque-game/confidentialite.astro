@@ -31,7 +31,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			Diese Erklärung betrifft <strong>die mobile App Pétanque Game</strong>
 			(<code>com.ludivenstudio.petanquegame</code>). Das Pétanque-Spiel der Website
 			(<a href="/jeux/petanque/">ludiven-studio.fr/jeux/petanque</a>) und die übrige Website haben eine
-			<a href="/confidentialite/">eigene Datenschutzerklärung</a>. Letzte Aktualisierung: 17. November 2026 (Version 1.0.14: Münzen zu gewinnen in den Ranglisten der Schuss-Challenge, die Zahl der Spieler, die gerade online sind, die Schuss-Challenge und ihre Ranglisten, Münzen und Käufe ohne Konto; Version 1.0.8: unsere eigene Werbung, neues Fenster „Personalisierte Werbung“, keine Google-Datensicherung mehr auf Android).
+			<a href="/confidentialite/">eigene Datenschutzerklärung</a>. Letzte Aktualisierung: 19. November 2026 (Version 1.0.14: die Gegnersuche, die den anderen Spielern angezeigt wird, Münzen zu gewinnen in den Ranglisten der Schuss-Challenge, die Zahl der Spieler, die gerade online sind, die Schuss-Challenge und ihre Ranglisten, Münzen und Käufe ohne Konto; Version 1.0.8: unsere eigene Werbung, neues Fenster „Personalisierte Werbung“, keine Google-Datensicherung mehr auf Android).
 		</p>
 		<p class="updated">
 			Dies ist eine Höflichkeitsübersetzung. Bei Abweichungen gilt die
@@ -43,7 +43,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<ul>
 				<li>Gegen den Computer oder zu zweit an einem Handy spielst du <strong>ohne Konto</strong>, auch offline. Wenn das Handy Internet hat, verlassen es nur die Werbung, wenn du sie akzeptiert hast, anonyme Nutzungsstatistiken, ein paar Abfragen an unsere Website (die neueste Version des Spiels, unsere eigene Werbung) und, einmal pro Minute während du spielst, ein Signal ohne Kennung, mit dem wir zählen, wie viele gerade spielen (siehe §2).</li>
 				<li>Für das Online-Spiel und die Ranglisten brauchst du ein <strong>Google-Konto</strong> (Android oder iPhone) <strong>oder Apple-Konto</strong> (iPhone). Münzen, Shop und Ligen funktionieren auch ohne Konto: Dein Spielstand bleibt dann auf deinem Handy. Mit einem Konto wird er bei <strong>Unity</strong>, unserem Dienstleister, gespeichert, damit du ihn auf all deinen Handys wiederfindest.</li>
-				<li><strong>Dein Spitzname ist öffentlich</strong>: in der Liste der öffentlichen Partien, bei deinem Gegner und in der Rangliste, zusammen mit deiner Wertung. Es gibt keinen Chat.</li>
+				<li><strong>Dein Spitzname ist öffentlich</strong>: in der Liste der öffentlichen Partien, bei deinem Gegner und in der Rangliste, zusammen mit deiner Wertung, und, solange du einen Gegner suchst, in einem Hinweis bei den Spielern, die das Spiel geöffnet haben. Es gibt keinen Chat.</li>
 				<li>Werbung der Werbenetzwerke erscheint <strong>nur mit deiner Einwilligung</strong>, nach der das Spiel beim ersten Start fragt. Ohne sie spielst du ganz normal, ohne Werbung zwischen den Partien; nur Videos zu unseren anderen Spielen und Apps können laufen, wenn du eine Belohnung möchtest. Kein Weiterverkauf von Daten.</li>
 				<li>Du kannst jederzeit <strong>dein Konto löschen</strong>: Optionen › „Mein Konto löschen“ (<a href="#suppression">siehe §11</a>).</li>
 			</ul>
@@ -74,7 +74,6 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Nutzungsstatistiken</strong> ohne Kennung (siehe §7);</li>
 				<li>das Abrufen der <strong>Nummer der neuesten Version</strong> des Spiels auf unserer Website (siehe §9);</li>
 				<li>ein <strong>Anwesenheitssignal</strong>, einmal pro Minute, solange das Spiel geöffnet ist: eine bei jedem Start zufällig gezogene Nummer, ohne Konto und ohne Spielerkennung, um anzuzeigen, wie viele gerade spielen (siehe §5 und §12);</li>
-				<li>wenn du online <strong>einen Gegner suchst</strong>, geht dieses Signal alle 15 Sekunden mit deinem Spitznamen, dem Format der Partie und ihrer Kennung bei Unity: Sie werden den Spielern gezeigt, die das Spiel geöffnet haben („Bébert sucht einen Gegner“), solange du suchst, damit sie dir beitreten können;</li>
 				<li>das Abrufen der Liste <strong>unserer eigenen Werbung</strong> auf unserer Website, bei jedem Start, dann von Bild und Video der Werbung, die gezeigt wird (siehe §6).</li>
 			</ul>
 			<p>
@@ -123,6 +122,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<p><strong>Was die anderen Spieler sehen:</strong></p>
 			<ul>
 				<li><strong>Öffentliche Partie</strong>: Dein Spitzname, deine Wertung und das Format der Partie stehen in der Liste der öffentlichen Partien, bis ein Gegner beitritt. Eine private Partie mit einem Freund über ihren Code steht nicht darin.</li>
+				<li><strong>Gegnersuche</strong>: Solange du in einer öffentlichen Partie auf einen Gegner wartest, sendet dein Handy alle 15 Sekunden deinen Spitznamen, das Format und die Kennung der Partie bei Unity an unsere Funktion (siehe §12); die Spieler, die das Spiel geöffnet haben, sehen „Bébert sucht einen Gegner“ und können dir beitreten. Eine private Partie mit einem Freund per Code wird nie angekündigt.</li>
 				<li><strong>Während der Partie</strong> erhält dein Gegner deinen Spitznamen, deine Wertung, deine Figur, dein Trikot und deine Kugel, dann deine Würfe (ihre Geschwindigkeit und die Stelle, an der deine Hand die Kugel loslässt). Nach jedem Wurf sendet das Handy, das die Partie eröffnet hat, die Schiedsrichterentscheidung (Lage der Kugeln, Punktestand). Diese Nachrichten laufen über <strong>Unity Relay</strong>, das sie weiterleitet, ohne sie zu speichern.</li>
 				<li><strong>Rangliste</strong>: Jede öffentliche Partie im Tête-à-tête, die bis zum Ende gespielt wird, verändert deine Wertung (eine Elo-Wertung). Deine Wertung und dein Spitzname werden dann an die Rangliste <strong>Unity Leaderboards</strong> gesendet, die alle Spieler des Spiels ansehen können: die ersten 50, und jeder seine eigene Zeile. Partien mit einem Freund über einen Code und Teampartien zählen nicht.</li>
 				<li><strong>Schuss-Challenge</strong>: Wenn du ein Konto hast, gehen die Punktzahl jeder Serie (von 50) und dein Spitzname in die Tages- und die Wochenrangliste (<strong>Unity Leaderboards</strong>), die alle Spieler des Spiels sehen können. Ohne Konto bleiben deine Serien auf deinem Handy.</li>
@@ -213,6 +213,12 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 							<td>Anzeigen, wie viele gerade spielen</td>
 							<td>Berechtigtes Interesse</td>
 							<td>Unsere Funktion bei Supabase (siehe §12)</td>
+						</tr>
+						<tr>
+							<td>Während deiner Gegnersuche: dein Spitzname, das Format und die Kennung der Partie bei Unity</td>
+							<td>Den anderen Spielern zeigen, dass du auf einen Gegner wartest, damit sie dir beitreten</td>
+							<td>Vertragserfüllung</td>
+							<td>Unsere Funktion bei Supabase (siehe §12); die Spieler des Spiels</td>
 						</tr>
 						<tr>
 							<td>Nutzungsstatistiken, ohne Konto und ohne Kennung (siehe §7)</td>
@@ -438,7 +444,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Google</strong> (Google Ireland Limited, Google LLC) — Anmeldung unter Android und auf dem iPhone, Google Play (Vertrieb, Zahlung, Bewertungsfenster).</li>
 				<li><strong>Apple Inc.</strong> — „Mit Apple anmelden“, Tracking-Erlaubnis, App Store (Vertrieb, Zahlung, Bewertungsfenster).</li>
 				<li><strong>Hetzner Online GmbH</strong> (Deutschland) — Hosting unseres Servers für die Nutzungsstatistiken (siehe §7).</li>
-				<li><strong>Supabase, Inc.</strong> — Hosting unserer Funktion, die den Zugriff über „Mit Apple anmelden“ entzieht (siehe §11): Sie erhält den Code von Apple, die Kennung der App und die IP-Adresse des Handys und speichert nichts; sowie der Funktion, die zählt, wie viele online spielen: Sie erhält die beim Start zufällig gezogene Nummer und die IP-Adresse des Handys. Sie speichert diese Adresse nicht, kann sie aber einige Minuten im Arbeitsspeicher behalten, um Missbrauch zu verhindern; die technischen Protokolle von Supabase bewahren sie nach dessen Bedingungen für begrenzte Zeit auf. Die Funktion für die Münzen der Schuss-Challenge erhält von Unity die IDs der Spieler auf den Gewinnplätzen und von deinem Telefon dein Unity-Anmeldetoken und seine IP-Adresse, die sie nicht speichert (die technischen Protokolle von Supabase bewahren sie eine begrenzte Zeit auf); das Token speichert sie nicht; sie speichert ID, Platz, Punktzahl und Münzen 30 Tage lang, ohne Spitznamen (siehe §13).</li>
+				<li><strong>Supabase, Inc.</strong> — Hosting unserer Funktion, die den Zugriff über „Mit Apple anmelden“ entzieht (siehe §11): Sie erhält den Code von Apple, die Kennung der App und die IP-Adresse des Handys und speichert nichts; sowie der Funktion, die zählt, wie viele online spielen: Sie erhält die beim Start zufällig gezogene Nummer und die IP-Adresse des Handys sowie, solange du einen Gegner suchst, deinen Spitznamen, das Format und die Kennung der Partie, die nur für die Dauer der Suche gespeichert werden. Sie speichert diese Adresse nicht, kann sie aber einige Minuten im Arbeitsspeicher behalten, um Missbrauch zu verhindern; die technischen Protokolle von Supabase bewahren sie nach dessen Bedingungen für begrenzte Zeit auf. Die Funktion für die Münzen der Schuss-Challenge erhält von Unity die IDs der Spieler auf den Gewinnplätzen und von deinem Telefon dein Unity-Anmeldetoken und seine IP-Adresse, die sie nicht speichert (die technischen Protokolle von Supabase bewahren sie eine begrenzte Zeit auf); das Token speichert sie nicht; sie speichert ID, Platz, Punktzahl und Münzen 30 Tage lang, ohne Spitznamen (siehe §13).</li>
 				<li><strong>GitHub, Inc.</strong> — Hosting unserer Website, die für die Update-Prüfung (siehe §9) und für unsere eigene Werbung (siehe §6) gelesen wird; GitHub speichert die IP-Adresse jedes Aufrufs für die Sicherheit seines Dienstes.</li>
 			</ul>
 			<p>
