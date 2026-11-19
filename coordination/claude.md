@@ -3642,3 +3642,16 @@
 - 09:07 : build complet OK (240 pages, 0 erreur, précache et liens OK) ; page vue en téléphone, sans erreur console.
 - 09:07 : commité et poussé à la demande de l'utilisateur (« publie » de Raphaël relayé par le Producer) : ma page et
   cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-19 — Pétanque Game : page bêta 1.0.14 n°11, achats simulés (session release-publisher)
+- Statut : en cours (2026-11-19T09:15+01:00). Demande de l'utilisateur : (relayé par le Producer, sous le « publie » de
+  Raphaël pour la bêta 11) corriger la page : les achats de la β sont simulés, et « À tester en priorité » de la 11e
+  bêta, textes de la session PetanqueGame
+- Réservations actives : `src/pages/petanque-game/beta-drm50otf.astro`.
+- Ressources : serveur de dev sur le port 4392 ; eslint, `astro check`. Build annoncé ici avant.
+- 09:17 : « Pas d'achat » remplacé par « Achats simulés » (le .beta simule les achats), et « À tester en priorité » de
+  la 11e bêta remplacé, textes de la session PetanqueGame ; eslint et astro check OK. Lancement du build complet (écrit
+  dist/, .astro/, public/vendor/ du worktree site-publish-game-beta11-fix)…
+- 09:19 : build complet OK (240 pages, 0 erreur, précache et liens OK).
+- 09:19 : commité et poussé sous le « publie » de Raphaël pour la bêta 11 (relayé par le Producer) : ma page et cette
+  section seulement. Statut : terminé. Réservations libérées.
