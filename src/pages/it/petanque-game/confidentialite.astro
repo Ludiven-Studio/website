@@ -31,7 +31,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			Questa informativa riguarda <strong>l'app mobile Pétanque Game</strong>
 			(<code>com.ludivenstudio.petanquegame</code>). Il gioco di pétanque del sito
 			(<a href="/jeux/petanque/">ludiven-studio.fr/jeux/petanque</a>) e il resto del sito hanno una
-			<a href="/confidentialite/">propria informativa</a>. Ultimo aggiornamento: 17 novembre 2026 (versione 1.0.14: monete in palio nelle classifiche della sfida di bocciata, il numero di giocatori collegati in questo momento, la sfida di bocciata e le sue classifiche, monete e acquisti senza account; versione 1.0.8: le nostre pubblicità, nuova finestra «Pubblicità personalizzata», niente più backup di Google su Android).
+			<a href="/confidentialite/">propria informativa</a>. Ultimo aggiornamento: 19 novembre 2026 (versione 1.0.14: la ricerca di un avversario annunciata agli altri giocatori, monete in palio nelle classifiche della sfida di bocciata, il numero di giocatori collegati in questo momento, la sfida di bocciata e le sue classifiche, monete e acquisti senza account; versione 1.0.8: le nostre pubblicità, nuova finestra «Pubblicità personalizzata», niente più backup di Google su Android).
 		</p>
 		<p class="updated">
 			Questa è una traduzione di cortesia. In caso di discordanza, prevale la
@@ -43,7 +43,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<ul>
 				<li>Contro il computer o in due su un telefono, giochi <strong>senza account</strong>, anche offline. Quando c'è internet, dal telefono partono solo la pubblicità, se l'hai accettata, statistiche d'uso anonime, alcune richieste al nostro sito (l'ultima versione del gioco, le nostre pubblicità) e, una volta al minuto mentre giochi, un segnale senza identificativo che serve a contare i giocatori collegati in questo momento (vedi §2).</li>
 				<li>Il gioco online e le classifiche richiedono un <strong>account Google</strong> (Android o iPhone) <strong>o Apple</strong> (iPhone). Monete, negozio e leghe funzionano anche senza account: i tuoi progressi restano allora sul telefono. Con un account, vengono salvati presso <strong>Unity</strong>, il nostro fornitore, per ritrovarli su tutti i tuoi telefoni.</li>
-				<li><strong>Il tuo nickname è pubblico</strong>: nell'elenco delle partite pubbliche, per il tuo avversario e in classifica, con il tuo punteggio. Non c'è chat.</li>
+				<li><strong>Il tuo nickname è pubblico</strong>: nell'elenco delle partite pubbliche, per il tuo avversario e in classifica, con il tuo punteggio, e, mentre cerchi un avversario, in un avviso sui telefoni dei giocatori che hanno il gioco aperto. Non c'è chat.</li>
 				<li>La pubblicità dei circuiti pubblicitari compare <strong>solo con il tuo consenso</strong>, chiesto al primo avvio. Senza, giochi normalmente, senza pubblicità tra le partite; possono comparire solo video dei nostri altri giochi e app, quando chiedi una ricompensa. Nessuna rivendita di dati.</li>
 				<li>Puoi <strong>eliminare il tuo account</strong> in qualsiasi momento: Opzioni › «Elimina il mio account» (<a href="#suppression">vedi §11</a>).</li>
 			</ul>
@@ -74,7 +74,6 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>statistiche d'uso</strong> senza identificativo (vedi §7);</li>
 				<li>la lettura del <strong>numero dell'ultima versione</strong> del gioco sul nostro sito (vedi §9);</li>
 				<li>un <strong>segnale di presenza</strong>, una volta al minuto finché il gioco è aperto: un numero estratto a caso a ogni avvio, senza account né identificativo del giocatore, per mostrare quanti giocano in questo momento (vedi §5 e §12);</li>
-				<li>quando <strong>cerchi un avversario</strong> online, questo segnale parte ogni 15 secondi con il tuo nickname, il formato della partita e il suo identificativo presso Unity: vengono mostrati ai giocatori che hanno il gioco aperto («Bébert cerca un avversario») finché cerchi, perché possano raggiungerti;</li>
 				<li>la lettura dell'elenco delle <strong>nostre pubblicità</strong> sul nostro sito, a ogni avvio, poi dell'immagine e del video di quella che viene mostrata (vedi §6).</li>
 			</ul>
 			<p>
@@ -123,6 +122,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<p><strong>Cosa vedono gli altri giocatori:</strong></p>
 			<ul>
 				<li><strong>Partita pubblica</strong>: il tuo nickname, il tuo punteggio e il formato della partita compaiono nell'elenco delle partite pubbliche, finché un avversario non entra nella partita. Una partita privata, con un amico tramite il suo codice, non vi compare.</li>
+				<li><strong>Ricerca di un avversario</strong>: finché aspetti un avversario in una partita pubblica, il tuo telefono invia ogni 15 secondi il tuo nickname, il formato e l'identificativo della partita presso Unity alla nostra funzione (vedi §12); i giocatori che hanno il gioco aperto vedono «Bébert cerca un avversario» e possono raggiungerti. Una partita privata, con un amico tramite il suo codice, non viene mai annunciata.</li>
 				<li><strong>Durante la partita</strong>, il tuo avversario riceve il tuo nickname, il tuo punteggio, il tuo giocatore, la tua divisa e la tua boccia, poi i tuoi lanci (la loro velocità e il punto in cui la tua mano lascia la boccia). Dopo ogni lancio, il telefono che ha aperto la partita invia l'arbitraggio (posizione delle bocce, punteggio della partita). Questi messaggi passano da <strong>Unity Relay</strong>, che li inoltra senza conservarli.</li>
 				<li><strong>Classifica</strong>: ogni partita pubblica individuale giocata fino alla fine fa variare il tuo punteggio (un punteggio Elo). Il tuo punteggio e il tuo nickname vengono allora inviati alla classifica <strong>Unity Leaderboards</strong>, che tutti i giocatori del gioco possono consultare: i primi 50, e ognuno la propria riga. Le partite con un amico tramite codice e le partite a squadre non contano.</li>
 				<li><strong>Sfida di bocciata</strong>: se hai un account, il punteggio di ogni serie (su 50) e il tuo nickname vanno alle classifiche del giorno e della settimana (<strong>Unity Leaderboards</strong>), consultabili da tutti i giocatori del gioco. Senza account, le tue serie restano sul telefono.</li>
@@ -213,6 +213,12 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 							<td>Mostrare quanti giocatori giocano in questo momento</td>
 							<td>Legittimo interesse</td>
 							<td>La nostra funzione presso Supabase (vedi §12)</td>
+						</tr>
+						<tr>
+							<td>Mentre cerchi un avversario: il tuo nickname, il formato e l'identificativo della partita presso Unity</td>
+							<td>Far sapere agli altri giocatori che aspetti un avversario, perché ti raggiungano</td>
+							<td>Esecuzione del contratto</td>
+							<td>La nostra funzione presso Supabase (vedi §12); i giocatori del gioco</td>
 						</tr>
 						<tr>
 							<td>Statistiche d'uso, senza account né identificativo (vedi §7)</td>
@@ -437,7 +443,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Google</strong> (Google Ireland Limited, Google LLC) — accesso su Android e su iPhone, Google Play (distribuzione, pagamento, scheda di valutazione).</li>
 				<li><strong>Apple Inc.</strong> — «Accedi con Apple», autorizzazione al tracciamento, App Store (distribuzione, pagamento, scheda di valutazione).</li>
 				<li><strong>Hetzner Online GmbH</strong> (Germania) — hosting del nostro server per le statistiche d'uso (vedi §7).</li>
-				<li><strong>Supabase, Inc.</strong> — hosting della nostra funzione che revoca l'accesso «Accedi con Apple» (vedi §11): riceve il codice di Apple, l'identificativo dell'app e l'indirizzo IP del telefono, e non conserva nulla; e di quella che conta i giocatori collegati: riceve il numero estratto a caso all'avvio e l'indirizzo IP del telefono. Non registra questo indirizzo, che può tenere in memoria per qualche minuto per bloccare gli abusi; i log tecnici di Supabase lo conservano per un tempo limitato, secondo le sue condizioni. Quella delle monete della sfida di bocciata riceve da Unity l'ID dei giocatori nei posti premiati e dal tuo telefono il tuo token di accesso Unity e il suo indirizzo IP, che non registra (i log tecnici di Supabase lo conservano per un tempo limitato); non conserva il token; conserva per 30 giorni ID, posto, punteggio e monete, senza nickname (vedi §13).</li>
+				<li><strong>Supabase, Inc.</strong> — hosting della nostra funzione che revoca l'accesso «Accedi con Apple» (vedi §11): riceve il codice di Apple, l'identificativo dell'app e l'indirizzo IP del telefono, e non conserva nulla; e di quella che conta i giocatori collegati: riceve il numero estratto a caso all'avvio e l'indirizzo IP del telefono, e, mentre cerchi un avversario, il tuo nickname, il formato e l'identificativo della partita, conservati per la durata della ricerca. Non registra questo indirizzo, che può tenere in memoria per qualche minuto per bloccare gli abusi; i log tecnici di Supabase lo conservano per un tempo limitato, secondo le sue condizioni. Quella delle monete della sfida di bocciata riceve da Unity l'ID dei giocatori nei posti premiati e dal tuo telefono il tuo token di accesso Unity e il suo indirizzo IP, che non registra (i log tecnici di Supabase lo conservano per un tempo limitato); non conserva il token; conserva per 30 giorni ID, posto, punteggio e monete, senza nickname (vedi §13).</li>
 				<li><strong>GitHub, Inc.</strong> — hosting del nostro sito, letto per il controllo degli aggiornamenti (vedi §9) e per le nostre pubblicità (vedi §6); GitHub registra l'indirizzo IP di ogni visita per la sicurezza del suo servizio.</li>
 			</ul>
 			<p>
