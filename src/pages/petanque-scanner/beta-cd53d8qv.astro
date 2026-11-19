@@ -2,16 +2,16 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 
 // Unlisted: noindex, out of the sitemap and of the offline precache (astro.config.mjs).
-// The next store build, from main (f6e2724), under the .beta id. Over 50 MB, so the APK is a GitHub prerelease asset
+// The next store build, from main (e59ade5), under the .beta id. Over 50 MB, so the APK is a GitHub prerelease asset
 // (the earlier builds' APKs stay there).
 const BETA = {
 	version: '1.2.15',
-	label: 'n°2',
+	label: 'n°3',
 	date: '2026-11-19',
-	size: 110016753,
+	size: 110028937,
 	android: '7.1',
-	sha256: '63ea138c572125f968c0771d68eeb45e268d294b6c77a3ae33f97924044befbb',
-	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-scanner-beta/petanque-scan-beta-1.2.15-n2.apk',
+	sha256: '9314912efdcb5bd1ff15a0d60e6d900b9d0a6e6c611d4d6d9b0b87fc1134a7d2',
+	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-scanner-beta/petanque-scan-beta-1.2.15-n3.apk',
 };
 const date = new Date(BETA.date).toLocaleDateString('fr-FR', { dateStyle: 'medium' });
 const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
@@ -38,22 +38,26 @@ const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 		</section>
 
 		<section class="card stack gap-3">
-			<h2>Quoi de neuf</h2>
-			<p>Bêta 1.2.15 (n°2, 19/11). Nouveau depuis le 16/11&nbsp;:</p>
+			<h2>Bêta 1.2.15 n°3 — à tester</h2>
 			<ul>
+				<li>Chaque cadenas, sur le cochonnet ou une boule, fait vibrer légèrement le téléphone.</li>
 				<li>
-					une légère vibration à chaque verrouillage du cochonnet et des boules, une seule si plusieurs se verrouillent
-					ensemble&nbsp;; elle suit le réglage « vibration au toucher » du téléphone&nbsp;;
+					Quitte l'appli en plein scan puis reviens&nbsp;: les boules pas encore verrouillées se remesurent, celles qui sont
+					verrouillées restent à leur place.
+				</li>
+				<li>Le classement part toujours du cochonnet verrouillé&nbsp;: un caillou ne prend plus sa place.</li>
+				<li>
+					Mode photo&nbsp;: reprendre la photo juste après ne coûte plus de scan, et la distance ne peut plus afficher « NaN cm ».
 				</li>
 				<li>
-					si l'installation d'ARCore est refusée, un écran propose « Passer en mode photo », et « Scan 3D » la redemande&nbsp;;
+					Si tu refuses l'installation du composant AR de Google, un écran te propose de passer en mode photo, et « Scan 3D » te le
+					redemande.
 				</li>
-				<li>mode photo&nbsp;: plus de « NaN cm », et une nouvelle visée reste gratuite pendant le délai de grâce&nbsp;;</li>
-				<li>classement&nbsp;: le cochonnet verrouillé garde sa place, un caillou ne peut plus la prendre.</li>
+				<li>L'icône porte un bandeau BÊTA.</li>
 			</ul>
 			<p class="muted">
-				Rappel&nbsp;: dans la bêta, pas d'achat ni de restauration Premium, pas de vraies pubs (bannière et vidéo de Pétanque Meet),
-				et des données séparées de l'appli du store.
+				Toujours vrai dans la bêta&nbsp;: l'achat Premium est impossible, il n'y a pas de vraies pubs (seulement nos annonces maison),
+				et elle s'installe à côté de l'appli du store, avec ses propres données.
 			</p>
 		</section>
 
