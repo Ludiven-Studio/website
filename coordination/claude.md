@@ -3670,3 +3670,16 @@
   erreur console.
 - 09:22 : commité et poussé à la demande de l'utilisateur (« publie » de Raphaël relayé par le Producer) : ma page et
   cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-19 — Pétanque Game : bêta 1.0.14 n°12 (session release-publisher)
+- Statut : en cours (2026-11-19T11:26+01:00). Demande de l'utilisateur : (relayé par le Producer, Raphaël vers 11:25) «
+  publie » la 12e bêta 1.0.14 de Pétanque Game (sha256 0d80014a…, 90,9 Mo), à la place de la 11e
+- Réservations actives : `src/pages/petanque-game/beta-drm50otf.astro`.
+- Ressources : serveur de dev sur le port 4394 ; eslint, `astro check`. Build annoncé ici avant.
+- 11:29 : APK envoyé sur la prerelease petanque-game-beta sous petanque-game-1.0.14-beta12.apk ; le lien sert sha256
+  0d80014a… (90 893 469 octets). Page : constante (taille, sha, url beta12), « de la 3e à la 12e » (App.Petanque.Net
+  inchangé entre b6af476 et 68635bf), bloc de la 12e bêta avec les notes de la session PetanqueGame ; eslint et astro
+  check OK. Lancement du build complet (écrit dist/, .astro/, public/vendor/ du worktree site-publish-game-beta12)…
+- 11:31 : build complet OK (240 pages, 0 erreur, précache et liens OK) ; page vue en téléphone, sans erreur console.
+- 11:31 : commité et poussé à la demande de l'utilisateur (« publie » de Raphaël relayé par le Producer) : ma page et
+  cette section seulement. Statut : terminé. Réservations libérées.
