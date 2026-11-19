@@ -26,6 +26,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2.117.0';
 import { createRemoteJWKSet, jwtVerify } from 'jsr:@panva/jose@6.1.0';
 import {
 	bounds,
+	claimSince,
 	closing,
 	DAY_BOARD,
 	endedPeriods,
@@ -57,9 +58,6 @@ const db = createClient(env('SUPABASE_URL'), env('SUPABASE_SERVICE_ROLE_KEY'), {
 // Unity Authentication's player tokens (docs: « Validate the player's ID token »).
 const ISSUER = 'https://player-auth.services.api.unity.com';
 const JWKS = createRemoteJWKSet(new URL(ISSUER + '/.well-known/jwks.json'));
-
-const DAY_MS = 86_400_000;
-const iso = (t: number): string => new Date(t).toISOString().slice(0, 10);
 
 function sameSecret(a: string, b: string): boolean {
 	if (a.length === 0 || a.length !== b.length) return false;
@@ -255,7 +253,7 @@ Deno.serve(async (req) => {
 		const { data, error } = await db.from('shot_prizes')
 			.select('board, period, rank, score, coins')
 			.eq('player_id', player)
-			.gte('period', iso(Date.now() - 15 * DAY_MS))
+			.gte('created_at', claimSince(Date.now()))
 			.order('period', { ascending: true });
 		if (error) throw new Error('mine: ' + error.message);
 		return json({ prizes: data ?? [] });

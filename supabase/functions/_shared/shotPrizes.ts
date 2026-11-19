@@ -13,6 +13,10 @@ export const WEEK_PRIZES: readonly [number, number][] = [[1, 2000], [2, 1200], [
 /** Rows older than this go (pg_cron's own purge, apart from the snapshots): the game claims within days. */
 export const KEEP_DAYS = 30;
 
+/** The prizes a player may still claim: those kept in the last `KEEP_DAYS` days, by when they were kept (a week's
+ * period starts 7 days before it closes), as long as the purge keeps them. ISO instant for created_at. */
+export const claimSince = (now: number): string => new Date(now - KEEP_DAYS * 86_400_000).toISOString();
+
 /** Lines read beyond the paid places, for the deleted accounts' lines skipped. */
 export const SPARE_LINES = 20;
 

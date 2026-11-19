@@ -1,6 +1,6 @@
 // deno test supabase/functions/_shared/shotPrizes_test.ts
 import { assertEquals } from 'jsr:@std/assert@1';
-import { bounds, closing, endedPeriods, LAST_READ_MS, openPeriods, paidPlaces, prize, readable, rowsFrom } from './shotPrizes.ts';
+import { bounds, claimSince, closing, endedPeriods, LAST_READ_MS, openPeriods, paidPlaces, prize, readable, rowsFrom } from './shotPrizes.ts';
 
 Deno.test('the prizes are the game\'s table', () => {
 	assertEquals([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((r) => prize(false, r)), [500, 300, 200, 150, 125, 100, 90, 80, 70, 60, 0]);
@@ -77,4 +77,10 @@ Deno.test('a run catches up every period that ended in the last 8 days, each boa
 	assertEquals(later.filter((p) => p.startsWith('shots_day')).length, 8);
 	assertEquals(later.filter((p) => p.startsWith('shots_week')), ['shots_week:2026-11-30']);
 	assertEquals(ended('2026-11-17T12:00:00Z'), []);
+});
+
+Deno.test('a prize stays claimable as long as it is kept: 30 days from when it was paid', () => {
+	assertEquals(claimSince(Date.parse('2026-12-20T09:00:00Z')), '2026-11-20T09:00:00.000Z');
+	// A week from 16/11, paid on 23/11 at midnight, is still claimed on 20/12 (the former 15 days by period start dropped it on 02/12).
+	assertEquals(claimSince(Date.parse('2026-12-20T09:00:00Z')) <= '2026-11-23T00:00:00.000Z', true);
 });
