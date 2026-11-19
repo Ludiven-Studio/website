@@ -1,8 +1,8 @@
 // shot-prizes — Pétanque Game's shooting challenge pays the best places of its day and week rankings
 // (Unity Leaderboards « shots_day », « shots_week »). A minute before each reset, pg_cron calls
 // « snapshot » with the day closing: the paid places are read with Unity's Admin API and kept here by Unity
-// player id, no name; each period is closed by its first good snapshot, later ones change nothing; Unity is
-// tried three times. The game then asks for its own (« mine ») with the player's Unity access token, and pays
+// player id, no name; each reading is kept as the period's draft, and the first snapshot closes the period from it
+// in one transaction (shot_prizes_settle), later ones change nothing; Unity is tried three times. The game then asks for its own (« mine ») with the player's Unity access token, and pays
 // each prize once on its side; « forget » deletes a player's rows as their account is deleted. pg_cron
 // purges the rows after 30 days on its own. Unity keeps no archive of the rankings.
 //
@@ -12,7 +12,8 @@
 // POST { action: 'check' }                        header x-cron-key   -> lines read from Unity, nothing written
 //
 // Deploy:  supabase functions deploy shot-prizes --no-verify-jwt   (the game holds no Supabase session)
-// Table:   migrations/20261118120000_shot_prizes.sql (shot_prizes, shot_prizes_closed, the cron jobs)
+// Tables:  migrations/20261118120000_shot_prizes.sql (shot_prizes, shot_prizes_closed, the cron jobs),
+//          20261119100000_shot_prizes_settle.sql (the drafts, shot_prizes_draft_save, shot_prizes_settle)
 // Secrets: UNITY_SERVICE_KEY_ID, UNITY_SERVICE_SECRET (a Unity service account allowed to list leaderboard
 //          scores), UNITY_PROJECT_ID, UNITY_ENVIRONMENT_ID (production), SHOT_PRIZES_CRON_KEY (also in the
 //          vault as « shot_prizes_cron_key », read by the cron job: set it before the first night)
@@ -87,24 +88,32 @@ async function topScores(board: string, limit: number): Promise<UnityScore[]> {
 	throw new Error(`${board} scores: ${last}`);
 }
 
-/** Closes the periods ending on `day`: each one once, by its first snapshot that reads Unity and writes. */
+/** Keeps a reading of a period's ranking as its draft (refused once closed, or over a reading of more lines). */
+async function saveDraft(board: string, week: boolean, period: string, read: UnityScore[]): Promise<boolean> {
+	const rows = rowsFrom(read, board, week, period).map(({ player_id, rank, score, coins }) => ({ player_id, rank, score, coins }));
+	const { data, error } = await db.rpc('shot_prizes_draft_save', { p_board: board, p_period: period, p_total: read.length, p_rows: rows });
+	if (error) throw new Error('draft: ' + error.message);
+	return data === true;
+}
+
+/** Closes a period from its draft in one transaction: the rows paid, -1 when closed already, -2 with no draft. */
+async function settle(board: string, period: string): Promise<number> {
+	const { data, error } = await db.rpc('shot_prizes_settle', { p_board: board, p_period: period });
+	if (error) throw new Error('settle: ' + error.message);
+	return Number(data);
+}
+
+/** Closes the periods ending on `day`: each one once, from the reading kept as its draft. */
 async function snapshot(day: string): Promise<Response> {
 	const periods = closing(day, new Date());
 	if (!periods) return json({ error: 'not today: the rankings may have reset' }, 409);
 	let kept = 0;
 	const closed: string[] = [];
 	for (const { board, week, period } of periods) {
-		const { data: done } = await db.from('shot_prizes_closed').select('board').eq('board', board).eq('period', period).maybeSingle();
-		if (done) continue;
-		const rows = rowsFrom(await topScores(board, paidPlaces(week) + SPARE_LINES), board, week, period);
-		if (rows.length > 0) {
-			const { error } = await db.from('shot_prizes').upsert(rows, { onConflict: 'board,period,player_id', ignoreDuplicates: true });
-			if (error) throw new Error('insert: ' + error.message);
-		}
-		// Closed once written: a later call changes nothing, even if the ranking moved.
-		const { error } = await db.from('shot_prizes_closed').upsert({ board, period }, { onConflict: 'board,period', ignoreDuplicates: true });
-		if (error) throw new Error('close: ' + error.message);
-		kept += rows.length;
+		await saveDraft(board, week, period, await topScores(board, paidPlaces(week) + SPARE_LINES));
+		const paid = await settle(board, period);
+		if (paid < 0) continue;
+		kept += paid;
 		closed.push(`${board}:${period}`);
 	}
 	return json({ kept, closed });
@@ -135,8 +144,10 @@ Deno.serve(async (req) => {
 		const player = await playerOf(req.headers.get('x-unity-token') ?? '');
 		if (!player) return json({ error: 'sign in first' }, 401);
 		if (action === 'forget') {
-			const { error } = await db.from('shot_prizes').delete().eq('player_id', player);
-			if (error) throw new Error('forget: ' + error.message);
+			for (const table of ['shot_prizes', 'shot_prizes_draft']) {
+				const { error } = await db.from(table).delete().eq('player_id', player);
+				if (error) throw new Error('forget: ' + error.message);
+			}
 			return json({ ok: true });
 		}
 		const { data, error } = await db.from('shot_prizes')
