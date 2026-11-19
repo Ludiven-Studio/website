@@ -1,6 +1,6 @@
 // deno test supabase/functions/_shared/shotPrizes_test.ts
 import { assertEquals } from 'jsr:@std/assert@1';
-import { closing, paidPlaces, prize, rowsFrom } from './shotPrizes.ts';
+import { bounds, closing, LAST_READ_MS, paidPlaces, prize, readable, rowsFrom } from './shotPrizes.ts';
 
 Deno.test('the prizes are the game\'s table', () => {
 	assertEquals([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((r) => prize(false, r)), [500, 300, 200, 150, 125, 100, 90, 80, 70, 60, 0]);
@@ -42,4 +42,17 @@ Deno.test('a deleted account\'s line is skipped and the places below move up', (
 		{ playerId: 'b', rank: 2, score: 30 },
 	], 'shots_day', false, '2026-11-18');
 	assertEquals(rows.map((r) => [r.player_id, r.rank, r.coins]), [['a', 1, 500], ['b', 2, 300]]);
+});
+
+Deno.test('the last reading is 10 s before the reset, and none past it stands for the period', () => {
+	const day = bounds(false, '2026-11-22');
+	assertEquals([new Date(day.start).toISOString(), new Date(day.end).toISOString()], ['2026-11-22T00:00:00.000Z', '2026-11-23T00:00:00.000Z']);
+	assertEquals(new Date(bounds(true, '2026-11-16').end).toISOString(), '2026-11-23T00:00:00.000Z', 'the week ends with Sunday');
+	const t = (s: string) => Date.parse(s);
+	assertEquals(new Date(day.end - LAST_READ_MS).toISOString(), '2026-11-22T23:59:50.000Z');
+	assertEquals(readable(false, '2026-11-22', t('2026-11-22T23:59:50Z')), true);
+	assertEquals(readable(true, '2026-11-16', t('2026-11-22T23:59:57.9Z')), true);
+	assertEquals(readable(false, '2026-11-22', t('2026-11-22T23:59:58Z')), false, 'too near the reset');
+	assertEquals(readable(false, '2026-11-22', t('2026-11-23T00:00:01Z')), false, 'after the reset');
+	assertEquals(readable(false, '2026-11-22', t('2026-11-21T23:59:59Z')), false, 'before the day');
 });

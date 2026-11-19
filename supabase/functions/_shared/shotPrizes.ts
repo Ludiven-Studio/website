@@ -43,6 +43,30 @@ export function closing(day: string, now: Date): { board: string; week: boolean;
 	return out;
 }
 
+export const DAY_MS = 86_400_000;
+
+/** A period's first instant and its end (Unity's reset), in ms. */
+export function bounds(week: boolean, period: string): { start: number; end: number } {
+	const start = Date.parse(period + 'T00:00:00Z');
+	return { start, end: start + (week ? 7 : 1) * DAY_MS };
+}
+
+/**
+ * When the snapshot reads the closing rankings a last time: 10 s before Unity's reset. Unity's Admin API reads only
+ * the live ranking (a reset one only if archived, and the game's rankings are not: an archive keeps every name for
+ * good), so the last seconds before the reset are never counted; the reading a minute earlier stays the fallback.
+ */
+export const LAST_READ_MS = 10_000;
+
+/** No reading of a period starts later than this before its end: it could come back from the reset ranking. */
+export const READ_MARGIN_MS = 2_000;
+
+/** Whether a reading started at `startedAt` may stand for the period: before the reset, with some margin. */
+export function readable(week: boolean, period: string, startedAt: number): boolean {
+	const { start, end } = bounds(week, period);
+	return startedAt >= start && startedAt < end - READ_MARGIN_MS;
+}
+
 /** One line of Unity's Leaderboards Admin API « Get Scores ». */
 export interface UnityScore {
 	playerId: string;

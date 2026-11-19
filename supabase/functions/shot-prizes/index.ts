@@ -1,6 +1,7 @@
 // shot-prizes — Pétanque Game's shooting challenge pays the best places of its day and week rankings
 // (Unity Leaderboards « shots_day », « shots_week »). A minute before each reset, pg_cron calls
-// « snapshot » with the day closing: the paid places are read with Unity's Admin API and kept here by Unity
+// « snapshot » with the day closing: the paid places are read with Unity's Admin API at once and again 10 s
+// before the reset (Unity cannot read a reset ranking that was not archived), and kept here by Unity
 // player id, no name; each reading is kept as the period's draft, and the first snapshot closes the period from it
 // in one transaction (shot_prizes_settle), later ones change nothing; Unity is tried three times. The game then asks for its own (« mine ») with the player's Unity access token, and pays
 // each prize once on its side; « forget » deletes a player's rows as their account is deleted. pg_cron
@@ -20,7 +21,19 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2.117.0';
 import { createRemoteJWKSet, jwtVerify } from 'jsr:@panva/jose@6.1.0';
-import { closing, DAY_BOARD, paidPlaces, rowsFrom, SPARE_LINES, type UnityScore, WEEK_BOARD } from '../_shared/shotPrizes.ts';
+import {
+	bounds,
+	closing,
+	DAY_BOARD,
+	LAST_READ_MS,
+	paidPlaces,
+	READ_MARGIN_MS,
+	readable,
+	rowsFrom,
+	SPARE_LINES,
+	type UnityScore,
+	WEEK_BOARD,
+} from '../_shared/shotPrizes.ts';
 
 const CORS = {
 	'Access-Control-Allow-Origin': '*',
@@ -68,30 +81,44 @@ async function playerOf(token: string): Promise<string | null> {
 	}
 }
 
+interface Reading {
+	results: UnityScore[];
+	total: number; // Unity's line count
+	startedAt: number; // when the request that answered was sent
+}
+
 /** The best `limit` lines of a ranking, from Unity's Leaderboards Admin API (service account, Basic auth), with
- * their metadata when the API gives it (a deleted account's line is marked gone). Three tries a few seconds apart. */
-async function topScores(board: string, limit: number): Promise<UnityScore[]> {
+ * their metadata when the API gives it (a deleted account's line is marked gone). Three tries `pauseMs` apart,
+ * none started at or after `stopAt`. */
+async function topScores(board: string, limit: number, stopAt = Infinity, pauseMs = 4000): Promise<Reading> {
 	const url = `https://services.api.unity.com/leaderboards/v1/projects/${env('UNITY_PROJECT_ID')}` +
 		`/environments/${env('UNITY_ENVIRONMENT_ID')}/leaderboards/${board}/scores?offset=0&limit=${limit}&includeMetadata=true`;
 	const basic = btoa(`${env('UNITY_SERVICE_KEY_ID')}:${env('UNITY_SERVICE_SECRET')}`);
-	let last = '';
+	let last = 'no try before the reset';
 	for (let attempt = 0; attempt < 3; attempt++) {
-		if (attempt > 0) await new Promise((r) => setTimeout(r, 4000));
+		if (attempt > 0) await sleep(pauseMs);
+		const startedAt = Date.now();
+		if (startedAt >= stopAt) break;
 		const res = await fetch(url, { headers: { Authorization: `Basic ${basic}` } });
-		if (res.status === 404) return []; // the ranking not made yet
+		if (res.status === 404) return { results: [], total: 0, startedAt }; // the ranking not made yet
 		if (res.ok) {
 			const body = await res.json();
-			return Array.isArray(body.results) ? body.results : [];
+			const results: UnityScore[] = Array.isArray(body.results) ? body.results : [];
+			return { results, total: typeof body.total === 'number' ? body.total : results.length, startedAt };
 		}
 		last = `${res.status} ${(await res.text()).slice(0, 200)}`;
 	}
 	throw new Error(`${board} scores: ${last}`);
 }
 
-/** Keeps a reading of a period's ranking as its draft (refused once closed, or over a reading of more lines). */
-async function saveDraft(board: string, week: boolean, period: string, read: UnityScore[]): Promise<boolean> {
-	const rows = rowsFrom(read, board, week, period).map(({ player_id, rank, score, coins }) => ({ player_id, rank, score, coins }));
-	const { data, error } = await db.rpc('shot_prizes_draft_save', { p_board: board, p_period: period, p_total: read.length, p_rows: rows });
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, Math.max(0, ms)));
+
+/** Keeps a reading of a period's ranking as its draft, if it was read before the reset; refused once the period is
+ * closed, or over a reading of more lines (one read after the reset has fewer). */
+async function saveDraft(board: string, week: boolean, period: string, read: Reading): Promise<boolean> {
+	if (!readable(week, period, read.startedAt)) return false;
+	const rows = rowsFrom(read.results, board, week, period).map(({ player_id, rank, score, coins }) => ({ player_id, rank, score, coins }));
+	const { data, error } = await db.rpc('shot_prizes_draft_save', { p_board: board, p_period: period, p_total: read.total, p_rows: rows });
 	if (error) throw new Error('draft: ' + error.message);
 	return data === true;
 }
@@ -103,20 +130,40 @@ async function settle(board: string, period: string): Promise<number> {
 	return Number(data);
 }
 
-/** Closes the periods ending on `day`: each one once, from the reading kept as its draft. */
+/**
+ * Closes the periods ending on `day` (called at 23:59 UTC): each ranking read at once and kept as its draft, read
+ * again 10 s before Unity's reset (kept only if it has as many lines), then closed from the draft in one transaction.
+ */
 async function snapshot(day: string): Promise<Response> {
 	const periods = closing(day, new Date());
 	if (!periods) return json({ error: 'not today: the rankings may have reset' }, 409);
+	const limit = (week: boolean) => paidPlaces(week) + SPARE_LINES;
+	for (const { board, week, period } of periods) {
+		try {
+			await saveDraft(board, week, period, await topScores(board, limit(week)));
+		} catch (e) {
+			console.warn('shot-prizes first reading', board, e instanceof Error ? e.message : e);
+		}
+	}
+	const end = bounds(false, day).end; // the week ends with its last day
+	await sleep(end - LAST_READ_MS - Date.now());
+	const late: string[] = [];
+	for (const { board, week, period } of periods) {
+		try {
+			if (await saveDraft(board, week, period, await topScores(board, limit(week), end - READ_MARGIN_MS, 1000))) late.push(board);
+		} catch (e) {
+			console.warn('shot-prizes last reading', board, e instanceof Error ? e.message : e);
+		}
+	}
 	let kept = 0;
 	const closed: string[] = [];
-	for (const { board, week, period } of periods) {
-		await saveDraft(board, week, period, await topScores(board, paidPlaces(week) + SPARE_LINES));
+	for (const { board, period } of periods) {
 		const paid = await settle(board, period);
 		if (paid < 0) continue;
 		kept += paid;
 		closed.push(`${board}:${period}`);
 	}
-	return json({ kept, closed });
+	return json({ kept, closed, late });
 }
 
 Deno.serve(async (req) => {
@@ -136,8 +183,8 @@ Deno.serve(async (req) => {
 			if (!sameSecret(req.headers.get('x-cron-key') ?? '', env('SHOT_PRIZES_CRON_KEY'))) return json({ error: 'forbidden' }, 403);
 			if (action === 'snapshot') return await snapshot(String(body.day ?? ''));
 			// The snapshot's reading without writing or closing anything: a deploy checks Unity answers mid-day.
-			const day = await topScores(DAY_BOARD, paidPlaces(false) + SPARE_LINES);
-			const week = await topScores(WEEK_BOARD, paidPlaces(true) + SPARE_LINES);
+			const day = (await topScores(DAY_BOARD, paidPlaces(false) + SPARE_LINES)).results;
+			const week = (await topScores(WEEK_BOARD, paidPlaces(true) + SPARE_LINES)).results;
 			return json({ day: day.length, week: week.length, dayPaid: rowsFrom(day, DAY_BOARD, false, 'check').length, weekPaid: rowsFrom(week, WEEK_BOARD, true, 'check').length });
 		}
 		if (action !== 'mine' && action !== 'forget') return json({ error: 'unknown action' }, 400);
