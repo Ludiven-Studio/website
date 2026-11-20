@@ -98,12 +98,24 @@ export function extendPlan<Cfg>(gameId: string, plan: LevelPlan<Cfg>, opts: Exte
 
 const localKey = (gameId: string): string => `ludiven-progress-${gameId}`;
 
+/** Keep only level numbers mapped to valid values: a string or a list here would throw on the next win. */
+function levels<T>(value: unknown, keep: (v: number) => T | null): Record<number, T> {
+	const out: Record<number, T> = {};
+	if (!value || typeof value !== 'object' || Array.isArray(value)) return out;
+	for (const [k, v] of Object.entries(value)) {
+		const level = Number(k);
+		const ok = Number.isInteger(level) && level >= 1 && typeof v === 'number' ? keep(v) : null;
+		if (ok !== null) out[level] = ok;
+	}
+	return out;
+}
+
 function loadLocal(gameId: string): GameProgress {
 	try {
 		const raw = localStorage.getItem(localKey(gameId));
 		if (!raw) return emptyProgress();
-		const p = JSON.parse(raw) as GameProgress;
-		return { stars: p.stars ?? {}, best: p.best ?? {} };
+		const p = JSON.parse(raw) as Partial<GameProgress> | null;
+		return { stars: levels(p?.stars, (v) => (v === 1 || v === 2 || v === 3 ? v : null)), best: levels(p?.best, (v) => (Number.isFinite(v) ? v : null)) };
 	} catch {
 		return emptyProgress();
 	}
