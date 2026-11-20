@@ -3792,3 +3792,16 @@
 - 14:50 : build complet OK (240 pages, précache 407, liens 269).
 - 14:50 : commité et poussé à la demande de l'utilisateur (« publie » de Raphaël relayé par le Producer) : ma page et
   cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-20 — Dragon Gems : bêta 1.1.7 sur la page des testeurs (session Producer)
+- Statut : en cours (2026-11-20T14:55+01:00). Demande de l'utilisateur : (« publie » de Raphaël dit dans le Producer le
+  20/11, release-publisher) la bêta 1.1.7 de Dragon Gems Swipe
+- Réservations actives : `src/pages/dragons-gems/beta-h4yb1lyxzz.astro`.
+- Ressources : serveur de dev sur le port 4441 ; eslint, `astro check`. Build annoncé ici avant.
+- 14:57 : APK 1.1.7 envoyé sur la prerelease dragons-gems-beta (dragonsgems-beta-v1.1.7.apk), le lien sert sha256
+  c5916de9… (76 591 727 octets). Page : constante 1.1.7 et notes des testeurs de la session Dragon Gems ; eslint 0,
+  astro check 0 erreur, vue téléphone et bureau sombre sans erreur console. Lancement du build complet (écrit dist/,
+  .astro/, public/vendor/ du worktree site-publish-gems-1.1.7)…
+- 14:59 : build complet OK (240 pages, précache 407, liens 269).
+- 14:59 : commité et poussé à la demande de l'utilisateur (« publie » de Raphaël relayé par le Producer) : ma page et
+  cette section seulement. Statut : terminé. Réservations libérées.
