@@ -32,7 +32,8 @@ const pad2 = (n: number): string => String(n).padStart(2, '0');
  * (a "≤ 15 s" star would otherwise look missed at 15 s displayed / 14.6 s real).
  */
 export const fmtSeconds = (totalSec: number): string => {
-	const s = Math.max(0, Math.floor(totalSec));
+	// A chrono fed a broken epoch would read "NaN:NaN".
+	const s = Number.isFinite(totalSec) ? Math.max(0, Math.floor(totalSec)) : 0;
 	return s < 60 ? `${s} s` : `${Math.floor(s / 60)}:${pad2(s % 60)}`;
 };
 
@@ -48,7 +49,7 @@ export const fmtCentis = (cs: number): string => fmtSeconds(cs / 100);
 export function fmtExact(v: number, div: number): string {
 	const dec = div >= 100 ? 2 : div >= 10 ? 1 : 0;
 	if (dec === 0) return fmtSeconds(v / div);
-	const t = Math.max(0, Math.floor(v));
+	const t = Number.isFinite(v) ? Math.max(0, Math.floor(v)) : 0;
 	const whole = Math.floor(t / div);
 	const frac = String(Math.floor(((t % div) * 10 ** dec) / div)).padStart(dec, '0');
 	return whole < 60 ? `${whole},${frac} s` : `${Math.floor(whole / 60)}:${pad2(whole % 60)},${frac}`;
