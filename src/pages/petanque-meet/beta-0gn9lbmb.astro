@@ -5,12 +5,12 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 // Main's next version under the .beta id, signed with the test key. The APK is a GitHub prerelease asset
 // (petanque-meet-beta); 1.0.1-1.0.4 were in Supabase.
 const BETA = {
-	version: '1.0.7',
+	version: '1.0.8',
 	date: '2026-11-20',
-	size: 35686879,
+	size: 35710327,
 	android: '7.1',
-	sha256: 'fe7e831fc177d72fc5cecf48cf9069a88006beee6955bc520aca85f2c1068608',
-	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-meet-beta/petanque-meet-beta-1.0.7.apk',
+	sha256: '23b7e6e474e88a28e4a6d16a53b5223b19d6c0b7d33d03b29fa1eb6fe1d382a2',
+	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-meet-beta/petanque-meet-beta-1.0.8.apk',
 };
 const date = new Date(BETA.date).toLocaleDateString('fr-FR', { dateStyle: 'medium' });
 const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
@@ -38,22 +38,20 @@ const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 
 		<section class="card stack gap-3">
 			<h2>Nouveautés</h2>
+			<p>Bêta 1.0.8 :</p>
 			<ul>
+				<li>Nouveau : « Crédits et licences » dans « Compte et aide » (polices, carte, musique, bibliothèques).</li>
 				<li>
-					Les rappels de concours sont plus fiables : un rappel coupé est annulé tout de suite, même hors connexion, et le
-					récap du jeudi ouvre bien le week-end annoncé.
+					Le bouton retour ne fait plus rien tant qu'un écran glisse ou s'ouvre (un appui pendant l'animation fermait l'écran du
+					dessous).
 				</li>
 				<li>
-					Changer de compte efface les infos de l'ancien compte sur le téléphone, y compris le numéro des recherches de
-					partenaire.
+					Bandeau maison : une vidéo figée n'est plus montrée, et le choix des applis suit les réglages du site.
 				</li>
-				<li>La carte se remet aux noms détaillés après une coupure de réseau.</li>
-				<li>
-					Corrections diverses : création d'une partie juste après minuit, textes avec emojis ou caractères spéciaux,
-					bannière et vidéo maison.
-				</li>
-				<li>Mesure d'audience anonyme des écrans visités (Umami).</li>
 			</ul>
+			<p>
+				À tester surtout : le retour (flèche et bouton du téléphone) sur tous les écrans, et l'écran des crédits.
+			</p>
 		</section>
 
 		<section class="card stack gap-3">

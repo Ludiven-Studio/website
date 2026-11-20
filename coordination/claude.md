@@ -3779,3 +3779,16 @@
 - 14:41 : build complet OK (240 pages, 0 erreur, précache 407 et liens 269 OK).
 - 14:41 : commité et poussé à la demande de l'utilisateur (« publie » de Raphaël relayé par le Producer) :
   src/data/ninoRush.ts et cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-20 — Pétanque Meet : bêta 1.0.8 sur la page des testeurs (session Producer)
+- Statut : en cours (2026-11-20T14:41+01:00). Demande de l'utilisateur : (« publie » de Raphaël dit dans le Producer le
+  20/11, release-publisher) la bêta 1.0.8 de Pétanque Meet
+- Réservations actives : `src/pages/petanque-meet/beta-0gn9lbmb.astro`.
+- Ressources : serveur de dev sur le port 4437 ; eslint, `astro check`. Build annoncé ici avant.
+- 14:46 : APK 1.0.8 envoyé sur la prerelease petanque-meet-beta (petanque-meet-beta-1.0.8.apk), le lien sert sha256
+  23b7e6e4… (35 710 327 octets). Page : constante 1.0.8 et notes des testeurs de la session Meet ; eslint 0, astro
+  check 0 erreur, vue téléphone et bureau sombre sans erreur console. Lancement du build complet (écrit dist/, .astro/,
+  public/vendor/ du worktree site-publish-meet-1.0.8)…
+- 14:50 : build complet OK (240 pages, précache 407, liens 269).
+- 14:50 : commité et poussé à la demande de l'utilisateur (« publie » de Raphaël relayé par le Producer) : ma page et
+  cette section seulement. Statut : terminé. Réservations libérées.
