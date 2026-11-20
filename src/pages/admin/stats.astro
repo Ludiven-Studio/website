@@ -1,0 +1,14 @@
+---
+// The studio's figures per app, from Umami through stats-admin (Raphaël's account only).
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdminStats from '../../components/admin/AdminStats';
+import '../../components/admin/admin.css';
+---
+
+<BaseLayout title="Statistiques — admin | Ludiven Studio" description="Statistiques des applis du studio." noindex>
+	<div class="wrapper stack gap-6">
+		<p class="pa-note"><a href="/admin/">← Admin du studio</a></p>
+		<h1 class="pa-h1">Statistiques</h1>
+		<AdminStats client:only="react" />
+	</div>
+</BaseLayout>

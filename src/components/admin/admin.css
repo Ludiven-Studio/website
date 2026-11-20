@@ -1,0 +1,37 @@
+/* The admin pages' shared look (/admin/, /admin/stats/); /admin/pubs/ keeps its own copy of the pa-* base. */
+.pa-h1 { font-size: var(--text-xl); margin-top: 1.5rem; }
+.pa-note, .as-muted { color: var(--sc-muted); font-size: var(--text-sm); }
+.pa-card { border: 1px solid var(--sc-line); border-radius: 0.75rem; padding: 1rem 1.25rem; background: var(--sc-surface); }
+.pa-bar { display: flex; flex-wrap: wrap; gap: 0.75rem; justify-content: space-between; align-items: center; }
+.pa-btn { border: 1px solid var(--sc-line); border-radius: 999px; padding: 0.4rem 1rem; background: var(--sc-surface); color: var(--sc-ink); font: inherit; font-size: var(--text-sm); cursor: pointer; }
+.pa-btn:disabled { opacity: 0.5; cursor: default; }
+.pa-primary { background: var(--sc-accent); border-color: var(--sc-accent); color: #fff; font-weight: 700; }
+.as-error { border-color: #dc2626; color: #b91c1c; }
+
+.ah-root, .as-root { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; margin-bottom: 3rem; }
+.ah-tiles { list-style: none; margin: 0; padding: 0; display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); }
+.ah-tile { display: grid; gap: 0.4rem; height: 100%; color: var(--sc-ink); text-decoration: none; }
+a.ah-tile:hover, a.ah-tile:focus-visible { border-color: var(--sc-accent); box-shadow: 0 0 0 2px var(--sc-accent); }
+.ah-tile strong { font-size: var(--text-lg); }
+.ah-tile span { color: var(--sc-muted); font-size: var(--text-sm); }
+.ah-tile em { font-style: normal; font-weight: 700; color: var(--sc-accent); }
+.ah-soon { opacity: 0.55; }
+.ah-soon em { color: var(--sc-muted); }
+
+.as-app { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.9rem; }
+.as-app header { display: grid; gap: 0.15rem; }
+.as-app h2 { margin: 0; font-size: var(--text-lg); }
+.as-app h3 { margin: 0 0 0.3rem; font-size: var(--text-base); }
+.as-app small { color: var(--sc-muted); }
+.as-scroll { overflow-x: auto; }
+.as-table { border-collapse: collapse; font-size: var(--text-sm); min-width: 100%; }
+.as-table th, .as-table td { border: 1px solid var(--sc-line); padding: 0.35rem 0.6rem; text-align: right; white-space: nowrap; }
+.as-table thead th { background: var(--sc-surface-2); text-align: center; }
+.as-table tbody th { text-align: left; font-weight: 600; }
+.as-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); }
+.as-counts { list-style: none; margin: 0 0 0.4rem; padding: 0; display: grid; gap: 0.15rem; font-size: var(--text-sm); }
+.as-counts li { display: flex; justify-content: space-between; gap: 1rem; border-bottom: 1px dotted var(--sc-line); }
+.as-retention { margin: 0; font-size: var(--text-sm); }
+.as-tag { display: inline-block; border: 1px solid var(--sc-line); border-radius: 999px; padding: 0 0.5rem; font-size: 0.75rem; color: var(--sc-muted); }
+.as-errors { overflow-wrap: anywhere; }
+.as-signin { display: grid; gap: 0.75rem; justify-items: start; }

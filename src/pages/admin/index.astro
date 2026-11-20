@@ -1,0 +1,14 @@
+---
+// The studio's admin home: one tile per admin page. Out of search engines, the sitemap and the offline cache
+// (astro.config.mjs); the functions behind each page check the account.
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdminHome from '../../components/admin/AdminHome';
+import '../../components/admin/admin.css';
+---
+
+<BaseLayout title="Admin | Ludiven Studio" description="Administration du studio." noindex>
+	<div class="wrapper stack gap-6">
+		<h1 class="pa-h1">Admin du studio</h1>
+		<AdminHome client:only="react" />
+	</div>
+</BaseLayout>

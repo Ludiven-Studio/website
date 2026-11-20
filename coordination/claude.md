@@ -3805,3 +3805,35 @@
 - 14:59 : build complet OK (240 pages, précache 407, liens 269).
 - 14:59 : commité et poussé à la demande de l'utilisateur (« publie » de Raphaël relayé par le Producer) : ma page et
   cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-20 — Admin pubs : poids par plateforme et bouton Valider (session website)
+- Statut : en cours (2026-11-20T16:09+01:00). Demande de l'utilisateur : « les poids des pubs avec un bouton de
+  validation aussi bien sur android que sur iOS et pour chaque appli » (Raphaël, relayé par le Producer le 20/11)
+- Réservations actives : `src/lib/promoShares*.ts`, `src/lib/promoRules.test.ts`,
+  `src/components/admin/PromoWeights.tsx`, `src/components/admin/PromoAdmin.tsx`, `src/pages/admin/pubs.astro`,
+  `supabase/functions/_shared/promoRules.*`.
+- Ressources : serveur de dev sur le port 4391 ; eslint, `astro check`. Build annoncé ici avant.
+- 16:09 : worktree website-worktrees/pubs-platform (branche pubs-platform-weights) : weights[app] = nombre ou {
+  android, ios } (schéma convenu avec LudivenTools, template e7cfdee3), un tableau par plateforme, « Valider » par
+  appli et plateforme qui publie cette ligne seule ; vitest promo 146 OK, eslint 0, astro check 0, check-promo OK,
+  essai Playwright sur une fausse promo-admin (la ligne seule part, le reste du brouillon reste en attente)
+- 16:13 : branche pubs-platform-weights poussée (b76e719, e7315fb), build complet OK (240 pages, précache 407, liens
+  269) ; à pousser sur main par le Producer
+- 16:14 : poussé sur main par le Producer (a40b602..e7315fb) ; mes fichiers seulement. Redéploiement de promo-admin
+  (vérification de weights) en attente de la parole de Raphaël. Statut : terminé. Réservations libérées.
+
+## 2026-11-20 — Admin : tableau de bord /admin/ et /admin/stats/ (session website)
+- Statut : en cours (2026-11-20T16:14+01:00). Demande de l'utilisateur : « je te laisse avancer sur le dashboard »
+  (Raphaël, relayé par le Producer le 20/11), selon la proposition validée
+- Réservations actives : `src/pages/admin/index.astro`, `src/pages/admin/stats.astro`,
+  `src/components/admin/Admin*.tsx`, `src/components/admin/useAdminSession.ts`, `src/lib/statsAdmin*.ts`,
+  `supabase/functions/stats-admin/`, `supabase/functions/_shared/statsAdmin.*`,
+  `supabase/migrations/20261120160000_admin_stats_cache.sql`.
+- Ressources : serveur de dev sur le port 4391 ; eslint, `astro check`. Build annoncé ici avant.
+- 16:20 : stats-admin (logique dans _shared/statsAdmin.mjs, deno check OK), migration admin_stats_cache, /admin/ et
+  /admin/stats/ ; vitest 12 OK sur fausse Umami v2/v3 et fausse table ; Playwright sur fausse fonction OK (bureau
+  clair, téléphone sombre, 390 px). Lancement du build complet (écrit dist/, .astro/, public/vendor/ du worktree
+  pubs-platform)…
+- 16:24 : build complet OK (242 pages, précache 411, liens 271) ; branche admin-dashboard, 2 commits ; aucun
+  déploiement de fonction ni de table (étapes pour Raphaël dans supabase/functions/stats-admin/DEPLOY.md) ; le Producer
+  pousse main (site statique : la fonction et la migration ne partent pas avec)
