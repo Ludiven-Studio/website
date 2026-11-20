@@ -14,7 +14,8 @@ const LANG_NAMES: Record<string, string> = { fr: 'Français', en: 'English', es:
 const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 const list = (s: string): string[] => s.split(',').map((x) => x.trim()).filter(Boolean);
 // A new name for every upload: the apps cache images by their URL, so a file replaced in place would stay old.
-const stamp = (): string => new Date().toISOString().replace(/[-:T]/g, '').slice(0, 12);
+// Down to the millisecond: two uploads in the same minute used to share one name.
+const stamp = (): string => new Date().toISOString().replace(/\D/g, '').slice(0, 17);
 const when = (iso: string): string => new Date(iso).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
 
 /** What changed, in the repo's commit style. */
