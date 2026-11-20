@@ -3697,3 +3697,17 @@
   9314912e…, notes de la n°3.
 - 19:32 : commité et poussé à la demande de l'utilisateur (« publie » de Raphaël relayé par le Producer) : ma page et
   cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-20 — ColorChain : corrections des prototypes du 20-11 (session ColorChain)
+- Statut : en cours (2026-11-20T10:22+01:00). Demande de l'utilisateur : Producer, Raphaël l'a autorisé pour
+  aujourd'hui : préparer la mise à jour des pages /prototypes/ avec les 4 corrections (sauvegarde corrompue, ?level,
+  tracé), sans pousser
+- Réservations actives : `public/prototypes/colorchain/index.html`, `public/prototypes/colorchain-peinture/index.html`,
+  `public/prototypes/colorchain-relais/index.html`, `public/prototypes/domino-pont/index.html`,
+  `public/prototypes/domino-trace/index.html`.
+- Ressources : serveur de dev sur le port 4391 ; eslint, `astro check`. Build annoncé ici avant.
+- 10:24 : 5 index.html copiés depuis ColorChain (0e3b181, b2fa5d5, d6fe0b1, da862b4) ; eslint ignore public/, astro
+  check 0 erreur. Lancement du build complet (écrit dist/, .astro/, public/vendor/ du worktree colorchain-1120)…
+- 10:27 : build complet OK (240 pages, précache 406, liens 269) ; les 5 pages construites portent les corrections.
+- 10:27 : commité sur la branche colorchain-1120 (worktree), push laissé au Producer qui l'a demandé ainsi : mes 5
+  fichiers et cette section seulement. Statut : terminé. Réservations libérées.

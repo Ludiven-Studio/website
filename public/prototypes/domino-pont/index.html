@@ -55,7 +55,12 @@ const px = x => x * S, py = z => H - z * S;
 const smooth = k => { k = Math.max(0, Math.min(1, k)); return k * k * (3 - 2 * k); };
 
 let prog = { stars: {}, live: {}, mode: 'live' };
-try { prog = Object.assign(prog, JSON.parse(localStorage.getItem(SAVE) || '{}')); } catch (e) { /* no storage */ }
+// A broken or edited save keeps only its valid fields.
+try {
+  const s = JSON.parse(localStorage.getItem(SAVE) || '{}') || {};
+  for (const key of ['stars', 'live']) if (s[key] && typeof s[key] === 'object') for (const [k, v] of Object.entries(s[key])) if ([1, 2, 3].includes(v)) prog[key][k] = v;
+  if (s.mode === 'calm' || s.mode === 'live') prog.mode = s.mode;
+} catch (e) { /* no storage */ }
 function saveProg() { try { localStorage.setItem(SAVE, JSON.stringify(prog)); } catch (e) { /* no storage */ } }
 const live = () => prog.mode === 'live';
 const won = () => live() ? prog.live : prog.stars;
@@ -837,7 +842,7 @@ window.__check = () => ['calm', 'live'].flatMap(mode => BR.SPECS.map((spec, n) =
 
 const query = new URLSearchParams(location.search), start = +query.get('level');
 if (query.get('mode') === 'calm' || query.get('mode') === 'live') prog.mode = query.get('mode');
-if (start >= 1 && start <= BR.SPECS.length) load(start - 1);
+if (Number.isInteger(start) && start >= 1 && start <= BR.SPECS.length) load(start - 1);
 CC.run({ canvas, step, draw });
 </script>
 </body>

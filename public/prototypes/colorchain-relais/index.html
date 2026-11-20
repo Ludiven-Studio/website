@@ -2272,7 +2272,14 @@ const SAVE = 'colorchain-relay-v1';
 // A test page: every level is open from the start, to try the last ones; progress and stars are kept as they are.
 const OPEN_ALL = true;
 let menu = false, prog = { unlocked: 0, stars: {} };
-try { prog = Object.assign(prog, JSON.parse(localStorage.getItem(SAVE) || '{}')); } catch (e) { /* no storage */ }
+// A broken or edited save keeps only its valid fields.
+try {
+  const s = JSON.parse(localStorage.getItem(SAVE) || '{}') || {};
+  if (s.stars && typeof s.stars === 'object') for (const [k, v] of Object.entries(s.stars)) if ([1, 2, 3].includes(v)) prog.stars[k] = v;
+  if (Number.isInteger(s.unlocked) && s.unlocked > 0) prog.unlocked = s.unlocked;
+  for (const k of ['best', 'pics']) if (Number.isInteger(s[k]) && s[k] > 0) prog[k] = s[k];
+  if (s.music === false) prog.music = false;
+} catch (e) { /* no storage */ }
 function saveProg() { try { localStorage.setItem(SAVE, JSON.stringify(prog)); } catch (e) { /* no storage */ } }
 const levelsRect = [40, 70, 200, 100];
 const PER = 20;
@@ -2945,7 +2952,9 @@ const askLevel = new URLSearchParams(location.search).get('level');
 // ?tout opens every picture, to test.
 const openAll = new URLSearchParams(location.search).has('tout');
 menu = !CC.auto && askLevel === null;
-loadLevel(CC.auto ? +(new URLSearchParams(location.search).get('from') || 0) : +(askLevel || (openAll ? 0 : Math.min(prog.unlocked, BUILD.length - 1))));
+// ?level=abc, 1.5 or 99 opens the first level.
+const levelIndex = i => Number.isInteger(i) && i >= 0 && i < BUILD.length ? i : 0;
+loadLevel(levelIndex(CC.auto ? +(new URLSearchParams(location.search).get('from') || 0) : +(askLevel || (openAll ? 0 : Math.min(prog.unlocked, BUILD.length - 1)))));
 page = Math.floor(li / PER);
 if (!CC.auto && new URLSearchParams(location.search).has('infini')) { menu = false; loadLevel(ENDLESS); }
 CC.run({ canvas, step, draw, autoplay });

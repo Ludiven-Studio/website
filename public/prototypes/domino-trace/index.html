@@ -153,7 +153,11 @@ const LEVELS = [
 ];
 
 let prog = { stars: {} };
-try { prog = Object.assign(prog, JSON.parse(localStorage.getItem(SAVE) || '{}')); } catch (e) { /* no storage */ }
+// A broken or edited save keeps only its valid star counts.
+try {
+  const s = JSON.parse(localStorage.getItem(SAVE) || '{}');
+  if (s && s.stars && typeof s.stars === 'object') for (const [k, v] of Object.entries(s.stars)) if ([1, 2, 3].includes(v)) prog.stars[k] = v;
+} catch (e) { /* no storage */ }
 function saveProg() { try { localStorage.setItem(SAVE, JSON.stringify(prog)); } catch (e) { /* no storage */ } }
 
 // state: menu, edit (drawing), run (the wave), miss (pieces left standing), rise (all stands up again), won.
@@ -465,6 +469,8 @@ function solve() {
 }
 function flick() {
   if (state !== 'edit') return;
+  // A second finger may launch while the first still draws.
+  pen = null;
   const { all, lever, rail } = solve();
   if (L.lv.starts) for (const d of L.doms) d.rgb = d.col != null ? PAL[d.col].map(v => Math.round(v + (255 - v) * 0.35)) : [200, 202, 210];
   // A domino tips away from the one that knocked it; the last of a line lies flat.
@@ -928,7 +934,8 @@ function drawMenu(ctx) {
 // ---- Input
 const inRect = (x, y, r, pad = 0) => x >= r[0] - pad && x <= r[0] + r[2] + pad && y >= r[1] - pad && y <= r[1] + r[3] + pad;
 const inCircle = (x, y, c, pad = 0) => Math.hypot(x - c[0], y - c[1]) <= c[2] + pad;
-const toGround = (x, y) => [x / S, (H - y) / S];
+// Kept near the table: a finger far off it would otherwise make a stroke of millions of steps.
+const toGround = (x, y) => [Math.max(-1, Math.min(W / S + 1, x / S)), Math.max(-1, Math.min(H / S + 1, (H - y) / S))];
 function down(x, y) {
   audio();
   if (state === 'menu') {
@@ -992,7 +999,7 @@ window.__check = () => LEVELS.map((lv, n) => {
 });
 
 const query = new URLSearchParams(location.search), start = +query.get('level');
-if (start >= 1 && start <= LEVELS.length) load(start - 1);
+if (Number.isInteger(start) && start >= 1 && start <= LEVELS.length) load(start - 1);
 CC.run({ canvas, step, draw });
 </script>
 </body>
