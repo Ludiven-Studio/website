@@ -149,6 +149,17 @@ export default defineConfig({
                         },
                     },
                     {
+                        // Big vendored engines (Mölkky's Rapier, 4.3 MB): too big for every visitor's
+                        // precache, kept once played so the game opens offline. Their names carry the
+                        // version, so a cached copy is never stale.
+                        urlPattern: ({ url, sameOrigin }) => sameOrigin && url.pathname.startsWith('/vendor/'),
+                        handler: 'CacheFirst',
+                        options: {
+                            cacheName: 'ludiven-vendor',
+                            expiration: { maxEntries: 4, purgeOnQuotaError: true },
+                        },
+                    },
+                    {
                         // Engine loops. WebAudio fetches them itself, so request.destination is ''
                         // and the image rule above never matches — go by extension instead.
                         urlPattern: ({ url }) => url.pathname.endsWith('.wav'),
