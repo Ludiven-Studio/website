@@ -5,12 +5,12 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 // Main's next version under the .beta id, signed with the test key. The APK is a GitHub prerelease asset
 // (petanque-meet-beta); 1.0.1-1.0.4 were in Supabase.
 const BETA = {
-	version: '1.0.5',
-	date: '2026-11-19',
-	size: 35642483,
+	version: '1.0.7',
+	date: '2026-11-20',
+	size: 35686879,
 	android: '7.1',
-	sha256: '93ce24ef573d818bf900bacfad9c3e25edf495ba72a93b227c9d7e0e8b0bc8ea',
-	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-meet-beta/petanque-meet-beta-1.0.5.apk',
+	sha256: 'fe7e831fc177d72fc5cecf48cf9069a88006beee6955bc520aca85f2c1068608',
+	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-meet-beta/petanque-meet-beta-1.0.7.apk',
 };
 const date = new Date(BETA.date).toLocaleDateString('fr-FR', { dateStyle: 'medium' });
 const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
@@ -39,22 +39,20 @@ const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 		<section class="card stack gap-3">
 			<h2>Nouveautés</h2>
 			<ul>
-				<li>Rappels des concours que tu suis : la veille à 19 h, puis 2 h avant le jet du but.</li>
 				<li>
-					Avis du jeudi à 19 h : les concours du week-end près de tes lieux. On te le propose quand tu enregistres ton premier lieu,
-					sinon Compte &gt; Notifications &gt; Concours du week-end.
+					Les rappels de concours sont plus fiables : un rappel coupé est annulé tout de suite, même hors connexion, et le
+					récap du jeudi ouvre bien le week-end annoncé.
 				</li>
 				<li>
-					Toucher une notification ouvre la partie, le concours, ou la carte des concours du week-end autour de tes lieux.
+					Changer de compte efface les infos de l'ancien compte sur le téléphone, y compris le numéro des recherches de
+					partenaire.
 				</li>
+				<li>La carte se remet aux noms détaillés après une coupure de réseau.</li>
 				<li>
-					« Enregistrer l'affiche » sous l'affiche validée d'un concours : elle va dans l'album « Pétanque Meet » de tes photos.
+					Corrections diverses : création d'une partie juste après minuit, textes avec emojis ou caractères spéciaux,
+					bannière et vidéo maison.
 				</li>
-				<li>
-					Aussi : les liens Confidentialité et Conditions d'utilisation s'ouvrent dans la langue de l'appli. Une partie renvoyée
-					après une coupure réseau n'est plus publiée deux fois. Sur la carte : les noms des pays en vue monde, des noms qui ne
-					passent plus sous le bouton « + Poser une partie », moins de mémoire.
-				</li>
+				<li>Mesure d'audience anonyme des écrans visités (Umami).</li>
 			</ul>
 		</section>
 

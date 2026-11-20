@@ -3711,3 +3711,17 @@
 - 10:27 : build complet OK (240 pages, précache 406, liens 269) ; les 5 pages construites portent les corrections.
 - 10:27 : commité sur la branche colorchain-1120 (worktree), push laissé au Producer qui l'a demandé ainsi : mes 5
   fichiers et cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-20 — Pétanque Meet : bêta 1.0.7 (session release-publisher)
+- Statut : en cours (2026-11-20T12:09+01:00). Demande de l'utilisateur : (relayé par le Producer, Raphaël le 20/11) «
+  publie » la bêta 1.0.7 de Pétanque Meet pour les testeurs ; APK sur la prerelease petanque-meet-beta
+- Réservations actives : `src/pages/petanque-meet/beta-0gn9lbmb.astro`.
+- Ressources : serveur de dev sur le port 4397 ; eslint, `astro check`. Build annoncé ici avant.
+- 12:12 : APK envoyé sur la prerelease petanque-meet-beta sous petanque-meet-beta-1.0.7.apk ; le lien sert sha256
+  fe7e831f… (35 686 879 octets). Page : constante (1.0.7, 20/11, taille, sha, url GitHub) et les notes de la session
+  Meet ; eslint et astro check OK.
+- 12:12 : Lancement du build complet (écrit dist/, .astro/, public/vendor/ du worktree site-publish-meet-beta107)…
+- 12:15 : build complet OK (240 pages, 0 erreur, précache 407 et liens 269 OK) ; page vue en téléphone et bureau
+  sombre, sans erreur console.
+- 12:15 : commité et poussé à la demande de l'utilisateur (« publie » de Raphaël relayé par le Producer) : ma page et
+  cette section seulement. Statut : terminé. Réservations libérées.
