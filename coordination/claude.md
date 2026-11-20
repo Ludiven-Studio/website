@@ -3767,3 +3767,15 @@
   docs/notes/<version>.md), mises à jour automatiques décrites, sous-titre avec les adultes ; eslint, astro check 0
   erreur, vue bureau et téléphone sombre sans erreur console ; build complet OK (240 pages, précache 407, liens 269).
   Branche capetoile-test-notes, pas main : le Producer pousse.
+
+## 2026-11-20 — Nino Rush : version 1.0.20 de l'APK de test (session Producer)
+- Statut : en cours (2026-11-20T14:36+01:00). Demande de l'utilisateur : (« publie » de Raphaël dit dans le Producer le
+  20/11, release-publisher) l'APK de test Nino Rush 1.0.20
+- Réservations actives : `src/data/ninoRush.ts`.
+- Ressources : serveur de dev sur le port 4433 ; eslint, `astro check`. Build annoncé ici avant.
+- 14:38 : APK 1.0.20 envoyé sur la prerelease nino-rush-dev, le lien sert sha256 c7cb23e0… (81 149 256 octets).
+  src/data/ninoRush.ts : 1.0.20, 81,1 Mo ; eslint et astro check OK, page vue en téléphone et bureau sombre sans erreur
+  console. Lancement du build complet (écrit dist/, .astro/, public/vendor/ du worktree site-publish-nino-1.0.20)…
+- 14:41 : build complet OK (240 pages, 0 erreur, précache 407 et liens 269 OK).
+- 14:41 : commité et poussé à la demande de l'utilisateur (« publie » de Raphaël relayé par le Producer) :
+  src/data/ninoRush.ts et cette section seulement. Statut : terminé. Réservations libérées.
