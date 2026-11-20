@@ -38,7 +38,7 @@ describe('demineur engine', () => {
 				// The full technique set always solves it (no guessing).
 				expect(solve(p, { useSubset: true, useEnum: true }).solved).toBe(true);
 			}
-		}, 20000);
+		});
 	}
 
 	it('mine count matches the requested density (no fallback for these seeds)', () => {
@@ -85,7 +85,7 @@ describe('demineur engine', () => {
 				expect(isWin(state, p)).toBe(true);
 				expect(isLose(state, p)).toBe(false);
 			}
-		}, 20000);
+		});
 	}
 
 	it('findHint corrects a wrongly placed flag', () => {

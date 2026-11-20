@@ -93,7 +93,7 @@ describe('cocotte-mineuse generation', () => {
 			}
 		}
 		expect(errors).toEqual([]);
-	}, 30_000);
+	});
 
 	it('createMine opens the surface and pre-generates rows', () => {
 		const s = createMine(5, DIFF);

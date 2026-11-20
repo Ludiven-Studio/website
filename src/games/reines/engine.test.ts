@@ -61,7 +61,7 @@ describe('reines engine', () => {
 				expect(countSolutions(p.regions, p.size, 2)).toBe(1);
 			}
 			// Expert regenerates until the board needs tier-4 reasoning: ~4 s alone, more on CI.
-		}, 60000);
+		});
 	}
 
 	// Moyen must force a confinement step, Difficile a k-subset or a wipe. Without this
@@ -73,7 +73,7 @@ describe('reines engine', () => {
 				const p = generateReines(diff, mulberry32(7700 + s * 53 + diff.size));
 				expect(solveByLogic(p.regions, p.size, easiest)).toBeNull();
 			}
-		}, 60000);
+		});
 	}
 
 	it('solveByLogic rejects a multi-solution board', () => {

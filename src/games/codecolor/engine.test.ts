@@ -94,7 +94,7 @@ describe('codecolor hints', () => {
 		}
 		// The Expert tier brute-forces P(8,7) = 40320 codes per call, so these three
 		// LEVELS-wide sweeps need room when the suite runs them all in parallel.
-	}, 30000);
+	});
 
 	it('an eliminated colour is really absent from the secret', () => {
 		for (const key of Object.keys(LEVELS)) {
@@ -112,7 +112,7 @@ describe('codecolor hints', () => {
 				}
 			}
 		}
-	}, 30000);
+	});
 
 	it('an eliminated (colour, slot) pair is really wrong in the secret', () => {
 		for (const key of Object.keys(LEVELS)) {
@@ -130,7 +130,7 @@ describe('codecolor hints', () => {
 				}
 			}
 		}
-	}, 30000);
+	});
 
 	it('never states a peg of the secret, and the remaining count is exact', () => {
 		const lvl = LEVELS.facile;

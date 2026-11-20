@@ -339,14 +339,14 @@ describe('generate', () => {
 			const b = generate(mulberry32(s), params);
 			expect(b.crystals[heroIndex(b)]).toBe(false);
 		}
-	}, 20_000);
+	});
 
 	// ~45 ms of generation a board, and this deals ninety of them: room for a slow CI runner.
 	it('never deals a board the hero cannot move', () => {
 		for (const p of TECTONIQUE_BANDS) {
 			for (let s = 0; s < 30; s++) expect(heroStuck(generate(mulberry32(s), p))).toBe(false);
 		}
-	}, 20_000);
+	});
 
 	// The player only ever pushes the hero's own line, one cell at a time. The recorded walk has
 	// to obey that too, or it is not a solution he could ever reproduce.
@@ -376,7 +376,7 @@ describe('generate', () => {
 			expect(isWon(b), `level ${l}`).toBe(true);
 		}
 		// ~45 ms of generation per level: fine once at level start, 100 in a row needs the room.
-	}, 30_000);
+	});
 
 	it('ships a walk that eats every crystal it dropped', () => {
 		for (const p of TECTONIQUE_BANDS) {
@@ -388,7 +388,7 @@ describe('generate', () => {
 				expect(isWon(b)).toBe(true);
 			}
 		}
-	}, 20_000);
+	});
 });
 
 /* A hint hands out ONE push, never the tail of the walk. It has to stay legal even after the
@@ -414,7 +414,7 @@ describe('hint', () => {
 			}
 			expect(isWon(b), `seed ${seed}`).toBe(true);
 		}
-	}, 20_000);
+	});
 
 	it('explains itself in French, naming the belt', () => {
 		const plan = generateDetailed(mulberry32(9), TECTONIQUE_BANDS[0]);
@@ -452,7 +452,7 @@ describe('hint', () => {
 		}
 		expect(offPath).toBeGreaterThan(0);
 		expect(routed).toBeGreaterThan(0);
-	}, 20_000);
+	});
 
 	it('has nothing left to say once the grid is clear', () => {
 		const plan = generateDetailed(mulberry32(31), TECTONIQUE_BANDS[0]);

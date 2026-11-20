@@ -277,7 +277,7 @@ describe('cordes hints', () => {
 	for (const key of Object.keys(DIFFS)) {
 		const diff = DIFFS[key];
 
-		it(`${diff.label}: hints finish the board, one rope at a time`, { timeout: 60_000 }, () => {
+		it(`${diff.label}: hints finish the board, one rope at a time`, () => {
 			for (let s = 0; s < 8; s++) {
 				const p = generateCordes(diff, mulberry32(1500 + s * 19 + diff.ropes));
 				let ropes: (Pt[] | null)[] = [];

@@ -62,7 +62,7 @@ describe('rond-carre engine', () => {
 				expect(solved).toEqual(p.solution);
 			}
 		}
-	}, 30_000);
+	});
 
 	it('findHint always names a technique — never falls back to "par déduction"', () => {
 		for (const key of Object.keys(DIFFS)) {
