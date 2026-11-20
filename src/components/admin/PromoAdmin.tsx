@@ -8,6 +8,7 @@ import {
 	type Catalog, type CatalogEntry, type Loaded, type Published, type Upload, type Version,
 } from '../../lib/promoAdmin';
 import PromoWeights from './PromoWeights';
+import { applyRow, type Platform } from '../../lib/promoShares';
 import { BANNER_TEXT_MAX, CATALOG_URL, LANGUAGES, PROMO_DIR, catalogUrl, checkCatalog, sitePath } from '../../../supabase/functions/_shared/promoRules.mjs';
 
 const LANG_NAMES: Record<string, string> = { fr: 'Français', en: 'English', es: 'Español', de: 'Deutsch', it: 'Italiano' };
@@ -172,6 +173,27 @@ export default function PromoAdmin() {
 		setMessage({ kind: 'ok', text: `Publié (${done.commit.slice(0, 7)}). Le site se déploie en 5 min environ ; les applis le liront à leur lancement suivant.${done.removed.length ? ` Fichiers effacés après 30 jours : ${done.removed.length}.` : ''}${done.warnings.length ? ` À noter : ${done.warnings.join(' ; ')}` : ''}` });
 	}
 
+	/** Publishes one app's weights on one platform, over the catalogue online; the rest of the draft stays pending. */
+	async function doValidate(app: string, platform: Platform) {
+		if (!loaded || !draft) return;
+		const next = applyRow(loaded.catalog, draft, app, platform);
+		const { problems: rules } = checkCatalog(next, { strict: true });
+		if (rules.length) {
+			setMessage({ kind: 'error', text: 'Cette ligne ne peut pas partir :', problems: rules });
+			return;
+		}
+		const where = platform === 'ios' ? 'iOS' : 'Android';
+		const done = await run(`Validation ${where}…`, () => publish(next, loaded.blob, [], `[CHANGED] House ads weights: ${app} on ${where} (admin page)`));
+		if (!done) return;
+		const data = await run('Chargement…', load);
+		if (!data) return;
+		setLoaded(data);
+		// Keeps the other pending changes: this row now matches the catalogue online.
+		setDraft((d) => (d ? { ...d, updated: data.catalog.updated } : d));
+		setHistory(await run('Historique…', versions) ?? null);
+		setMessage({ kind: 'ok', text: `Poids de ${app} sur ${where} publiés (${done.commit.slice(0, 7)}). Le site se déploie en 5 min environ.` });
+	}
+
 	async function doRevert(v: Version) {
 		if (!loaded || !confirm(`Revenir à la version du ${when(v.date)} ? Elle sera publiée telle quelle.`)) return;
 		const done = await run('Retour en arrière…', () => revert(v.sha, v.date, loaded.blob));
@@ -284,12 +306,14 @@ export default function PromoAdmin() {
 			)}
 
 			{shown && (
-				<PromoWeights catalog={shown} readOnly={!!peek} change={(fn) => setDraft((d) => {
-					if (!d) return d;
-					const next = clone(d);
-					fn(next);
-					return next;
-				})} />
+				<PromoWeights catalog={shown} published={peek ? null : loaded?.catalog ?? null} readOnly={!!peek} busy={!!busy}
+					validate={(app, platform) => void doValidate(app, platform)}
+					change={(fn) => setDraft((d) => {
+						if (!d) return d;
+						const next = clone(d);
+						fn(next);
+						return next;
+					})} />
 			)}
 
 			<details className="pa-card pa-history">

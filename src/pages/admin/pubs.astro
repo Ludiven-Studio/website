@@ -77,5 +77,9 @@ import PromoAdmin from '../../components/admin/PromoAdmin';
 	.pw-self, .pw-off, .pw-out { background: var(--sc-surface-2); opacity: 0.55; }
 	.pw-later strong { color: var(--sc-muted); }
 	.pw-switch { display: inline-flex; gap: 0.3rem; align-items: center; }
+	.pw-platform { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.4rem; min-width: 0; }
+	.pw-platform h3 { margin: 0; font-size: var(--text-base); }
+	.pw-changed th[scope="row"] { box-shadow: inset 3px 0 0 var(--sc-accent); }
+	.pw-save small { display: block; color: var(--sc-muted); font-size: 0.75rem; max-width: 8rem; margin: 0.3rem auto 0; }
 	.pa-signin { display: grid; gap: 0.75rem; justify-items: start; }
 </style>

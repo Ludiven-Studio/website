@@ -54,12 +54,33 @@ export function isWeighted(catalog: Catalog, appId: string): boolean {
 
 const plain = (w: unknown): number => (typeof w === 'number' && Number.isFinite(w) && w >= 0 ? w : 0);
 
-/** The entry's weight in the app: its weights' when the app is weighted and named there, else `weight` (1 when absent). */
-export function weightIn(entry: CatalogEntry, appId: string, weighted: boolean): number {
+/** The weight an entry's `weights` value gives on the platform: a number counts on both, { android, ios } on its own;
+ *  undefined when it says nothing for this platform (the entry then takes `weight`). */
+export function platformWeight(value: unknown, platform: Platform): number | undefined {
+	if (isObject(value)) return Object.hasOwn(value, platform) ? plain(value[platform]) : undefined;
+	return plain(value);
+}
+
+/** The entry's weight in the app on the platform: its weights' when the app is weighted and named there, else `weight` (1 when absent). */
+export function weightIn(entry: CatalogEntry, appId: string, weighted: boolean, platform: Platform): number {
 	const key = weighted ? weightKey(entry, appId) : undefined;
-	if (key !== undefined) return plain((entry.weights as Record<string, unknown>)[key]);
+	const own = key !== undefined ? platformWeight((entry.weights as Record<string, unknown>)[key], platform) : undefined;
+	if (own !== undefined) return own;
 	return entry.weight === undefined ? 1 : plain(entry.weight);
 }
+
+/** Sets the entry's weight in the app on one platform, keeping the other: a number when both match, so the app
+ *  versions that read numbers only keep the entry; { android, ios } when they differ. */
+export function setWeightIn(entry: CatalogEntry, appId: string, platform: Platform, weight: number): void {
+	const other: Platform = platform === 'android' ? 'ios' : 'android';
+	const keep = weightIn(entry, appId, true, other);
+	const id = baseAppId(appId);
+	const w = Math.max(0, Number.isFinite(weight) ? weight : 0);
+	entry.weights = { ...(entry.weights ?? {}), [id]: w === keep ? w : platform === 'android' ? { android: w, ios: keep } : { android: keep, ios: w } };
+}
+
+/** True when a weights value differs between platforms: the app versions that read numbers only drop that entry. */
+export const perPlatform = (entry: CatalogEntry): boolean => isObject(entry.weights) && Object.values(entry.weights).some(isObject);
 
 /** True when the entry advertises the app itself: its `app` ids, or `hideIn` in an entry without `app`. */
 export function hiddenIn(entry: CatalogEntry, appId: string): boolean {
@@ -108,7 +129,7 @@ export function shares(catalog: Catalog, appId: string, ctx: ShareContext): AppS
 	const rows: Share[] = [];
 	const tiers: Share[][] = [[], [], [], []];
 	for (const e of catalog.entries ?? []) {
-		const weight = weightIn(e, appId, weighted);
+		const weight = weightIn(e, appId, weighted, ctx.platform);
 		const row: Share = { id: e.id, state: 'out', weight, share: 0 };
 		rows.push(row);
 		if (hiddenIn(e, appId)) Object.assign(row, { state: 'self', reason: 'sa propre pub, ou masquée ici' });
@@ -141,4 +162,37 @@ export function showingApps(catalog: Catalog, others: readonly string[] = []): s
 	for (const e of catalog.entries ?? []) if (isObject(e.weights)) Object.keys(e.weights).forEach(add);
 	others.forEach(add);
 	return ids;
+}
+
+/** True when the draft draws differently from the published catalogue in the app on the platform. */
+export function rowChanged(published: Catalog, draft: Catalog, appId: string, platform: Platform): boolean {
+	const wp = isWeighted(published, appId);
+	const wd = isWeighted(draft, appId);
+	if (wp !== wd) return true;
+	const before = new Map((published.entries ?? []).map((e) => [e.id, e]));
+	return (draft.entries ?? []).some((d) => {
+		const p = before.get(d.id);
+		return !!p && weightIn(p, appId, wp, platform) !== weightIn(d, appId, wd, platform);
+	});
+}
+
+/** The published catalogue with only the draft's weights of one app on one platform: what « Valider » sends.
+ *  Turning the weighted mode on or off counts for both platforms, as the apps read it. Entries new or gone in
+ *  the draft are left as published. */
+export function applyRow(published: Catalog, draft: Catalog, appId: string, platform: Platform): Catalog {
+	const next = JSON.parse(JSON.stringify(published)) as Catalog;
+	const weighted = isWeighted(draft, appId);
+	const id = baseAppId(appId);
+	const drafted = new Map((draft.entries ?? []).map((e) => [e.id, e]));
+	for (const e of next.entries ?? []) {
+		const d = drafted.get(e.id);
+		if (!d) continue;
+		if (weighted) setWeightIn(e, appId, platform, weightIn(d, appId, true, platform));
+		else if (isObject(e.weights) && Object.hasOwn(e.weights, id)) {
+			const rest = Object.fromEntries(Object.entries(e.weights).filter(([k]) => k !== id));
+			if (Object.keys(rest).length) e.weights = rest;
+			else delete e.weights;
+		}
+	}
+	return next;
 }
