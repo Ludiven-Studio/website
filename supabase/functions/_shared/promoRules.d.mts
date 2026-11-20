@@ -15,6 +15,8 @@ export interface CatalogEntry {
 	start?: string;
 	end?: string;
 	weight?: number;
+	/** The weight in each app that shows the entry, by its base id. */
+	weights?: Record<string, number>;
 	spots?: string[];
 	[key: string]: unknown;
 }

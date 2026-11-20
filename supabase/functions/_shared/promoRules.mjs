@@ -55,6 +55,8 @@ export function catalogUrl(path) {
 	return path.startsWith(PROMO_DIR) ? path.slice(PROMO_DIR.length) : path.slice('public'.length);
 }
 
+const isWeight = (w) => typeof w === 'number' && Number.isFinite(w) && w >= 0;
+
 function texts(value, what, errors, { required = false, shown = true } = {}) {
 	if (value === undefined && !required) return {};
 	if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -139,7 +141,16 @@ function checkEntry(e, base, defaultLanguage, strict, files) {
 	const start = date(e.start, 'start', errors);
 	const end = date(e.end, 'end', errors);
 	if (start !== undefined && end !== undefined && end <= start) errors.push('ends before it starts');
-	if (e.weight !== undefined && (typeof e.weight !== 'number' || !Number.isFinite(e.weight) || e.weight < 0)) errors.push('bad weight');
+	if (e.weight !== undefined && !isWeight(e.weight)) errors.push('bad weight');
+	// The weight in each app that shows it, by that app's base id: an app named here drops the group order.
+	if (e.weights !== undefined) {
+		if (!e.weights || typeof e.weights !== 'object' || Array.isArray(e.weights)) errors.push('weights is not an object of app ids');
+		else
+			for (const [id, w] of Object.entries(e.weights)) {
+				if (!PACKAGE.test(id)) errors.push(`weights: ${JSON.stringify(id.slice(0, 60))} is not an app id`);
+				if (!isWeight(w)) errors.push(`weights: ${PACKAGE.test(id) ? id : 'an entry'} is not a number of 0 or more`);
+			}
+	}
 	strings(e.spots, 'spots', errors, (s) => SPOTS.includes(s));
 	if (e.spots?.includes?.('video') && Object.keys(clips).length === 0) errors.push('a video spot without clips');
 	return errors;

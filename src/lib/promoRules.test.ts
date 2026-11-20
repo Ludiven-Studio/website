@@ -93,6 +93,32 @@ describe('checkCatalog: values an attacker or a typo could send', () => {
 		expect(problems(catalog([entry({ weight })]))).toContain('meet: bad weight');
 	});
 
+	it('accepts weights per app, 0 included', () => {
+		expect(problems(catalog([entry({ weights: { 'com.ludivenstudio.petanquegame': 3, 'com.ludivenstudio.dominoland': 0, 'com.x.y': 0.5 } })]))).toEqual([]);
+		expect(problems(catalog([entry({ weights: {} })]))).toEqual([]);
+	});
+
+	it.each([null, 3, 'com.a.b', [], [1, 2], true])('refuses weights %j that is not an object', (weights) => {
+		expect(problems(catalog([entry({ weights })]))).toContain('meet: weights is not an object of app ids');
+	});
+
+	it.each(['', 'petanque', '__proto__', 'com..b', '1com.a', 'com.a.b ', 'com.a/b', 'x'.repeat(200)])('refuses the app id %j in weights', (id) => {
+		const p = problems(catalog([entry({ weights: JSON.parse(JSON.stringify({ [id]: 1 })) })]));
+		expect(p.some((x) => x.includes('is not an app id'))).toBe(true);
+		expect(p.every((x) => x.length < 200)).toBe(true);
+	});
+
+	it.each([-1, NaN, Infinity, -Infinity, '2', null, true, [1], { w: 1 }])('refuses the weight %j in weights', (w) => {
+		expect(problems(catalog([entry({ weights: { 'com.ludivenstudio.petanquegame': w } })])))
+			.toContain('meet: weights: com.ludivenstudio.petanquegame is not a number of 0 or more');
+	});
+
+	it('reads a hostile __proto__ key as data, without touching other objects', () => {
+		const c = JSON.parse('{"schema":1,"updated":"2026-11-20T10:00:00Z","entries":[{"id":"meet","title":{"en":"M"},"image":"img/m.png","link":{"ios":"1"},"weights":{"__proto__":{"polluted":1}}}]}');
+		expect(problems(c).some((x) => x.includes('"__proto__" is not an app id'))).toBe(true);
+		expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+	});
+
 	it('accepts a zero weight (a paused ad)', () => {
 		expect(problems(catalog([entry({ weight: 0 })]))).toEqual([]);
 	});
