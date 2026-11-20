@@ -55,10 +55,18 @@ const hasDaily = gameId in DAILY_LB;
 				box.classList.add('on');
 			};
 			if (island) {
-				// Never rendered. `load` has already waited for the whole module graph, so an
-				// island still empty a few seconds later is dead, not slow.
-				addEventListener('load', () => setTimeout(() => {
-					if (!island.childElementCount) show(false);
+				// Never rendered. `load` does not wait for the island's dynamic import: on a slow
+				// phone a healthy 3D game mounts 5-9 s after it. So ask for the same module: its
+				// promise fails if the game's code cannot load, and waits for it while it is coming.
+				addEventListener('load', () => setTimeout(async () => {
+					if (island.childElementCount) return;
+					const url = island.getAttribute('component-url');
+					try {
+						if (url) await import(/* @vite-ignore */ url);
+					} catch {
+						return show(false);
+					}
+					setTimeout(() => { if (!island.childElementCount) show(false); }, 8000);
 				}, 4000));
 				// Rendered, then emptied: React unmounts the whole root on an uncaught render or
 				// effect error, so the island dropping back to zero children IS the crash. A throw
@@ -66,7 +74,11 @@ const hasDaily = gameId in DAILY_LB;
 				// ErrorBoundary would miss that one just the same.
 				let mounted = false;
 				const obs = new MutationObserver(() => {
-					if (island.childElementCount) { mounted = true; return; }
+					if (island.childElementCount) {
+						mounted = true;
+						if (!reloadOnly) box.classList.remove('on');
+						return;
+					}
 					if (!mounted) return;
 					obs.disconnect();
 					show(true);
