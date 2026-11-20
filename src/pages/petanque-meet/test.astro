@@ -44,6 +44,8 @@ const LATEST = `${SUPABASE_URL}/storage/v1/object/public/builds/petanquemeet/lat
 </BaseLayout>
 
 <script>
+	import { readBetaBuild } from '../../lib/betaBuild';
+
 	const box = document.getElementById('build');
 	const show = (state: string) => {
 		box?.querySelectorAll<HTMLElement>('[data-state]').forEach((el) => {
@@ -56,16 +58,17 @@ const LATEST = `${SUPABASE_URL}/storage/v1/object/public/builds/petanquemeet/lat
 		try {
 			const res = await fetch(`${box?.dataset.latest}?t=${Date.now()}`, { cache: 'no-store' });
 			if (!res.ok) throw new Error(String(res.status));
-			const b = await res.json();
+			const b = readBetaBuild(await res.json());
+			if (!b) throw new Error('no build to offer');
 			const link = field('url') as HTMLAnchorElement | null;
 			if (link) link.href = b.url;
 			field('version')!.textContent = b.version;
-			field('date')!.textContent = new Date(b.date).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
-			field('size')!.textContent = `${(b.size / 1e6).toFixed(1)} Mo`;
+			field('date')!.textContent = b.date ? b.date.toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+			field('size')!.textContent = b.size ? `${(b.size / 1e6).toFixed(1)} Mo` : '—';
 			field('commit')!.textContent = b.commit;
 			const notes = field('notes');
 			if (notes) {
-				notes.replaceChildren(...(b.notes as string[]).map((n) => {
+				notes.replaceChildren(...b.notes.map((n) => {
 					const li = document.createElement('li');
 					li.textContent = n;
 					return li;
