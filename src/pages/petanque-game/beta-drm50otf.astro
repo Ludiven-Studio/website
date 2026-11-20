@@ -2,23 +2,23 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 
 // Unlisted: noindex, out of the sitemap and of the offline precache (astro.config.mjs).
-// The next store version, built from the game's main (68635bf) under the .beta id, signed with the dev key,
+// The next store version, built from the game's main (c8092ec) under the .beta id, signed with the dev key,
 // ARM64 only, on a prerelease of this repo (the earlier betas' APKs stay there).
 const BETA = {
-	version: '1.0.14',
-	date: '2026-11-19',
-	size: 90893469,
+	version: '1.0.15',
+	date: '2026-11-20',
+	size: 90927213,
 	android: '7.1',
-	sha256: '0d80014aa576de66f60cc2906978c341140f2d1e0be7caa0c7edd511db287b0f',
-	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-game-beta/petanque-game-1.0.14-beta12.apk',
+	sha256: '6ccdd92c919d3147dbb6394d1eaf952fe74fa01e56f61abe2119786362607700',
+	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-game-beta/petanque-game-1.0.15-beta13.apk',
 };
 const date = new Date(BETA.date).toLocaleDateString('fr-FR', { dateStyle: 'medium' });
 const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 ---
 
 <BaseLayout
-	title="Pétanque Game β — version 1.0.14 | Ludiven Studio"
-	description="Version bêta Android de Pétanque Game 1.0.14, pour les testeurs."
+	title="Pétanque Game β — version 1.0.15 | Ludiven Studio"
+	description="Version bêta Android de Pétanque Game 1.0.15, pour les testeurs."
 	noindex
 >
 	<div class="wrapper beta-page stack gap-6">
@@ -39,203 +39,13 @@ const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 		<section class="card stack gap-3">
 			<h2>Quoi de neuf à tester</h2>
 			<ul>
-				<li><strong>Sans compte</strong> : les pièces, le magasin, les défis, le bonus du jour et les ligues marchent aussi.</li>
-				<li>
-					<strong>Reprendre une partie</strong> : ferme le jeu en pleine partie contre l'ordinateur, rouvre-le, il propose de la
-					reprendre là où elle en était.
-				</li>
-				<li>
-					<strong>Pendant la partie</strong> : la ligne du tour dit pourquoi tel camp joue, les boules qui tiennent le point sont
-					entourées, le téléphone vibre quand les boules se touchent (Options › Vibrations).
-				</li>
-				<li>
-					<strong>Après la partie</strong> : un prochain objectif sous le résultat. Les nouvelles parties se jouent en 7 points.
-				</li>
-				<li>
-					<strong>L'aide pour lancer</strong> (au premier lancer, ou Menu › Revoir comment lancer) : le texte est juste au-dessus
-					de la planche, le reste de l'écran s'assombrit, et elle finit par « À toi ! » où tu lances pour de vrai.
-				</li>
-				<li>
-					<strong>Le bouchon placé</strong> : quand tu poses le bouchon, la caméra revient pour regarder l'adversaire jouer
-					sa première boule.
-				</li>
-				<li>Les images des menus et de la planche prennent quatre fois moins de mémoire.</li>
-				<li>
-					<strong>Le défi de tir du jour</strong> (accueil › Défi de tir du jour) : à rejouer autant que tu veux. Avec un compte,
-					ton score entre dans le classement mondial du jour et de la semaine.
-				</li>
-				<li>
-					<strong>Nouveau dans la 1.0.12 : après une mise à jour</strong>, si le jeu a perdu ta connexion, il te propose de te
-					reconnecter au lieu de te faire recréer ton joueur.
-				</li>
-				<li>
-					<strong>Nouveau dans la 1.0.13 : le défi de tir devient le tir de précision des championnats</strong> : cinq ateliers
-					(la boule seule, derrière le bouchon, entre deux boules, derrière une boule, le bouchon), chacun à 6 puis 8 m, dix
-					boules, 50 points au plus. Carreau 5, les deux sortent 3, touchée 1. Ta boule doit tomber dans le cercle. Il se joue
-					seul sur une piste d'un boulodrome couvert.
-				</li>
-				<li>
-					<strong>Le rythme rapide</strong> (Options › Rythme, ou « Passer ») : l'image du terrain se fige puis s'efface en
-					douceur pendant que les joueurs se replacent, sans écran noir.
-				</li>
-				<li>
-					<strong>Nouveau dans la 1.0.13 : Options › Repartir de zéro (test)</strong>, en bas des options : le jeu se ferme et
-					repart comme au tout premier lancement, pour revoir l'arrivée d'un nouveau joueur. Ton compte et sa sauvegarde en
-					ligne restent : reconnecte-toi pour les retrouver.
-				</li>
-				<li>
-					<strong>Nouveau dans la 1.0.14&nbsp;: la leçon du premier lancement</strong> (Options › Repartir de zéro pour la revoir)&nbsp;:
-					deux lancers, pointer près du bouchon puis tirer une boule orange, en moins d'une minute&nbsp;; puis le choix du joueur
-					et de la main.
-				</li>
-				<li>
-					<strong>Nouveau dans la 1.0.14&nbsp;: «&nbsp;Ta boule touche le bouchon&nbsp;»</strong> au lieu de «&nbsp;0&nbsp;mm&nbsp;», dans la leçon,
-					l'entraînement et les cartes de fin de mène.
-				</li>
-				<li>
-					<strong>Nouveau dans la 1.0.14&nbsp;: une partie en ligne dont la connexion coupe attend 30 secondes</strong>. À tester à
-					deux téléphones en «&nbsp;Partie rapide&nbsp;»&nbsp;: coupe le Wi-Fi de l'un 10 secondes, la partie doit reprendre&nbsp;; puis 40 secondes,
-					celui qui a coupé perd et l'autre gagne. Abandonner exprès reste une défaite.
-				</li>
-				<li>
-					<strong>Nouveau dans la 1.0.14&nbsp;: avant un 2e achat en argent réel dans les 24 heures</strong>, une question pour un
-					adulte (une multiplication). La β ne vend rien&nbsp;: elle ne s'affiche pas ici.
-				</li>
-				<li>
-					<strong>Corrigé dans la 1.0.14</strong>&nbsp;: les parties en ligne restent en phase jusqu'au bout&nbsp;; une vidéo dont la
-					récompense arrive en retard paie quand même&nbsp;; une suppression de compte coupée en route se termine toute seule au
-					lancement suivant.
-				</li>
-				<li>
-					<strong>2e bêta 1.0.14&nbsp;: ton compte revient tout seul au lancement</strong>, même après Options › Repartir de zéro&nbsp;:
-					si le téléphone a déjà connecté ton compte Google au jeu, il se reconnecte sans rien demander et la leçon est sautée si
-					tu l'as déjà faite. Sinon, «&nbsp;Tu as déjà un compte&nbsp;?&nbsp;» passe avant la leçon.
-				</li>
-				<li>
-					<strong>2e bêta 1.0.14&nbsp;: le défi de tir montre d'abord le cercle de près</strong>, 2,5 secondes avant chaque boule&nbsp;;
-					touche la planche pour viser tout de suite.
-				</li>
-				<li>
-					<strong>Corrigé dans la 2e bêta</strong>&nbsp;: plus de carrés blancs avant la leçon&nbsp;; la planche attend que ton joueur
-					soit dans le cercle, et le texte du bas n'en parle que quand elle est là&nbsp;; dans «&nbsp;Comment jouer&nbsp;», la planche
-					reste dans son image.
-				</li>
-				<li>
-					<strong>3e bêta 1.0.14&nbsp;: la règle du tir qui ne laisse aucune boule en jeu</strong>&nbsp;: c'est le tireur qui
-					rejoue, puis chaque équipe à son tour tant qu'aucune boule n'est en jeu (règlement FIPJP, articles 15 et 28). En
-					ligne, cette bêta ne joue qu'avec une autre bêta 1.0.14, de la 3e à la 12e.
-				</li>
-				<li>
-					<strong>4e bêta 1.0.14&nbsp;: des pièces à gagner au défi de tir</strong>&nbsp;: chaque jour, les 10 premiers du classement
-					gagnent jusqu'à 500 pièces&nbsp;; chaque semaine, les 50 premiers jusqu'à 2 000. Avec un compte, tes pièces arrivent au
-					lancement qui suit la fin de la journée (minuit UTC) ou de la semaine.
-				</li>
-				<li>
-					<strong>4e bêta 1.0.14&nbsp;: plusieurs comptes Google sur le téléphone&nbsp;?</strong> La liste d'Android reste ouverte au
-					lancement jusqu'à ton choix, et tu retrouves ton joueur et ta progression. Si une connexion échoue, le jeu le dit et
-					propose «&nbsp;Réessayer&nbsp;».
-				</li>
-				<li>
-					<strong>Corrigé dans la 4e bêta</strong>&nbsp;: une partie classée coupée va contre le téléphone qui n'a vraiment plus
-					d'internet, même si son Wi-Fi reste allumé&nbsp;; la récompense d'une vidéo arrivée en retard n'est plus prise pour la
-					vidéo suivante.
-				</li>
-				<li>
-					<strong>5e bêta 1.0.14&nbsp;: une nouvelle boutique</strong>&nbsp;: des prix ronds et plus élevés, un prestige très cher
-					(le château à 25 000 pièces), des jeunes joueurs de 2 000 à 10 000 pièces, à moitié prix quand tu as battu leur parrain
-					(ceux que tu avais déjà débloqués restent à toi). Les packs donnent 1 000, 3 000 et 8 000 pièces au même prix. Tes pièces
-					et tes objets restent.
-				</li>
-				<li>
-					<strong>5e bêta 1.0.14&nbsp;: des gains arrondis et des ligues plus chères</strong>&nbsp;: victoires, bonus du jour, défis et
-					succès arrondis vers le haut&nbsp;; des inscriptions rondes, nettement plus chères en National et en Professionnel&nbsp;; la
-					coupe Bronze gratuite de la semaine va jusqu'au niveau Régional. Au défi de tir, le jour paie 500, 300, 200 puis de 150 à
-					60 pièces jusqu'au 10e, la semaine 2 000, 1 200, 800 puis 400, 200 et 100 jusqu'au 50e.
-				</li>
-				<li>
-					<strong>6e bêta 1.0.14&nbsp;: un nouveau décor, la crique au couchant</strong>&nbsp;: le terrain longe une plage de
-					Méditerranée, le soleil se couche sur la mer, des voiliers passent au large, les vagues viennent mourir sur le sable,
-					et des amis prennent l'apéro autour d'un feu devant leur caravane. Dans la collection prestige du magasin, à
-					30 000 pièces.
-				</li>
-				<li>
-					<strong>6e bêta 1.0.14&nbsp;: le multi mis en avant</strong>&nbsp;: «&nbsp;Jouer en ligne&nbsp;» à l'accueil avec le nombre
-					de joueurs connectés, une pastille verte sur l'onglet Multi, et un bandeau quand quelqu'un cherche un adversaire
-					(«&nbsp;Bébert cherche un adversaire · Jouer&nbsp;»). Le bandeau se coupe dans Options, «&nbsp;Alertes multi&nbsp;».
-				</li>
-				<li>
-					<strong>7e bêta 1.0.14&nbsp;: les packs de pièces dans la bêta</strong>&nbsp;: la bêta n'est pas sur le Play Store, elle
-					ne vendait donc aucun pack. Ils créditent maintenant tes pièces tout de suite, sans paiement, et Options a une ligne
-					«&nbsp;+50 000 pièces (test)&nbsp;» pour essayer la crique et le prestige.
-				</li>
-				<li>
-					<strong>8e bêta 1.0.14&nbsp;: tes retours</strong>&nbsp;: le son de la crique plus doux, son fond fermé par les
-					falaises jusqu'à l'eau, la planche du défi de tir qui vise dès le premier appui pendant le zoom, et les ligues qui
-					défilent vite d'un geste puis se calent.
-				</li>
-				<li>
-					<strong>9e bêta 1.0.14&nbsp;: un seul soleil, des transitions en fondu, une appli plus légère</strong>&nbsp;: un seul soleil
-					sur la crique, un peu plus bas&nbsp;; un fondu masque la partie en 3D quand elle s'ouvre ou se ferme&nbsp;; l'appli
-					pèse 10&nbsp;Mo de moins. À vérifier en priorité&nbsp;: la connexion, la sauvegarde, un achat de pièces, une vidéo et
-					une partie en ligne.
-				</li>
-				<li>
-					<strong>10e bêta 1.0.14&nbsp;: les pièces sur une ligne, la recherche en ligne protégée</strong>&nbsp;: le compteur
-					de pièces tient sur une ligne jusqu'à 999&nbsp;999&nbsp;; pendant la recherche d'un adversaire, une fenêtre «&nbsp;En
-					recherche…&nbsp;» montre le temps écoulé et bloque le reste de l'écran, et «&nbsp;Annuler&nbsp;» arrête vraiment la recherche.
-				</li>
-				<li>
-					<strong>11e bêta 1.0.14, depuis la bêta 10</strong>&nbsp;:
-					<ul>
-						<li><strong>Multi</strong>&nbsp;: seul en ligne, la page dit «&nbsp;1 joueur en ligne (toi)&nbsp;».</li>
-						<li>
-							<strong>Partie rapide</strong>&nbsp;: «&nbsp;Annuler&nbsp;» pendant la recherche, ou quitter la page, quitte vraiment la
-							partie sur le serveur.
-						</li>
-						<li>
-							<strong>Défi de tir</strong>&nbsp;: les prix sont vérifiés une fois par lancement et par joueur&nbsp;; une réponse qui
-							arrive après un changement de compte ne paie plus le mauvais joueur.
-						</li>
-						<li>
-							<strong>Achats</strong>&nbsp;: un achat rendu par le magasin après un changement de joueur ne paie plus une deuxième
-							fois. Un 2e achat pendant qu'un autre est en attente pose la question de l'adulte, et le même produit attend que le
-							premier soit réglé.
-						</li>
-						<li>
-							<strong>Entrée et sortie de partie</strong>&nbsp;: le voile couvre tout pendant que la partie se construit (plus de 3D
-							à moitié visible). Fermer pendant l'ouverture ne bloque plus les menus. Une partie demandée pendant qu'un menu glisse
-							s'ouvre bien.
-						</li>
-						<li>
-							<strong>À tester en priorité</strong>&nbsp;: ouvrir et quitter des parties (contre l'ordinateur, la ligue, le défi
-							de tir), quitter une partie pendant qu'elle s'ouvre, et «&nbsp;Annuler&nbsp;» pendant une recherche de partie rapide.
-						</li>
-					</ul>
-				</li>
-				<li>
-					<strong>12e bêta 1.0.14, depuis la 11e</strong>&nbsp;:
-					<ul>
-						<li>
-							<strong>Nouveaux prix</strong>&nbsp;: une sauvegarde d'avant la 1.0.14 voit ses pièces doublées une fois, et un
-							acheteur reçoit en plus les pièces de chaque pack acheté (et 1&nbsp;000 pour «&nbsp;Sans publicité&nbsp;»). Une fenêtre
-							«&nbsp;Nouveaux prix&nbsp;» le dit une fois à l'accueil.
-						</li>
-						<li>
-							<strong>À tester</strong>&nbsp;: Options › «&nbsp;Copie 1.0.8 (test)&nbsp;» transforme ta sauvegarde en copie 1.0.8
-							(2&nbsp;000 pièces, un pack de chaque taille et «&nbsp;Sans publicité&nbsp;»). La fenêtre doit dire «&nbsp;Merci d'avoir
-							soutenu le jeu&nbsp;: +10&nbsp;500 pièces&nbsp;», et le compteur montrer 12&nbsp;500 (2&nbsp;000 × 2, + 500 + 1&nbsp;500 +
-							4&nbsp;000 + 1&nbsp;000). Toucher le bouton à nouveau refait la même copie et redonne la même chose&nbsp;: c'est voulu,
-							pour le test.
-						</li>
-						<li>
-							Après ce test, «&nbsp;Sans publicité&nbsp;» reste activé&nbsp;: plus de pub de test entre les parties. «&nbsp;Repartir
-							de zéro (test)&nbsp;» remet tout à zéro.
-						</li>
-						<li>
-							Les achats restent simulés dans la bêta&nbsp;; le vrai parcours se teste sur l'AAB en piste de test interne.
-						</li>
-					</ul>
-				</li>
+				<li>Parties en ligne en 7 ou en 13 points&nbsp;; les compteurs du multi sont à jour toutes les 5&nbsp;s.</li>
+				<li>Dans le menu de la partie&nbsp;: animations passées ou non, mode simple ou expert.</li>
+				<li>Une manche de coupe coupée par l'appli se reprend ou se rejoue&nbsp;: elle ne compte plus comme perdue.</li>
+				<li>Touche Retour d'Android&nbsp;: la pause en partie, «&nbsp;Quitter le jeu&nbsp;?&nbsp;» à l'accueil.</li>
+				<li>Classé&nbsp;: une coupure de connexion sans faute connue ne compte pour personne, et une seule partie classée à la fois par compte.</li>
+				<li>Une pub avant la finale des coupes&nbsp;; «&nbsp;Signaler&nbsp;» plus discret&nbsp;; les points de classement affichés en fin de partie.</li>
+				<li>Beaucoup de corrections&nbsp;: sauvegarde, achats, défis après minuit, rappels, connexion annulée.</li>
 			</ul>
 		</section>
 
@@ -245,7 +55,7 @@ const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 				<li>
 					<strong>C'est ton vrai compte.</strong> Si tu te connectes avec Google comme dans le jeu du store, tu retrouves tes
 					pièces, tes coupes et ton classement. Ce que tu gagnes ou dépenses dans la β compte pour de vrai. En ligne, la β ne
-					croise que d'autres téléphones en 1.0.14, tant que le store n'a pas cette version.
+					croise que d'autres téléphones en {BETA.version}, tant que le store n'a pas cette version.
 				</li>
 				<li>
 					<strong>Achats simulés</strong>&nbsp;: la bêta n'est pas sur le magasin, les packs de pièces et «&nbsp;Sans

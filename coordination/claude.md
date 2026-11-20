@@ -3739,3 +3739,19 @@
 - 13:06 : build complet OK (240 pages, 0 erreur, précache 407 et liens 269 OK).
 - 13:06 : commité et poussé à la demande de l'utilisateur (« publie » de Raphaël relayé par le Producer) : ma page et
   cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-20 — Pétanque Game : bêta 1.0.15 (beta13) (session release-publisher)
+- Statut : en cours (2026-11-20T13:53+01:00). Demande de l'utilisateur : (relayé par le Producer, Raphaël le 20/11) «
+  publie » la bêta 1.0.15 (beta13) de Pétanque Game pour les testeurs ; APK sur la prerelease petanque-game-beta
+- Réservations actives : `src/pages/petanque-game/beta-drm50otf.astro`.
+- Ressources : serveur de dev sur le port 4399 ; eslint, `astro check`. Build annoncé ici avant.
+- 13:53 : APK envoyé sur la prerelease petanque-game-beta sous petanque-game-1.0.15-beta13.apk ; le lien sert sha256
+  6ccdd92c… (90 927 213 octets), com.ludivenstudio.petanquegame.beta 1.0.15 (100015), signature vérifiée.
+- 13:55 : Page : constante (1.0.15, 20/11, taille, sha, url GitHub), titre et description en 1.0.15, les notes de la
+  session Pétanque Game à la place de celles de la 1.0.14, et « En ligne, la β ne croise que » d'autres téléphones en
+  {BETA.version} (protocole en ligne 14 depuis d40edb0, la 1.0.14 du store est au 13) ; eslint et astro check OK, page
+  vue en téléphone et bureau sombre, sans erreur console.
+- 13:55 : Lancement du build complet (écrit dist/, .astro/, public/vendor/ du worktree site-publish-game-beta13)…
+- 13:57 : build complet OK (240 pages, 0 erreur, précache 407 et liens 269 OK).
+- 13:57 : commité et poussé à la demande de l'utilisateur (« publie » de Raphaël relayé par le Producer) : ma page et
+  cette section seulement. Statut : terminé. Réservations libérées.
