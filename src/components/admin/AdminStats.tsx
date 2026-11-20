@@ -10,14 +10,20 @@ import { useAdminSession } from './useAdminSession';
 const int = new Intl.NumberFormat('fr-FR');
 const pct = (x: number | null | undefined): string => (x == null ? '–' : `${(x * 100).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} %`);
 const when = (iso: string): string => new Date(iso).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
-const RESULT_NAMES: Record<string, string> = { ok: 'réussis', fail: 'échoués', cancel: 'annulés', cancelled: 'annulés', canceled: 'annulés' };
+const RESULT_NAMES: Record<string, string> = { ok: 'réussis', success: 'réussis', fail: 'échoués', failed: 'échoués', error: 'échoués', cancel: 'annulés', cancelled: 'annulés', canceled: 'annulés' };
 
 function Counts({ rows, names, empty = 'aucun' }: { rows: Count[] | null; names?: Record<string, string>; empty?: string }) {
 	if (rows === null) return <span className="as-muted">indisponible</span>;
 	if (!rows.length) return <span className="as-muted">{empty}</span>;
+	// Apps word the same outcome differently ("fail", "failed"): one line per shown name.
+	const merged = new Map<string, number>();
+	for (const r of rows) {
+		const name = names?.[r.key] ?? r.key;
+		merged.set(name, (merged.get(name) ?? 0) + r.count);
+	}
 	return (
 		<ul className="as-counts">
-			{rows.map((r) => <li key={r.key}><span>{names?.[r.key] ?? r.key}</span> <strong>{int.format(r.count)}</strong></li>)}
+			{[...merged].sort((a, b) => b[1] - a[1]).map(([name, count]) => <li key={name}><span>{name}</span> <strong>{int.format(count)}</strong></li>)}
 		</ul>
 	);
 }
