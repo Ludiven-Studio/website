@@ -4,7 +4,7 @@ import {
 	makeTerrain, ampFor, SURFACES, SURFACE_IDS, heightAt, PITCH_W, PITCH_L, type SurfaceId, type Terrain, type TerrainOpts,
 } from './terrain';
 import {
-	makeBoule, makeJack, place, stepSim, isSettled, throwVelocity, G, STANDARD_KIT,
+	makeBoule, makeJack, place, stepSim, isSettled, throwVelocity, STANDARD_KIT,
 	type Sim, type Boule, type Impact, type Velocity, type Kit,
 } from './engine';
 import {
