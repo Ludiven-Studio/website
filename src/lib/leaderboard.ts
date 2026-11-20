@@ -96,7 +96,27 @@ export interface DailyRun {
 	abandoned?: boolean;
 }
 
-const runKey = (game: string): string => `ludiven-dailyrun-${game}-${todayKey()}`;
+const keyFor = (game: string, day: string): string => `ludiven-dailyrun-${game}-${day}`;
+
+/* The day of the board on screen. A run opened at 23:59 and finished at 00:01 belongs to the day it was
+   opened: saving it under the new day would spend tomorrow's attempt with yesterday's board. The pin
+   holds while that run is in progress; once it is done (or gone), the next load opens today's. */
+const openedDay = new Map<string, string>();
+
+function runDay(game: string): string {
+	const pinned = openedDay.get(game);
+	const today = todayKey();
+	if (!pinned || pinned === today) return today;
+	try {
+		const run = decodeRun(localStorage.getItem(keyFor(game, pinned)));
+		if (run && !run.done) return pinned;
+	} catch {
+		/* storage unavailable */
+	}
+	return today;
+}
+
+const runKey = (game: string): string => keyFor(game, runDay(game));
 
 /** Dailies that are a fixed-duration race rather than a chrono. Their countdown has to
  *  keep burning while the player is away, or the blitz could be solved a slice at a time. */
@@ -119,6 +139,7 @@ function decodeRun(raw: string | null): DailyRun | null {
 }
 
 export function loadDailyRun(game: string): DailyRun | null {
+	openedDay.set(game, runDay(game));
 	try {
 		const run = decodeRun(localStorage.getItem(runKey(game)));
 		if (!run) return null;

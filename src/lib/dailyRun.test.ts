@@ -211,3 +211,43 @@ describe('the day of a daily score', () => {
 		expect(best('2026-03-10')).toBe('500');
 	});
 });
+
+/* A board opened before midnight in Paris and finished after it. */
+describe('a daily run across midnight', () => {
+	const at = (iso: string) => vi.setSystemTime(new Date(iso));
+	const stored = (day: string) => localStorage.getItem(`ludiven-dailyrun-sudoku-${day}`);
+
+	it('is saved, checkpointed and finished on the day it was opened, leaving the new day free', () => {
+		at('2026-03-28T22:58:00Z'); // 23:58 in Paris
+		expect(loadDailyRun('sudoku')).toBeNull();
+		const startedAt = Date.now();
+		saveDailyRun('sudoku', { startedAt, done: false });
+		at('2026-03-28T23:01:00Z'); // 00:01, and the clocks go forward that night
+		checkpointDailyClock('sudoku', 150_000);
+		expect(JSON.parse(stored('2026-03-28')!).elapsedMs).toBe(150_000);
+		saveDailyRun('sudoku', { startedAt, done: true, finalTime: 18_000 });
+		expect(JSON.parse(stored('2026-03-28')!).done).toBe(true);
+		expect(stored('2026-03-29')).toBeNull();
+		// Once it is finished, the next open is the new day's fresh daily.
+		expect(loadDailyRun('sudoku')).toBeNull();
+		saveDailyRun('sudoku', { startedAt: Date.now(), done: false });
+		expect(stored('2026-03-29')).not.toBeNull();
+	});
+
+	it('a run opened yesterday and still in progress resumes on reopening', () => {
+		at('2026-03-10T22:50:00Z');
+		loadDailyRun('sudoku');
+		saveDailyRun('sudoku', { startedAt: Date.now(), done: false, seed: 7 });
+		at('2026-03-10T23:10:00Z');
+		expect(loadDailyRun('sudoku')?.seed).toBe(7);
+	});
+
+	it('a save with no load since another test pinned a day goes to today', () => {
+		at('2026-03-10T12:00:00Z');
+		loadDailyRun('sudoku'); // pins the 10th, nothing stored there
+		at('2026-03-12T12:00:00Z');
+		saveDailyRun('sudoku', { startedAt: Date.now(), done: false });
+		expect(stored('2026-03-12')).not.toBeNull();
+		expect(stored('2026-03-10')).toBeNull();
+	});
+});
