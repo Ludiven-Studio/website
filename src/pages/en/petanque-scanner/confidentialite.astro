@@ -18,7 +18,7 @@ import Hero from '../../../components/Hero.astro';
 		<p class="updated">
 			This policy covers <strong>the Pétanque Scan mobile app</strong>
 			(formerly Pétanque Scanner, <code>com.raphbenpro.petanquear</code>), not the ludiven-studio.fr website, which has its
-			<a href="/confidentialite/">own policy</a>. Last updated: 19 November 2026 (the screens opened and your choice about ads, counted in the statistics; version 1.2.14: our house ads, read from our website, replace the Pétanque Meet strip and video; after a refusal, "Turn ads on?" is offered once per session when you ask for a video; advertising moves from Google AdMob to Unity LevelPlay, with our own consent window; on iPhone, without Apple's tracking permission, ads are not personalised; withdrawing your consent is passed on to the ad networks; Google Firebase is removed; 10 free scans a day instead of 3).
+			<a href="/confidentialite/">own policy</a>. Last updated: 20 November 2026 (version 1.2.15: each screen opened and your choice about ads are counted in the statistics, events take the names shared by our apps and scans say their mode, 3D or photo; our house videos have a "Report this video" link; version 1.2.14: our house ads, read from our website, replace the Pétanque Meet strip and video; after a refusal, "Turn ads on?" is offered once per session when you ask for a video; advertising moves from Google AdMob to Unity LevelPlay, with our own consent window; on iPhone, without Apple's tracking permission, ads are not personalised; withdrawing your consent is passed on to the ad networks; Google Firebase is removed; 10 free scans a day instead of 3).
 		</p>
 		<p class="updated">
 			This is a courtesy translation. In case of discrepancy, the
@@ -102,7 +102,7 @@ import Hero from '../../../components/Hero.astro';
 							<td>Unity Technologies and its subsidiary ironSource (Unity LevelPlay, ironSource Ads, Unity Ads); through their auctions, other ad buyers (see §4)</td>
 						</tr>
 						<tr>
-							<td>App usage events and screens opened (see §5), together with: platform (Android or iOS), app and system version, device model, phone language, screen resolution</td>
+							<td>App usage events and screens opened (see §5), together with: platform (Android or iOS), app and system version, device model, phone language, screen resolution, build type (release or test)</td>
 							<td>Analytics: understanding which features are used and improving the app</td>
 							<td>Legitimate interest (no cookie, no identifier, see §5)</td>
 							<td>Umami, on our own server (Hetzner Online GmbH, Germany)</td>
@@ -148,7 +148,7 @@ import Hero from '../../../components/Hero.astro';
 			</div>
 			<p>
 				The app does <strong>not</strong> collect: your name, your email address, your phone number, your
-				contacts, your GPS location, your address book, your photos, or any identifier you may have entered. There
+				contacts, your GPS location, your address book, your photos, or any identifier you may have entered, unless you write to us yourself (see §8). There
 				is no account creation.
 			</p>
 		</section>
@@ -207,9 +207,9 @@ import Hero from '../../../components/Hero.astro';
 				they are updated, still send it these events if you had accepted.
 			</p>
 			<ul>
-				<li><code>scan_started</code> — a scan starts</li>
-				<li><code>scan_completed</code> — a scan completes, with the number of scans made that day</li>
-				<li><code>scan_cancelled</code> — a scan is abandoned, with whether it counted for the day</li>
+				<li><code>scan_started</code> — a scan starts, with its mode (3D or photo)</li>
+				<li><code>scan_completed</code> — a scan completes, with the number of scans made that day, with its mode (3D or photo)</li>
+				<li><code>scan_cancelled</code> — a scan is abandoned, with whether it counted for the day, with its mode (3D or photo)</li>
 				<li><code>scan_blocked_quota</code> — a scan is refused because the daily limit has been reached</li>
 				<li><code>frame_jump_seen</code> — the AR tracking moved under the scan (its markers shifted), with the shift in centimetres (since 1.2.14)</li>
 				<li><code>floor_off_seen</code> — the detected ground looked wrong (the boules seemed to float or sink), with the gap in centimetres (since 1.2.14)</li>
@@ -225,33 +225,43 @@ import Hero from '../../../components/Hero.astro';
 				<li><code>photo_failed_…</code> — a photo's computation fails; the reason is in the event's name</li>
 				<li><code>photo_retake</code> — you retake a photo</li>
 				<li><code>photo_camera_unavailable</code> — the camera could not be opened</li>
-				<li><code>settings_opened</code> — the settings screen is opened</li>
+				<li><code>settings_opened</code> — the settings screen is opened — old name, sent until 4 weeks after 1.2.15 is out</li>
 				<li><code>settings_action</code> — an action is triggered there: consent, privacy policy, terms of use, language, or purchase restore</li>
-				<li><code>paywall_shown</code> / <code>paywall_dismissed</code> — the Premium offer screen is shown or closed, with the reason it was shown</li>
+				<li><code>paywall_shown</code> / <code>paywall_dismissed</code> — the Premium offer screen is shown or closed, with the reason it was shown (<code>paywall_shown</code>: old name, sent until 4 weeks after 1.2.15 is out)</li>
 				<li><code>paywall_watch_ad</code> — you choose to watch a video to recharge your scans</li>
-				<li><code>ad_reward_earned</code> — the ad was watched to the end and the scans are recharged</li>
-				<li><code>ad_unavailable</code> — no ad was available to show</li>
-				<li><code>house_ad_shown</code> — one of our house ads is shown, with its name and its spot (strip or video), only once per ad and spot in a session (since 1.2.14)</li>
-				<li><code>house_ad_opened</code> — you tap one of our house ads, with its name and its spot (since 1.2.14)</li>
+				<li><code>ad_reward_earned</code> — the ad was watched to the end and the scans are recharged (up to 1.2.14)</li>
+				<li><code>ad_unavailable</code> — no ad was available to show (up to 1.2.14)</li>
+				<li><code>house_ad_shown</code> — one of our house ads is shown, with its name and its spot (strip or video), only once per ad and spot in a session (since 1.2.14) — old name, sent until 4 weeks after 1.2.15 is out</li>
+				<li><code>house_ad_opened</code> — you tap one of our house ads, with its name and its spot (since 1.2.14) — old name, sent until 4 weeks after 1.2.15 is out</li>
 				<li><code>meet_promo_shown</code> / <code>meet_promo_refill</code> / <code>meet_promo_closed</code> — the Pétanque Meet video is shown, recharges your scans, or is closed (up to 1.2.12)</li>
 				<li><code>meet_store_opened</code> — you open Pétanque Meet's page in the store, from the strip or the video (up to 1.2.12)</li>
 				<li><code>game_store_opened</code> — you open Pétanque Game's page in the store, from the strip (up to 1.2.12)</li>
-				<li><code>premium_purchase_started</code> / <code>premium_purchase_success</code> / <code>premium_purchase_failed</code> — steps of a purchase, with the reason for failure where applicable</li>
-				<li><code>premium_restore_success</code> — a previous purchase was restored</li>
+				<li><code>premium_purchase_started</code> / <code>premium_purchase_success</code> / <code>premium_purchase_failed</code> — steps of a purchase, with the reason for failure where applicable — old name, sent until 4 weeks after 1.2.15 is out</li>
+				<li><code>premium_restore_success</code> — a previous purchase was restored — old name, sent until 4 weeks after 1.2.15 is out</li>
 				<li><code>premium_revoked</code> — the store no longer recognises a Premium (after a refund, for example)</li>
 				<li><code>iap_receipt_invalid</code> — a proof of purchase could not be validated</li>
-				<li><code>update_prompt</code> / <code>update_tapped</code> — an update is offered to you (recommended or required), or you tap the update button</li>
-				<li><code>consent_accepted</code> / <code>consent_declined</code> — your consent choice, sent at each launch</li>
+				<li><code>update_prompt</code> / <code>update_tapped</code> — an update is offered to you (recommended or required), or you tap the update button — old name, sent until 4 weeks after 1.2.15 is out</li>
+				<li><code>consent_accepted</code> / <code>consent_declined</code> — your consent choice, sent at each launch — old name, sent until 4 weeks after 1.2.15 is out</li>
+				<li><code>app_open</code> — the app starts, with whether it is the first launch and your choice about ads (yes, no, or not asked yet) (since 1.2.15)</li>
+				<li><code>ad_consent</code> — your answer in the "Ads" window: yes or no (since 1.2.15)</li>
+				<li><code>update_shown</code> / <code>update_tap</code> — an update is offered (advised or required), or you tap the update button (since 1.2.15)</li>
+				<li><code>shop_open</code> — the Premium screen opens, with where you came from (since 1.2.15)</li>
+				<li><code>iap_tap</code> / <code>iap_result</code> / <code>iap_restore</code> — you tap the Premium purchase; its result (done, cancelled or failed, with a short failure code and the store); a restore, with the number of purchases found. Never a price. (since 1.2.15)</li>
+				<li><code>ad_offer</code> — a video to refill your scans is offered, with its spot (since 1.2.15)</li>
+				<li><code>ad_start</code> — an ad starts (strip or video), with its spot and source (our partners or our house ads) (since 1.2.15)</li>
+				<li><code>ad_rewarded</code> — the outcome of a video you asked for (watched, skipped or unavailable), with its spot and source (since 1.2.15)</li>
+				<li><code>ad_banner_fail</code> — our partners' strip could not load (since 1.2.15)</li>
+				<li><code>house_ad_show</code> / <code>house_ad_tap</code> — one of our house ads is shown or tapped, with its name and spot (strip or video) (since 1.2.15)</li>
 			</ul>
 			<p>
-				In addition to these events, the app sends the name of each screen you open (home, scan, result, settings…), and nothing else.
+				In addition to these events, the app sends the name of each screen you open (home, scan, result, settings…), and again when it comes back to the foreground, nothing else; Umami works out the time spent on each screen from it.
 			</p>
 			<p>
 				<strong>What Umami receives, precisely.</strong> Each event or screen opened is sent to
 				<code>stats.ludiven-studio.fr</code>, our server, with the following, and nothing more: the event
 				name (or the screen's name) and its detail if any (for example the number of scans that day), a site identifier that
 				belongs to us, the platform (<code>android</code> or <code>ios</code>), the app version, the system
-				version, the phone model, the phone language and the screen resolution. <strong>No advertising
+				version, the phone model, the phone language, the screen resolution, the build type (release or test), the app's name in our statistics (<code>app.petanquear</code>, or <code>beta.app.petanquear</code> for the beta) and a technical header (<em>User-Agent</em>) made of the platform, the system version and the app version. <strong>No advertising
 				identifier, no device number, no cookie and no persistent identifier</strong> is included. As with
 				any request on the Internet, the server necessarily sees your IP address; our server does not store
 				it: it is used only to infer the country, the region and the city, and to compute an anonymous
@@ -301,6 +311,9 @@ import Hero from '../../../components/Hero.astro';
 				Google Play, the link says that it comes from Pétanque Scan, from which ad and which spot (strip or
 				video), with no identifier; the App Store link says nothing. Up to version 1.2.12, the app only read
 				the Pétanque Meet video from our website and, when the Premium screen opened, the list of its videos.
+			</p>
+			<p>
+				<strong>Reporting a video.</strong> Under our house videos, the "Report this video" link opens your mail app with an e-mail to <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a> whose subject names the video. Nothing is sent until you send it yourself. If you do, we receive your e-mail address and your message, used only to handle your report and answer you.
 			</p>
 		</section>
 
@@ -363,6 +376,7 @@ import Hero from '../../../components/Hero.astro';
 				<li><strong>Advertising data</strong>: according to the rules of Unity and ironSource.</li>
 				<li><strong>Your answer about advertising</strong>: 6 months on the phone, then the app asks you again.</li>
 				<li><strong>Premium flag</strong>: kept on the device until uninstallation (on iOS, the Keychain may keep it, see §9).</li>
+				<li>E-mails sent with "Report this video" are kept as long as it takes to handle the report, then deleted, at the latest after 12 months.</li>
 			</ul>
 		</section>
 

@@ -18,7 +18,7 @@ import Hero from '../../../components/Hero.astro';
 		<p class="updated">
 			Esta política se refiere a <strong>la aplicación móvil Pétanque Scan</strong>
 			(antes llamada Pétanque Scanner, <code>com.raphbenpro.petanquear</code>), y no al sitio web ludiven-studio.fr, que tiene su
-			<a href="/confidentialite/">propia política</a>. Última actualización: 19 de noviembre de 2026 (las pantallas abiertas y tu elección sobre la publicidad, contadas en las estadísticas; versión 1.2.14: nuestros anuncios propios, leídos en nuestro sitio, sustituyen a la franja y al vídeo de Pétanque Meet; tras un rechazo, «¿Activar los anuncios?» se propone una vez por sesión cuando pides un vídeo; la publicidad pasa de Google AdMob a Unity LevelPlay, con nuestra propia ventana de consentimiento; en iPhone, sin la autorización de seguimiento de Apple, la publicidad no es personalizada; la retirada de tu consentimiento se transmite a las redes publicitarias; se retira Google Firebase; 10 escaneos gratis al día en lugar de 3).
+			<a href="/confidentialite/">propia política</a>. Última actualización: 20 de noviembre de 2026 (versión 1.2.15: cada pantalla abierta y tu elección sobre la publicidad se cuentan en las estadísticas, los eventos toman los nombres comunes a nuestras aplicaciones y los escaneos indican su modo, 3D o foto; nuestros vídeos propios tienen un enlace «Denunciar este vídeo»; versión 1.2.14: nuestros anuncios propios, leídos en nuestro sitio, sustituyen a la franja y al vídeo de Pétanque Meet; tras un rechazo, «¿Activar los anuncios?» se propone una vez por sesión cuando pides un vídeo; la publicidad pasa de Google AdMob a Unity LevelPlay, con nuestra propia ventana de consentimiento; en iPhone, sin la autorización de seguimiento de Apple, la publicidad no es personalizada; la retirada de tu consentimiento se transmite a las redes publicitarias; se retira Google Firebase; 10 escaneos gratis al día en lugar de 3).
 		</p>
 		<p class="updated">
 			Esta es una traducción de cortesía. En caso de discrepancia, prevalece la
@@ -103,7 +103,7 @@ import Hero from '../../../components/Hero.astro';
 							<td>Unity Technologies y su filial ironSource (Unity LevelPlay, ironSource Ads, Unity Ads); a través de sus subastas, otros compradores de publicidad (ver §4)</td>
 						</tr>
 						<tr>
-							<td>Eventos de uso de la aplicación y pantallas abiertas (ver §5), acompañados de: plataforma (Android o iOS), versión de la aplicación y del sistema, modelo del dispositivo, idioma del móvil, resolución de la pantalla</td>
+							<td>Eventos de uso de la aplicación y pantallas abiertas (ver §5), acompañados de: plataforma (Android o iOS), versión de la aplicación y del sistema, modelo del dispositivo, idioma del móvil, resolución de la pantalla, tipo de versión (publicada o de prueba)</td>
 							<td>Medición de audiencia: entender qué funciones se usan y mejorar la aplicación</td>
 							<td>Interés legítimo (sin cookies ni identificador, ver §5)</td>
 							<td>Umami, en nuestro propio servidor (Hetzner Online GmbH, Alemania)</td>
@@ -149,7 +149,7 @@ import Hero from '../../../components/Hero.astro';
 			</div>
 			<p>
 				La aplicación <strong>no</strong> recoge: tu nombre, tu correo electrónico, tu número de teléfono, tus
-				contactos, tu posición GPS, tu agenda, tus fotos ni ningún identificador que hayas introducido. No hay
+				contactos, tu posición GPS, tu agenda, tus fotos ni ningún identificador que hayas introducido, salvo si nos escribes tú mismo (ver §8). No hay
 				creación de cuenta.
 			</p>
 		</section>
@@ -210,9 +210,9 @@ import Hero from '../../../components/Hero.astro';
 				mientras no se actualicen, todavía le envían estos eventos si lo habías aceptado.
 			</p>
 			<ul>
-				<li><code>scan_started</code> — empieza un escaneo</li>
-				<li><code>scan_completed</code> — un escaneo termina, con el número de escaneos hechos en el día</li>
-				<li><code>scan_cancelled</code> — se abandona un escaneo, indicando si ha contado o no en el día</li>
+				<li><code>scan_started</code> — empieza un escaneo, con su modo (3D o foto)</li>
+				<li><code>scan_completed</code> — un escaneo termina, con el número de escaneos hechos en el día, con su modo (3D o foto)</li>
+				<li><code>scan_cancelled</code> — se abandona un escaneo, indicando si ha contado o no en el día, con su modo (3D o foto)</li>
 				<li><code>scan_blocked_quota</code> — se rechaza un escaneo porque se ha alcanzado el límite diario</li>
 				<li><code>frame_jump_seen</code> — el seguimiento de realidad aumentada se ha movido durante el escaneo (sus referencias se han desplazado), con el desplazamiento en centímetros (desde la 1.2.14)</li>
 				<li><code>floor_off_seen</code> — el suelo detectado parecía erróneo (las bolas parecían flotar o hundirse), con la diferencia en centímetros (desde la 1.2.14)</li>
@@ -228,33 +228,43 @@ import Hero from '../../../components/Hero.astro';
 				<li><code>photo_failed_…</code> — falla el cálculo de una foto; el motivo está en el nombre del evento</li>
 				<li><code>photo_retake</code> — repites una foto</li>
 				<li><code>photo_camera_unavailable</code> — no se ha podido abrir la cámara</li>
-				<li><code>settings_opened</code> — se abre la pantalla de ajustes</li>
+				<li><code>settings_opened</code> — se abre la pantalla de ajustes — nombre antiguo, enviado hasta 4 semanas después de la salida de la 1.2.15</li>
 				<li><code>settings_action</code> — se realiza una acción en ella: consentimiento, política de privacidad, condiciones de uso, idioma o restauración de compra</li>
-				<li><code>paywall_shown</code> / <code>paywall_dismissed</code> — se muestra o se cierra la pantalla de la oferta Premium, con el motivo por el que se mostró</li>
+				<li><code>paywall_shown</code> / <code>paywall_dismissed</code> — se muestra o se cierra la pantalla de la oferta Premium, con el motivo por el que se mostró (<code>paywall_shown</code>: nombre antiguo, enviado hasta 4 semanas después de la salida de la 1.2.15)</li>
 				<li><code>paywall_watch_ad</code> — eliges ver un vídeo para recargar tus escaneos</li>
-				<li><code>ad_reward_earned</code> — el anuncio se ha visto hasta el final y los escaneos se recargan</li>
-				<li><code>ad_unavailable</code> — no había ningún anuncio disponible</li>
-				<li><code>house_ad_shown</code> — se muestra uno de nuestros anuncios propios, con su nombre y su lugar (franja o vídeo), una sola vez por anuncio y lugar en una sesión (desde la 1.2.14)</li>
-				<li><code>house_ad_opened</code> — tocas uno de nuestros anuncios propios, con su nombre y su lugar (desde la 1.2.14)</li>
+				<li><code>ad_reward_earned</code> — el anuncio se ha visto hasta el final y los escaneos se recargan (hasta la 1.2.14)</li>
+				<li><code>ad_unavailable</code> — no había ningún anuncio disponible (hasta la 1.2.14)</li>
+				<li><code>house_ad_shown</code> — se muestra uno de nuestros anuncios propios, con su nombre y su lugar (franja o vídeo), una sola vez por anuncio y lugar en una sesión (desde la 1.2.14) — nombre antiguo, enviado hasta 4 semanas después de la salida de la 1.2.15</li>
+				<li><code>house_ad_opened</code> — tocas uno de nuestros anuncios propios, con su nombre y su lugar (desde la 1.2.14) — nombre antiguo, enviado hasta 4 semanas después de la salida de la 1.2.15</li>
 				<li><code>meet_promo_shown</code> / <code>meet_promo_refill</code> / <code>meet_promo_closed</code> — se muestra el vídeo de Pétanque Meet, recarga tus escaneos o se cierra (hasta la 1.2.12)</li>
 				<li><code>meet_store_opened</code> — abres la ficha de Pétanque Meet en la tienda, desde la franja o el vídeo (hasta la 1.2.12)</li>
 				<li><code>game_store_opened</code> — abres la ficha de Pétanque Game en la tienda, desde la franja (hasta la 1.2.12)</li>
-				<li><code>premium_purchase_started</code> / <code>premium_purchase_success</code> / <code>premium_purchase_failed</code> — pasos de una compra, con el motivo del fallo si lo hay</li>
-				<li><code>premium_restore_success</code> — se ha restaurado una compra anterior</li>
+				<li><code>premium_purchase_started</code> / <code>premium_purchase_success</code> / <code>premium_purchase_failed</code> — pasos de una compra, con el motivo del fallo si lo hay — nombre antiguo, enviado hasta 4 semanas después de la salida de la 1.2.15</li>
+				<li><code>premium_restore_success</code> — se ha restaurado una compra anterior — nombre antiguo, enviado hasta 4 semanas después de la salida de la 1.2.15</li>
 				<li><code>premium_revoked</code> — la tienda ya no reconoce un Premium (tras un reembolso, por ejemplo)</li>
 				<li><code>iap_receipt_invalid</code> — no se ha podido validar un justificante de compra</li>
-				<li><code>update_prompt</code> / <code>update_tapped</code> — se te propone una actualización (recomendada u obligatoria), o pulsas el botón de actualizar</li>
-				<li><code>consent_accepted</code> / <code>consent_declined</code> — tu elección de consentimiento, enviada en cada inicio</li>
+				<li><code>update_prompt</code> / <code>update_tapped</code> — se te propone una actualización (recomendada u obligatoria), o pulsas el botón de actualizar — nombre antiguo, enviado hasta 4 semanas después de la salida de la 1.2.15</li>
+				<li><code>consent_accepted</code> / <code>consent_declined</code> — tu elección de consentimiento, enviada en cada inicio — nombre antiguo, enviado hasta 4 semanas después de la salida de la 1.2.15</li>
+				<li><code>app_open</code> — la aplicación se inicia, indicando si es el primer inicio y tu elección sobre la publicidad (sí, no, o aún no preguntado) (desde la 1.2.15)</li>
+				<li><code>ad_consent</code> — respondes a la ventana «Publicidad»: sí o no (desde la 1.2.15)</li>
+				<li><code>update_shown</code> / <code>update_tap</code> — se te propone una actualización (recomendada u obligatoria), o pulsas el botón de actualizar (desde la 1.2.15)</li>
+				<li><code>shop_open</code> — se abre la pantalla de la oferta Premium, con el lugar desde el que llegas (desde la 1.2.15)</li>
+				<li><code>iap_tap</code> / <code>iap_result</code> / <code>iap_restore</code> — pulsas la compra del Premium; su resultado (hecha, cancelada o fallida, con un breve código de fallo y la tienda); una restauración, con el número de compras encontradas. Nunca un precio. (desde la 1.2.15)</li>
+				<li><code>ad_offer</code> — se te propone un vídeo para recargar tus escaneos, con su lugar (desde la 1.2.15)</li>
+				<li><code>ad_start</code> — empieza un anuncio (franja o vídeo), con su lugar y su origen (nuestros socios o nuestros anuncios propios) (desde la 1.2.15)</li>
+				<li><code>ad_rewarded</code> — el resultado de un vídeo que has pedido (visto, saltado o no disponible), con su lugar y su origen (desde la 1.2.15)</li>
+				<li><code>ad_banner_fail</code> — la franja de nuestros socios no ha podido cargarse (desde la 1.2.15)</li>
+				<li><code>house_ad_show</code> / <code>house_ad_tap</code> — se muestra o tocas uno de nuestros anuncios propios, con su nombre y su lugar (franja o vídeo) (desde la 1.2.15)</li>
 			</ul>
 			<p>
-				Además de estos eventos, la aplicación envía el nombre de cada pantalla abierta (inicio, escaneo, resultado, ajustes…), y nada más.
+				Además de estos eventos, la aplicación envía el nombre de cada pantalla abierta (inicio, escaneo, resultado, ajustes…), y de nuevo cuando vuelve al primer plano, nada más; Umami deduce de ello el tiempo pasado en cada pantalla.
 			</p>
 			<p>
 				<strong>Lo que recibe Umami, exactamente.</strong> Cada evento o pantalla abierta se envía a
 				<code>stats.ludiven-studio.fr</code>, nuestro servidor, con esto y nada más: el nombre del evento (o de la pantalla) y
 				su detalle si lo hay (por ejemplo el número de escaneos del día), un identificador de sitio que nos
 				pertenece, la plataforma (<code>android</code> o <code>ios</code>), la versión de la aplicación, la
-				versión del sistema, el modelo del teléfono, el idioma del teléfono y la resolución de la pantalla.
+				versión del sistema, el modelo del teléfono, el idioma del teléfono, la resolución de la pantalla, el tipo de versión (publicada o de prueba), el nombre de la aplicación en nuestras estadísticas (<code>app.petanquear</code>, o <code>beta.app.petanquear</code> para la versión beta) y una cabecera técnica (<em>User-Agent</em>) formada por la plataforma, la versión del sistema y la de la aplicación.
 				<strong>Ningún identificador publicitario, ningún número de dispositivo, ninguna cookie y ningún
 				identificador persistente</strong> figura en él. Como en cualquier petición por Internet, el
 				servidor ve necesariamente tu dirección IP; nuestro servidor no la conserva: solo sirve para deducir
@@ -307,6 +317,9 @@ import Hero from '../../../components/Hero.astro';
 				(franja o vídeo), sin ningún identificador; el enlace a la App Store no indica nada. Hasta la versión
 				1.2.12, la aplicación solo leía en nuestro sitio el vídeo de Pétanque Meet y, al abrir la pantalla
 				Premium, la lista de sus vídeos.
+			</p>
+			<p>
+				<strong>Denunciar un vídeo.</strong> Bajo nuestros vídeos propios, el enlace «Denunciar este vídeo» abre tu aplicación de correo con un e-mail dirigido a <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>, cuyo asunto nombra el vídeo. No se envía nada hasta que lo envíes tú mismo. Si lo envías, recibimos tu dirección de correo y tu mensaje, que solo sirven para tratar tu denuncia y responderte.
 			</p>
 		</section>
 
@@ -369,6 +382,7 @@ import Hero from '../../../components/Hero.astro';
 				<li><strong>Datos publicitarios</strong>: según las normas de Unity y de ironSource.</li>
 				<li><strong>Tu respuesta sobre la publicidad</strong>: 6 meses en el teléfono; después, la aplicación te vuelve a preguntar.</li>
 				<li><strong>Indicador de Premium</strong>: se conserva en el dispositivo hasta la desinstalación (en iOS, el Llavero puede guardarlo, ver §9).</li>
+				<li>Los e-mails enviados con «Denunciar este vídeo» se conservan el tiempo necesario para tratar la denuncia y luego se borran, como máximo al cabo de 12 meses.</li>
 			</ul>
 		</section>
 
