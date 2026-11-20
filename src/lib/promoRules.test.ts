@@ -108,6 +108,10 @@ describe('checkCatalog: values an attacker or a typo could send', () => {
 		expect(p.every((x) => x.length < 200)).toBe(true);
 	});
 
+	it.each(['com.ludivenstudio.petanquegame.dev', 'com.ludivenstudio.petanquegame.beta'])('refuses the test build %s as a weights key', (id) => {
+		expect(problems(catalog([entry({ weights: { [id]: 1 } })]))).toContain(`meet: weights: ${id} is a test build's id, name its base app`);
+	});
+
 	it.each([-1, NaN, Infinity, -Infinity, '2', null, true, [1], { w: 1 }])('refuses the weight %j in weights', (w) => {
 		expect(problems(catalog([entry({ weights: { 'com.ludivenstudio.petanquegame': w } })])))
 			.toContain('meet: weights: com.ludivenstudio.petanquegame is not a number of 0 or more');

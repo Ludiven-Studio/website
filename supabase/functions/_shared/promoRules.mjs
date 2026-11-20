@@ -148,6 +148,8 @@ function checkEntry(e, base, defaultLanguage, strict, files) {
 		else
 			for (const [id, w] of Object.entries(e.weights)) {
 				if (!PACKAGE.test(id)) errors.push(`weights: ${JSON.stringify(id.slice(0, 60))} is not an app id`);
+				// The apps look up their id without these endings (HousePicker.BaseAppId), so such a key is never read.
+				else if (/\.(dev|beta)$/.test(id)) errors.push(`weights: ${id} is a test build's id, name its base app`);
 				if (!isWeight(w)) errors.push(`weights: ${PACKAGE.test(id) ? id : 'an entry'} is not a number of 0 or more`);
 			}
 	}

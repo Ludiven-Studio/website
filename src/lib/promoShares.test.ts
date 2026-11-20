@@ -90,12 +90,15 @@ describe('weighted mode', () => {
 		expect(pct(cat(e), MEET)).toEqual({ meet: 0, game: 100, dragon: 0 });
 	});
 
-	it('covers a dev build by its base id, the longest key first', () => {
+	it('reads a test build under its base id, and that exact key only', () => {
 		const e = base();
-		e[0].weights = { [PG]: 1, [`${PG}.dev`]: 0 };
-		expect(weightIn(e[0], `${PG}.dev`, true)).toBe(0);
-		expect(weightIn(e[0], PG, true)).toBe(1);
-		expect(weightIn(e[0], `${PG}.beta`, true)).toBe(1);
+		e[0].weights = { [PG]: 2, [`${PG}.dev`]: 0, 'com.ludivenstudio': 5 };
+		expect(weightIn(e[0], `${PG}.dev`, true)).toBe(2);
+		expect(weightIn(e[0], `${PG}.beta`, true)).toBe(2);
+		expect(weightIn(e[0], PG, true)).toBe(2);
+		expect(weightIn(e[0], `${PG}.other`, true)).toBe(1);
+		expect(isWeighted(cat(e), `${PG}.beta`)).toBe(true);
+		expect(isWeighted(cat(e), DG)).toBe(false);
 	});
 
 	it('still puts an installed app last', () => {

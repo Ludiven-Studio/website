@@ -38,10 +38,13 @@ const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v =
 
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((s): s is string => typeof s === 'string' && s !== '') : []);
 
-/** The key of `weights` that covers the app (its base id covers a ".dev" build), the longest when several do. */
+/** The id the apps look up in `weights`: without a ".dev" or ".beta" ending (HousePicker.BaseAppId). */
+export const baseAppId = (appId: string): string => appId.replace(/\.(dev|beta)$/, '');
+
+/** The key of `weights` the app reads: its base id, exactly. */
 export function weightKey(entry: CatalogEntry, appId: string): string | undefined {
-	if (!isObject(entry.weights)) return undefined;
-	return Object.keys(entry.weights).filter((k) => matches(appId, k)).sort((a, b) => b.length - a.length)[0];
+	const id = baseAppId(appId);
+	return isObject(entry.weights) && APP_ID.test(id) && Object.hasOwn(entry.weights, id) ? id : undefined;
 }
 
 /** An app named in any entry's weights draws by those weights and drops the group order. */
