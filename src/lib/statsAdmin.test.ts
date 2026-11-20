@@ -9,7 +9,7 @@ const BASE = 'https://stats.example';
 const ENV = { UMAMI_URL: BASE, UMAMI_USER: 'dashboard', UMAMI_PASSWORD: 'pw', PROMO_ADMIN_USER_ID: 'raph' };
 
 /** A fake Umami: two websites, v2 or v3 answer shapes, and the calls it got. */
-function fakeUmami(version: 2 | 3, opts: { fail?: RegExp; loginFails?: boolean } = {}) {
+function fakeUmami(version: 2 | 3, opts: { fail?: RegExp; loginFails?: boolean; inTeam?: boolean } = {}) {
 	const calls: string[] = [];
 	const fetchFn = async (url: string | URL | Request, init: RequestInit = {}): Promise<Response> => {
 		const u = new URL(String(url));
@@ -23,7 +23,11 @@ function fakeUmami(version: 2 | 3, opts: { fail?: RegExp; loginFails?: boolean }
 		}
 		if ((init.headers as Record<string, string>)?.Authorization !== 'Bearer tok') return new Response('{}', { status: 401 });
 		if (opts.fail?.test(`${path}?${q}`)) return new Response('{}', { status: 500 });
-		if (path === '/websites') return ok({ data: [{ id: 'w-meet', name: 'Pétanque Meet', domain: 'com.ludivenstudio.petanquemeet' }, { id: 'w-pg', name: 'Pétanque Game', domain: 'com.ludivenstudio.petanquegame' }], count: 2 });
+		const SITES = [{ id: 'w-meet', name: 'Pétanque Meet', domain: 'com.ludivenstudio.petanquemeet' }, { id: 'w-pg', name: 'Pétanque Game', domain: 'com.ludivenstudio.petanquegame' }];
+		// inTeam: the sites belong to a team the user views; /websites lists only its own (one, also in the team).
+		if (path === '/websites') return ok(opts.inTeam ? { data: [SITES[1]], count: 1 } : { data: SITES, count: 2 });
+		if (path === (version === 3 ? '/me/teams' : '/teams')) return ok({ data: opts.inTeam ? [{ id: 't-ludiven', name: 'Ludiven' }] : [], count: opts.inTeam ? 1 : 0 });
+		if (path === '/teams/t-ludiven/websites') return opts.inTeam ? ok({ data: SITES, count: 2 }) : new Response('{}', { status: 404 });
 		const site = path.split('/')[2];
 		const big = site === 'w-pg';
 		if (path.endsWith('/stats')) {
@@ -169,6 +173,14 @@ describe('the stats-admin function', () => {
 		expect(calls.length).toBe(first * 2);
 		now = new Date(NOW.getTime() + 11 * 60_000);
 		expect((await (await handle(post({ action: 'overview' }))).json()).cached).toBe(false);
+	});
+
+	it.each([2, 3] as const)('reads the websites of the teams the user is in, once each (Umami v%i)', async (version) => {
+		const { fetchFn, calls } = fakeUmami(version, { inTeam: true });
+		const res = await statsHandler({ env: ENV, isAdmin, cache: fakeCache(), fetch: fetchFn, now: () => NOW })(post({ action: 'overview' }));
+		const body = await res.json() as Overview;
+		expect(body.apps.map((a) => a.name)).toEqual(['Pétanque Game', 'Pétanque Meet']);
+		expect(calls.filter((c) => c.startsWith('GET /teams/t-ludiven/websites'))).toHaveLength(1);
 	});
 
 	it('still answers when the cache table fails', async () => {

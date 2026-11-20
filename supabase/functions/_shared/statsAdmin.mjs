@@ -167,9 +167,17 @@ export async function appStats(u, site, now) {
 export async function overview(env, fetchFn, now) {
 	const u = umami(env.UMAMI_URL, fetchFn);
 	await u.login(env.UMAMI_USER, env.UMAMI_PASSWORD);
-	const list = await u.get(`/websites?${query({ includeTeams: 'true', pageSize: 200 })}`);
-	const sites = (Array.isArray(list) ? list : Array.isArray(list?.data) ? list.data : [])
-		.filter((s) => s && (typeof s.id === 'string' || typeof s.id === 'number'));
+	const rows = (r) => (Array.isArray(r) ? r : Array.isArray(r?.data) ? r.data : []);
+	// The user's own websites, then each of its teams' websites: this Umami does not mix team websites into
+	// /websites, and the studio's sites belong to a team the dashboard user only views (2026-11-20).
+	const own = rows(await u.get(`/websites?${query({ includeTeams: 'true', pageSize: 200 })}`));
+	const teams = rows(await u.get(`/me/teams?${query({ pageSize: 100 })}`).catch(() => u.get(`/teams?${query({ pageSize: 100 })}`)).catch(() => []));
+	const teamSites = await Promise.all(teams.filter((t) => t && t.id != null)
+		.map((t) => u.get(`/teams/${encodeURIComponent(t.id)}/websites?${query({ pageSize: 200 })}`).then(rows).catch(() => [])));
+	const seen = new Set();
+	const sites = [...own, ...teamSites.flat()]
+		.filter((s) => s && (typeof s.id === 'string' || typeof s.id === 'number'))
+		.filter((s) => !seen.has(s.id) && seen.add(s.id));
 	const apps = await Promise.all(sites.map((s) => appStats(u, s, now)));
 	apps.sort((a, b) => (b.periods.d28?.visitors ?? 0) - (a.periods.d28?.visitors ?? 0) || a.name.localeCompare(b.name));
 	return { generatedAt: now.toISOString(), apps };
