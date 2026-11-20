@@ -14,7 +14,7 @@ import PromoAdmin from '../../components/admin/PromoAdmin';
 
 <style is:global>
 	.pa-h1 { font-size: var(--text-xl); margin-top: 1.5rem; }
-	.pa-root { display: grid; gap: 1rem; margin-bottom: 3rem; }
+	.pa-root { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; margin-bottom: 3rem; }
 	.pa-note { color: var(--sc-muted); font-size: var(--text-sm); }
 	.pa-card { border: 1px solid var(--sc-line); border-radius: 0.75rem; padding: 1rem 1.25rem; background: var(--sc-surface); }
 	.pa-card ul { margin: 0.5rem 0 0 1.25rem; }
@@ -58,5 +58,24 @@ import PromoAdmin from '../../components/admin/PromoAdmin';
 	.pa-uploads { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: end; }
 	.pa-history ul { list-style: none; margin: 0.75rem 0 0; padding: 0; display: grid; gap: 0.5rem; }
 	.pa-history li { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: space-between; }
+	.pw-root summary { font-weight: 700; cursor: pointer; }
+	.pw-root { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.75rem; min-width: 0; }
+	.pw-warn { border-left: 3px solid var(--sc-accent); padding-left: 0.6rem; }
+	.pw-controls { display: flex; flex-wrap: wrap; gap: 0.75rem 1.5rem; align-items: center; font-size: var(--text-sm); }
+	.pw-installed { flex-wrap: wrap; gap: 0.4rem 1rem; }
+	.pw-scroll { overflow-x: auto; }
+	.pw-table { border-collapse: collapse; font-size: var(--text-sm); min-width: 100%; }
+	.pw-table th, .pw-table td { border: 1px solid var(--sc-line); padding: 0.4rem 0.5rem; text-align: center; vertical-align: top; }
+	.pw-table thead th { background: var(--sc-surface-2); }
+	.pw-table tbody th { text-align: left; white-space: nowrap; }
+	.pw-table tbody th small { display: block; color: var(--sc-muted); font-weight: 400; }
+	.pw-cell { min-width: 6.5rem; }
+	.pw-cell input { width: 4.5rem; border: 1px solid var(--sc-line); border-radius: 0.4rem; padding: 0.2rem 0.3rem; background: var(--sc-surface); color: var(--sc-ink); font: inherit; }
+	.pw-cell strong, .pw-cell small, .pw-weight { display: block; }
+	.pw-cell small { color: var(--sc-muted); font-size: 0.75rem; }
+	.pw-weight { color: var(--sc-muted); }
+	.pw-self, .pw-off, .pw-out { background: var(--sc-surface-2); opacity: 0.55; }
+	.pw-later strong { color: var(--sc-muted); }
+	.pw-switch { display: inline-flex; gap: 0.3rem; align-items: center; }
 	.pa-signin { display: grid; gap: 0.75rem; justify-items: start; }
 </style>

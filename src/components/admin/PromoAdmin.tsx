@@ -7,6 +7,7 @@ import {
 	AdminError, LOCAL_RUN, fileBase64, load, publish, revert, upload, versionAt, versions,
 	type Catalog, type CatalogEntry, type Loaded, type Published, type Upload, type Version,
 } from '../../lib/promoAdmin';
+import PromoWeights from './PromoWeights';
 import { BANNER_TEXT_MAX, CATALOG_URL, LANGUAGES, PROMO_DIR, catalogUrl, checkCatalog, sitePath } from '../../../supabase/functions/_shared/promoRules.mjs';
 
 const LANG_NAMES: Record<string, string> = { fr: 'Français', en: 'English', es: 'Español', de: 'Deutsch', it: 'Italiano' };
@@ -280,6 +281,15 @@ export default function PromoAdmin() {
 						/>
 					)}
 				</div>
+			)}
+
+			{shown && (
+				<PromoWeights catalog={shown} readOnly={!!peek} change={(fn) => setDraft((d) => {
+					if (!d) return d;
+					const next = clone(d);
+					fn(next);
+					return next;
+				})} />
 			)}
 
 			<details className="pa-card pa-history">
