@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { saveDailyRun, loadDailyRun, checkpointDailyClock, submitDaily } from './leaderboard';
+import { saveDailyRun, loadDailyRun, readDailyRun, checkpointDailyClock, submitDaily, resetDailyDays } from './leaderboard';
 import { globalStreak, gameStreak } from './streak';
 import { balance, resetWalletCache } from './wallet';
 
@@ -23,6 +23,7 @@ class MemStorage {
 beforeEach(() => {
 	vi.stubGlobal('localStorage', new MemStorage());
 	resetWalletCache(); // a brand new store: the wallet's cached parse belongs to the last one
+	resetDailyDays(); // and so do the days the last test opened
 	vi.useFakeTimers();
 	vi.setSystemTime(new Date('2026-03-10T12:00:00Z'));
 });
@@ -242,12 +243,26 @@ describe('a daily run across midnight', () => {
 		expect(loadDailyRun('sudoku')?.seed).toBe(7);
 	});
 
-	it('a save with no load since another test pinned a day goes to today', () => {
-		at('2026-03-10T12:00:00Z');
-		loadDailyRun('sudoku'); // pins the 10th, nothing stored there
-		at('2026-03-12T12:00:00Z');
+	it('a board opened and started after midnight is played on the day it shows', () => {
+		at('2026-03-10T22:58:00Z');
+		expect(loadDailyRun('sudoku')).toBeNull(); // the 10th's fresh board, Start not pressed yet
+		at('2026-03-10T23:02:00Z');
 		saveDailyRun('sudoku', { startedAt: Date.now(), done: false });
-		expect(stored('2026-03-12')).not.toBeNull();
-		expect(stored('2026-03-10')).toBeNull();
+		expect(stored('2026-03-10')).not.toBeNull();
+		expect(stored('2026-03-11')).toBeNull();
+	});
+
+	it('a game of several tries keeps a try that ends after midnight on its board (Bolides, Drift)', () => {
+		at('2026-03-10T22:50:00Z');
+		loadDailyRun('sudoku');
+		saveDailyRun('sudoku', { startedAt: Date.now(), done: true, seed: 7, state: { tries: 1 } }); // first try
+		at('2026-03-10T23:05:00Z'); // the second try, started at 23:59, ends now
+		const prev = readDailyRun('sudoku');
+		expect(prev?.seed).toBe(7);
+		saveDailyRun('sudoku', { startedAt: prev!.startedAt, done: true, seed: 7, state: { tries: 2 } });
+		expect(JSON.parse(stored('2026-03-10')!).state).toEqual({ tries: 2 });
+		expect(stored('2026-03-11')).toBeNull();
+		// The next try opens the 11th: a fresh board, not the 10th's seed again.
+		expect(loadDailyRun('sudoku')).toBeNull();
 	});
 });

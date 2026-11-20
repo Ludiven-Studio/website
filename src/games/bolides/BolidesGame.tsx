@@ -20,7 +20,7 @@ import { createRenderer, type Renderer } from './render3d';
 import { BOLIDES, DEFAULT_CAR, carById, ownedCars, selectedCar, selectCar, type Bolide } from './cars';
 import * as sfx from './sfx';
 import { trackGame, trackEvent } from '../../lib/analytics';
-import { getDaily, saveDailyRun, loadDailyRun, dailyWeekdayLabel, playerName } from '../../lib/leaderboard';
+import { getDaily, saveDailyRun, loadDailyRun, readDailyRun, dailyWeekdayLabel, playerName } from '../../lib/leaderboard';
 import { balance, buyCar, WALLET_EVENT } from '../../lib/wallet';
 import { formatScore } from '../../lib/scoreFormat';
 import { isTypingTarget } from '../../lib/keyboard';
@@ -289,7 +289,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			return;
 		}
 		if (modeRef.current === 'defi') {
-			const prev = loadDailyRun(gameId);
+			const prev = readDailyRun(gameId);
 			const prevState = (prev?.state as DailyState | undefined) ?? { best: 0, tries: 0 };
 			const best = Math.max(dailyBestRef.current, peak);
 			dailyBestRef.current = best;

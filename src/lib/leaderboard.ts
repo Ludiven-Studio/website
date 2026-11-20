@@ -98,12 +98,20 @@ export interface DailyRun {
 
 const keyFor = (game: string, day: string): string => `ludiven-dailyrun-${game}-${day}`;
 
-/* The day of the board on screen. A run opened at 23:59 and finished at 00:01 belongs to the day it was
-   opened: saving it under the new day would spend tomorrow's attempt with yesterday's board. The pin
-   holds while that run is in progress; once it is done (or gone), the next load opens today's. */
+/* The day of the board on screen, set when a game opens its daily (loadDailyRun). A run opened at 23:59
+   and finished at 00:01 belongs to that day: saving it under the new day would spend tomorrow's attempt
+   with yesterday's board. Every save, checkpoint and read follows it until the next open, which moves to
+   today unless the pinned run is still in progress (then it resumes). */
 const openedDay = new Map<string, string>();
 
+/** Forget the opened days: for tests, whose stores start empty. */
+export const resetDailyDays = (): void => openedDay.clear();
+
 function runDay(game: string): string {
+	return openedDay.get(game) ?? todayKey();
+}
+
+function dayToOpen(game: string): string {
 	const pinned = openedDay.get(game);
 	const today = todayKey();
 	if (!pinned || pinned === today) return today;
@@ -138,8 +146,14 @@ function decodeRun(raw: string | null): DailyRun | null {
 	}
 }
 
+/** Open today's daily (or resume the one in progress): call it when the board is laid out. */
 export function loadDailyRun(game: string): DailyRun | null {
-	openedDay.set(game, runDay(game));
+	openedDay.set(game, dayToOpen(game));
+	return readDailyRun(game);
+}
+
+/** The run of the board on screen, without opening a new day: for a game that reads it mid-play. */
+export function readDailyRun(game: string): DailyRun | null {
 	try {
 		const run = decodeRun(localStorage.getItem(runKey(game)));
 		if (!run) return null;

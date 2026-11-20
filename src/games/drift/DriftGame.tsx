@@ -19,7 +19,7 @@ import {
 } from './engine';
 import { mulberry32 } from '../prng';
 import { joinRace, multiplayerAvailable, MAX_PLAYERS, type Race, type Peer, type PosMsg, type LapMsg } from './net';
-import { playerName, setPlayerName, getDaily, dailyWeekdayLabel, saveDailyRun, loadDailyRun } from '../../lib/leaderboard';
+import { playerName, setPlayerName, getDaily, dailyWeekdayLabel, saveDailyRun, loadDailyRun, readDailyRun } from '../../lib/leaderboard';
 import { trackGame } from '../../lib/analytics';
 import { isTypingTarget } from '../../lib/keyboard';
 import { formatScore } from '../../lib/scoreFormat';
@@ -714,7 +714,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 					lapPosesRef.current = [];
 					// A completed lap = today's daily is done (games-page chip).
 					if (isDefiRef.current) {
-						const prevRun = loadDailyRun(gameId);
+						const prevRun = readDailyRun(gameId);
 						saveDailyRun(gameId, {
 							startedAt: prevRun?.startedAt ?? Date.now(),
 							done: true,
