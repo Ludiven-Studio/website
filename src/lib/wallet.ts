@@ -116,6 +116,13 @@ function read(): WalletData {
 	return { ...cache, owned: cache.owned.slice() };
 }
 
+// Every change starts from the stored copy, not the cache: another tab may have written a moment
+// ago, before its storage event reached us, and its gain or purchase would be overwritten.
+function fresh(): WalletData {
+	cache = null;
+	return read();
+}
+
 function write(w: WalletData): void {
 	try {
 		localStorage.setItem(KEY, JSON.stringify(w));
@@ -148,7 +155,7 @@ export const balance = (): number => read().balance;
 /** Add cocoins (level clears, daily challenges, rewards). Returns the new balance. */
 export function earn(amount: number): number {
 	if (amount <= 0) return balance();
-	const w = read();
+	const w = fresh();
 	const gain = Math.round(amount);
 	w.balance += gain;
 	write(w);
@@ -160,8 +167,7 @@ export function earn(amount: number): number {
  *  the key is stored with the balance, in the same write. Returns false if it was already paid. */
 export function earnOnce(id: string, amount: number): boolean {
 	const key = `paid:${id}`;
-	cache = null; // another tab may have paid it a moment ago
-	const w = read();
+	const w = fresh(); // another tab may have paid it a moment ago
 	if (w.owned.includes(key) || amount <= 0) return false;
 	const gain = Math.round(amount);
 	w.balance += gain;
@@ -179,7 +185,7 @@ export const equippedBlason = (): Blason | null => { const e = read().equipped; 
 export function buyBlason(id: string): boolean {
 	const b = BLASONS.find((x) => x.id === id);
 	if (!b) return false;
-	const w = read();
+	const w = fresh();
 	if (w.owned.includes(id)) return true;
 	if (w.balance < b.price) return false;
 	w.balance -= b.price;
@@ -190,7 +196,7 @@ export function buyBlason(id: string): boolean {
 
 /** Equip an owned blason (or null to clear). Namespaced unlock ids are not blasons. */
 export function equipBlason(id: string | null): void {
-	const w = read();
+	const w = fresh();
 	if (id === null || (w.owned.includes(id) && BLASONS.some((b) => b.id === id))) {
 		w.equipped = id;
 		write(w);
@@ -203,7 +209,7 @@ export const hasTheme = (id: string): boolean => read().owned.includes(themeId(i
 export function buyTheme(id: string): boolean {
 	const t = THEMES.find((x) => x.id === id);
 	if (!t) return false;
-	const w = read();
+	const w = fresh();
 	const key = themeId(id);
 	if (w.owned.includes(key)) return true;
 	if (w.balance < t.price) return false;
@@ -220,7 +226,7 @@ export const hasCar = (id: string): boolean => read().owned.includes(carId(id));
 /** Buy a bolide. Returns true on success (or if already owned). */
 export function buyCar(id: string, price: number): boolean {
 	const key = carId(id);
-	const w = read();
+	const w = fresh();
 	if (w.owned.includes(key)) return true;
 	if (w.balance < price) return false;
 	w.balance -= price;
@@ -232,7 +238,7 @@ export function buyCar(id: string, price: number): boolean {
 /** Buy an item a game names itself ('petanque:boule_bronze'), for the price it gives — same reason
  *  as buyCar: no game catalog in here. Returns true on success (or if already owned). */
 export function buyOwned(key: string, price: number): boolean {
-	const w = read();
+	const w = fresh();
 	if (w.owned.includes(key)) return true;
 	if (price < 0 || w.balance < price) return false;
 	w.balance -= price;
@@ -243,7 +249,7 @@ export function buyOwned(key: string, price: number): boolean {
 
 /** Spend cocoins on a consumable (atelier energy). Returns false if the balance is short. */
 export function spend(amount: number): boolean {
-	const w = read();
+	const w = fresh();
 	if (amount <= 0 || w.balance < amount) return false;
 	w.balance -= amount;
 	write(w);
@@ -255,7 +261,7 @@ export const hasUnlock = (gameId: string): boolean => read().owned.includes(unlo
 /** Buy a game's Expert pack. Returns true on success (or if already owned). */
 export function buyUnlock(gameId: string): boolean {
 	const id = unlockId(gameId);
-	const w = read();
+	const w = fresh();
 	if (w.owned.includes(id)) return true;
 	if (w.balance < UNLOCK_PRICE) return false;
 	w.balance -= UNLOCK_PRICE;
@@ -288,7 +294,8 @@ export function rewardState(): RewardState {
 export function claimDailyReward(): number {
 	const st = rewardState();
 	if (!st.canClaim) return 0;
-	const w = read();
+	const w = fresh();
+	if (w.lastReward === challengeDay()) return 0; // claimed in another tab
 	w.balance += st.amount;
 	w.lastReward = challengeDay();
 	write(w);

@@ -146,3 +146,36 @@ describe('blason catalogue', () => {
 		expect(Math.min(...legend.map((b) => b.price))).toBeGreaterThan(commonMax);
 	});
 });
+
+/* Two tabs share one localStorage. The other tab's write lands before its storage event reaches
+   this one, so this tab's cache is stale: a change must start from the stored copy. */
+describe('another tab wrote a moment ago', () => {
+	const otherTab = (change: (w: Record<string, unknown>) => void): void => {
+		const w = JSON.parse(localStorage.getItem('ludiven-cocottes') ?? '{}') as Record<string, unknown>;
+		change(w);
+		localStorage.setItem('ludiven-cocottes', JSON.stringify(w));
+	};
+
+	it('keeps its gain when this tab earns too', () => {
+		earn(100);
+		expect(balance()).toBe(100); // cached here
+		otherTab((w) => { w.balance = Number(w.balance) + 40; });
+		expect(earn(10)).toBe(150);
+	});
+
+	it('keeps its purchase when this tab buys too', () => {
+		earn(500);
+		otherTab((w) => { w.owned = [...(w.owned as string[]), 'expert:sudoku']; w.balance = Number(w.balance) - 200; });
+		expect(spend(50)).toBe(true);
+		expect(balance()).toBe(250);
+		expect(hasUnlock('sudoku')).toBe(true);
+	});
+
+	it('does not pay the daily reward twice', () => {
+		recordDayActivity();
+		expect(rewardState().canClaim).toBe(true); // read here before the other tab claims
+		otherTab((w) => { w.lastReward = '2026-03-10'; w.balance = Number(w.balance ?? 0) + 5; });
+		expect(claimDailyReward()).toBe(0);
+		expect(balance()).toBe(5);
+	});
+});

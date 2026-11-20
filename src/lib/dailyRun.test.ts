@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { saveDailyRun, loadDailyRun, checkpointDailyClock } from './leaderboard';
 import { globalStreak, gameStreak } from './streak';
-import { balance } from './wallet';
+import { balance, resetWalletCache } from './wallet';
 
 // Minimal localStorage shim (vitest runs in the node environment).
 class MemStorage {
@@ -22,6 +22,7 @@ class MemStorage {
 
 beforeEach(() => {
 	vi.stubGlobal('localStorage', new MemStorage());
+	resetWalletCache(); // a brand new store: the wallet's cached parse belongs to the last one
 	vi.useFakeTimers();
 	vi.setSystemTime(new Date('2026-03-10T12:00:00Z'));
 });
