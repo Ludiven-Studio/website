@@ -150,7 +150,14 @@ function checkEntry(e, base, defaultLanguage, strict, files) {
 				if (!PACKAGE.test(id)) errors.push(`weights: ${JSON.stringify(id.slice(0, 60))} is not an app id`);
 				// The apps look up their id without these endings (HousePicker.BaseAppId), so such a key is never read.
 				else if (/\.(dev|beta)$/.test(id)) errors.push(`weights: ${id} is a test build's id, name its base app`);
-				if (!isWeight(w)) errors.push(`weights: ${PACKAGE.test(id) ? id : 'an entry'} is not a number of 0 or more`);
+				const what = PACKAGE.test(id) ? id : 'an entry';
+				// A number counts on both platforms; { android, ios } per platform, a missing one taking `weight`.
+				if (w && typeof w === 'object' && !Array.isArray(w)) {
+					for (const [p, n] of Object.entries(w)) {
+						if (!PLATFORMS.includes(p)) errors.push(`weights: ${what}: ${JSON.stringify(p.slice(0, 20))} is not android or ios`);
+						else if (!isWeight(n)) errors.push(`weights: ${what}.${p} is not a number of 0 or more`);
+					}
+				} else if (!isWeight(w)) errors.push(`weights: ${what} is not a number of 0 or more, nor { android, ios }`);
 			}
 	}
 	strings(e.spots, 'spots', errors, (s) => SPOTS.includes(s));

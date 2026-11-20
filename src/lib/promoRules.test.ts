@@ -112,15 +112,46 @@ describe('checkCatalog: values an attacker or a typo could send', () => {
 		expect(problems(catalog([entry({ weights: { [id]: 1 } })]))).toContain(`meet: weights: ${id} is a test build's id, name its base app`);
 	});
 
-	it.each([-1, NaN, Infinity, -Infinity, '2', null, true, [1], { w: 1 }])('refuses the weight %j in weights', (w) => {
+	it.each([-1, NaN, Infinity, -Infinity, '2', null, true, [1], [], ''])('refuses the weight %j in weights', (w) => {
 		expect(problems(catalog([entry({ weights: { 'com.ludivenstudio.petanquegame': w } })])))
-			.toContain('meet: weights: com.ludivenstudio.petanquegame is not a number of 0 or more');
+			.toContain('meet: weights: com.ludivenstudio.petanquegame is not a number of 0 or more, nor { android, ios }');
+	});
+
+	it('accepts a weight per platform, one platform or none', () => {
+		const PG = 'com.ludivenstudio.petanquegame';
+		for (const w of [{ android: 3, ios: 1 }, { android: 0 }, { ios: 2.5 }, {}])
+			expect(problems(catalog([entry({ weights: { [PG]: w } })]))).toEqual([]);
+	});
+
+	it.each(['web', 'Android', 'IOS', '', '__proto__', 'constructor', 'x'.repeat(200)])('refuses the platform %j in a weight', (p) => {
+		const w = JSON.parse(JSON.stringify({ [p]: 1 }));
+		const got = problems(catalog([entry({ weights: { 'com.ludivenstudio.petanquegame': w } })]));
+		expect(got.some((x) => x.includes('is not android or ios'))).toBe(true);
+		expect(got.every((x) => x.length < 200)).toBe(true);
+	});
+
+	it.each([-1, NaN, Infinity, -Infinity, '2', null, true, [1], {}, { android: 1 }])('refuses the per-platform weight %j', (n) => {
+		expect(problems(catalog([entry({ weights: { 'com.ludivenstudio.petanquegame': { android: 2, ios: n } } })])))
+			.toContain('meet: weights: com.ludivenstudio.petanquegame.ios is not a number of 0 or more');
+	});
+
+	it('reads a hostile __proto__ platform as data', () => {
+		const c = JSON.parse('{"schema":1,"updated":"2026-11-20T10:00:00Z","entries":[{"id":"meet","title":{"en":"M"},"image":"img/m.png","link":{"ios":"1"},"weights":{"com.a.b":{"__proto__":{"polluted":1}}}}]}');
+		expect(problems(c).some((x) => x.includes('"__proto__" is not android or ios'))).toBe(true);
+		expect(({} as Record<string, unknown>).polluted).toBeUndefined();
 	});
 
 	it('reads a hostile __proto__ key as data, without touching other objects', () => {
 		const c = JSON.parse('{"schema":1,"updated":"2026-11-20T10:00:00Z","entries":[{"id":"meet","title":{"en":"M"},"image":"img/m.png","link":{"ios":"1"},"weights":{"__proto__":{"polluted":1}}}]}');
 		expect(problems(c).some((x) => x.includes('"__proto__" is not an app id'))).toBe(true);
 		expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+	});
+
+	it('refuses 1e400, which JSON reads as Infinity, in weight, weights and a platform weight', () => {
+		const raw = (w: string) => JSON.parse(`{"schema":1,"updated":"2026-11-20T10:00:00Z","entries":[{"id":"meet","title":{"en":"M"},"image":"img/m.png","link":{"ios":"1"},${w}}]}`);
+		expect(problems(raw('"weight":1e400'))).toContain('meet: bad weight');
+		expect(problems(raw('"weights":{"com.a.b":1e400}'))).toContain('meet: weights: com.a.b is not a number of 0 or more, nor { android, ios }');
+		expect(problems(raw('"weights":{"com.a.b":{"ios":1e400}}'))).toContain('meet: weights: com.a.b.ios is not a number of 0 or more');
 	});
 
 	it('accepts a zero weight (a paused ad)', () => {
