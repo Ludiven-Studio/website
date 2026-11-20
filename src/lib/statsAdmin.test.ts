@@ -9,7 +9,7 @@ const BASE = 'https://stats.example';
 const ENV = { UMAMI_URL: BASE, UMAMI_USER: 'dashboard', UMAMI_PASSWORD: 'pw', PROMO_ADMIN_USER_ID: 'raph' };
 
 /** A fake Umami: two websites, v2 or v3 answer shapes, and the calls it got. */
-function fakeUmami(version: 2 | 3, opts: { fail?: RegExp; loginFails?: boolean; inTeam?: boolean } = {}) {
+function fakeUmami(version: 2 | 3, opts: { fail?: RegExp; loginFails?: boolean; inTeam?: boolean; eventsOnly?: boolean } = {}) {
 	const calls: string[] = [];
 	const fetchFn = async (url: string | URL | Request, init: RequestInit = {}): Promise<Response> => {
 		const u = new URL(String(url));
@@ -30,6 +30,11 @@ function fakeUmami(version: 2 | 3, opts: { fail?: RegExp; loginFails?: boolean; 
 		if (path === '/teams/t-ludiven/websites') return opts.inTeam ? ok({ data: SITES, count: 2 }) : new Response('{}', { status: 404 });
 		const site = path.split('/')[2];
 		const big = site === 'w-pg';
+		if (path.endsWith('/sessions/stats')) {
+			if (!opts.eventsOnly) return new Response('{}', { status: 404 });
+			const days = Math.round((Number(q.get('endAt')) - Number(q.get('startAt'))) / 86_400_000);
+			return ok({ visitors: { value: days * 50 }, visits: { value: days * 60 }, pageviews: { value: 0 } });
+		}
 		if (path.endsWith('/stats')) {
 			const days = Math.round((Number(q.get('endAt')) - Number(q.get('startAt'))) / 86_400_000);
 			const v = (n: number) => (version === 2 ? { value: n, prev: 0 } : n);
@@ -57,7 +62,8 @@ function fakeUmami(version: 2 | 3, opts: { fail?: RegExp; loginFails?: boolean; 
 		}
 		if (path === '/reports/retention') {
 			const b = JSON.parse(String(init.body));
-			if (!b.websiteId || !(b.dateRange?.startDate || b.parameters?.startDate)) return new Response('{}', { status: 400 });
+			// Each version refuses the other's shape, with the field it wanted.
+			if (!b.websiteId || (version === 2 ? !b.dateRange?.startDate : !b.parameters?.startDate)) return new Response('{"error":"Bad request: startDate required"}', { status: 400 });
 			return ok([
 				{ date: '2026-11-01', day: 0, visitors: 10, returnVisitors: 10 },
 				{ date: '2026-11-01', day: 1, visitors: 10, returnVisitors: 4 },
@@ -181,6 +187,18 @@ describe('the stats-admin function', () => {
 		const body = await res.json() as Overview;
 		expect(body.apps.map((a) => a.name)).toEqual(['Pétanque Game', 'Pétanque Meet']);
 		expect(calls.filter((c) => c.startsWith('GET /teams/t-ludiven/websites'))).toHaveLength(1);
+	});
+
+	it('counts the visitors of an app that sends events only from the session stats', async () => {
+		const { fetchFn } = fakeUmami(3, { eventsOnly: true });
+		const body = await (await statsHandler({ env: ENV, isAdmin, cache: fakeCache(), fetch: fetchFn, now: () => NOW })(post({ action: 'overview' }))).json() as Overview;
+		expect(body.apps[0].periods.d7).toEqual({ visitors: 350, visits: 420, pageviews: 280 });
+	});
+
+	it('names what Umami refused, with its reason', async () => {
+		const { fetchFn } = fakeUmami(3, { fail: /reports\/retention/ });
+		const body = await (await statsHandler({ env: ENV, isAdmin, cache: fakeCache(), fetch: fetchFn, now: () => NOW })(post({ action: 'overview' }))).json() as Overview;
+		expect(body.apps[0].errors.find((e) => e.startsWith('retention:'))).toBe('retention: Umami POST /reports/retention: 500 | Umami POST /reports/retention: 500');
 	});
 
 	it('still answers when the cache table fails', async () => {

@@ -93,7 +93,11 @@ export function umami(base, fetchFn) {
 			headers: { Accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(body ? { 'Content-Type': 'application/json' } : {}) },
 			body: body ? JSON.stringify(body) : undefined,
 		});
-		if (!res.ok) throw new Error(`Umami ${method} ${path.split('?')[0]}: ${res.status}`);
+		if (!res.ok) {
+			// Umami's 400 names the field it refused: keep a bit of it for the page's « Non lus » line.
+			const why = (await res.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 160);
+			throw new Error(`Umami ${method} ${path.split('?')[0]}: ${res.status}${why && why !== '{}' ? ` ${why}` : ''}`);
+		}
 		return await res.json();
 	}
 	return {
@@ -119,18 +123,25 @@ export async function appStats(u, site, now) {
 		try {
 			return await fn();
 		} catch (e) {
-			errors.push(`${what}: ${String(e?.message ?? e).slice(0, 120)}`);
+			errors.push(`${what}: ${String(e?.message ?? e).slice(0, 240)}`);
 			return null;
 		}
 	};
 	const values = (event, property) => safe(`${event}.${property}`, async () =>
 		readCounts(await u.get(`/websites/${id}/event-data/values?${query({ ...range(28), event, eventName: event, propertyName: property })}`)));
 	const [d1, d7, d28, events, hostname, iapItem, iapResult, signProvider, signResult, adShow, adTap, retention] = await Promise.all([
-		...Object.values(PERIODS).map((days) => safe(`stats ${days} j`, async () => readStats(await u.get(`/websites/${id}/stats?${query(range(days))}`)))),
+		...Object.values(PERIODS).map((days) => safe(`stats ${days} j`, async () => {
+			// /stats counts pageviews only; the apps send events only, so their visitors come from the session
+			// stats, which count every event (Umami 2.14 and later). The larger of the two wins.
+			const page = readStats(await u.get(`/websites/${id}/stats?${query(range(days))}`));
+			const all = await u.get(`/websites/${id}/sessions/stats?${query(range(days))}`).then(readStats).catch(() => null);
+			return all ? { visitors: Math.max(page.visitors, all.visitors), visits: Math.max(page.visits, all.visits), pageviews: page.pageviews } : page;
+		})),
 		safe('events', async () => readCounts(await u.get(`/websites/${id}/metrics?${query({ ...range(28), type: 'event' })}`))),
 		safe('hosts', async () => {
-			const v3 = readCounts(await u.get(`/websites/${id}/metrics?${query({ ...range(28), type: 'hostname' })}`).catch(() => []));
-			return v3.length ? v3 : readCounts(await u.get(`/websites/${id}/metrics?${query({ ...range(28), type: 'host' })}`));
+			// Newer Umami names it hostname, older host; an empty answer to hostname is an answer.
+			const v3 = await u.get(`/websites/${id}/metrics?${query({ ...range(28), type: 'hostname' })}`).then(readCounts).catch(() => null);
+			return v3 ?? readCounts(await u.get(`/websites/${id}/metrics?${query({ ...range(28), type: 'host' })}`));
 		}),
 		values('iap_result', 'item'),
 		values('iap_result', 'result'),
@@ -141,11 +152,11 @@ export async function appStats(u, site, now) {
 		safe('retention', async () => {
 			const startDate = new Date(end - RETENTION_DAYS * DAY).toISOString();
 			const endDate = now.toISOString();
-			// v2 reads dateRange, v3 parameters: both are sent.
-			return readRetention(await u.post('/reports/retention', {
-				websiteId: site.id, type: 'retention', timezone: TIMEZONE,
-				dateRange: { startDate, endDate }, parameters: { startDate, endDate, timezone: TIMEZONE },
-			}));
+			// v3 takes parameters, v2 dateRange; each refuses the other's shape, so try one then the other.
+			const v3 = { websiteId: site.id, type: 'retention', filters: {}, parameters: { startDate, endDate, timezone: TIMEZONE } };
+			const v2 = { websiteId: site.id, dateRange: { startDate, endDate }, timezone: TIMEZONE };
+			return readRetention(await u.post('/reports/retention', v3).catch((e3) =>
+				u.post('/reports/retention', v2).catch((e2) => { throw new Error(`${e3.message} | ${e2.message}`); })));
 		}),
 	]);
 	return {
