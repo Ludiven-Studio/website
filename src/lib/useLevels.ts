@@ -69,7 +69,7 @@ export function useLevels<Cfg>(gameId: string, plan: LevelPlan<Cfg>): UseLevels<
 			setStars(0);
 			setWon(false);
 		}
-		void getProgression(gameId).then((p) => setProgress({ stars: { ...p.stars }, best: { ...p.best }, count: plan.count }));
+		void getProgression(gameId, plan.metric === 'time').then((p) => setProgress({ stars: { ...p.stars }, best: { ...p.best }, count: plan.count }));
 	}, [gameId, plan]);
 
 	const exit = useCallback(() => setPhase('off'), []);
@@ -91,7 +91,7 @@ export function useLevels<Cfg>(gameId: string, plan: LevelPlan<Cfg>): UseLevels<
 		resumedRef.current = true;
 		let p;
 		try {
-			p = await getProgression(gameId);
+			p = await getProgression(gameId, plan.metric === 'time');
 		} catch {
 			setBooting(false); // progression unreachable → fall back to the game's own menu
 			return null;
@@ -101,7 +101,7 @@ export function useLevels<Cfg>(gameId: string, plan: LevelPlan<Cfg>): UseLevels<
 		const maxCleared = cleared.length ? Math.max(...cleared) : 0;
 		if (maxCleared >= plan.count) { setPhase('menu'); setBooting(false); return null; } // all cleared → grid
 		return maxCleared + 1; // next unlocked level → caller auto-starts it, and play() clears booting
-	}, [gameId, plan.count]);
+	}, [gameId, plan.count, plan.metric]);
 
 	const play = useCallback((lvl: number): Cfg => {
 		submittedRef.current = false;

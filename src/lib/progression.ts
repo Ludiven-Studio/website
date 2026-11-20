@@ -130,7 +130,7 @@ export function unlockedUpTo(p: GameProgress): number {
 /** Read the player's progression: localStorage first (instant), then reconcile with the server. */
 const PROGRESS_TIMEOUT_MS = 2500;
 
-export async function getProgression(gameId: string): Promise<GameProgress> {
+export async function getProgression(gameId: string, metricIsTime?: boolean): Promise<GameProgress> {
 	const local = loadLocal(gameId);
 	if (!leaderboardEnabled()) return local;
 	// Games wait on this before laying their first board, so a stalled network must not stall the
@@ -147,7 +147,8 @@ export async function getProgression(gameId: string): Promise<GameProgress> {
 		});
 		if (!res.ok) return local;
 		const rows: { level: number; stars: number; best_score: number }[] = await res.json();
-		const merged = mergeIntoLocal(local, rows);
+		// Read the local copy again: a level cleared (here or in another tab) during the fetch must stay.
+		const merged = mergeIntoLocal(loadLocal(gameId), rows, metricIsTime);
 		saveLocal(gameId, merged);
 		return merged;
 	} catch {
@@ -157,14 +158,25 @@ export async function getProgression(gameId: string): Promise<GameProgress> {
 	}
 }
 
-/** Server rows win on higher stars; keep local best on ties (server is source of truth once synced). */
-function mergeIntoLocal(local: GameProgress, rows: { level: number; stars: number; best_score: number }[]): GameProgress {
+/** Server rows win on higher stars. On a tie the better score stays; with no metric given, the local one. */
+export function mergeIntoLocal(
+	local: GameProgress,
+	rows: { level: number; stars: number; best_score: number }[],
+	metricIsTime?: boolean,
+): GameProgress {
 	const merged: GameProgress = { stars: { ...local.stars }, best: { ...local.best } };
 	for (const r of rows) {
 		const stars = Math.max(1, Math.min(3, r.stars)) as 1 | 2 | 3;
-		if (!merged.stars[r.level] || stars >= merged.stars[r.level]) {
+		const had = merged.stars[r.level] ?? 0;
+		const mine = merged.best[r.level];
+		if (stars > had) {
 			merged.stars[r.level] = stars;
 			merged.best[r.level] = r.best_score;
+		} else if (stars === had) {
+			const serverBetter = mine == null
+				|| (metricIsTime === true && r.best_score < mine)
+				|| (metricIsTime === false && r.best_score > mine);
+			if (serverBetter) merged.best[r.level] = r.best_score;
 		}
 	}
 	return merged;
