@@ -2,16 +2,16 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 
 // Unlisted: noindex, out of the sitemap and of the offline precache (astro.config.mjs).
-// The next store build, from main (e59ade5), under the .beta id. Over 50 MB, so the APK is a GitHub prerelease asset
+// The next store build, from main (8325853), under the .beta id. Over 50 MB, so the APK is a GitHub prerelease asset
 // (the earlier builds' APKs stay there).
 const BETA = {
 	version: '1.2.15',
-	label: 'n°3',
-	date: '2026-11-19',
-	size: 110028937,
+	label: 'n°4',
+	date: '2026-11-20',
+	size: 110053045,
 	android: '7.1',
-	sha256: '9314912efdcb5bd1ff15a0d60e6d900b9d0a6e6c611d4d6d9b0b87fc1134a7d2',
-	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-scanner-beta/petanque-scan-beta-1.2.15-n3.apk',
+	sha256: '9b80d1ecfbc182caebbb6800d37af61fa5e9c3ebc67cd300e2fa370cc19af9f4',
+	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-scanner-beta/petanque-scan-beta-1.2.15-n4.apk',
 };
 const date = new Date(BETA.date).toLocaleDateString('fr-FR', { dateStyle: 'medium' });
 const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
@@ -38,23 +38,24 @@ const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 		</section>
 
 		<section class="card stack gap-3">
-			<h2>Bêta 1.2.15 n°3 — à tester</h2>
+			<h2>Bêta 1.2.15 n°4 — corrections</h2>
 			<ul>
-				<li>Chaque cadenas, sur le cochonnet ou une boule, fait vibrer légèrement le téléphone.</li>
+				<li>Un objet que tu déplaces à la main puis verrouilles fait vibrer le téléphone, comme les autres verrous.</li>
 				<li>
-					Quitte l'appli en plein scan puis reviens&nbsp;: les boules pas encore verrouillées se remesurent, celles qui sont
-					verrouillées restent à leur place.
+					Après avoir atteint la limite de scans, « Scan 3D » repart bien d'un scan neuf (il rouvrait parfois l'ancien résultat).
 				</li>
-				<li>Le classement part toujours du cochonnet verrouillé&nbsp;: un caillou ne prend plus sa place.</li>
+				<li>En mode photo, le résultat ne disparaît plus quand tu reviens dans l'appli.</li>
 				<li>
-					Mode photo&nbsp;: reprendre la photo juste après ne coûte plus de scan, et la distance ne peut plus afficher « NaN cm ».
+					« Nouveau scan » juste après un résultat, puis un scan lancé depuis l'accueil, compte bien comme un nouveau scan.
 				</li>
-				<li>
-					Si tu refuses l'installation du composant AR de Google, un écran te propose de passer en mode photo, et « Scan 3D » te le
-					redemande.
-				</li>
-				<li>L'icône porte un bandeau BÊTA.</li>
+				<li>Une vidéo regardée pour recharger les scans ne perd plus sa recharge quand on en enchaîne deux.</li>
+				<li>Le bandeau « mise à jour disponible » ne disparaît plus des semaines si l'heure du téléphone a été changée.</li>
+				<li>Vidéos et bannières maison&nbsp;: divers correctifs.</li>
 			</ul>
+			<p>
+				Rien à tester de neuf à l'écran&nbsp;: refais un scan 3D, un scan photo, et quitte puis reviens dans l'appli pendant
+				chacun.
+			</p>
 			<p class="muted">
 				Toujours vrai dans la bêta&nbsp;: l'achat Premium est impossible, il n'y a pas de vraies pubs (seulement nos annonces maison),
 				et elle s'installe à côté de l'appli du store, avec ses propres données.

@@ -3725,3 +3725,17 @@
   sombre, sans erreur console.
 - 12:15 : commité et poussé à la demande de l'utilisateur (« publie » de Raphaël relayé par le Producer) : ma page et
   cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-20 — Pétanque Scan : bêta 1.2.15 n°4 (session release-publisher)
+- Statut : en cours (2026-11-20T13:02+01:00). Demande de l'utilisateur : (relayé par le Producer, Raphaël le 20/11) «
+  publie » la bêta n°4 de la 1.2.15 de Pétanque Scan pour les testeurs ; APK sur la prerelease petanque-scanner-beta
+- Réservations actives : `src/pages/petanque-scanner/beta-cd53d8qv.astro`.
+- Ressources : serveur de dev sur le port 4398 ; eslint, `astro check`. Build annoncé ici avant.
+- 13:04 : APK envoyé sur la prerelease petanque-scanner-beta sous petanque-scan-beta-1.2.15-n4.apk ; le lien sert
+  sha256 9b80d1ec… (110 053 045 octets). Page : constante (n°4, 20/11, taille, sha, url GitHub) et les notes de la
+  session Scan à la place de celles du n°3 ; eslint et astro check OK, page vue en téléphone et bureau sombre, sans
+  erreur console.
+- 13:04 : Lancement du build complet (écrit dist/, .astro/, public/vendor/ du worktree site-publish-scanner-n4)…
+- 13:06 : build complet OK (240 pages, 0 erreur, précache 407 et liens 269 OK).
+- 13:06 : commité et poussé à la demande de l'utilisateur (« publie » de Raphaël relayé par le Producer) : ma page et
+  cette section seulement. Statut : terminé. Réservations libérées.
