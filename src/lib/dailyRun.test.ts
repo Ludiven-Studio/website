@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { saveDailyRun, loadDailyRun, checkpointDailyClock } from './leaderboard';
+import { saveDailyRun, loadDailyRun, checkpointDailyClock, submitDaily } from './leaderboard';
 import { globalStreak, gameStreak } from './streak';
 import { balance, resetWalletCache } from './wallet';
 
@@ -150,5 +150,64 @@ describe('daily run chrono pauses while away', () => {
 			JSON.stringify({ startedAt: Date.now() - 45_000, done: false }),
 		);
 		expect(open('motifs').elapsed()).toBe(45_000);
+	});
+});
+
+/* What a full disk, an old version or a hand edit can leave under today's key. */
+describe('a broken daily run in storage', () => {
+	const key = (game: string) => `ludiven-dailyrun-${game}-2026-03-10`;
+
+	it.each(['{', 'null', '[]', '"run"', '{"startedAt":"x"}', '{"done":"yes","startedAt":1}', '{"done":false,"startedAt":"abc"}'])(
+		'%j reads as no run, and finishing still pays',
+		(raw) => {
+			localStorage.setItem(key('sudoku'), raw);
+			expect(loadDailyRun('sudoku')).toBeNull();
+			const before = balance();
+			saveDailyRun('sudoku', { startedAt: Date.now(), done: true, finalTime: 900 });
+			expect(balance()).toBe(before + 10);
+			expect(gameStreak('sudoku').count).toBe(1);
+		},
+	);
+
+	it('ignores an elapsedMs that is not a number instead of resuming at NaN', () => {
+		localStorage.setItem(key('tente'), JSON.stringify({ startedAt: Date.now() - 5000, done: false, elapsedMs: 'abc' }));
+		const run = loadDailyRun('tente');
+		expect(Number.isFinite(run?.startedAt)).toBe(true);
+	});
+
+	it('keeps a finished run finished even with a broken chrono, so the attempt is not handed out again', () => {
+		localStorage.setItem(key('reines'), JSON.stringify({ startedAt: null, done: true, finalTime: 4300 }));
+		expect(loadDailyRun('reines')?.done).toBe(true);
+	});
+
+	it('a checkpoint on a broken run writes nothing', () => {
+		localStorage.setItem(key('chemin'), '[]');
+		checkpointDailyClock('chemin', 5000);
+		expect(localStorage.getItem(key('chemin'))).toBe('[]');
+	});
+});
+
+/* The network is stubbed: no request leaves the test. */
+describe('the day of a daily score', () => {
+	const best = (day: string) => localStorage.getItem(`ludiven-dailybest-sudoku-${day}`);
+
+	it('an answer that arrives after midnight in Paris records the best on the day it was sent', async () => {
+		localStorage.setItem('ludiven-player', 'Raph');
+		vi.setSystemTime(new Date('2026-10-24T21:59:59Z')); // 23:59:59 in Paris
+		vi.stubGlobal('fetch', vi.fn(async () => {
+			vi.setSystemTime(new Date('2026-10-24T22:00:01Z'));
+			return { ok: true } as Response;
+		}));
+		expect(await submitDaily('sudoku', 100, 'time')).toBe(true);
+		expect(best('2026-10-24')).toBe('100');
+		expect(best('2026-10-25')).toBeNull();
+	});
+
+	it('a stored best that is not a number does not block a real score', async () => {
+		localStorage.setItem('ludiven-player', 'Raph');
+		localStorage.setItem('ludiven-dailybest-sudoku-2026-03-10', 'NaN');
+		vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true }) as Response));
+		expect(await submitDaily('sudoku', 500, 'time')).toBe(true);
+		expect(best('2026-03-10')).toBe('500');
 	});
 });

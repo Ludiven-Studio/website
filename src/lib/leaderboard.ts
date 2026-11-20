@@ -102,11 +102,26 @@ const runKey = (game: string): string => `ludiven-dailyrun-${game}-${todayKey()}
  *  keep burning while the player is away, or the blitz could be solved a slice at a time. */
 const WALL_CLOCK_DAILIES = new Set(['meli-melo']);
 
+/** A stored run, or null when it is missing, truncated or not a run (a full disk, an old bug, a hand edit). */
+function decodeRun(raw: string | null): DailyRun | null {
+	if (!raw) return null;
+	try {
+		const run = JSON.parse(raw) as Partial<DailyRun> | null;
+		if (!run || typeof run !== 'object' || Array.isArray(run)) return null;
+		if (typeof run.done !== 'boolean') return null;
+		// A finished run stays finished whatever its chrono: losing it would hand out a second attempt.
+		if (!run.done && !Number.isFinite(run.startedAt)) return null;
+		if (run.elapsedMs != null && !Number.isFinite(run.elapsedMs)) delete run.elapsedMs;
+		return run as DailyRun;
+	} catch {
+		return null;
+	}
+}
+
 export function loadDailyRun(game: string): DailyRun | null {
 	try {
-		const raw = localStorage.getItem(runKey(game));
-		if (!raw) return null;
-		const run = JSON.parse(raw) as DailyRun;
+		const run = decodeRun(localStorage.getItem(runKey(game)));
+		if (!run) return null;
 		// Hand back an epoch that already discounts the break. Runs saved before elapsedMs
 		// existed have none, and keep their old wall-clock behaviour.
 		if (!run.done && run.elapsedMs != null && !WALL_CLOCK_DAILIES.has(game))
@@ -125,7 +140,8 @@ export function saveDailyRun(game: string, run: DailyRun): void {
 		localStorage.setItem(runKey(game), JSON.stringify(stamped));
 		if (prevRaw === null) trackGame(game, 'daily_played');
 		if (run.done) {
-			const prevDone = prevRaw ? (JSON.parse(prevRaw) as DailyRun).done === true : false;
+			// An unreadable previous run must not stop the reward: the new one is already written.
+			const prevDone = decodeRun(prevRaw)?.done === true;
 			if (!prevDone) {
 				if (run.abandoned) {
 					trackGame(game, 'daily_revealed');
@@ -148,8 +164,8 @@ export function checkpointDailyClock(game: string, elapsedMs: number): void {
 	try {
 		const raw = localStorage.getItem(runKey(game));
 		if (!raw) return;
-		const run = JSON.parse(raw) as DailyRun;
-		if (run.done) return;
+		const run = decodeRun(raw);
+		if (!run || run.done) return;
 		run.elapsedMs = Math.max(0, Math.round(elapsedMs));
 		localStorage.setItem(runKey(game), JSON.stringify(run));
 	} catch {
@@ -215,10 +231,13 @@ const bestKey = (game: string): string => `ludiven-dailybest-${game}-${todayKey(
 /** Submit only when it beats the player's own best of the day (fewer rows). */
 export async function submitDaily(game: string, value: number, metric: Metric): Promise<boolean> {
 	value = Math.round(value); // the RPC's p_value is bigint — never send a fractional value (e.g. Drift lap ms)
+	// One key for the whole call: an answer arriving after midnight must not set tomorrow's best.
+	const key = bestKey(game);
 	let prev: number | null = null;
 	try {
-		const v = localStorage.getItem(bestKey(game));
-		prev = v == null ? null : Number(v);
+		const v = localStorage.getItem(key);
+		const n = v == null ? NaN : Number(v);
+		prev = Number.isFinite(n) ? n : null;
 	} catch {
 		/* ignore */
 	}
@@ -227,7 +246,7 @@ export async function submitDaily(game: string, value: number, metric: Metric): 
 	const ok = await submitScore(game, value, metric);
 	if (ok) {
 		try {
-			localStorage.setItem(bestKey(game), String(value));
+			localStorage.setItem(key, String(value));
 		} catch {
 			/* ignore */
 		}
