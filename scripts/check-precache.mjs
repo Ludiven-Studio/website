@@ -52,6 +52,11 @@ for (const url of entries) {
 		failures.push(`A. "${url}" resolves to no file in dist — this one entry disables the whole PWA`);
 		continue;
 	}
+	// C. Workbox matches a navigation to "jeux/sudoku/" against "jeux/sudoku/" or
+	// "jeux/sudoku/index.html", never "jeux/sudoku": the page is cached but never served offline.
+	if (file.endsWith('/index.html') && !url.endsWith('/') && !url.endsWith('/index.html')) {
+		failures.push(`C. "${url}" is not the page's URL "${url}/": offline, its navigation misses the precache`);
+	}
 	if (!file.endsWith('.js')) continue;
 	const code = readFileSync(join(DIST, file), 'utf8');
 	// Relative specifiers only: bare ones are bundled, absolute ones are not chunks. A literal

@@ -110,6 +110,15 @@ export default defineConfig({
                     // Unlisted work-in-progress games: their own three.js copy stays off every visitor's precache.
                     'prototypes/**',
                 ],
+                // A page's entry must be the URL the site links to: "jeux/sudoku/", not the
+                // integration's "jeux/sudoku", which no navigation matches since links end with a
+                // slash (40c53f6). Every game page then failed offline.
+                manifestTransforms: [
+                    async (entries) => ({
+                        manifest: entries.map((e) => (e.url.endsWith('index.html') ? { ...e, url: e.url.slice(0, -'index.html'.length) || '/' } : e)),
+                        warnings: [],
+                    }),
+                ],
                 navigateFallback: null,
                 cleanupOutdatedCaches: true,
                 maximumFileSizeToCacheInBytes: 3_500_000,
