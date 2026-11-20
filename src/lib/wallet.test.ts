@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
 	balance, earn, buyBlason, owns, equipBlason, equippedBlason, ownedBlasons,
 	dailyRewardAmount, rewardState, claimDailyReward,
-	buyUnlock, hasUnlock, unlockedGames, unlockId, resetWalletCache, earnOnce, spend, buyOwned,
+	buyUnlock, hasUnlock, unlockedGames, unlockId, resetWalletCache, earnOnce, spend, buyOwned, buyCar,
 	BLASONS, UNLOCK_PRICE,
 } from './wallet';
 import { recordDayActivity } from './streak';
@@ -177,5 +177,83 @@ describe('another tab wrote a moment ago', () => {
 		otherTab((w) => { w.lastReward = '2026-03-10'; w.balance = Number(w.balance ?? 0) + 5; });
 		expect(claimDailyReward()).toBe(0);
 		expect(balance()).toBe(5);
+	});
+});
+
+/* Amounts a buggy game could pass. A NaN or an Infinity written into the wallet comes back from JSON as
+   null, which reads as 0: the whole balance would be gone. */
+describe('hostile amounts never touch the balance', () => {
+	beforeEach(() => { earn(100); });
+
+	it.each([NaN, Infinity, -Infinity, -5, 0])('earn(%s) adds nothing', (x) => {
+		earn(x);
+		resetWalletCache();
+		expect(balance()).toBe(100);
+	});
+
+	it.each([NaN, Infinity, -5, 0])('spend(%s) is refused', (x) => {
+		expect(spend(x)).toBe(false);
+		resetWalletCache();
+		expect(balance()).toBe(100);
+	});
+
+	it.each([NaN, Infinity, -5])('buyOwned at %s is refused', (x) => {
+		expect(buyOwned('car:x', x)).toBe(false);
+		resetWalletCache();
+		expect(balance()).toBe(100);
+	});
+
+	it.each([NaN, Infinity, -5, 0])('earnOnce(%s) pays nothing and can still pay later', (x) => {
+		expect(earnOnce('gift', x)).toBe(false);
+		resetWalletCache();
+		expect(balance()).toBe(100);
+		expect(earnOnce('gift', 20)).toBe(true);
+		expect(balance()).toBe(120);
+	});
+});
+
+/* What a player, an old version or a full disk could leave in storage. */
+describe('a tampered or broken wallet in storage', () => {
+	const stored = (raw: string): void => { localStorage.setItem('ludiven-cocottes', raw); resetWalletCache(); };
+
+	it.each(['{', 'null', '[]', '"cocoins"', '42', ''])('%j reads as an empty wallet', (raw) => {
+		stored(raw);
+		expect(balance()).toBe(0);
+		expect(owns('cocotte')).toBe(true);
+	});
+
+	it.each([
+		['"Infinity"', 0],
+		['-500', 0],
+		['"abc"', 0],
+		['null', 0],
+		['"250"', 250],
+		['12.5', 12.5],
+	])('a balance of %s reads as %s', (b, want) => {
+		stored(`{"balance":${b},"owned":["cocotte"]}`);
+		expect(balance()).toBe(want);
+	});
+
+	it('ignores an equipped blason the player does not own', () => {
+		stored(JSON.stringify({ balance: 0, owned: ['cocotte'], equipped: BLASONS[BLASONS.length - 1].id }));
+		expect(equippedBlason()).toBeNull();
+	});
+
+	it('survives an owned list that is not a list of names', () => {
+		stored('{"balance":10,"owned":"expert:sudoku"}');
+		expect(hasUnlock('sudoku')).toBe(false);
+		expect(earn(5)).toBe(15);
+		stored('{"balance":10,"owned":[1,null,{"a":1},"expert:sudoku"]}');
+		expect(hasUnlock('sudoku')).toBe(true);
+		expect(() => ownedBlasons()).not.toThrow();
+	});
+});
+
+describe('a car at a broken price', () => {
+	it.each([NaN, Infinity, -5])('buyCar at %s is refused and keeps the balance', (x) => {
+		earn(100);
+		expect(buyCar('bolide-x', x)).toBe(false);
+		resetWalletCache();
+		expect(balance()).toBe(100);
 	});
 });

@@ -83,9 +83,12 @@ function parse(): WalletData {
 		const raw = localStorage.getItem(KEY);
 		if (!raw) return empty();
 		const w = JSON.parse(raw) as Partial<WalletData>;
-		const owned = Array.isArray(w.owned) && w.owned.length ? w.owned : ['cocotte'];
+		const names = Array.isArray(w.owned) ? w.owned.filter((s): s is string => typeof s === 'string' && s !== '') : [];
+		const owned = names.length ? names : ['cocotte'];
+		const coins = Number(w.balance);
 		return {
-			balance: Number(w.balance) || 0,
+			// Infinity or a negative left by an old bug or a hand edit would stick forever: start from 0.
+			balance: Number.isFinite(coins) && coins > 0 ? coins : 0,
 			owned,
 			equipped: typeof w.equipped === 'string' && owned.includes(w.equipped)
 				&& BLASONS.some((b) => b.id === w.equipped) ? w.equipped : null,
@@ -153,8 +156,11 @@ export const resetWalletCache = (): void => { cache = null; };
 export const balance = (): number => read().balance;
 
 /** Add cocoins (level clears, daily challenges, rewards). Returns the new balance. */
+// NaN or Infinity written to the wallet comes back from JSON as null, read as 0: the balance would be gone.
+const isAmount = (x: number): boolean => Number.isFinite(x) && x > 0;
+
 export function earn(amount: number): number {
-	if (amount <= 0) return balance();
+	if (!isAmount(amount)) return balance();
 	const w = fresh();
 	const gain = Math.round(amount);
 	w.balance += gain;
@@ -168,7 +174,7 @@ export function earn(amount: number): number {
 export function earnOnce(id: string, amount: number): boolean {
 	const key = `paid:${id}`;
 	const w = fresh(); // another tab may have paid it a moment ago
-	if (w.owned.includes(key) || amount <= 0) return false;
+	if (w.owned.includes(key) || !isAmount(amount)) return false;
 	const gain = Math.round(amount);
 	w.balance += gain;
 	w.owned.push(key);
@@ -228,7 +234,7 @@ export function buyCar(id: string, price: number): boolean {
 	const key = carId(id);
 	const w = fresh();
 	if (w.owned.includes(key)) return true;
-	if (w.balance < price) return false;
+	if (!(Number.isFinite(price) && price >= 0) || w.balance < price) return false;
 	w.balance -= price;
 	w.owned.push(key);
 	write(w);
@@ -240,7 +246,7 @@ export function buyCar(id: string, price: number): boolean {
 export function buyOwned(key: string, price: number): boolean {
 	const w = fresh();
 	if (w.owned.includes(key)) return true;
-	if (price < 0 || w.balance < price) return false;
+	if (!(Number.isFinite(price) && price >= 0) || w.balance < price) return false;
 	w.balance -= price;
 	w.owned.push(key);
 	write(w);
@@ -250,7 +256,7 @@ export function buyOwned(key: string, price: number): boolean {
 /** Spend cocoins on a consumable (atelier energy). Returns false if the balance is short. */
 export function spend(amount: number): boolean {
 	const w = fresh();
-	if (amount <= 0 || w.balance < amount) return false;
+	if (!isAmount(amount) || w.balance < amount) return false;
 	w.balance -= amount;
 	write(w);
 	return true;
