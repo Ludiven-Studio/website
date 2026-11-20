@@ -18,7 +18,7 @@ const LATEST = `${SUPABASE_URL}/storage/v1/object/public/builds/suivifamilial/la
 			<img src="/cap-etoile/cap-etoile.png" width="72" height="72" alt="" />
 			<div class="stack gap-2">
 				<h1>Cap Étoile — version de test</h1>
-				<p class="lead">Suivi des enfants et des familles. Un logiciel Windows de Ludiven Studio, en cours de développement. Cette page n'est pas publique : ne la partagez pas.</p>
+				<p class="lead">Suivi des enfants, des adultes et des familles. Un logiciel Windows de Ludiven Studio, en cours de développement. Cette page n'est pas publique : ne la partagez pas.</p>
 			</div>
 		</header>
 
@@ -27,6 +27,11 @@ const LATEST = `${SUPABASE_URL}/storage/v1/object/public/builds/suivifamilial/la
 			<div class="stack gap-3" data-state="ready" hidden>
 				<a class="download" data-field="url" href="#">Télécharger pour Windows (version <span data-field="version"></span>)</a>
 				<p class="muted">Mise en ligne le <span data-field="date"></span> · <span data-field="size"></span></p>
+				<div class="stack gap-2" data-field="news-box" hidden>
+					<h2 class="news-title">Nouveautés</h2>
+					<ul data-field="news"></ul>
+					<p data-field="advice" hidden></p>
+				</div>
 			</div>
 			<p class="muted" data-state="error" hidden>Aucune version de test n'est publiée pour l'instant.</p>
 		</section>
@@ -62,7 +67,7 @@ const LATEST = `${SUPABASE_URL}/storage/v1/object/public/builds/suivifamilial/la
 				<li>Au premier lancement, choisissez votre phrase secrète.</li>
 				<li>Le logiciel ouvre ensuite Paramètres › Licence : saisissez la clé de licence qui vous a été envoyée, puis cliquez sur « Vérifier ma clé ». Sans clé valide, vous pouvez consulter, mais pas créer ni modifier.</li>
 			</ol>
-			<p class="muted">Pour une nouvelle version, refaites la même chose : elle s'installe par-dessus et garde vos dossiers. Désinstaller le logiciel (Paramètres Windows › Applications) ne supprime pas les dossiers.</p>
+			<p class="muted">Les versions suivantes vous sont proposées dans le logiciel. Vous pouvez aussi télécharger la dernière ici et l'installer par-dessus : elle garde vos dossiers. Désinstaller le logiciel (Paramètres Windows › Applications) ne supprime pas les dossiers.</p>
 		</section>
 
 		<section class="stack gap-2">
@@ -70,7 +75,7 @@ const LATEST = `${SUPABASE_URL}/storage/v1/object/public/builds/suivifamilial/la
 			<ul>
 				<li>Utilisez uniquement des familles et des dossiers inventés, jamais de vraies données.</li>
 				<li>Une clé de licence de test est nécessaire : demandez-la à Ludiven Studio. Elle vaut 15 jours, sur 2 ordinateurs au plus. Pour la vérifier, seuls la clé, le numéro de version et un numéro tiré au hasard pour l'ordinateur sont envoyés ; aucun contenu de vos dossiers ne quitte l'ordinateur.</li>
-				<li>Les mises à jour automatiques arriveront plus tard : revenez sur cette page pour une nouvelle version.</li>
+				<li>Les mises à jour sont automatiques : quand une nouvelle version de test sort, un bandeau « Une nouvelle version est disponible » s'affiche dans le logiciel. Vous lisez ce qui change, puis vous l'installez tout de suite ou plus tard. Elle est vérifiée par une signature avant d'être installée, et vos dossiers ne sont pas touchés.</li>
 			</ul>
 		</section>
 
@@ -79,7 +84,7 @@ const LATEST = `${SUPABASE_URL}/storage/v1/object/public/builds/suivifamilial/la
 			<div class="stack gap-3">
 				<p class="muted small">Commit <code data-field="commit"></code> · empreinte SHA-256 : <code data-field="sha256"></code></p>
 				<div>
-					<h3>Dernières modifications</h3>
+					<h3>Derniers changements dans le code</h3>
 					<ul class="small" data-field="notes"></ul>
 				</div>
 			</div>
@@ -109,6 +114,21 @@ const LATEST = `${SUPABASE_URL}/storage/v1/object/public/builds/suivifamilial/la
 			field('size')!.textContent = `${(b.size / 1e6).toFixed(1)} Mo`;
 			field('commit')!.textContent = b.commit;
 			field('sha256')!.textContent = b.sha256 ?? '';
+			const news = Array.isArray(b.news) ? (b.news as string[]) : [];
+			const newsList = field('news');
+			if (newsList && news.length > 0) {
+				newsList.replaceChildren(...news.map((n) => {
+					const li = document.createElement('li');
+					li.textContent = n;
+					return li;
+				}));
+				field('news-box')!.hidden = false;
+			}
+			const advice = field('advice');
+			if (advice && typeof b.advice === 'string' && b.advice.length > 0) {
+				advice.textContent = b.advice;
+				advice.hidden = false;
+			}
 			const notes = field('notes');
 			if (notes) {
 				notes.replaceChildren(...(b.notes as string[]).map((n) => {
@@ -194,6 +214,9 @@ const LATEST = `${SUPABASE_URL}/storage/v1/object/public/builds/suivifamilial/la
 	}
 	.test-page h2 {
 		font-size: var(--text-xl);
+	}
+	.test-page .news-title {
+		font-size: var(--text-lg);
 	}
 	.lead,
 	.muted {

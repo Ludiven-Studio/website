@@ -3755,3 +3755,15 @@
 - 13:57 : build complet OK (240 pages, 0 erreur, précache 407 et liens 269 OK).
 - 13:57 : commité et poussé à la demande de l'utilisateur (« publie » de Raphaël relayé par le Producer) : ma page et
   cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-20 — Cap Étoile : notes françaises et mises à jour sur la page des testeurs (session suivifamilial)
+- Statut : en cours (2026-11-20T14:20+01:00). Demande de l'utilisateur : (relayé par le Producer) la page des testeurs
+  doit montrer les notes françaises de docs/notes/<version>.md et ne plus dire que les mises à jour automatiques
+  arriveront plus tard ; branche dans un worktree, le Producer pousse
+- Réservations actives : `src/pages/cap-etoile/test-7o8v154o.astro`.
+- Ressources : serveur de dev sur le port 4421 ; eslint, `astro check`. Build annoncé ici avant.
+- 14:26 : Lancement du build complet (écrit dist/, .astro/, public/vendor/ du worktree capetoile-test-notes)…
+- 14:27 : page : bloc « Nouveautés » (champs news et advice du latest.json, écrits par publish_test_build.py depuis
+  docs/notes/<version>.md), mises à jour automatiques décrites, sous-titre avec les adultes ; eslint, astro check 0
+  erreur, vue bureau et téléphone sombre sans erreur console ; build complet OK (240 pages, précache 407, liens 269).
+  Branche capetoile-test-notes, pas main : le Producer pousse.
