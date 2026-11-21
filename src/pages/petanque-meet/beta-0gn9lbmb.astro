@@ -5,12 +5,13 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 // Main's next version under the .beta id, signed with the test key. The APK is a GitHub prerelease asset
 // (petanque-meet-beta); 1.0.1-1.0.4 were in Supabase.
 const BETA = {
-	version: '1.0.8',
-	date: '2026-11-20',
-	size: 35710327,
+	version: '1.1.0',
+	label: 'beta8',
+	date: '2026-11-21',
+	size: 35732911,
 	android: '7.1',
-	sha256: '23b7e6e474e88a28e4a6d16a53b5223b19d6c0b7d33d03b29fa1eb6fe1d382a2',
-	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-meet-beta/petanque-meet-beta-1.0.8.apk',
+	sha256: 'b91f6f806c2a0faecf9a6d082f28e33a99226c0d415dd14a5cace030eb714530',
+	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-meet-beta/petanque-meet-1.1.0-beta8.apk',
 };
 const date = new Date(BETA.date).toLocaleDateString('fr-FR', { dateStyle: 'medium' });
 const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
@@ -32,26 +33,34 @@ const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 
 		<section class="card stack gap-3">
 			<a class="download" href={BETA.url}>Télécharger Pétanque Meet&nbsp;β&nbsp;{BETA.version}</a>
-			<p class="muted">{date} · {size} · Android {BETA.android} ou plus récent</p>
+			<p class="muted">Build {BETA.label} · {date} · {size} · Android {BETA.android} ou plus récent</p>
 			<p class="muted sha">SHA-256 : <code>{BETA.sha256}</code></p>
 		</section>
 
 		<section class="card stack gap-3">
 			<h2>Nouveautés</h2>
-			<p>Bêta 1.0.8 :</p>
+			<p>Pétanque Meet β 1.1.0 : la version qui partira sur les stores, avec des corrections de fiabilité.</p>
 			<ul>
-				<li>Nouveau : « Crédits et licences » dans « Compte et aide » (polices, carte, musique, bibliothèques).</li>
 				<li>
-					Le bouton retour ne fait plus rien tant qu'un écran glisse ou s'ouvre (un appui pendant l'animation fermait l'écran du
-					dessous).
+					Nouveau : chaque envoi au serveur (rejoindre, quitter, publier, modifier, annuler, signaler…) affiche une fenêtre
+					d'attente avec « Annuler ». Si le réseau ne répond pas en 20 secondes, elle propose « Réessayer ». Une réponse qui
+					arrive après un « Annuler » est quand même prise en compte, sans doublon.
 				</li>
 				<li>
-					Bandeau maison : une vidéo figée n'est plus montrée, et le choix des applis suit les réglages du site.
+					Concours : si la connexion coupe pendant la publication, l'appli vérifie et te dit que le concours semble en ligne, au
+					lieu de te laisser le publier deux fois.
 				</li>
+				<li>« Modifier » juste après avoir publié un concours ouvre bien le formulaire.</li>
+				<li>
+					Se déconnecter ne fait plus disparaître les parties rejointes, et les rappels des concours suivis par l'ancien compte
+					s'arrêtent.
+				</li>
+				<li>Un rappel touché pendant qu'une fenêtre est ouverte s'ouvre ensuite au lieu d'être perdu.</li>
+				<li>Une recherche de partenaire fermée ne réapparaît plus sur la fiche du concours.</li>
+				<li>Annuler une partie ne crée plus de doublon quand on la renvoie après une coupure.</li>
+				<li>Des données enregistrées abîmées ne bloquent plus le lancement (session, lieux enregistrés).</li>
+				<li>Affiches, bannière « Nos applis » et carte plus robustes.</li>
 			</ul>
-			<p>
-				À tester surtout : le retour (flèche et bouton du téléphone) sur tous les écrans, et l'écran des crédits.
-			</p>
 		</section>
 
 		<section class="card stack gap-3">

@@ -3837,3 +3837,16 @@
 - 16:24 : build complet OK (242 pages, précache 411, liens 271) ; branche admin-dashboard, 2 commits ; aucun
   déploiement de fonction ni de table (étapes pour Raphaël dans supabase/functions/stats-admin/DEPLOY.md) ; le Producer
   pousse main (site statique : la fonction et la migration ne partent pas avec)
+
+## 2026-11-21 — Pétanque Meet : bêta 1.1.0 (beta8) sur la page des testeurs (session Producer)
+- Statut : en cours (2026-11-21T10:30+01:00). Demande de l'utilisateur : (« Publie les 4 » de Raphaël dit dans le
+  Producer le 21/11, release-publisher) la bêta 1.1.0 beta8 de Pétanque Meet
+- Réservations actives : `src/pages/petanque-meet/beta-0gn9lbmb.astro`.
+- Ressources : serveur de dev sur le port 4453 ; eslint, `astro check`. Build annoncé ici avant.
+- 10:32 : APK 1.1.0 beta8 envoyé sur la prerelease petanque-meet-beta (petanque-meet-1.1.0-beta8.apk), le lien sert
+  sha256 b91f6f80… (35 732 911 octets). Page : constante 1.1.0, libellé beta8 et notes des testeurs de la session Meet
+  ; eslint 0, astro check 0 erreur, vue téléphone et bureau sombre sans erreur console. Lancement du build complet
+  (écrit dist/, .astro/, public/vendor/ du worktree site-publish-meet-beta8)…
+- 10:34 : build complet OK (242 pages, précache 411, liens 271).
+- 10:34 : commité et poussé à la demande de l'utilisateur (« Publie les 4 » de Raphaël relayé par le Producer) : ma
+  page et cette section seulement. Statut : terminé. Réservations libérées.
