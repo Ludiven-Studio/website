@@ -27,6 +27,7 @@ import { ipKey, ipQuotaEnabled } from '../_shared/ipKey.ts';
 import { deleteAccount } from '../_shared/account.ts';
 import { appleOf } from '../_shared/apple.ts';
 import { createKeyOf, isTwinInsert } from '../_shared/createOnce.ts';
+import { leaveEvent } from '../_shared/leave.ts';
 import { dropPosters, thumbOf } from '../_shared/posters.ts';
 import {
 	P_CONTACTS_PER_DAY, P_CONTACTS_PER_IP_DAY, P_HIDE_IPS, P_HIDE_REPORTERS, P_MAX_OPEN, P_REASON_LABEL, P_REASONS,
@@ -1631,7 +1632,7 @@ Deno.serve(async (req) => {
 			case 'leave': {
 				const ids = identities(await whoAmI(), body.playerId);
 				if (!isUuid(body.eventId) || !ids.length) return bad('bad request');
-				await db.from('meetup_signups').delete().eq('event_id', body.eventId).in('player_id', ids);
+				await leaveEvent(db, body.eventId, ids);
 				return json({ ok: true });
 			}
 
