@@ -26,7 +26,7 @@ import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2.1
 import { ipKey, ipQuotaEnabled } from '../_shared/ipKey.ts';
 import { deleteAccount } from '../_shared/account.ts';
 import { appleOf } from '../_shared/apple.ts';
-import { createKeyOf, isTwinInsert } from '../_shared/createOnce.ts';
+import { createKeyOf, isTwinInsert, TOURNAMENT_CREATE_KEY_INDEX } from '../_shared/createOnce.ts';
 import { leaveEvent } from '../_shared/leave.ts';
 import { dropPosters, thumbOf } from '../_shared/posters.ts';
 import {
@@ -669,6 +669,15 @@ async function createdWithKey(db: SupabaseClient, organizer: string, key: string
 	return data ? { id: data.id as string, secret: data.secret as string } : null;
 }
 
+/** The tournament this organizer already made with this create key, as create_tournament first answered. */
+async function tournamentWithKey(db: SupabaseClient, organizer: string, key: string | null): Promise<{ id: string } | null> {
+	if (!key) return null;
+	const { data, error } = await db.from('meetup_tournaments').select('id')
+		.eq('organizer_id', organizer).eq('create_key', key).maybeSingle();
+	if (error) throw error;
+	return data ? { id: data.id as string } : null;
+}
+
 /** The account, plus the device uuid it used before accounts: games and signups
  *  made then still belong to the same person. */
 const identities = (uid: string | null, legacy: unknown): string[] =>
@@ -1236,6 +1245,10 @@ Deno.serve(async (req) => {
 			case 'create_tournament': {
 				const playerId = await whoAmI();
 				if (!playerId) return bad(LOGIN, 401);
+				// Sent again after a lost answer: the first tournament, before any cap counts it twice.
+				const createKey = createKeyOf(body);
+				const madeBefore = await tournamentWithKey(db, playerId, createKey);
+				if (madeBefore) return json(madeBefore);
 				const needed = 'contests' in body ? ['clubName', 'title'] : ['startsAt', 'clubName', 'title', 'format', 'category'];
 				for (const k of needed) {
 					if (!(k in body)) return bad('Champ manquant.');
@@ -1265,9 +1278,13 @@ Deno.serve(async (req) => {
 					spotId = known.id as string;
 				}
 				const { data: created, error } = await db.from('meetup_tournaments').insert({
-					...fields, spot_id: spotId, organizer_id: playerId, organizer_ip: createIp,
+					...fields, spot_id: spotId, organizer_id: playerId, organizer_ip: createIp, create_key: createKey,
 				}).select('id').single();
-				if (error) throw error;
+				if (error) {
+					const twin = isTwinInsert(error, TOURNAMENT_CREATE_KEY_INDEX) ? await tournamentWithKey(db, playerId, createKey) : null;
+					if (twin) return json(twin);
+					throw error;
+				}
 				return json({ id: created.id });
 			}
 
