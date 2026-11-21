@@ -2,16 +2,16 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 
 // Unlisted: noindex, out of the sitemap and of the offline precache (astro.config.mjs).
-// The next store build, from main (8325853), under the .beta id. Over 50 MB, so the APK is a GitHub prerelease asset
+// The next store build, from main (dcf85e1), under the .beta id. Over 50 MB, so the APK is a GitHub prerelease asset
 // (the earlier builds' APKs stay there).
 const BETA = {
 	version: '1.2.15',
-	label: 'n°4',
-	date: '2026-11-20',
-	size: 110053045,
+	label: 'n°5',
+	date: '2026-11-21',
+	size: 110081419,
 	android: '7.1',
-	sha256: '9b80d1ecfbc182caebbb6800d37af61fa5e9c3ebc67cd300e2fa370cc19af9f4',
-	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-scanner-beta/petanque-scan-beta-1.2.15-n4.apk',
+	sha256: 'b5920cadd78dddaf264b2bb64cfd27fa30edd08d8e6e1d6876e18e2be2338c47',
+	url: 'https://github.com/Ludiven-Studio/website/releases/download/petanque-scanner-beta/petanque-scan-beta-1.2.15-n5.apk',
 };
 const date = new Date(BETA.date).toLocaleDateString('fr-FR', { dateStyle: 'medium' });
 const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
@@ -38,28 +38,51 @@ const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 		</section>
 
 		<section class="card stack gap-3">
-			<h2>Bêta 1.2.15 n°4 — corrections</h2>
-			<ul>
-				<li>Un objet que tu déplaces à la main puis verrouilles fait vibrer le téléphone, comme les autres verrous.</li>
-				<li>
-					Après avoir atteint la limite de scans, « Scan 3D » repart bien d'un scan neuf (il rouvrait parfois l'ancien résultat).
-				</li>
-				<li>En mode photo, le résultat ne disparaît plus quand tu reviens dans l'appli.</li>
-				<li>
-					« Nouveau scan » juste après un résultat, puis un scan lancé depuis l'accueil, compte bien comme un nouveau scan.
-				</li>
-				<li>Une vidéo regardée pour recharger les scans ne perd plus sa recharge quand on en enchaîne deux.</li>
-				<li>Le bandeau « mise à jour disponible » ne disparaît plus des semaines si l'heure du téléphone a été changée.</li>
-				<li>Vidéos et bannières maison&nbsp;: divers correctifs.</li>
-			</ul>
+			<h2>Bêta 1.2.15 n°5</h2>
 			<p>
-				Rien à tester de neuf à l'écran&nbsp;: refais un scan 3D, un scan photo, et quitte puis reviens dans l'appli pendant
-				chacun.
+				Bêta n°5 de Pétanque Scan. Elle contient les corrections de la nuit&nbsp;: achats Premium, pubs récompensées, compteur
+				de scans, pubs maison, et une nouvelle fenêtre d'attente pendant que le store répond.
 			</p>
 			<p class="muted">
-				Toujours vrai dans la bêta&nbsp;: l'achat Premium est impossible, il n'y a pas de vraies pubs (seulement nos annonces maison),
-				et elle s'installe à côté de l'appli du store, avec ses propres données.
+				Rappel&nbsp;: dans la bêta, l'achat Premium ne peut pas aboutir, car Google Play ne connaît pas cette appli. Il n'y a
+				pas non plus de vraie pub, seulement celles de Pétanque Meet.
 			</p>
+			<h3>À vérifier dans la fenêtre d'attente</h3>
+			<ol>
+				<li>
+					Ouvrez Premium (quand les scans gratuits sont épuisés, ou depuis l'accueil) et touchez «&nbsp;Acheter&nbsp;».
+					<ul>
+						<li>
+							Un voile sombre couvre tout l'écran, avec «&nbsp;Connexion…&nbsp;», un anneau doré qui tourne et un bouton
+							«&nbsp;Annuler&nbsp;».
+						</li>
+						<li>Rien derrière ne doit réagir au doigt.</li>
+					</ul>
+				</li>
+				<li>
+					Touchez «&nbsp;Annuler&nbsp;»&nbsp;: la fenêtre se ferme et rien d'autre ne s'ouvre ensuite. Refaites l'essai avec la
+					touche retour du téléphone&nbsp;: même résultat.
+				</li>
+				<li>
+					Retouchez «&nbsp;Acheter&nbsp;» et attendez 20 secondes sans rien toucher.
+					<ul>
+						<li>Le texte passe à «&nbsp;pas de réponse&nbsp;», avec «&nbsp;Réessayer&nbsp;» et «&nbsp;Annuler&nbsp;».</li>
+						<li>«&nbsp;Réessayer&nbsp;» relance l'anneau.</li>
+					</ul>
+				</li>
+				<li>
+					Faites «&nbsp;Restaurer mes achats&nbsp;» depuis Premium, puis depuis les Réglages&nbsp;: la même fenêtre s'ouvre,
+					puis se ferme avec un message.
+				</li>
+				<li>
+					Coupez le réseau (mode avion) et refaites 1 à 4. La fenêtre ne doit jamais rester bloquée&nbsp;: «&nbsp;Annuler&nbsp;»
+					ou la touche retour la ferment toujours.
+				</li>
+				<li>
+					Dites-nous si un texte dépasse ou est mal traduit (5 langues), et si la fenêtre apparaît alors qu'il n'y avait rien à
+					attendre.
+				</li>
+			</ol>
 		</section>
 
 		<section class="card notice stack gap-3">
@@ -111,6 +134,9 @@ const size = `${(BETA.size / 1e6).toFixed(1).replace('.', ',')} Mo`;
 	}
 	.beta-page h2 {
 		font-size: var(--text-xl);
+	}
+	.beta-page h3 {
+		font-size: var(--text-lg);
 	}
 	.lead,
 	.muted {

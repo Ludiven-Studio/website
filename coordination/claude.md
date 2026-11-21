@@ -3862,3 +3862,15 @@
 - 10:34 : build complet OK (242 pages, 0 erreur, précache 411 et liens 271 OK).
 - 10:34 : commité et poussé à la demande de l'utilisateur (« Publie les 4 » de Raphaël relayé par le Producer) :
   src/data/ninoRush.ts et cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-21 — Pétanque Scan : bêta 1.2.15 n°5 sur la page des testeurs (session Producer)
+- Statut : en cours (2026-11-21T10:31+01:00). Demande de l'utilisateur : (« Publie les 4 » de Raphaël dit dans le
+  Producer le 21/11, release-publisher) la bêta 1.2.15 n°5 de Pétanque Scan
+- Réservations actives : `src/pages/petanque-scanner/beta-cd53d8qv.astro`.
+- Ressources : serveur de dev sur le port 4467 ; eslint, `astro check`. Build annoncé ici avant.
+- 10:33 : APK n°5 sur la prerelease petanque-scanner-beta (200, sha256 b5920cad… vérifié) ; page modifiée dans le
+  worktree D:/tmp/site-publish-scanner-n5, eslint 0, astro check 0, captures OK. Lancement du build complet (écrit
+  dist/, .astro/, public/vendor/ du worktree site-publish-scanner-n5)…
+- 10:34 : build complet OK (astro check, astro build, précache, liens)
+- 10:34 : commité et poussé sur « Publie les 4 » de Raphaël (Producer, 21/11) : mon fichier et cette section seulement.
+  Statut : terminé. Réservations libérées.
