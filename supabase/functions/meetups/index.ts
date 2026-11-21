@@ -28,6 +28,7 @@ import { deleteAccount } from '../_shared/account.ts';
 import { appleOf } from '../_shared/apple.ts';
 import { createKeyOf, isTwinInsert, TOURNAMENT_CREATE_KEY_INDEX } from '../_shared/createOnce.ts';
 import { leaveEvent } from '../_shared/leave.ts';
+import { secretRows } from '../_shared/secretOwner.ts';
 import { dropPosters, thumbOf } from '../_shared/posters.ts';
 import {
 	P_CONTACTS_PER_DAY, P_CONTACTS_PER_IP_DAY, P_HIDE_IPS, P_HIDE_REPORTERS, P_MAX_OPEN, P_REASON_LABEL, P_REASONS,
@@ -197,15 +198,24 @@ async function authUid(db: SupabaseClient, req: Request): Promise<string | null>
 	return data.user?.id ?? null;
 }
 
+/** True for a Supabase account, false for a device id from before accounts. */
+async function isAccount(db: SupabaseClient, id: string): Promise<boolean> {
+	if (!isUuid(id)) return false;
+	const { data, error } = await db.auth.admin.getUserById(id);
+	if (error && error.status !== 404) throw error;
+	return Boolean(data?.user);
+}
+
 /** Owner = the account that posted it, or the secret for a game posted before
- *  accounts. Secrets are uuids by construction, which also makes them safe in `or`. */
+ *  accounts (_shared/secretOwner.ts). Secrets are uuids by construction, which also makes them safe in `or`. */
 async function ownsEvent(db: SupabaseClient, eventId: string, secret: unknown, uid: string | null): Promise<boolean> {
 	const ors: string[] = [];
 	if (uid) ors.push(`organizer_id.eq.${uid}`);
 	if (isUuid(secret)) ors.push(`secret.eq.${secret}`);
 	if (!ors.length) return false;
-	const { data } = await db.from('meetup_events').select('id').eq('id', eventId).or(ors.join(',')).maybeSingle();
-	return Boolean(data);
+	const { data } = await db.from('meetup_events').select('id, organizer_id').eq('id', eventId).or(ors.join(',')).maybeSingle();
+	if (!data) return false;
+	return (await secretRows([data], uid, (id) => isAccount(db, id))).length > 0;
 }
 
 async function ban(db: SupabaseClient, playerId: string, ip: string | null, eventId: string): Promise<void> {
@@ -843,14 +853,16 @@ Deno.serve(async (req) => {
 					.filter((p) => isUuid(p?.eventId) && isUuid(p?.secret))
 					.slice(0, 40);
 				let events: Record<string, unknown>[] = [];
+				const uid = await whoAmI();
 				if (pairs.length) {
 					const filter = pairs.map((p) => `and(id.eq.${p.eventId},secret.eq.${p.secret})`).join(',');
-					const { data, error } = await db.from('meetup_events').select(EMBED).or(filter).order('starts_at');
+					const { data, error } = await db.from('meetup_events').select(`${EMBED}, organizer_id`).or(filter).order('starts_at');
 					if (error) throw error;
-					events = (data ?? []).map((r) => shapeEvent(r as Record<string, unknown>));
+					const mine = await secretRows((data ?? []) as Record<string, unknown>[], uid, (id) => isAccount(db, id));
+					// organizer_id was read only to sort the secrets: it never leaves.
+					events = mine.map(({ organizer_id: _o, ...r }) => shapeEvent(r));
 				}
 				// Plus every game of the account, on any device. Merged by id.
-				const uid = await whoAmI();
 				if (uid) {
 					const { data, error } = await db.from('meetup_events').select(EMBED)
 						.eq('organizer_id', uid).order('starts_at').limit(100);
