@@ -3850,3 +3850,15 @@
 - 10:34 : build complet OK (242 pages, précache 411, liens 271).
 - 10:34 : commité et poussé à la demande de l'utilisateur (« Publie les 4 » de Raphaël relayé par le Producer) : ma
   page et cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-21 — Nino Rush : version 1.0.21 de l'APK de test (session Producer)
+- Statut : en cours (2026-11-21T10:30+01:00). Demande de l'utilisateur : (« Publie les 4 » de Raphaël dit dans le
+  Producer le 21/11, release-publisher) l'APK de test Nino Rush 1.0.21
+- Réservations actives : `src/data/ninoRush.ts`.
+- Ressources : serveur de dev sur le port 4461 ; eslint, `astro check`. Build annoncé ici avant.
+- 10:32 : APK 1.0.21 envoyé sur la prerelease nino-rush-dev, le lien sert sha256 85e16c16… (81 186 384 octets).
+  src/data/ninoRush.ts : 1.0.21, 81,2 Mo ; eslint et astro check OK, page vue en téléphone et bureau sombre sans erreur
+  console. Lancement du build complet (écrit dist/, .astro/, public/vendor/ du worktree site-publish-nino-1.0.21)…
+- 10:34 : build complet OK (242 pages, 0 erreur, précache 411 et liens 271 OK).
+- 10:34 : commité et poussé à la demande de l'utilisateur (« Publie les 4 » de Raphaël relayé par le Producer) :
+  src/data/ninoRush.ts et cette section seulement. Statut : terminé. Réservations libérées.
