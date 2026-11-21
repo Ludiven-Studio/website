@@ -2,26 +2,26 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 
 // Unlisted: noindex, out of the sitemap and of the offline precache (BaseLayout, astro.config.mjs's /beta- rules).
-// The next version, built from DragonsGemsSwipe's main (5440303) as com.ludivenstudio.dragonsgems.beta
+// The next version, built from DragonsGemsSwipe's main (12d26c9) as com.ludivenstudio.dragonsgems.beta
 // (Profile_Android_Beta, APP_BETA), signed with the dev key, ARM64 only, on a prerelease of this repo.
 const APK = {
-	url: 'https://github.com/Ludiven-Studio/website/releases/download/dragons-gems-beta/dragonsgems-beta-v1.1.7.apk',
-	version: '1.1.7',
-	code: 101007,
-	size: 76591727,
-	sha256: 'c5916de95f2adde3560647e84f2bd5b960c83898c20c8225141276d87f75155b',
-	commit: '5440303',
+	url: 'https://github.com/Ludiven-Studio/website/releases/download/dragons-gems-beta/dragonsgems-beta-v1.1.8.apk',
+	version: '1.1.8',
+	code: 101008,
+	size: 76623743,
+	sha256: '4f15baccc19fae94b280cc7e9829ed387a642470bf83d9c1ce7755d5f39d680e',
+	commit: '12d26c9',
 };
 ---
 
 <BaseLayout
-	title="Dragon Gems Swipe — bêta 1.1.7 | Ludiven Studio"
-	description="La version 1.1.7 de Dragon Gems Swipe, à essayer avant son envoi aux stores."
+	title="Dragon Gems Swipe — bêta 1.1.8 | Ludiven Studio"
+	description="La version 1.1.8 de Dragon Gems Swipe, à essayer avant son envoi aux stores."
 	noindex
 >
 	<div class="wrapper beta-page stack gap-6">
 		<header class="stack gap-2">
-			<h1>Dragon Gems Swipe — bêta 1.1.7</h1>
+			<h1>Dragon Gems Swipe — bêta 1.1.8</h1>
 			<p class="lead">La prochaine version, à essayer avant son envoi aux stores. Elle s'installe à côté de l'appli du Play Store, sous le nom « Dragon Gems β », avec sa propre partie.</p>
 		</header>
 
@@ -33,7 +33,17 @@ const APK = {
 
 		<section class="card stack gap-3">
 			<h2>Quoi de neuf à tester</h2>
-			<p><strong>Nouveau dans la 1.1.7 :</strong></p>
+			<p><strong>Nouveau dans la 1.1.8 :</strong></p>
+			<ul>
+				<li>Connexion au compte, suppression du compte et restauration des achats : une fenêtre d'attente avec « Annuler » s'affiche pendant l'échange avec le serveur.</li>
+				<li>Votre progression est mieux protégée : une sauvegarde abîmée est reprise de la copie de secours au lieu de repartir de zéro, et la synchronisation entre téléphones ne compte plus deux fois les mêmes pièces.</li>
+				<li>Un achat fait pendant le changement de compte reste bien au compte connecté.</li>
+				<li>Une partie payée n'est plus perdue quand on joue un autre niveau ou le défi du jour, ni quand on utilise un bonus juste avant que l'appli soit fermée.</li>
+				<li>Un double tap sur un bouton de fenêtre, sur la vidéo du cœur ou sur la relance ne lance plus deux fois l'action ni deux vidéos.</li>
+				<li>Les scores ne partent plus en double au classement ; une connexion qui réussit ne s'affiche plus en échec.</li>
+			</ul>
+			<p><strong>À vérifier sur votre téléphone :</strong> regardez une vidéo maison jusqu'au bout pour un cœur ou une relance. La récompense doit tomber une seule fois, et un double tap ne doit lancer qu'une seule vidéo. Si vous avez deux téléphones sur le même compte, jouez sur les deux et vérifiez que vos pièces restent justes.</p>
+			<p><strong>Dans la 1.1.7 :</strong></p>
 			<ul>
 				<li>Une partie où vous avez payé une relance ou un souffle reprend là où elle en était si l'appli se ferme.</li>
 				<li>Une victoire est enregistrée dès le coup gagnant.</li>
