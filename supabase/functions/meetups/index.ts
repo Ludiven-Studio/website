@@ -846,6 +846,8 @@ Deno.serve(async (req) => {
 			// Cancelled and finished games are returned too: a list that hides them
 			// cannot explain why a slot is free, or let you reopen the link you shared.
 			case 'my_events': {
+				// Each game carries its create_key, to its organizer only: the app that lost a create's
+				// answer frees its pending key by that, not by a start time two games can share.
 				const items = Array.isArray(body.items) ? body.items : [];
 				const pairs = (items as Record<string, unknown>[])
 					// Secrets are uuid-shaped by construction, and checking that is also what
@@ -856,7 +858,7 @@ Deno.serve(async (req) => {
 				const uid = await whoAmI();
 				if (pairs.length) {
 					const filter = pairs.map((p) => `and(id.eq.${p.eventId},secret.eq.${p.secret})`).join(',');
-					const { data, error } = await db.from('meetup_events').select(`${EMBED}, organizer_id`).or(filter).order('starts_at');
+					const { data, error } = await db.from('meetup_events').select(`${EMBED}, organizer_id, create_key`).or(filter).order('starts_at');
 					if (error) throw error;
 					const mine = await secretRows((data ?? []) as Record<string, unknown>[], uid, (id) => isAccount(db, id));
 					// organizer_id was read only to sort the secrets: it never leaves.
@@ -864,7 +866,7 @@ Deno.serve(async (req) => {
 				}
 				// Plus every game of the account, on any device. Merged by id.
 				if (uid) {
-					const { data, error } = await db.from('meetup_events').select(EMBED)
+					const { data, error } = await db.from('meetup_events').select(`${EMBED}, create_key`)
 						.eq('organizer_id', uid).order('starts_at').limit(100);
 					if (error) throw error;
 					const seen = new Set(events.map((e) => e.id));
