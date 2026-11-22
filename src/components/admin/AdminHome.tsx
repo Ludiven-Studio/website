@@ -1,5 +1,5 @@
 // /admin/: one tile per admin page. Once signed in, the tiles show a few figures: the house ads from the
-// catalogue online, the visitors and taps from stats-admin.
+// catalogue online, the visitors and taps from stats-admin. Versions links the studio board.
 import { useEffect, useState } from 'react';
 import { accountLabel, signIn, signOut } from '../../lib/meetupAuth';
 import { STATS_LOCAL, overview, statsMessage, totals } from '../../lib/statsAdmin';
@@ -28,11 +28,11 @@ export default function AdminHome() {
 
 	const tiles: Tile[] = [
 		{ href: '/admin/pubs/', title: 'Pubs maison', text: 'Le catalogue que lisent les applis, leurs poids par appli et par plateforme.', figure: ads === null ? undefined : `${ads} pubs actives` },
+		{ href: '/admin/versions/', title: 'Versions', text: "Chaque appli sur Google Play, l'App Store, chez les testeurs et sur main, et ce qui t'attend." },
 		{
 			href: '/admin/stats/', title: 'Statistiques', text: 'Visiteurs, achats, connexions et pubs maison, appli par appli (Umami).',
 			figure: stats ? `${int.format(stats.visitors7)} visiteurs sur 7 j · ${stats.apps} applis` : statsError ?? undefined,
 		},
-		{ title: 'Stores', text: 'Versions en ligne, fiches et avis Google Play et App Store.', figure: 'bientôt' },
 		{ title: 'Revenus', text: 'Achats intégrés et publicité, par appli.', figure: 'bientôt' },
 	];
 

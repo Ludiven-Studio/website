@@ -35,3 +35,15 @@ a.ah-tile:hover, a.ah-tile:focus-visible { border-color: var(--sc-accent); box-s
 .as-tag { display: inline-block; border: 1px solid var(--sc-line); border-radius: 999px; padding: 0 0.5rem; font-size: 0.75rem; color: var(--sc-muted); }
 .as-errors { overflow-wrap: anywhere; }
 .as-signin { display: grid; gap: 0.75rem; justify-items: start; }
+.av-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr)); }
+.av-app { display: grid; gap: 0.75rem; align-content: start; }
+.av-app header { display: grid; gap: 0.15rem; }
+.av-app h2 { margin: 0; font-size: var(--text-lg); }
+.av-app small { color: var(--sc-muted); font-size: var(--text-sm); }
+.av-rows { margin: 0; display: grid; gap: 0.4rem; font-size: var(--text-sm); }
+.av-rows div { display: grid; grid-template-columns: 8.5rem minmax(0, 1fr); gap: 0.6rem; border-bottom: 1px dotted var(--sc-line); padding-bottom: 0.3rem; }
+.av-rows dt { color: var(--sc-muted); }
+.av-rows dd { margin: 0; overflow-wrap: anywhere; }
+.av-waits h3 { margin: 0 0 0.3rem; font-size: var(--text-base); }
+.av-waits ul { margin: 0; padding-left: 1.2rem; display: grid; gap: 0.25rem; font-size: var(--text-sm); }
+@media (max-width: 30rem) { .av-rows div { grid-template-columns: minmax(0, 1fr); gap: 0.1rem; } }

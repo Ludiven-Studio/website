@@ -1,0 +1,14 @@
+---
+// Each app's versions on the stores, for testers and on main, and what waits for Raphaël (his account only).
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdminVersions from '../../components/admin/AdminVersions';
+import '../../components/admin/admin.css';
+---
+
+<BaseLayout title="Versions — admin | Ludiven Studio" description="Versions des applis du studio." noindex>
+	<div class="wrapper stack gap-6">
+		<p class="pa-note"><a href="/admin/">← Admin du studio</a></p>
+		<h1 class="pa-h1">Versions</h1>
+		<AdminVersions client:only="react" />
+	</div>
+</BaseLayout>

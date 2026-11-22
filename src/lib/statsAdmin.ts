@@ -2,9 +2,9 @@
 // PUBLIC_STATS_ADMIN_URL, set in dev only, points at a local mock, with a fixed token and no sign-in.
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from '../data/site';
 import { accessToken } from './meetupAuth';
-import type { Overview } from '../../supabase/functions/_shared/statsAdmin.mjs';
+import type { Board, Overview } from '../../supabase/functions/_shared/statsAdmin.mjs';
 
-export type { AppStats, Count, Overview } from '../../supabase/functions/_shared/statsAdmin.mjs';
+export type { AppStats, Board, BoardApp, Count, Overview } from '../../supabase/functions/_shared/statsAdmin.mjs';
 
 const LOCAL = import.meta.env.PUBLIC_STATS_ADMIN_URL as string | undefined;
 export const STATS_URL = LOCAL || `${SUPABASE_URL}/functions/v1/stats-admin`;
@@ -16,7 +16,16 @@ export class StatsError extends Error {
 	}
 }
 
-export async function overview(refresh = false): Promise<Overview> {
+export function overview(refresh = false): Promise<Overview> {
+	return call<Overview>({ action: 'overview', refresh });
+}
+
+/** The studio board of /admin/versions/. */
+export function board(): Promise<Board> {
+	return call<Board>({ action: 'board' });
+}
+
+async function call<T>(payload: Record<string, unknown>): Promise<T> {
 	const token = STATS_LOCAL ? 'local-dev' : await accessToken();
 	if (!token) throw new StatsError(401, 'not signed in');
 	let res: Response;
@@ -24,14 +33,14 @@ export async function overview(refresh = false): Promise<Overview> {
 		res = await fetch(STATS_URL, {
 			method: 'POST',
 			headers: { Authorization: `Bearer ${token}`, apikey: SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
-			body: JSON.stringify({ action: 'overview', refresh }),
+			body: JSON.stringify(payload),
 		});
 	} catch {
 		throw new StatsError(0, 'network error');
 	}
 	const body = await res.json().catch(() => ({}));
 	if (!res.ok) throw new StatsError(res.status, body.error ?? `HTTP ${res.status}`);
-	return body as Overview;
+	return body as T;
 }
 
 /** The error in French for the page. */
