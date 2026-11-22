@@ -22,7 +22,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			Cette politique concerne <strong>l'application mobile Dragon Gems Swipe</strong>
 			(<code>com.ludivenstudio.dragonsgems</code>) et ses classements, partagés avec le jeu du site
 			(<a href="/jeux/eclats/">ludiven-studio.fr/jeux/eclats</a>). Le reste du site a sa
-			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 19 novembre 2026.
+			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 22 novembre 2026.
 		</p>
 
 		<div class="summary">
@@ -240,7 +240,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			</p>
 			<p>
 				Un achat ne demande pas de compte&nbsp;; connecté, tes cœurs illimités suivent ton compte.
-				«&nbsp;Restaurer mes achats&nbsp;», dans la boutique, les rend après une réinstallation.
+				«&nbsp;Restaurer mes achats&nbsp;», dans la boutique, les rend après une réinstallation. Si un achat des Cœurs illimités est remboursé par Google Play, ils s'arrêtent sur ce téléphone.
 			</p>
 		</section>
 
@@ -251,17 +251,20 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				propre serveur, le nom de chaque écran ouvert et le nom de certaines actions, avec quelques précisions&nbsp;:
 			</p>
 			<ul>
-				<li><code>app_open</code> — l'application démarre (avec ton choix sur la publicité&nbsp;: oui, non ou pas encore demandé)&nbsp;;</li>
+				<li><code>app_open</code> — l'application démarre (première ouverture ou non, et ton choix sur la publicité&nbsp;: oui, non ou pas encore demandé)&nbsp;;</li>
 				<li><code>level_start</code> / <code>level_end</code> — un niveau commence ou finit (mode de jeu, numéro du niveau, gagné ou perdu, coups joués, étoiles)&nbsp;;</li>
 				<li><code>run_end</code> — une partie du défi du jour, du mode infini ou du défi du sommet finit (mode, résultat, score, coups joués)&nbsp;;</li>
-				<li><code>tutorial_end</code> — un tutoriel finit (lequel, passé ou non, étape atteinte)&nbsp;;</li>
-				<li><code>ad_rewarded</code> — une vidéo proposée (pour un cœur, continuer un niveau, doubler le cadeau ou des pièces de la boutique) est regardée, passée ou indisponible&nbsp;;</li>
-				<li><code>house_ad_shown</code>, <code>house_ad_opened</code> — une vidéo de nos autres jeux ou applis est montrée ou ouverte (laquelle, où)&nbsp;;</li>
-				<li><code>continue_buy</code>, <code>breath_buy</code> — des pièces sont dépensées pour continuer un niveau ou pour un souffle (mode, niveau)&nbsp;;</li>
-				<li><code>iap_buy</code> — un achat avec de l'argent (produit acheté)&nbsp;;</li>
-				<li><code>daily_gift</code> — le cadeau du jour est reçu (jour de la série)&nbsp;;</li>
-				<li><code>reminders</code>, <code>ad_consent</code> — ta réponse sur les rappels et sur la publicité (oui ou non)&nbsp;;</li>
-				<li><code>sign_in</code>, <code>sign_out</code>, <code>account_delete</code> — une connexion (Google ou Apple&nbsp;; réussie, annulée ou échouée), une déconnexion, une suppression de compte (réussie ou non).</li>
+				<li><code>tutorial_start</code> / <code>tutorial_end</code> — un tutoriel commence ou finit (lequel, passé ou non, étape atteinte)&nbsp;;</li>
+				<li><code>bonus_use</code>, <code>fragments_buy</code> — un bonus est utilisé (lequel, mode, niveau), des fragments de bonus sont achetés avec des pièces (lesquels, combien)&nbsp;;</li>
+				<li><code>ad_offer</code>, <code>ad_start</code>, <code>ad_rewarded</code> — une vidéo est proposée (pour un cœur, continuer un niveau, doubler le cadeau ou des pièces de la boutique), commence, puis est regardée, passée ou indisponible (vidéo de Unity ou de nos autres jeux)&nbsp;;</li>
+				<li><code>house_ad_shown</code>, <code>house_ad_opened</code> (et <code>house_ad_show</code>, <code>house_ad_tap</code>) — une vidéo de nos autres jeux ou applis est montrée ou ouverte (laquelle, où)&nbsp;;</li>
+				<li><code>continue_buy</code>, <code>breath_buy</code>, <code>coins_spend</code>, <code>coins_short</code> — des pièces sont dépensées (pour quoi, combien, mode, niveau) ou manquent (dans quelle tranche, et si une vidéo est proposée)&nbsp;;</li>
+				<li><code>shop_open</code>, <code>iap_tap</code>, <code>iap_buy</code>, <code>iap_result</code>, <code>iap_restore</code> — la boutique s'ouvre (depuis quel écran), un achat avec de l'argent est demandé, réussi, annulé, en attente ou échoué (produit, Google Play ou App Store, code court de l'erreur), une restauration des achats (résultat, nombre d'achats rendus)&nbsp;;</li>
+				<li><code>daily_gift</code> (et <code>daily_claim</code>) — le cadeau du jour est reçu (jour de la série)&nbsp;;</li>
+				<li><code>reminders</code> (et <code>reminders_answer</code>), <code>ad_consent</code> — ta réponse sur les rappels et sur la publicité (oui ou non)&nbsp;;</li>
+				<li><code>update_prompt</code>, <code>update_tapped</code> (et <code>update_shown</code>, <code>update_tap</code>) — la proposition de mise à jour est montrée ou touchée (facultative ou obligatoire)&nbsp;;</li>
+				<li><code>theme</code> — tu changes de thème ou de mode sombre (lequel)&nbsp;;</li>
+				<li><code>sign_in_offer</code>, <code>sign_in</code>, <code>sign_out</code>, <code>account_delete</code> — le jeu te propose de te connecter (à quel moment), une connexion (Google ou Apple&nbsp;; réussie, annulée, échouée ou remise à plus tard), une déconnexion, une suppression de compte (réussie ou non).</li>
 			</ul>
 			<p>
 				Chaque envoi porte aussi la plateforme, le type de version (test ou publique), la version de

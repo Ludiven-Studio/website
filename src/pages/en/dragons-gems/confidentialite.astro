@@ -23,7 +23,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			This policy covers <strong>the Dragon Gems Swipe mobile app</strong>
 			(<code>com.ludivenstudio.dragonsgems</code>) and its leaderboards, shared with the game on the website
 			(<a href="/jeux/eclats/">ludiven-studio.fr/jeux/eclats</a>). The rest of the website has its
-			<a href="/confidentialite/">own policy</a> (in French). Last updated: November 19, 2026.
+			<a href="/confidentialite/">own policy</a> (in French). Last updated: November 22, 2026.
 		</p>
 		<p class="updated">
 			This is a courtesy translation. In case of discrepancy, the
@@ -234,7 +234,8 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			</p>
 			<p>
 				A purchase needs no account; signed in, your unlimited hearts follow your account. "Restore purchases",
-				in the shop, gives them back after a reinstall.
+				in the shop, gives them back after a reinstall. If a purchase of unlimited hearts is refunded by Google
+				Play, they stop on this phone.
 			</p>
 		</section>
 
@@ -245,17 +246,20 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				name of each screen you open and the name of certain actions, with a few details:
 			</p>
 			<ul>
-				<li><code>app_open</code> — the app starts (with your choice about ads: yes, no or not asked yet);</li>
+				<li><code>app_open</code> — the app starts (first launch or not, and your choice about ads: yes, no or not asked yet);</li>
 				<li><code>level_start</code> / <code>level_end</code> — a level starts or ends (game mode, level number, won or lost, moves played, stars);</li>
 				<li><code>run_end</code> — a daily challenge, endless mode or summit challenge game ends (mode, result, score, moves played);</li>
-				<li><code>tutorial_end</code> — a tutorial ends (which one, skipped or not, step reached);</li>
-				<li><code>ad_rewarded</code> — an offered video (for a heart, to continue a level, to double the gift or for shop coins) is watched, skipped or unavailable;</li>
-				<li><code>house_ad_shown</code>, <code>house_ad_opened</code> — a video of our other games or apps is shown or opened (which one, where);</li>
-				<li><code>continue_buy</code>, <code>breath_buy</code> — coins are spent to continue a level or on a breath (mode, level);</li>
-				<li><code>iap_buy</code> — a purchase with money (product bought);</li>
-				<li><code>daily_gift</code> — the daily gift is received (day of the streak);</li>
-				<li><code>reminders</code>, <code>ad_consent</code> — your answer about reminders and about ads (yes or no);</li>
-				<li><code>sign_in</code>, <code>sign_out</code>, <code>account_delete</code> — a sign-in (Google or Apple; succeeded, cancelled or failed), a sign-out, an account deletion (succeeded or not).</li>
+				<li><code>tutorial_start</code> / <code>tutorial_end</code> — a tutorial starts or ends (which one, skipped or not, step reached);</li>
+				<li><code>bonus_use</code>, <code>fragments_buy</code> — a bonus is used (which one, mode, level), bonus fragments are bought with coins (which ones, how many);</li>
+				<li><code>ad_offer</code>, <code>ad_start</code>, <code>ad_rewarded</code> — a video is offered (for a heart, to continue a level, to double the gift or for shop coins), starts, then is watched, skipped or unavailable (a Unity video or one of our other games);</li>
+				<li><code>house_ad_shown</code>, <code>house_ad_opened</code> (and <code>house_ad_show</code>, <code>house_ad_tap</code>) — a video of our other games or apps is shown or opened (which one, where);</li>
+				<li><code>continue_buy</code>, <code>breath_buy</code>, <code>coins_spend</code>, <code>coins_short</code> — coins are spent (on what, how many, mode, level) or are short (in which range, and whether a video is offered);</li>
+				<li><code>shop_open</code>, <code>iap_tap</code>, <code>iap_buy</code>, <code>iap_result</code>, <code>iap_restore</code> — the shop opens (from which screen), a purchase with money is requested, succeeds, is cancelled, pending or fails (product, Google Play or App Store, short error code), a restore of purchases (result, number of purchases restored);</li>
+				<li><code>daily_gift</code> (and <code>daily_claim</code>) — the daily gift is received (day of the streak);</li>
+				<li><code>reminders</code> (and <code>reminders_answer</code>), <code>ad_consent</code> — your answer about reminders and about ads (yes or no);</li>
+				<li><code>update_prompt</code>, <code>update_tapped</code> (and <code>update_shown</code>, <code>update_tap</code>) — the update prompt is shown or tapped (optional or required);</li>
+				<li><code>theme</code> — you change the theme or dark mode (which one);</li>
+				<li><code>sign_in_offer</code>, <code>sign_in</code>, <code>sign_out</code>, <code>account_delete</code> — the game offers you to sign in (at which moment), a sign-in (Google or Apple; succeeded, cancelled, failed or put off), a sign-out, an account deletion (succeeded or not).</li>
 			</ul>
 			<p>
 				Each send also carries the platform, the kind of build (test or public), the app and system versions,
