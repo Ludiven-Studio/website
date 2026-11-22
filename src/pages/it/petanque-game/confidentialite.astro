@@ -31,7 +31,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			Questa informativa riguarda <strong>l'app mobile Pétanque Game</strong>
 			(<code>com.ludivenstudio.petanquegame</code>). Il gioco di pétanque del sito
 			(<a href="/jeux/petanque/">ludiven-studio.fr/jeux/petanque</a>) e il resto del sito hanno una
-			<a href="/confidentialite/">propria informativa</a>. Ultimo aggiornamento: 19 novembre 2026 (le schermate aperte e la tua scelta sulla pubblicità nelle statistiche; versione 1.0.14: la ricerca di un avversario annunciata agli altri giocatori, monete in palio nelle classifiche della sfida di bocciata, il numero di giocatori collegati in questo momento, la sfida di bocciata e le sue classifiche, monete e acquisti senza account; versione 1.0.8: le nostre pubblicità, nuova finestra «Pubblicità personalizzata», niente più backup di Google su Android).
+			<a href="/confidentialite/">propria informativa</a>. Ultimo aggiornamento: 22 novembre 2026 (versione 1.0.15: la presenza durante il gioco online, una pubblicità prima della finale di una coppa, la partita classificata in corso, l'ora del gioco, gli accessi annullati e falliti nelle statistiche; le schermate aperte e la tua scelta sulla pubblicità nelle statistiche; versione 1.0.14: la ricerca di un avversario annunciata agli altri giocatori, monete in palio nelle classifiche della sfida di bocciata, il numero di giocatori collegati in questo momento, la sfida di bocciata e le sue classifiche, monete e acquisti senza account; versione 1.0.8: le nostre pubblicità, nuova finestra «Pubblicità personalizzata», niente più backup di Google su Android).
 		</p>
 		<p class="updated">
 			Questa è una traduzione di cortesia. In caso di discordanza, prevale la
@@ -73,7 +73,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li>la <strong>pubblicità</strong>, se l'hai accettata (vedi §6);</li>
 				<li><strong>statistiche d'uso</strong> senza identificativo (vedi §7);</li>
 				<li>la lettura del <strong>numero dell'ultima versione</strong> del gioco sul nostro sito (vedi §9);</li>
-				<li>un <strong>segnale di presenza</strong>, una volta al minuto finché il gioco è aperto: un numero estratto a caso a ogni avvio, senza account né identificativo del giocatore, per mostrare quanti giocano in questo momento (vedi §5 e §12);</li>
+				<li>un <strong>segnale di presenza</strong>, una volta al minuto finché il gioco è aperto, ogni 5 secondi finché è mostrata una schermata del gioco online: un numero estratto a caso a ogni avvio, senza account né identificativo del giocatore, per mostrare quanti giocano in questo momento (vedi §5 e §12);</li>
 				<li>la lettura dell'elenco delle <strong>nostre pubblicità</strong> sul nostro sito, a ogni avvio, poi dell'immagine e del video di quella che viene mostrata (vedi §6).</li>
 			</ul>
 			<p>
@@ -100,7 +100,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				giocatore: le tue monete, gli oggetti acquistati e quelli che usi (bocce, pallini, cerchi,
 				ambientazioni, divise), il tuo bonus giornaliero e la tua serie, le tue sfide e i tuoi traguardi, le
 				tue vittorie e le tue sconfitte, le tue leghe, la tua coppa in corso e i tuoi trofei, il tuo punteggio
-				online, le tue impostazioni di gioco, il tuo nickname, il giocatore che hai scelto, i tuoi record della sfida di bocciata, l'opzione «Senza
+				online, le tue impostazioni di gioco, il tuo nickname, il giocatore che hai scelto, i tuoi record della sfida di bocciata, durante una partita classificata in corso, un numero estratto a caso per questo telefono e l'ora d'inizio (perché un altro dei tuoi telefoni non ne inizi una seconda né la conti persa), l'opzione «Senza
 				pubblicità» se l'hai acquistata, e i numeri degli acquisti già accreditati (per non accreditare mai due
 				volte lo stesso pagamento).
 			</p>
@@ -121,7 +121,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			</p>
 			<p><strong>Cosa vedono gli altri giocatori:</strong></p>
 			<ul>
-				<li><strong>Partita pubblica</strong>: il tuo nickname, il tuo punteggio e il formato della partita compaiono nell'elenco delle partite pubbliche, finché un avversario non entra nella partita. Una partita privata, con un amico tramite il suo codice, non vi compare.</li>
+				<li><strong>Partita pubblica</strong>: il tuo nickname, il tuo punteggio, il formato e il numero di punti della partita compaiono nell'elenco delle partite pubbliche, finché un avversario non entra nella partita. Una partita privata, con un amico tramite il suo codice, non vi compare.</li>
 				<li><strong>Ricerca di un avversario</strong>: finché aspetti un avversario in una partita pubblica, il tuo telefono invia ogni 15 secondi il tuo nickname, il formato e l'identificativo della partita presso Unity alla nostra funzione (vedi §12); i giocatori che hanno il gioco aperto vedono «Bébert cerca un avversario» e possono raggiungerti. Una partita privata, con un amico tramite il suo codice, non viene mai annunciata.</li>
 				<li><strong>Durante la partita</strong>, il tuo avversario riceve il tuo nickname, il tuo punteggio, il tuo giocatore, la tua divisa e la tua boccia, poi i tuoi lanci (la loro velocità e il punto in cui la tua mano lascia la boccia). Dopo ogni lancio, il telefono che ha aperto la partita invia l'arbitraggio (posizione delle bocce, punteggio della partita). Questi messaggi passano da <strong>Unity Relay</strong>, che li inoltra senza conservarli.</li>
 				<li><strong>Classifica</strong>: ogni partita pubblica individuale giocata fino alla fine fa variare il tuo punteggio (un punteggio Elo). Il tuo punteggio e il tuo nickname vengono allora inviati alla classifica <strong>Unity Leaderboards</strong>, che tutti i giocatori del gioco possono consultare: i primi 50, e ognuno la propria riga. Le partite con un amico tramite codice e le partite a squadre non contano.</li>
@@ -209,7 +209,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 							<td>GitHub, che ospita il nostro sito</td>
 						</tr>
 						<tr>
-							<td>Un numero estratto a caso a ogni avvio del gioco, inviato una volta al minuto finché il gioco è aperto, senza account né identificativo del giocatore</td>
+							<td>Un numero estratto a caso a ogni avvio del gioco, inviato una volta al minuto finché il gioco è aperto, ogni 5 secondi finché è mostrata una schermata del gioco online, senza account né identificativo del giocatore</td>
 							<td>Mostrare quanti giocatori giocano in questo momento</td>
 							<td>Legittimo interesse</td>
 							<td>La nostra funzione presso Supabase (vedi §12)</td>
@@ -249,7 +249,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				reti <strong>ironSource Ads</strong> e <strong>Unity Ads</strong> (Unity Technologies e la sua controllata
 				ironSource): video facoltativi che scegli di guardare (per raddoppiare le monete di una partita o il tuo
 				bonus giornaliero, o per avere monete gratis), e una pubblicità tra due partite libere contro il
-				computer, al massimo una volta ogni due partite. Google non interviene né nella pubblicità di questo
+				computer, al massimo una volta ogni due partite, e una prima della finale di una coppa, quando hai appena vinto la semifinale. Google non interviene né nella pubblicità di questo
 				gioco né nel tuo consenso.
 			</p>
 			<p>
@@ -302,8 +302,8 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><code>ad_consent</code> — la tua risposta nella finestra «Pubblicità personalizzata» (sì o no);</li>
 				<li><code>ad_offer</code>, <code>ad_start</code>, <code>ad_rewarded</code>, <code>ad_interstitial</code> — un video viene proposto o guardato, una pubblicità viene mostrata (posizione, formato, esito, video di una rete o nostro);</li>
 				<li><code>house_ads_ask</code> — la tua risposta quando un'offerta di video ti propone di attivare la pubblicità (sì o no);</li>
-				<li><code>house_ad</code>, <code>house_ad_open</code> — viene mostrato un video dei nostri altri giochi e app, o apri la sua scheda con «Scopri» (quale, posizione);</li>
-				<li><code>account_gate</code>, <code>sign_in</code>, <code>sign_out</code>, <code>account_delete</code> — viene richiesto l'account, avviene un accesso, un'uscita o un'eliminazione (Google o Apple, riuscita);</li>
+				<li><code>house_ad_show</code>, <code>house_ad_tap</code> — viene mostrato un video dei nostri altri giochi e app, o apri la sua scheda con «Scopri» (quale, posizione); prima della versione 1.0.15, con i nomi <code>house_ad</code>, <code>house_ad_open</code>;</li>
+				<li><code>account_gate</code>, <code>sign_in</code>, <code>sign_out</code>, <code>account_delete</code> — viene richiesto l'account, avviene un accesso, un'uscita o un'eliminazione (Google o Apple, riuscita o annullata; in caso di errore, il passaggio e un codice d'errore, mai il messaggio);</li>
 				<li><code>ambience</code> — l'«Atmosfera» scelta nelle Opzioni (luogo, impostazione della modalità scura);</li>
 				<li><code>onboarding</code> — i primi passi di un nuovo giocatore, una volta ciascuno (lezione di lancio, giocatore scelto, mano, «Come si gioca», primo lancio, prima partita e il suo esito), con il tempo dalla prima apertura, per fasce;</li>
 				<li><code>shots_start</code>, <code>shots_end</code> — una serie della sfida di bocciata inizia o finisce (punteggio, carreaux, record del giorno o no, account o no, numero di serie, per fasce);</li>
@@ -384,6 +384,8 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li>la tua risposta nella finestra «Pubblicità personalizzata», il giorno in cui l'hai data e la versione del testo, e, se hai accettato, i dati dei moduli pubblicitari (vedi §6);</li>
 				<li>i tuoi pagamenti con denaro reale delle ultime 24 ore (ora, importo, valuta), per la domanda a un adulto prima di un nuovo acquisto; non lasciano mai il telefono;</li>
 				<li>una partita contro il computer interrotta (una chiamata, il gioco chiuso), per riprenderla dove si era fermata;</li>
+				<li>l'ora del gioco, perché cambiare l'ora del telefono non dia in anticipo il bonus giornaliero né le sfide; il gioco la regola sull'ora delle risposte del nostro server di statistiche, senza inviare altro;</li>
+				<li>un numero estratto a caso su questo telefono, che ne esce solo nei tuoi progressi, durante una partita classificata (vedi §3);</li>
 				<li>l'elenco delle nostre pubblicità e le loro immagini, conservati per la volta successiva (vedi §6).</li>
 			</ul>
 			<p>Tutto questo scompare quando disinstalli l'applicazione. Dalla versione 1.0.8, nulla di tutto ciò viene copiato nel backup di Google del tuo telefono Android né trasferito su un nuovo telefono; una versione precedente poteva copiarlo lì, e quel backup ripristinarlo alla reinstallazione.</p>

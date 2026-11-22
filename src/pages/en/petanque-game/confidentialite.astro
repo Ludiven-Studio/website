@@ -31,7 +31,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			This policy covers <strong>the Pétanque Game mobile app</strong>
 			(<code>com.ludivenstudio.petanquegame</code>). The pétanque game on the website
 			(<a href="/jeux/petanque/">ludiven-studio.fr/jeux/petanque</a>) and the rest of the website have their
-			<a href="/confidentialite/">own policy</a>. Last updated: 19 November 2026 (the screens opened and your choice about ads, counted in the statistics; version 1.0.14: the opponent search shown to the other players, coins to win in the shooting challenge rankings, the number of players online right now, the shooting challenge and its rankings, coins and purchases without an account; version 1.0.8: our own ads, new "Personalised advertising" window, no more Google backup on Android).
+			<a href="/confidentialite/">own policy</a>. Last updated: 22 November 2026 (version 1.0.15: presence during online play, an ad before a cup final, the rated match under way, the game's own time, sign-in cancels and failures in the statistics; the screens opened and your choice about ads, counted in the statistics; version 1.0.14: the opponent search shown to the other players, coins to win in the shooting challenge rankings, the number of players online right now, the shooting challenge and its rankings, coins and purchases without an account; version 1.0.8: our own ads, new "Personalised advertising" window, no more Google backup on Android).
 		</p>
 		<p class="updated">
 			This is a courtesy translation. In case of discrepancy, the
@@ -73,7 +73,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>advertising</strong>, if you accepted it (see §6);</li>
 				<li><strong>usage statistics</strong> with no identifier (see §7);</li>
 				<li>reading the <strong>number of the latest version</strong> of the game on our website (see §9);</li>
-				<li>a <strong>presence signal</strong>, once a minute while the game is open: a number drawn at random at each launch, with no account or player identifier, to show how many are playing right now (see §5 and §12);</li>
+				<li>a <strong>presence signal</strong>, once a minute while the game is open, every 5 seconds while an online play screen is on show: a number drawn at random at each launch, with no account or player identifier, to show how many are playing right now (see §5 and §12);</li>
 				<li>reading the list of <strong>our own ads</strong> on our website, at each launch, then the picture and the video of the one that plays (see §6).</li>
 			</ul>
 			<p>
@@ -100,7 +100,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				items you bought and the ones you use (boules, jacks, throwing circles, scenery, outfits), your daily
 				bonus and your streak, your challenges and your achievements, your wins and your losses, your leagues,
 				your current cup and your trophies, your online rating, your game settings, your name, the player you
-				chose, your shooting challenge bests, the "No ads" option if you bought it, and the numbers of the purchases already credited (so the
+				chose, your shooting challenge bests, while a rated match is under way, a number drawn at random for this phone and its start time (so another of your phones neither starts a second one nor counts it lost), the "No ads" option if you bought it, and the numbers of the purchases already credited (so the
 				same payment is never credited twice).
 			</p>
 			<p>
@@ -120,7 +120,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			</p>
 			<p><strong>What other players see:</strong></p>
 			<ul>
-				<li><strong>Public game</strong>: your name, your rating and the game's format appear in the list of public games, until an opponent joins it. A private game, with a friend through its code, is not in that list.</li>
+				<li><strong>Public game</strong>: your name, your rating, the game's format and its number of points appear in the list of public games, until an opponent joins it. A private game, with a friend through its code, is not in that list.</li>
 				<li><strong>Looking for an opponent</strong>: while you wait for an opponent in a public game, your phone sends your nickname, the game's format and its Unity id to our function every 15 seconds (see §12); the players who have the game open see "Bébert is looking for an opponent" and can join you. A private game, with a friend by its code, is never announced.</li>
 				<li><strong>During the game</strong>, your opponent receives your name, your rating, your player, your outfit and your boule, then your throws (their speed and where your hand lets go of the boule). After each throw, the phone that opened the game sends the ruling (where the boules lie, the score). These messages go through <strong>Unity Relay</strong>, which passes them on without keeping them.</li>
 				<li><strong>Ranking</strong>: each public singles game played to the end changes your rating (an Elo rating). Your rating and your name are then sent to the <strong>Unity Leaderboards</strong> ranking, which every player of the game can view: the top 50, and each player their own line. Games with a friend by code and team games do not count.</li>
@@ -208,7 +208,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 							<td>GitHub, our website's host</td>
 						</tr>
 						<tr>
-							<td>A random number drawn at each launch of the game, sent once a minute while the game is open, with no account or player identifier</td>
+							<td>A random number drawn at each launch of the game, sent once a minute while the game is open, every 5 seconds while an online play screen is on show, with no account or player identifier</td>
 							<td>Show how many players are playing right now</td>
 							<td>Legitimate interest</td>
 							<td>Our function at Supabase (see §12)</td>
@@ -246,7 +246,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				The game is free and funded by advertising, served by <strong>Unity LevelPlay</strong> with the ad networks
 				<strong>ironSource Ads</strong> and <strong>Unity Ads</strong> (Unity Technologies and its subsidiary ironSource):
 				optional videos that you choose to watch (to double your coins from a game or your daily bonus, or for
-				free coins), and an ad between two free-play games against the computer, at most once every two games.
+				free coins), and an ad between two free-play games against the computer, at most once every two games, and one before a cup final, once you have won the semi-final.
 				Google plays no part in this game's ads or in your consent.
 			</p>
 			<p>
@@ -297,8 +297,8 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><code>ad_consent</code> — your answer in the "Personalised advertising" window (yes or no);</li>
 				<li><code>ad_offer</code>, <code>ad_start</code>, <code>ad_rewarded</code>, <code>ad_interstitial</code> — a video is offered or watched, an ad is shown (placement, format, result, a network's video or ours);</li>
 				<li><code>house_ads_ask</code> — your answer when a video offer asks whether to turn ads on (yes or no);</li>
-				<li><code>house_ad</code>, <code>house_ad_open</code> — a video of our other games and apps plays, or you open its page with "Discover" (which one, placement);</li>
-				<li><code>account_gate</code>, <code>sign_in</code>, <code>sign_out</code>, <code>account_delete</code> — the account is asked for, a sign-in, a sign-out or a deletion takes place (Google or Apple, success);</li>
+				<li><code>house_ad_show</code>, <code>house_ad_tap</code> — a video of our other games and apps plays, or you open its page with "Discover" (which one, placement); before version 1.0.15, named <code>house_ad</code>, <code>house_ad_open</code>;</li>
+				<li><code>account_gate</code>, <code>sign_in</code>, <code>sign_out</code>, <code>account_delete</code> — the account is asked for, a sign-in, a sign-out or a deletion takes place (Google or Apple, success or cancel; on a failure, the step and an error code, never the message);</li>
 				<li><code>ambience</code> — the "Look" chosen in Options (place, dark mode setting);</li>
 				<li><code>onboarding</code> — a new player's first steps, once each (throwing lesson, player chosen, hand, "How to play", first throw, first game and its result), with the time since the app first opened, in bands;</li>
 				<li><code>shots_start</code>, <code>shots_end</code> — a shooting challenge series starts or ends (score, carreaux, day's best or not, account or not, number of series, in bands);</li>
@@ -376,6 +376,8 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li>your answer in the "Personalised advertising" window, the day you gave it and the version of the text, and, if you accepted, the ad modules' data (see §6);</li>
 				<li>your real-money payments of the last 24 hours (time, amount, currency), for the question asked to an adult before a new purchase; they never leave your phone;</li>
 				<li>a game against the computer that was cut off (a call, the game closed), to pick it up where it stopped;</li>
+				<li>the game's own time, so that changing the phone's clock does not give the daily bonus or challenges early; the game sets it from the time in our statistics server's answers, without sending anything more;</li>
+				<li>a number drawn at random on this phone, which leaves it only in your progress, during a rated match (see §3);</li>
 				<li>the list of our own ads and their pictures, kept for next time (see §6).</li>
 			</ul>
 			<p>All of this disappears when you uninstall the app. From version 1.0.8 on, none of it is copied to your Android phone's Google backup or moved to a new phone; an older version could copy it there, and that backup could restore it when you installed the app again.</p>
