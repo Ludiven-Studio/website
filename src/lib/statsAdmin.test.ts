@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-	CACHE_KEY, num, readCounts, readHosts, readRetention, readStats, statsHandler, tapRates,
-	type Overview,
+	CACHE_KEY, num, readBoard, readCounts, readHosts, readRetention, readStats, statsHandler, tapRates,
+	type Board, type BoardRow, type Overview,
 } from '../../supabase/functions/_shared/statsAdmin.mjs';
 
 const NOW = new Date('2026-11-20T12:00:00Z');
@@ -236,5 +236,50 @@ describe('the stats-admin function', () => {
 		const bare = statsHandler({ env: { ...ENV, UMAMI_PASSWORD: '' }, isAdmin, cache: fakeCache(), fetch: fetchFn });
 		expect((await bare(post({ action: 'overview' }))).status).toBe(503);
 		expect(calls).toEqual([]);
+	});
+});
+
+describe('the board action', () => {
+	const ROWS = [
+		{ app: 'scan', data: { name: 'Pétanque Scan', order: 2, play_prod: '1.2.15 (102015)', ios: '1.2.15', waits: ['Build iOS 1.2.16'] }, updated_at: '2026-11-22T10:00:00Z' },
+		{ app: 'meet', data: { name: 'Pétanque Meet', order: 1, main: 'abc1234', waits: 'Déployer la 1.1.2 | Build iOS' }, updated_at: '2026-11-22T09:00:00Z' },
+		{ app: 'odd', data: { order: 'x', name: 7, play_prod: { html: '<b>' }, waits: [3, '', ' ok '], token: 'secret' }, updated_at: 5 },
+		{ app: 'bad', data: ['not', 'an', 'object'], updated_at: '' },
+		null,
+	] as unknown as BoardRow[];
+
+	it('lists the apps in the board order, text fields only', () => {
+		const b = readBoard(ROWS, NOW);
+		expect(b.generatedAt).toBe(NOW.toISOString());
+		expect(b.apps.map((a) => a.app)).toEqual(['meet', 'scan', 'odd']);
+		expect(b.apps[0]).toEqual({ app: 'meet', name: 'Pétanque Meet', order: 1, play_prod: '', play_test: '', ios: '', beta: '', main: 'abc1234', waits: ['Déployer la 1.1.2', 'Build iOS'], updatedAt: '2026-11-22T09:00:00Z' });
+		const odd = b.apps[2];
+		expect([odd.name, odd.order, odd.play_prod, odd.waits, odd.updatedAt]).toEqual(['odd', 999, '', ['ok'], null]);
+		expect(Object.keys(odd)).not.toContain('token');
+		expect(readBoard('nope', NOW).apps).toEqual([]);
+	});
+
+	it('serves the board to Raphaël only, without Umami', async () => {
+		const { fetchFn, calls } = fakeUmami(3);
+		const board = { list: async () => ROWS };
+		const handle = statsHandler({ env: { PROMO_ADMIN_USER_ID: 'raph' }, isAdmin, cache: fakeCache(), board, fetch: fetchFn, now: () => NOW });
+		const res = await handle(post({ action: 'board' }));
+		expect(res.status).toBe(200);
+		expect(((await res.json()) as Board).apps).toHaveLength(3);
+		expect((await handle(post({ action: 'board' }, 'someone-else'))).status).toBe(403);
+		// Overview still needs Umami's secrets.
+		expect((await handle(post({ action: 'overview' }))).status).toBe(503);
+		expect(calls).toEqual([]);
+	});
+
+	it('says when the board is missing or unreadable', async () => {
+		const noBoard = statsHandler({ env: ENV, isAdmin, cache: fakeCache() });
+		expect((await noBoard(post({ action: 'board' }))).status).toBe(503);
+		const broken = statsHandler({ env: ENV, isAdmin, cache: fakeCache(), board: { list: async () => { throw new Error('relation "studio_board" does not exist'); } } });
+		const res = await broken(post({ action: 'board' }));
+		expect(res.status).toBe(502);
+		expect(await res.json()).toEqual({ error: 'board not readable' });
+		const noAdmin = statsHandler({ env: { ...ENV, PROMO_ADMIN_USER_ID: '' }, isAdmin, cache: fakeCache(), board: { list: async () => ROWS } });
+		expect((await noAdmin(post({ action: 'board' }))).status).toBe(503);
 	});
 });

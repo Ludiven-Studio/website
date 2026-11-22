@@ -27,3 +27,14 @@ Needs Raphaël's word (server and production database). Run from the website fol
 
 promo-admin's check of `weights` per platform (2026-11-20) also waits for a redeploy:
 `& $s functions deploy promo-admin --project-ref mzrdfahmzllgbpudpsdi`.
+
+## The studio board (/admin/versions/, 2026-11-22)
+
+Needs Raphaël's word typed in the session: the table, then the function.
+
+1. **Table** `studio_board` (migration 20261122120000): `migration list`, then `db push --dry-run`; the dry run
+   must list `20261122120000_studio_board.sql` only; then the same line without `--dry-run`.
+2. **Function**: `& $s functions deploy stats-admin --project-ref mzrdfahmzllgbpudpsdi` (the `board` action).
+3. **First rows**: the studio-board skill, `python board.py show`, then `push` on Raphaël's standing OK for
+   writes to studio_board only.
+4. **Check**: https://www.ludiven-studio.fr/admin/versions/ signed in with Raphaël's Google account.

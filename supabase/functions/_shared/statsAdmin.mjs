@@ -1,5 +1,5 @@
 // stats-admin's logic: the studio's figures per app, read from the self-hosted Umami (one website per app),
-// for /admin/stats/ and the tiles of /admin/. Plain JavaScript with its fetch, cache and admin check passed in,
+// for /admin/stats/ and the tiles of /admin/, and the studio board of /admin/versions/. Plain JavaScript with its fetch, cache and admin check passed in,
 // so vitest runs it against a fake Umami and a fake table, and Deno serves it (stats-admin/index.ts).
 //
 // Umami differs between v2 and v3 in a few names (stats as { value } or plain numbers, `eventName` or `event`,
@@ -194,18 +194,40 @@ export async function overview(env, fetchFn, now) {
 	return { generatedAt: now.toISOString(), apps };
 }
 
+// The board's text fields, as board.py writes them; anything else in a row is left out.
+export const BOARD_FIELDS = ['name', 'play_prod', 'play_test', 'ios', 'beta', 'main'];
+
+/** studio_board rows ({ app, data, updated_at }) as the page's list, in the board's order. */
+export function readBoard(rows, now) {
+	const text = (v) => (typeof v === 'string' ? v.slice(0, 600) : '');
+	const apps = (Array.isArray(rows) ? rows : [])
+		.filter((r) => r && typeof r.app === 'string' && r.data && typeof r.data === 'object' && !Array.isArray(r.data))
+		.map((r) => {
+			const d = r.data;
+			const app = { app: r.app, order: Number.isFinite(d.order) ? d.order : 999, updatedAt: typeof r.updated_at === 'string' ? r.updated_at : null };
+			for (const f of BOARD_FIELDS) app[f] = text(d[f]);
+			if (!app.name) app.name = r.app;
+			app.waits = (Array.isArray(d.waits) ? d.waits : typeof d.waits === 'string' ? d.waits.split(' | ') : [])
+				.map(text).map((w) => w.trim()).filter(Boolean).slice(0, 20);
+			return app;
+		});
+	apps.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+	return { generatedAt: now.toISOString(), apps };
+}
+
 /**
  * The function's request handler. deps:
  * - env: UMAMI_URL, UMAMI_USER, UMAMI_PASSWORD, PROMO_ADMIN_USER_ID;
  * - isAdmin(req): true for Raphaël's account only (the same check as promo-admin);
  * - cache: { get(key) → { body, fetchedAt } | null, put(key, body) };
+ * - board: { list() → studio_board rows } for /admin/versions/;
  * - fetch, now() for the tests.
  */
-export function statsHandler({ env, isAdmin, cache, fetch: fetchFn = fetch, now = () => new Date() }) {
+export function statsHandler({ env, isAdmin, cache, board, fetch: fetchFn = fetch, now = () => new Date() }) {
 	return async (req) => {
 		if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
 		if (req.method !== 'POST') return json({ error: 'method not allowed' }, 405);
-		if (!env.UMAMI_URL || !env.UMAMI_USER || !env.UMAMI_PASSWORD || !env.PROMO_ADMIN_USER_ID) return json({ error: 'not configured' }, 503);
+		if (!env.PROMO_ADMIN_USER_ID) return json({ error: 'not configured' }, 503);
 		try {
 			if (!(await isAdmin(req))) return json({ error: 'not allowed' }, 403);
 		} catch {
@@ -217,7 +239,16 @@ export function statsHandler({ env, isAdmin, cache, fetch: fetchFn = fetch, now 
 		} catch {
 			return json({ error: 'invalid JSON body' }, 400);
 		}
+		if (body?.action === 'board') {
+			if (!board) return json({ error: 'not configured' }, 503);
+			try {
+				return json(readBoard(await board.list(), now()));
+			} catch {
+				return json({ error: 'board not readable' }, 502);
+			}
+		}
 		if (body?.action !== 'overview') return json({ error: 'unknown action' }, 400);
+		if (!env.UMAMI_URL || !env.UMAMI_USER || !env.UMAMI_PASSWORD) return json({ error: 'not configured' }, 503);
 		const at = now();
 		try {
 			const hit = body.refresh === true ? null : await Promise.resolve().then(() => cache.get(CACHE_KEY)).catch(() => null);

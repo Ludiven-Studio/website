@@ -21,6 +21,21 @@ export interface AppStats {
 	errors: string[];
 }
 
+export interface BoardApp {
+	app: string;
+	name: string;
+	order: number;
+	play_prod: string;
+	play_test: string;
+	ios: string;
+	beta: string;
+	main: string;
+	waits: string[];
+	updatedAt: string | null;
+}
+export interface Board { generatedAt: string; apps: BoardApp[] }
+export interface BoardRow { app: string; data: unknown; updated_at: string }
+
 export interface Overview { generatedAt: string; apps: AppStats[]; cached?: boolean }
 
 export interface Cache {
@@ -54,10 +69,13 @@ export function umami(base: string, fetchFn: typeof fetch): {
 };
 export function appStats(u: ReturnType<typeof umami>, site: { id: string; name?: string; domain?: string }, now: Date): Promise<AppStats>;
 export function overview(env: StatsEnv, fetchFn: typeof fetch, now: Date): Promise<Overview>;
+export const BOARD_FIELDS: string[];
+export function readBoard(rows: unknown, now: Date): Board;
 export function statsHandler(deps: {
 	env: StatsEnv;
 	isAdmin: (req: Request) => Promise<boolean>;
 	cache: Cache;
+	board?: { list(): Promise<BoardRow[]> };
 	fetch?: typeof fetch;
 	now?: () => Date;
 }): (req: Request) => Promise<Response>;

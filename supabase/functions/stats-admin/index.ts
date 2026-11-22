@@ -1,6 +1,7 @@
 // stats-admin — the studio dashboard's figures (/admin/stats/ and the tiles of /admin/), for Raphaël's account
 // only: each app's visitors, purchases, sign-ins, house ads and retention, read from the self-hosted Umami with a
-// view-only user, cached 10 minutes in admin_stats_cache. The logic is in _shared/statsAdmin.mjs.
+// view-only user, cached 10 minutes in admin_stats_cache; and the studio board of /admin/versions/ (studio_board,
+// written by the studio's board.py). The logic is in _shared/statsAdmin.mjs.
 //
 // Secrets: UMAMI_URL (https://stats.ludiven-studio.fr), UMAMI_USER and UMAMI_PASSWORD (the view-only
 // « dashboard » user), PROMO_ADMIN_USER_ID (Raphaël's Supabase user id, the same as promo-admin).
@@ -9,7 +10,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2.117.0';
 // @deno-types="../_shared/statsAdmin.d.mts"
 import { statsHandler } from '../_shared/statsAdmin.mjs';
-import type { Overview } from '../_shared/statsAdmin.d.mts';
+import type { BoardRow, Overview } from '../_shared/statsAdmin.d.mts';
 
 const env = Deno.env.toObject();
 const db = createClient(env.SUPABASE_URL!, env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
@@ -33,4 +34,12 @@ const cache = {
 	},
 };
 
-Deno.serve(statsHandler({ env, isAdmin, cache }));
+const board = {
+	async list(): Promise<BoardRow[]> {
+		const { data, error } = await db.from('studio_board').select('app, data, updated_at');
+		if (error) throw new Error(error.message);
+		return (data ?? []) as BoardRow[];
+	},
+};
+
+Deno.serve(statsHandler({ env, isAdmin, cache, board }));
