@@ -2,15 +2,16 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 
 // Unlisted: noindex, out of the sitemap and of the offline precache (BaseLayout, astro.config.mjs's /beta- rules).
-// The next version, built from DragonsGemsSwipe's main (12d26c9) as com.ludivenstudio.dragonsgems.beta
+// The next version, built from DragonsGemsSwipe's main (3484537) as com.ludivenstudio.dragonsgems.beta
 // (Profile_Android_Beta, APP_BETA), signed with the dev key, ARM64 only, on a prerelease of this repo.
 const APK = {
-	url: 'https://github.com/Ludiven-Studio/website/releases/download/dragons-gems-beta/dragonsgems-beta-v1.1.8.apk',
+	url: 'https://github.com/Ludiven-Studio/website/releases/download/dragons-gems-beta/dragons-gems-1.1.8-beta2.apk',
 	version: '1.1.8',
 	code: 101008,
-	size: 76623743,
-	sha256: '4f15baccc19fae94b280cc7e9829ed387a642470bf83d9c1ce7755d5f39d680e',
-	commit: '12d26c9',
+	size: 76655387,
+	sha256: '55841d462d6ab729ba8350be482085c5a3a39f0933b8d0cc11053c0b1b05d7dc',
+	commit: '3484537',
+	label: 'beta2',
 };
 ---
 
@@ -27,13 +28,34 @@ const APK = {
 
 		<section class="card stack gap-3">
 			<a class="download" href={APK.url}>Télécharger la bêta {APK.version}</a>
-			<p class="muted">{(APK.size / 1e6).toFixed(1).replace('.', ',')} Mo · version {APK.version} (code {APK.code}) · commit <code>{APK.commit}</code></p>
+			<p class="muted">{(APK.size / 1e6).toFixed(1).replace('.', ',')} Mo · version {APK.version} {APK.label} (code {APK.code}) · commit <code>{APK.commit}</code></p>
 			<p class="muted sha">SHA-256 : <code>{APK.sha256}</code></p>
 		</section>
 
 		<section class="card stack gap-3">
 			<h2>Quoi de neuf à tester</h2>
-			<p><strong>Nouveau dans la 1.1.8 :</strong></p>
+			<p><strong>Nouveau dans la 1.1.8 beta2 :</strong></p>
+			<ul>
+				<li>Tous les petits textes sont plus grands (15 pt au minimum) et plus lisibles, en 5 langues ; les boutons grisés sont plus foncés.</li>
+				<li>Boutique : les lignes de fragments du bonus tiennent dans toutes les langues ; le titre peut passer sur 2 lignes et le prix reste dans son bouton.</li>
+				<li>L'écran ne se met plus en veille pendant un niveau (les menus gardent le réglage du téléphone).</li>
+				<li>Réglages : nouveau lien « Conditions d'utilisation » sous « Confidentialité ».</li>
+				<li>Vidéos de nos jeux : un lien « Signaler cette vidéo » ouvre un e-mail au studio.</li>
+				<li>L'heure du téléphone ne compte plus pour le cadeau du jour, l'objectif du jour, les vidéos du jour, le défi du jour, les cœurs et l'invite de mise à jour : reculer ou avancer l'horloge ne donne rien en double et ne bloque rien.</li>
+				<li>Connexion : « Annuler » abandonne vraiment la connexion, même si Google ou Apple répond oui juste après ; un double tap ne demande plus deux fois.</li>
+				<li>Les cartes qui arrivent en retard (restauration, suppression du compte, cadeau du jour) attendent l'accueil au lieu de s'ouvrir sur le plateau ; la proposition de compte attend la fin d'une restauration.</li>
+				<li>« Jouer » ou « Défi du jour » tapés deux fois n'ouvrent qu'une partie.</li>
+				<li>Partie en ligne : une copie de secours ou un changement de compte ne fait plus revenir des pièces dépensées ni compter un coffre deux fois.</li>
+				<li>Nombreuses petites corrections.</li>
+			</ul>
+			<p><strong>À tester en priorité :</strong></p>
+			<ul>
+				<li>la boutique (bonus, fragments) en espagnol et en allemand ;</li>
+				<li>laisser le téléphone sans le toucher pendant un niveau (l'écran reste allumé ; sur l'accueil il s'éteint comme d'habitude) ;</li>
+				<li>changer l'heure du téléphone en arrière puis en avant (le cadeau du jour et les cœurs ne bougent pas).</li>
+			</ul>
+			<p><strong>Inchangé :</strong> pas d'achats, aucune pub réseau, pas d'invite de mise à jour, ARM64 seulement.</p>
+			<p><strong>Dans la 1.1.8 beta1 :</strong></p>
 			<ul>
 				<li>Connexion au compte, suppression du compte et restauration des achats : une fenêtre d'attente avec « Annuler » s'affiche pendant l'échange avec le serveur.</li>
 				<li>Votre progression est mieux protégée : une sauvegarde abîmée est reprise de la copie de secours au lieu de repartir de zéro, et la synchronisation entre téléphones ne compte plus deux fois les mêmes pièces.</li>

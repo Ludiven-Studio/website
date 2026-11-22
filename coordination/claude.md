@@ -3886,3 +3886,16 @@
 - 10:36 : build complet OK (précache 411, liens 271)
 - 10:36 : commité et poussé sur « Publie les 4 » de Raphaël (Producer, 21/11) : ma page et cette section seulement.
   Statut : terminé. Réservations libérées.
+
+## 2026-11-22 — Dragon's Gems : bêta 1.1.8 beta2 (rebuild 3484537) (session producer-release-publisher)
+- Statut : en cours (2026-11-22T22:17+01:00). Demande de l'utilisateur : « Publie » de Raphaël dans le Producer
+  (22/11), relayé par le Producer : APK beta2 sur la prerelease et page des testeurs
+- Réservations actives : `src/pages/dragons-gems/beta-h4yb1lyxzz.astro`.
+- Ressources : serveur de dev sur le port 4431 ; eslint, `astro check`. Build annoncé ici avant.
+- 22:19 : APK beta2 (code 101008, 76 655 387 o, sha256 55841d46…) mis sur la prerelease dragons-gems-beta sous
+  dragons-gems-1.1.8-beta2.apk, octets servis vérifiés ; page à jour, eslint et astro check OK, captures bureau et
+  téléphone ; lancement du build complet (écrit dist/, .astro/, public/vendor/ du worktree
+  D:/tmp/site-publish-gems-beta2)…
+- 22:21 : build complet OK (précache 412, liens 272)
+- 22:21 : commité et poussé sur « Publie » de Raphaël (Producer, 22/11) relayé par le Producer : ma page et cette
+  section seulement. Statut : terminé. Réservations libérées.
