@@ -2,16 +2,16 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 
 // Unlisted: noindex, out of the sitemap and of the offline precache (BaseLayout, astro.config.mjs's /beta- rules).
-// The next version, built from DragonsGemsSwipe's main (3484537) as com.ludivenstudio.dragonsgems.beta
+// The next version, built from DragonsGemsSwipe's main (925eabf) as com.ludivenstudio.dragonsgems.beta
 // (Profile_Android_Beta, APP_BETA), signed with the dev key, ARM64 only, on a prerelease of this repo.
 const APK = {
-	url: 'https://github.com/Ludiven-Studio/website/releases/download/dragons-gems-beta/dragons-gems-1.1.8-beta2.apk',
+	url: 'https://github.com/Ludiven-Studio/website/releases/download/dragons-gems-beta/dragons-gems-1.1.8-beta3.apk',
 	version: '1.1.8',
 	code: 101008,
-	size: 76655387,
-	sha256: '55841d462d6ab729ba8350be482085c5a3a39f0933b8d0cc11053c0b1b05d7dc',
-	commit: '3484537',
-	label: 'beta2',
+	size: 76666395,
+	sha256: '237d47c6ae2b124784086177ba13d3c6865580b5335d7ae555f19e170d4c1953',
+	commit: '925eabf',
+	label: 'beta3',
 };
 ---
 
@@ -34,7 +34,24 @@ const APK = {
 
 		<section class="card stack gap-3">
 			<h2>Quoi de neuf à tester</h2>
-			<p><strong>Nouveau dans la 1.1.8 beta2 :</strong></p>
+			<p><strong>Nouveau dans la 1.1.8 beta3 :</strong></p>
+			<ul>
+				<li>Tutos : la leçon des gemmes qui arrivent dit maintenant « glisse et garde le doigt appuyé » pour les voir ; elle s'affiche aussi sur un plateau où rien ne bouge ; ses fenêtres suivent le plateau si l'écran change de taille (téléphone pliable, rotation).</li>
+				<li>La proposition de compte n'apparaît plus par-dessus la boutique, un niveau ou la carte de restauration, ni pendant qu'on glisse vers un autre onglet.</li>
+				<li>Rappels : fermer la question sans répondre compte comme « non », elle ne revient plus.</li>
+				<li>Touche retour : elle attend la fin de la fermeture d'une carte et n'agit plus sur la carte ou l'écran du dessous.</li>
+				<li>Cartes : un deuxième appui pendant la fermeture ne relance plus l'action (achat, suppression).</li>
+				<li>Le téléphone peut de nouveau se mettre en veille dans la boutique ou la réserve ouvertes depuis un niveau.</li>
+				<li>Horloge : un téléphone avancé de plusieurs jours puis remis à l'heure revient à la bonne date.</li>
+				<li>Vidéos de nos jeux : la récompense est gardée même si la vidéo se ferme pendant sa fermeture ; les bannières se mettent à jour.</li>
+			</ul>
+			<p><strong>À tester en priorité :</strong></p>
+			<ul>
+				<li>les tutos des niveaux 3 et 201 ;</li>
+				<li>la touche retour sur les cartes ;</li>
+				<li>la proposition de compte après le niveau 10.</li>
+			</ul>
+			<p><strong>Dans la 1.1.8 beta2 :</strong></p>
 			<ul>
 				<li>Tous les petits textes sont plus grands (15 pt au minimum) et plus lisibles, en 5 langues ; les boutons grisés sont plus foncés.</li>
 				<li>Boutique : les lignes de fragments du bonus tiennent dans toutes les langues ; le titre peut passer sur 2 lignes et le prix reste dans son bouton.</li>
