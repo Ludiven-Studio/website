@@ -9,7 +9,9 @@
 // « dashboard » user), PROMO_ADMIN_USER_ID (Raphaël's Supabase user id, the same as promo-admin),
 // LEVELPLAY_SECRET_KEY and LEVELPLAY_REFRESH_TOKEN (LevelPlay, My Account), PLAY_REPORTS_KEY (the JSON key, or
 // its base64, of a service account with only « View financial data » in the Play Console) and PLAY_REPORTS_BUCKET
-// (pubsite_prod_…, Play Console → Download reports → Financial → Copy Cloud Storage URI).
+// (pubsite_prod_…, Play Console → Download reports → Financial → Copy Cloud Storage URI); ASC_ISSUER_ID, ASC_KEY_ID,
+// ASC_PRIVATE_KEY (the .p8's text) and ASC_VENDOR_NUMBER, an App Store Connect team key with the Sales role, for the
+// App Store's in-app sales of /admin/revenus/ (_shared/appStoreSales.mjs, with the ECB's euro rates).
 // Deploy: supabase functions deploy stats-admin --project-ref mzrdfahmzllgbpudpsdi
 
 import { createClient } from 'jsr:@supabase/supabase-js@2.117.0';

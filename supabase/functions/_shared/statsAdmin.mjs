@@ -7,6 +7,7 @@
 // in `errors`, instead of failing the page.
 
 import { ORDERS_CACHE_MINUTES, ORDERS_KEY, playOrders } from './playSales.mjs';
+import { APPSTORE_CACHE_MINUTES, APPSTORE_KEY, RATES_CACHE_MINUTES, RATES_KEY, appStoreSales, ecbRates } from './appStoreSales.mjs';
 
 export const CACHE_MINUTES = 10;
 export const CACHE_KEY = 'overview';
@@ -525,6 +526,22 @@ export function statsHandler({ env, isAdmin, cache, board, fetch: fetchFn = fetc
 			} catch {
 				return json({ error: 'board not readable' }, 502);
 			}
+		}
+		if (body?.action === 'appstore' || body?.action === 'rates') {
+			const apple = body.action === 'appstore';
+			if (apple && (!env.ASC_ISSUER_ID || !env.ASC_KEY_ID || !env.ASC_PRIVATE_KEY || !env.ASC_VENDOR_NUMBER)) return json({ error: 'appstore not configured' }, 503);
+			const [key, minutes] = apple ? [APPSTORE_KEY, APPSTORE_CACHE_MINUTES] : [RATES_KEY, RATES_CACHE_MINUTES];
+			const at = now();
+			const hit = body.refresh === true ? null : await Promise.resolve().then(() => cache.get(key)).catch(() => null);
+			if (hit && at.getTime() - new Date(hit.fetchedAt).getTime() < minutes * 60_000) return json({ ...hit.body, cached: true });
+			let data;
+			try {
+				data = apple ? await appStoreSales(env, fetchFn, at) : await ecbRates(fetchFn, at);
+			} catch (e) {
+				return json({ error: apple ? 'App Store Connect did not answer' : 'ECB did not answer', detail: String(e?.message ?? e).slice(0, 200) }, 502);
+			}
+			await Promise.resolve().then(() => cache.put(key, data)).catch(() => undefined);
+			return json({ ...data, cached: false });
 		}
 		if (body?.action === 'orders') {
 			if (!env.PLAY_REPORTS_KEY || !env.PLAY_REPORTS_BUCKET) return json({ error: 'orders not configured' }, 503);
