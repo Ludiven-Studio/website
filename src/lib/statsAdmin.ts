@@ -2,9 +2,9 @@
 // PUBLIC_STATS_ADMIN_URL, set in dev only, points at a local mock, with a fixed token and no sign-in.
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from '../data/site';
 import { accessToken } from './meetupAuth';
-import type { Board, Overview, Purchases, Revenue } from '../../supabase/functions/_shared/statsAdmin.mjs';
+import type { Board, Overview, PurchaseKind, Purchases, Revenue } from '../../supabase/functions/_shared/statsAdmin.mjs';
 
-export type { AppStats, Board, BoardApp, Count, Overview, Purchase, Purchases, Revenue, RevenueApp, RevenueDay } from '../../supabase/functions/_shared/statsAdmin.mjs';
+export type { AppStats, Board, BoardApp, Count, Overview, Purchase, PurchaseKind, Purchases, Revenue, RevenueApp, RevenueDay } from '../../supabase/functions/_shared/statsAdmin.mjs';
 
 const LOCAL = import.meta.env.PUBLIC_STATS_ADMIN_URL as string | undefined;
 export const STATS_URL = LOCAL || `${SUPABASE_URL}/functions/v1/stats-admin`;
@@ -41,6 +41,12 @@ export const PRODUCTS: Record<string, { name: string; price: string }> = {
 };
 
 export const STORES: Record<string, string> = { play: 'Google Play', appstore: 'App Store' };
+
+export const KINDS: Record<PurchaseKind, string> = {
+	real: 'réel', unchecked: 'réel (non vérifié)', tester: 'testeur', promo: 'promo', dev: 'simulé', beta: 'simulé (bêta)',
+};
+/** The kinds the page counts and shows by default. */
+export const COUNTED_KINDS: readonly PurchaseKind[] = ['real', 'unchecked'];
 
 /** The studio board of /admin/versions/. */
 export function board(): Promise<Board> {

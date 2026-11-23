@@ -347,10 +347,27 @@ export const PURCHASES_KEY = 'purchases';
 export const PURCHASES_DAYS = 30;
 const PURCHASE_PAGE = 100;
 const PURCHASE_PAGES = 5;
-const NOT_REAL = new Set(['yes', 'true', '1']);
+const TESTER = new Set(['yes', 'true', '1']);
+// What a purchase that went through really was. Only real and unchecked count; the others show on request.
+export const COUNTED = new Set(['real', 'unchecked']);
 
-/** One event-data entry as a purchase that went through, or null: another event, another result, a tester's
- *  card or a dev build's fake store. */
+/** The purchase's kind from its event data (the template's ShopEvents and Pétanque Game's own):
+ *  - beta: a beta build (« beta » in the app version, Raphaël's rule of 2026-11-23, or a .beta hostname);
+ *  - dev: a simulated purchase (test=dev, store=dev, build=dev or a .dev hostname);
+ *  - tester: a Play licence tester's card (test=yes); promo: a promo code;
+ *  - real: test=no, or none on Google Play; unchecked: test=unknown, or none elsewhere (the App Store). */
+export function purchaseKind(props, hostname = '') {
+	const test = props.get('test') ?? '';
+	if (/beta/i.test(props.get('app_version') ?? '') || /\.beta$/i.test(hostname)) return 'beta';
+	if (test === 'dev' || props.get('store') === 'dev' || props.get('build') === 'dev' || /\.dev$/i.test(hostname)) return 'dev';
+	if (TESTER.has(test)) return 'tester';
+	if (test === 'promo') return 'promo';
+	if (test === 'no' || (!test && props.get('store') === 'play')) return 'real';
+	return 'unchecked';
+}
+
+/** One event-data entry as a purchase that went through (any kind), or null: another event or another result.
+ *  Its props stay inside the function, for the hostname check. */
 export function readPurchase(entry, app) {
 	if (!entry || typeof entry !== 'object') return null;
 	const name = entry.eventName ?? entry.event;
@@ -364,13 +381,15 @@ export function readPurchase(entry, app) {
 		if (!at && p.createdAt) at = String(p.createdAt);
 	}
 	const time = Date.parse(at || entry.createdAt);
-	if (props.get('result') !== 'ok' || NOT_REAL.has(props.get('test') ?? '') || props.get('store') === 'dev' || !Number.isFinite(time)) return null;
+	if (props.get('result') !== 'ok' || !Number.isFinite(time)) return null;
 	return {
 		at: new Date(time).toISOString(),
 		app,
 		item: (props.get('item') || '?').slice(0, 40),
 		store: (props.get('store') ?? '').slice(0, 20),
 		later: props.get('asked') === 'no',
+		kind: purchaseKind(props),
+		props,
 	};
 }
 
@@ -401,6 +420,7 @@ export async function recentPurchases(env, fetchFn, now) {
 			errors.push(`${name} : ${String(e?.message ?? e).slice(0, 200)}`);
 		}
 		const sessions = new Map();
+		const hosts = new Map();
 		const wanted = new Set(found.map((f) => f.event).filter(Boolean));
 		try {
 			for (let page = 1; page <= PURCHASE_PAGES && wanted.size > 0; page++) {
@@ -408,8 +428,9 @@ export async function recentPurchases(env, fetchFn, now) {
 				const body = await u.get(`/websites/${id}/events?${q}`);
 				const data = rows(body);
 				for (const e of data) {
-					if (!e || !wanted.has(e.id) || (typeof e.sessionId !== 'string' && typeof e.sessionId !== 'number')) continue;
-					sessions.set(e.id, `${site.id}|${e.sessionId}`);
+					if (!e || !wanted.has(e.id)) continue;
+					if (typeof e.hostname === 'string') hosts.set(e.id, e.hostname);
+					if (typeof e.sessionId === 'string' || typeof e.sessionId === 'number') sessions.set(e.id, `${site.id}|${e.sessionId}`);
 					wanted.delete(e.id);
 				}
 				if (data.length < PURCHASE_PAGE) break;
@@ -417,16 +438,29 @@ export async function recentPurchases(env, fetchFn, now) {
 		} catch (e) {
 			errors.push(`${name} : acheteurs non lus (${String(e?.message ?? e).slice(0, 160)})`);
 		}
-		return found.map((f) => ({ ...f.p, session: sessions.get(f.event) ?? null }));
+		return found.map(({ p: { props, ...p }, event }) => ({
+			...p,
+			kind: hosts.has(event) ? purchaseKind(props, hosts.get(event)) : p.kind,
+			session: sessions.get(event) ?? null,
+		}));
 	}));
 	const sorted = perSite.flat().sort((a, b) => b.at.localeCompare(a.at) || a.app.localeCompare(b.app));
 	// Numbered in order of the newest purchase, within this answer only: the session never reaches the page.
+	// The counted purchases' buyers first, so the default view reads 1, 2, 3 without gaps.
 	const buyers = new Map();
-	const purchases = sorted.map(({ session, ...p }) => {
-		if (session && !buyers.has(session)) buyers.set(session, buyers.size + 1);
-		return { ...p, buyer: session ? buyers.get(session) : null };
-	});
-	return { generatedAt: now.toISOString(), from: new Date(startAt).toISOString(), purchases, buyers: buyers.size, errors };
+	for (const counted of [true, false])
+		for (const { session, kind } of sorted)
+			if (session && COUNTED.has(kind) === counted && !buyers.has(session)) buyers.set(session, buyers.size + 1);
+	const counted = sorted.filter((p) => COUNTED.has(p.kind));
+	const purchases = sorted.map(({ session, ...p }) => ({ ...p, buyer: session ? buyers.get(session) : null }));
+	return {
+		generatedAt: now.toISOString(),
+		from: new Date(startAt).toISOString(),
+		purchases,
+		counted: counted.length,
+		buyers: new Set(counted.map((p) => p.session).filter(Boolean)).size,
+		errors,
+	};
 }
 
 /**

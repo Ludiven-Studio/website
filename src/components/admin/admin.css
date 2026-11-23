@@ -37,6 +37,8 @@ a.ah-tile:hover, a.ah-tile:focus-visible { border-color: var(--sc-accent); box-s
 .as-purchases .as-table tbody :is(th, td) { text-align: left; }
 .as-purchases .as-table tbody td:last-child { text-align: right; }
 .as-purchases .as-table small { font-weight: normal; }
+.as-purchases .as-not-real { color: var(--sc-muted); }
+.as-check { display: flex; gap: 0.4rem; align-items: center; font-size: var(--text-sm); }
 .as-signin { display: grid; gap: 0.75rem; justify-items: start; }
 .av-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr)); }
 .av-app { display: grid; gap: 0.75rem; align-content: start; }

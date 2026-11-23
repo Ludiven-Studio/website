@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-	CACHE_KEY, PURCHASES_KEY, REVENUE_KEY, num, readPurchase, readBoard, readRevenueRow, revenueRange, revenueSummary, readCounts, readHosts, readRetention, readStats, statsHandler, tapRates,
+	CACHE_KEY, PURCHASES_KEY, REVENUE_KEY, num, purchaseKind, readPurchase, readBoard, readRevenueRow, revenueRange, revenueSummary, readCounts, readHosts, readRetention, readStats, statsHandler, tapRates,
 	type Board, type BoardRow, type Overview, type Purchases, type Revenue,
 } from '../../supabase/functions/_shared/statsAdmin.mjs';
 
@@ -63,17 +63,17 @@ function fakeUmami(version: 2 | 3, opts: { fail?: RegExp; loginFails?: boolean; 
 		if (path.endsWith('/event-data')) {
 			// Umami 3 only: each event with its properties, newest first, one page of events at a time.
 			if (version === 2) return new Response('{}', { status: 404 });
-			const all = ((opts.iapEvents ?? IAP_EVENTS)[site] ?? []) as { session?: string }[];
+			const all = ((opts.iapEvents ?? IAP_EVENTS)[site] ?? []) as { session?: string; host?: string }[];
 			const size = Number(q.get('pageSize') ?? 20), page = Number(q.get('page') ?? 1);
 			// This list carries no session: drop the fake's own field.
-			return ok({ data: all.slice((page - 1) * size, page * size).map(({ session: _session, ...e }) => e), count: all.length, page, pageSize: size });
+			return ok({ data: all.slice((page - 1) * size, page * size).map(({ session: _session, host: _host, ...e }) => e), count: all.length, page, pageSize: size });
 		}
 		if (path.endsWith('/events')) {
 			if (version === 2) return new Response('{}', { status: 404 });
-			const all = ((opts.iapEvents ?? IAP_EVENTS)[site] ?? []) as { eventId: string; eventName: string; session?: string }[];
+			const all = ((opts.iapEvents ?? IAP_EVENTS)[site] ?? []) as { eventId: string; eventName: string; session?: string; host?: string }[];
 			const size = Number(q.get('pageSize') ?? 20), page = Number(q.get('page') ?? 1);
 			const data = all.slice((page - 1) * size, page * size)
-				.map((e) => ({ id: e.eventId, websiteId: site, sessionId: e.session, visitId: `v-${e.session}`, eventName: e.eventName, country: 'FR', device: 'mobile' }));
+				.map((e) => ({ id: e.eventId, websiteId: site, sessionId: e.session, visitId: `v-${e.session}`, hostname: e.host ?? 'com.ludivenstudio.app', eventName: e.eventName, country: 'FR', device: 'mobile' }));
 			return ok({ data, count: all.length, page, pageSize: size });
 		}
 		if (path === '/reports/retention') {
@@ -93,8 +93,8 @@ function fakeUmami(version: 2 | 3, opts: { fail?: RegExp; loginFails?: boolean; 
 }
 
 /** An iap_result event as Umami 3's event-data list gives it. */
-const iap = (at: string, props: Record<string, string>, eventName = 'iap_result', session = 's-x') => ({
-	websiteId: 'w', eventId: `e-${at}`, eventName, session,
+const iap = (at: string, props: Record<string, string>, eventName = 'iap_result', session = 's-x', host?: string) => ({
+	websiteId: 'w', eventId: `e-${at}`, eventName, session, host,
 	eventProperties: Object.entries(props).map(([dataKey, stringValue]) => ({ dataKey, stringValue, numberValue: null, dateValue: null, dataType: 1, createdAt: at })),
 });
 const IAP_EVENTS: Record<string, unknown[]> = {
@@ -104,10 +104,13 @@ const IAP_EVENTS: Record<string, unknown[]> = {
 		iap('2026-11-17T09:00:00Z', { item: 'coins_l', result: 'ok', store: 'play', asked: 'yes', test: 'yes' }),
 		iap('2026-11-16T09:00:00Z', { item: 'no_ads', result: 'ok', store: 'appstore', asked: 'no' }, 'iap_result', 's-a'),
 		iap('2026-11-15T09:00:00Z', { item: 'coins_m', result: 'ok', store: 'play' }, 'iap_tap'),
+		// A beta build known by its hostname only.
+		iap('2026-11-14T09:00:00Z', { item: 'coins_m', result: 'ok', store: 'play', test: 'no' }, 'iap_result', 's-d', 'com.ludivenstudio.petanquegame.beta'),
 	],
 	'w-meet': [
 		iap('2026-11-20T08:00:00Z', { item: 'hearts', result: 'ok', store: 'dev', asked: 'yes' }),
 		iap('2026-11-18T12:00:00Z', { item: 'full', result: 'ok', store: 'play', asked: 'yes' }, 'iap_result', 's-a'),
+		iap('2026-11-19T12:00:00Z', { item: 'wardrobe', result: 'ok', store: 'play', test: 'no', app_version: '1.0.15-Beta3' }, 'iap_result', 's-b'),
 	],
 };
 
@@ -416,18 +419,35 @@ describe('the revenue action', () => {
 });
 
 describe('the purchases action', () => {
-	it('keeps a purchase that went through only, without any id', () => {
+	it('reads a purchase that went through, of any kind, and nothing else', () => {
 		const ok = { item: 'coins_s', result: 'ok', store: 'play', asked: 'yes' };
-		expect(readPurchase(iap('2026-11-19T10:00:00Z', ok), 'Pétanque Game')).toEqual({ at: '2026-11-19T10:00:00.000Z', app: 'Pétanque Game', item: 'coins_s', store: 'play', later: false });
+		expect(readPurchase(iap('2026-11-19T10:00:00Z', ok), 'Pétanque Game')).toMatchObject({ at: '2026-11-19T10:00:00.000Z', app: 'Pétanque Game', item: 'coins_s', store: 'play', later: false, kind: 'real' });
 		expect(readPurchase(iap('2026-11-19T10:00:00Z', { ...ok, result: 'fail' }), 'x')).toBeNull();
-		expect(readPurchase(iap('2026-11-19T10:00:00Z', { ...ok, test: 'yes' }), 'x')).toBeNull();
-		expect(readPurchase(iap('2026-11-19T10:00:00Z', { ...ok, store: 'dev' }), 'x')).toBeNull();
 		expect(readPurchase(iap('2026-11-19T10:00:00Z', ok, 'iap_tap'), 'x')).toBeNull();
 		expect(readPurchase(iap('not a date', ok), 'x')).toBeNull();
 		expect(readPurchase(null, 'x')).toBeNull();
 		expect(readPurchase({ eventProperties: 'nope' }, 'x')).toBeNull();
-		const odd = readPurchase(iap('2026-11-19T10:00:00Z', { result: 'OK', item: 'k'.repeat(99), asked: 'no', sessionId: 's-1' }), 'x');
-		expect(odd).toEqual({ at: '2026-11-19T10:00:00.000Z', app: 'x', item: 'k'.repeat(40), store: '', later: true });
+		const odd = readPurchase(iap('2026-11-19T10:00:00Z', { result: 'OK', item: 'k'.repeat(99), asked: 'no' }), 'x');
+		expect(odd).toMatchObject({ item: 'k'.repeat(40), store: '', later: true, kind: 'unchecked' });
+	});
+
+	it('tells real purchases from testers, promos, dev and beta builds', () => {
+		const kind = (props: Record<string, string>, host?: string) => purchaseKind(new Map(Object.entries(props)), host);
+		expect(kind({ store: 'play', test: 'no' })).toBe('real');
+		expect(kind({ store: 'play' })).toBe('real');
+		expect(kind({ store: 'appstore' })).toBe('unchecked');
+		expect(kind({ store: 'appstore', test: 'unknown' })).toBe('unchecked');
+		expect(kind({ store: 'play', test: 'yes' })).toBe('tester');
+		expect(kind({ store: 'play', test: 'promo' })).toBe('promo');
+		expect(kind({ store: 'play', test: 'dev' })).toBe('dev');
+		expect(kind({ store: 'dev' })).toBe('dev');
+		expect(kind({ store: 'play', test: 'no', build: 'dev' })).toBe('dev');
+		expect(kind({ store: 'play', test: 'no' }, 'com.ludivenstudio.petanquegame.dev')).toBe('dev');
+		// Raphaël's rule: « beta » in the version, whatever the case, is never a real purchase.
+		expect(kind({ store: 'play', test: 'no', app_version: '1.0.15-BETA' })).toBe('beta');
+		expect(kind({ store: 'appstore', app_version: '1.2.0 beta 4' })).toBe('beta');
+		expect(kind({ store: 'play', test: 'no' }, 'com.ludivenstudio.petanquegame.beta')).toBe('beta');
+		expect(kind({ store: 'play', test: 'yes', app_version: '1.1.8-beta2' })).toBe('beta');
 	});
 
 	it("lists every app's purchases of 30 days, newest first, and caches them 10 minutes", async () => {
@@ -436,13 +456,18 @@ describe('the purchases action', () => {
 		let now = NOW;
 		const handle = statsHandler({ env: ENV, isAdmin, cache, fetch: fetchFn, now: () => now });
 		const body = await (await handle(post({ action: 'purchases' }))).json() as Purchases;
+		// The counted purchases' buyers are numbered first: 1 and 2, then the others' 3 to 6.
 		expect(body.purchases).toEqual([
-			{ at: '2026-11-19T10:00:00.000Z', app: 'Pétanque Game', item: 'coins_s', store: 'play', later: false, buyer: 1 },
-			{ at: '2026-11-18T12:00:00.000Z', app: 'Pétanque Meet', item: 'full', store: 'play', later: false, buyer: 2 },
-			{ at: '2026-11-16T09:00:00.000Z', app: 'Pétanque Game', item: 'no_ads', store: 'appstore', later: true, buyer: 1 },
+			{ at: '2026-11-20T08:00:00.000Z', app: 'Pétanque Meet', item: 'hearts', store: 'dev', later: false, kind: 'dev', buyer: 3 },
+			{ at: '2026-11-19T12:00:00.000Z', app: 'Pétanque Meet', item: 'wardrobe', store: 'play', later: false, kind: 'beta', buyer: 4 },
+			{ at: '2026-11-19T10:00:00.000Z', app: 'Pétanque Game', item: 'coins_s', store: 'play', later: false, kind: 'real', buyer: 1 },
+			{ at: '2026-11-18T12:00:00.000Z', app: 'Pétanque Meet', item: 'full', store: 'play', later: false, kind: 'real', buyer: 2 },
+			{ at: '2026-11-17T09:00:00.000Z', app: 'Pétanque Game', item: 'coins_l', store: 'play', later: false, kind: 'tester', buyer: 5 },
+			{ at: '2026-11-16T09:00:00.000Z', app: 'Pétanque Game', item: 'no_ads', store: 'appstore', later: true, kind: 'unchecked', buyer: 1 },
+			{ at: '2026-11-14T09:00:00.000Z', app: 'Pétanque Game', item: 'coins_m', store: 'play', later: false, kind: 'beta', buyer: 6 },
 		]);
-		expect(body).toMatchObject({ from: '2026-10-21T12:00:00.000Z', buyers: 2, errors: [], cached: false });
-		expect(JSON.stringify(body)).not.toMatch(/eventId|session|s-a|v-s|e-2026|country|mobile/);
+		expect(body).toMatchObject({ from: '2026-10-21T12:00:00.000Z', counted: 3, buyers: 2, errors: [], cached: false });
+		expect(JSON.stringify(body)).not.toMatch(/eventId|session|s-a|v-s|e-2026|country|mobile|props|app_version|hostname|ludivenstudio/);
 		expect(JSON.stringify(cache.rows.get(PURCHASES_KEY))).not.toMatch(/session|s-a/);
 		const asked = calls.filter((c) => c.includes('/event-data?'));
 		expect(asked).toHaveLength(2);
@@ -469,7 +494,7 @@ describe('the purchases action', () => {
 	it('names an app it could not read and keeps the others; an Umami without the list says so', async () => {
 		const { fetchFn } = fakeUmami(3, { fail: /w-meet\/event-data\?/ });
 		const body = await (await statsHandler({ env: ENV, isAdmin, cache: fakeCache(), fetch: fetchFn, now: () => NOW })(post({ action: 'purchases' }))).json() as Purchases;
-		expect(body.purchases.map((p) => p.app)).toEqual(['Pétanque Game', 'Pétanque Game']);
+		expect(body.purchases.map((p) => p.app)).toEqual(['Pétanque Game', 'Pétanque Game', 'Pétanque Game', 'Pétanque Game']);
 		expect(body.errors).toEqual(['Pétanque Meet : Umami GET /websites/w-meet/event-data: 500']);
 		const v2 = await (await statsHandler({ env: ENV, isAdmin, cache: fakeCache(), fetch: fakeUmami(2).fetchFn, now: () => NOW })(post({ action: 'purchases' }))).json() as Purchases;
 		expect(v2.purchases).toEqual([]);
@@ -479,8 +504,12 @@ describe('the purchases action', () => {
 	it('keeps the purchases without a buyer when the events list fails, and asks it nothing without a purchase', async () => {
 		const { fetchFn } = fakeUmami(3, { fail: /w-pg\/events\?/ });
 		const body = await (await statsHandler({ env: ENV, isAdmin, cache: fakeCache(), fetch: fetchFn, now: () => NOW })(post({ action: 'purchases' }))).json() as Purchases;
-		expect(body.purchases.map((p) => [p.app, p.buyer])).toEqual([['Pétanque Game', null], ['Pétanque Meet', 1], ['Pétanque Game', null]]);
-		expect(body.buyers).toBe(1);
+		// Without the events list, PG's beta known by its hostname only reads as real: a declared limit.
+		expect(body.purchases.map((p) => [p.app, p.kind, p.buyer])).toEqual([
+			['Pétanque Meet', 'dev', 2], ['Pétanque Meet', 'beta', 3], ['Pétanque Game', 'real', null], ['Pétanque Meet', 'real', 1],
+			['Pétanque Game', 'tester', null], ['Pétanque Game', 'unchecked', null], ['Pétanque Game', 'real', null],
+		]);
+		expect(body).toMatchObject({ counted: 4, buyers: 1 });
 		expect(body.errors).toEqual(['Pétanque Game : acheteurs non lus (Umami GET /websites/w-pg/events: 500)']);
 		const none = fakeUmami(3, { iapEvents: { 'w-pg': [iap('2026-11-19T10:00:00Z', { item: 'coins_s', result: 'cancel' })] } });
 		await statsHandler({ env: ENV, isAdmin, cache: fakeCache(), fetch: none.fetchFn, now: () => NOW })(post({ action: 'purchases' }));

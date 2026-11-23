@@ -2,7 +2,7 @@
 // catalogue online next to its shows and taps, and the purchases that went through over 30 days.
 import { useEffect, useState } from 'react';
 import { signIn } from '../../lib/meetupAuth';
-import { PRODUCTS, STATS_LOCAL, STORES, StatsError, overview, purchases, statsMessage, type AppStats, type Count, type Overview, type Purchases } from '../../lib/statsAdmin';
+import { COUNTED_KINDS, KINDS, PRODUCTS, STATS_LOCAL, STORES, StatsError, overview, purchases, statsMessage, type AppStats, type Count, type Overview, type Purchases } from '../../lib/statsAdmin';
 import { baseAppId, shares } from '../../lib/promoShares';
 import type { Catalog } from '../../../supabase/functions/_shared/promoRules.mjs';
 import { useAdminSession } from './useAdminSession';
@@ -34,29 +34,40 @@ function purchasesMessage(e: unknown): string {
 	return statsMessage(e);
 }
 
-/** Purchases only: the time, the app, the product, the store. Never a session, an account or an event id. */
+/** Purchases only: the time, the app, the product, the store. Never a session, an account or an event id.
+ *  Real ones by default; testers', promo codes and simulated (dev and beta builds) on request. */
 function RecentPurchases({ data, message }: { data: Purchases | null; message: string | null }) {
+	const [all, setAll] = useState(false);
 	const product = (item: string) => (Object.hasOwn(PRODUCTS, item) ? PRODUCTS[item] : null);
-	const shown = data?.purchases.slice(0, SHOWN_PURCHASES) ?? [];
+	const listed = data?.purchases.filter((p) => all || COUNTED_KINDS.includes(p.kind)) ?? [];
+	const others = (data?.purchases.length ?? 0) - (data?.counted ?? 0);
+	const shown = listed.slice(0, SHOWN_PURCHASES);
 	return (
 		<section className="pa-card as-app as-purchases">
 			<header>
 				<h2>Derniers achats</h2>
-				<small>{data ? `${int.format(data.purchases.length)} réussis sur 30 jours, ${int.format(data.buyers ?? 0)} acheteurs, du plus récent au plus ancien` : 'achats réussis sur 30 jours'}</small>
+				<small>{data ? `${int.format(data.counted ?? 0)} achats réels sur 30 jours, ${int.format(data.buyers ?? 0)} acheteurs, du plus récent au plus ancien` : 'achats réussis sur 30 jours'}</small>
 			</header>
 			{message && <p className="as-error">{message}</p>}
-			{data && data.purchases.length === 0 && <p className="as-muted">Aucun achat réussi sur ces 30 jours.</p>}
+			{data && others > 0 && (
+				<label className="as-check">
+					<input type="checkbox" checked={all} onChange={(e) => setAll(e.target.checked)} />
+					{` Voir aussi testeurs, promos et simulés (${int.format(others)})`}
+				</label>
+			)}
+			{data && listed.length === 0 && <p className="as-muted">Aucun achat réel sur ces 30 jours.</p>}
 			{shown.length > 0 && (
 				<div className="as-scroll">
 					<table className="as-table">
-						<thead><tr><th scope="col">Date</th><th scope="col">Appli</th><th scope="col">Article</th><th scope="col">Store</th><th scope="col">Acheteur</th><th scope="col">Prix catalogue</th></tr></thead>
+						<thead><tr><th scope="col">Date</th><th scope="col">Appli</th><th scope="col">Article</th><th scope="col">Store</th><th scope="col">Type</th><th scope="col">Acheteur</th><th scope="col">Prix catalogue</th></tr></thead>
 						<tbody>
 							{shown.map((p, i) => (
-								<tr key={`${p.at}-${i}`}>
+								<tr key={`${p.at}-${i}`} className={COUNTED_KINDS.includes(p.kind) ? undefined : 'as-not-real'}>
 									<th scope="row">{when(p.at)}{p.later && <small className="as-muted" title="Le store l'a rendu plus tard (après une relance, ou un paiement validé ensuite)."> · rendu plus tard</small>}</th>
 									<td>{p.app}</td>
 									<td>{product(p.item)?.name ?? p.item}</td>
 									<td>{STORES[p.store] ?? (p.store || '–')}</td>
+									<td>{KINDS[p.kind] ?? p.kind}</td>
 									<td>{p.buyer ? `Acheteur ${p.buyer}` : '–'}</td>
 									<td>{product(p.item)?.price ?? '–'}</td>
 								</tr>
@@ -65,9 +76,10 @@ function RecentPurchases({ data, message }: { data: Purchases | null; message: s
 					</table>
 				</div>
 			)}
-			{data && data.purchases.length > SHOWN_PURCHASES && <p className="as-muted">Et {int.format(data.purchases.length - SHOWN_PURCHASES)} plus anciens.</p>}
+			{listed.length > SHOWN_PURCHASES && <p className="as-muted">Et {int.format(listed.length - SHOWN_PURCHASES)} plus anciens.</p>}
 			<p className="as-muted">
-				D'après l'événement iap_result des applis : achats réussis seulement, sans les cartes de test ni les builds de dev.
+				D'après l'événement iap_result des applis, achats réussis seulement. Réel : payé sur Google Play (reçu lu) ; réel (non vérifié) : l'App Store, dont le reçu ne dit pas s'il s'agit d'un test.
+				Testeur : carte de test Play ; simulé : build de dev, ou de bêta (« beta » dans la version) ; ni les uns ni les autres ne sont comptés.
 				Le prix est celui du catalogue en France, pas celui payé dans la monnaie de l'acheteur ; un achat remboursé ensuite reste dans la liste.
 				Acheteur : même appareil ce mois-ci, approximatif (Umami reconnaît un appareil à son adresse IP et à son modèle, et repart de zéro chaque mois ; un changement de réseau en fait un autre acheteur, deux téléphones d'un même compte en font deux).
 			</p>
