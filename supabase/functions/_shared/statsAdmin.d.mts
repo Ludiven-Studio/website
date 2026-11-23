@@ -39,6 +39,8 @@ export interface BoardRow { app: string; data: unknown; updated_at: string }
 export interface Overview { generatedAt: string; apps: AppStats[]; cached?: boolean }
 
 export interface RevenueDay { date: string; revenue: number }
+/** One ad network's share: network is LevelPlay's networkName (unityAds…), « ? » when the row has none. */
+export interface RevenueNetwork { network: string; name: string; month: number; last30: number }
 export interface RevenueApp {
 	name: string;
 	keys: string[];
@@ -47,6 +49,8 @@ export interface RevenueApp {
 	last30: number;
 	impressions30: number;
 	days: RevenueDay[];
+	/** Missing from a report cached before the split by network. */
+	networks?: RevenueNetwork[];
 }
 export interface Revenue {
 	generatedAt: string;
@@ -54,7 +58,7 @@ export interface Revenue {
 	monthStart: string;
 	from: string;
 	to: string;
-	total: { month: number; last30: number; days: RevenueDay[] };
+	total: { month: number; last30: number; days: RevenueDay[]; networks?: RevenueNetwork[] };
 	apps: RevenueApp[];
 	cached?: boolean;
 }
@@ -106,7 +110,9 @@ export const REVENUE_KEY: string;
 export const REVENUE_CACHE_MINUTES: number;
 export const REVENUE_DAYS: number;
 export function revenueRange(now: Date): { today: string; monthStart: string; from30: string; startDate: string };
-export function readRevenueRow(row: unknown): { date: string; key: string; name: string; platform: string; revenue: number; impressions: number } | null;
+export function readRevenueRow(row: unknown): { date: string; key: string; name: string; platform: string; network: string; revenue: number; impressions: number } | null;
+export const NETWORK_NAMES: Record<string, string>;
+export const UNITY_ADS: string;
 export function revenueSummary(rows: unknown[], now: Date): Revenue;
 export function levelPlayRows(env: StatsEnv, fetchFn: typeof fetch, now: Date): Promise<unknown[]>;
 export const PURCHASES_KEY: string;

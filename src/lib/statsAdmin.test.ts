@@ -360,7 +360,8 @@ describe('the revenue action', () => {
 	});
 
 	it('reads a row whatever the app field is called, and drops rows without a date', () => {
-		expect(readRevenueRow({ date: '2026-11-20', app: 'Nino Rush', os: 'ios', revenue: 'x' })).toEqual({ date: '2026-11-20', key: '', name: 'Nino Rush', platform: 'ios', revenue: 0, impressions: 0 });
+		expect(readRevenueRow({ date: '2026-11-20', app: 'Nino Rush', os: 'ios', revenue: 'x' })).toEqual({ date: '2026-11-20', key: '', name: 'Nino Rush', platform: 'ios', network: '', revenue: 0, impressions: 0 });
+		expect(readRevenueRow({ date: '2026-11-20', appName: 'Nino Rush', networkName: 'unityAds', revenue: 1 })?.network).toBe('unityAds');
 		expect(readRevenueRow({ revenue: 3 })).toBeNull();
 		expect(readRevenueRow('nope')).toBeNull();
 	});
@@ -376,6 +377,40 @@ describe('the revenue action', () => {
 		expect(pg.platforms).toEqual([{ platform: 'android', month: 3.5 }, { platform: 'ios', month: 0.25 }]);
 		expect(pg.days.find((d) => d.date === '2026-11-20')?.revenue).toBe(1.75);
 		expect(dg.days[0]).toEqual({ date: '2026-10-22', revenue: 0 });
+		// Rows without a network fall under « ? ».
+		expect(r.total.networks).toEqual([{ network: '?', name: '?', month: 3.75, last30: 7.75 }]);
+	});
+
+	it('splits each app and the total by ad network, Unity Ads apart, this month and the last 30 days', () => {
+		const rows = [
+			{ date: '2026-11-20', appName: 'Pétanque Game', platform: 'Android', networkName: 'unityAds', revenue: 0.4 },
+			{ date: '2026-11-19', appName: 'Pétanque Game', platform: 'Android', networkName: 'ironSource', revenue: 0.6 },
+			{ date: '2026-11-18', appName: 'Pétanque Game', platform: 'iOS', networkName: 'ironSourceExchange', revenue: 0.1 },
+			// 31 October: in the 30 days only.
+			{ date: '2026-10-31', appName: "Dragon's Gems", platform: 'Android', networkName: 'unityAds', revenue: 0.3 },
+			{ date: '2026-11-05', appName: "Dragon's Gems", platform: 'Android', networkName: 'meta', revenue: 0.2 },
+		];
+		const r = revenueSummary(rows, NOW);
+		expect(r.total.networks).toEqual([
+			{ network: 'unityAds', name: 'Unity Ads', month: 0.4, last30: 0.7 },
+			{ network: 'ironSource', name: 'ironSource Ads', month: 0.6, last30: 0.6 },
+			{ network: 'meta', name: 'meta', month: 0.2, last30: 0.2 },
+			{ network: 'ironSourceExchange', name: 'ironSource Ads', month: 0.1, last30: 0.1 },
+		]);
+		const dg = r.apps.find((a) => a.name === "Dragon's Gems")!;
+		expect(dg.networks?.find((n) => n.network === 'unityAds')).toEqual({ network: 'unityAds', name: 'Unity Ads', month: 0, last30: 0.3 });
+		expect([dg.month, dg.last30]).toEqual([0.2, 0.5]);
+	});
+
+	it('keeps one app whatever the accents, apostrophes or case of its name on each platform', () => {
+		const rows = [
+			{ date: '2026-11-20', appName: 'Pétanque Game (Android)', platform: 'Android', revenue: 1 },
+			{ date: '2026-11-20', appName: 'Petanque game', platform: 'iOS', revenue: 2 },
+			{ date: '2026-11-20', appName: "Dragon's Gems", platform: 'Android', revenue: 1 },
+			{ date: '2026-11-20', appName: 'Dragons Gems', platform: 'iOS', revenue: 1 },
+		];
+		const r = revenueSummary(rows, NOW);
+		expect(r.apps.map((a) => [a.name, a.month])).toEqual([['Pétanque Game', 3], ["Dragon's Gems", 2]]);
 	});
 
 	it('gets a token, reads every page, then serves the cache for an hour', async () => {
@@ -389,7 +424,7 @@ describe('the revenue action', () => {
 		expect(calls[0]).toBe('/partners/publisher/auth');
 		expect(calls.slice(1).map((c) => new URL(`https://x${c}`).searchParams.get('page'))).toEqual(['1', '2', '3']);
 		const q = new URL(`https://x${calls[1]}`).searchParams;
-		expect([q.get('startDate'), q.get('endDate'), q.get('breakdowns'), q.get('metrics')]).toEqual(['2026-10-22', '2026-11-20', 'date,app,platform', 'revenue,impressions']);
+		expect([q.get('startDate'), q.get('endDate'), q.get('breakdowns'), q.get('metrics')]).toEqual(['2026-10-22', '2026-11-20', 'date,app,platform,adNetwork', 'revenue,impressions']);
 		expect(cache.rows.has(REVENUE_KEY)).toBe(true);
 		const again = (await (await handle(post({ action: 'revenue' }))).json()) as Revenue;
 		expect(again.cached).toBe(true);

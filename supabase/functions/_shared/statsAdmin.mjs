@@ -256,31 +256,57 @@ export function readRevenueRow(row) {
 	const key = str(row.appKey ?? row.app_key ?? row.applicationKey ?? row.appId);
 	const name = str(row.appName ?? row.app_name ?? row.applicationName ?? row.app ?? row.title) || key || '?';
 	const platform = str(row.platform ?? row.os).toLowerCase();
-	return { date, key, name, platform, revenue: money(row.revenue), impressions: money(row.impressions) };
+	const network = str(row.networkName ?? row.adNetwork ?? row.network);
+	return { date, key, name, platform, network, revenue: money(row.revenue), impressions: money(row.impressions) };
 }
 
+// LevelPlay's networkName values (docs: naming and configurations), as the page shows them.
+export const NETWORK_NAMES = { unityAds: 'Unity Ads', ironSource: 'ironSource Ads', ironSourceExchange: 'ironSource Ads' };
+export const UNITY_ADS = 'unityAds';
+
+const appName = (name) => name.replace(/\s*\((android|ios)\)\s*$/i, '');
+// One app whatever the accents, apostrophes or case of its name on each platform.
+const appId = (name) => appName(name).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+
+function addNetwork(map, network, month, last30) {
+	const key = network || '?';
+	const n = map.get(key) ?? { network: key, name: NETWORK_NAMES[key] ?? key, month: 0, last30: 0 };
+	n.month += month;
+	n.last30 += last30;
+	map.set(key, n);
+}
+const networkList = (map) => [...map.values()]
+	.map((n) => ({ ...n, month: round2(n.month), last30: round2(n.last30) }))
+	.sort((a, b) => b.last30 - a.last30 || b.month - a.month || a.name.localeCompare(b.name));
+
 /** The page's figures from the report rows: totals, and per app (its platforms merged under its name)
- *  this month, the last 30 days and each of those days. */
+ *  this month, the last 30 days and each of those days, each split by ad network. */
 export function revenueSummary(rows, now) {
 	const r = revenueRange(now);
 	const days = [];
 	for (let t = new Date(`${r.from30}T00:00:00Z`).getTime(); isoDay(t) <= r.today; t += DAY) days.push(isoDay(t));
 	const apps = new Map();
-	const total = { month: 0, last30: 0, byDay: new Map(days.map((d) => [d, 0])) };
+	const total = { month: 0, last30: 0, byDay: new Map(days.map((d) => [d, 0])), networks: new Map() };
 	for (const row of rows.map(readRevenueRow).filter(Boolean)) {
-		const id = row.name.replace(/\s*\((android|ios)\)\s*$/i, '').toLowerCase();
+		const id = appId(row.name);
 		let app = apps.get(id);
 		if (!app) {
-			app = { name: row.name.replace(/\s*\((android|ios)\)\s*$/i, ''), keys: new Set(), platforms: new Map(), month: 0, last30: 0, impressions30: 0, byDay: new Map(days.map((d) => [d, 0])) };
+			app = { name: appName(row.name), keys: new Set(), platforms: new Map(), month: 0, last30: 0, impressions30: 0, byDay: new Map(days.map((d) => [d, 0])), networks: new Map() };
 			apps.set(id, app);
 		}
 		if (row.key) app.keys.add(row.key);
-		if (row.date >= r.monthStart && row.date <= r.today) {
+		const inMonth = row.date >= r.monthStart && row.date <= r.today;
+		const in30 = app.byDay.has(row.date);
+		if (inMonth || in30) {
+			addNetwork(app.networks, row.network, inMonth ? row.revenue : 0, in30 ? row.revenue : 0);
+			addNetwork(total.networks, row.network, inMonth ? row.revenue : 0, in30 ? row.revenue : 0);
+		}
+		if (inMonth) {
 			app.month += row.revenue;
 			total.month += row.revenue;
 			if (row.platform) app.platforms.set(row.platform, (app.platforms.get(row.platform) ?? 0) + row.revenue);
 		}
-		if (app.byDay.has(row.date)) {
+		if (in30) {
 			app.byDay.set(row.date, app.byDay.get(row.date) + row.revenue);
 			total.byDay.set(row.date, total.byDay.get(row.date) + row.revenue);
 			app.last30 += row.revenue;
@@ -295,7 +321,7 @@ export function revenueSummary(rows, now) {
 		monthStart: r.monthStart,
 		from: r.from30,
 		to: r.today,
-		total: { month: round2(total.month), last30: round2(total.last30), days: series(total.byDay) },
+		total: { month: round2(total.month), last30: round2(total.last30), days: series(total.byDay), networks: networkList(total.networks) },
 		apps: [...apps.values()]
 			.map((a) => ({
 				name: a.name,
@@ -305,6 +331,7 @@ export function revenueSummary(rows, now) {
 				last30: round2(a.last30),
 				impressions30: Math.round(a.impressions30),
 				days: series(a.byDay),
+				networks: networkList(a.networks),
 			}))
 			.sort((a, b) => b.last30 - a.last30 || b.month - a.month || a.name.localeCompare(b.name)),
 	};
@@ -327,7 +354,7 @@ export async function levelPlayRows(env, fetchFn, now) {
 	const { startDate, today } = revenueRange(now);
 	const rows = [];
 	for (let page = 1; page <= MAX_PAGES; page++) {
-		const q = query({ startDate, endDate: today, breakdowns: 'date,app,platform', metrics: 'revenue,impressions', page, resultsPerPage: 5000 });
+		const q = query({ startDate, endDate: today, breakdowns: 'date,app,platform,adNetwork', metrics: 'revenue,impressions', page, resultsPerPage: 5000 });
 		const res = await fetchFn(`${LEVELPLAY}/levelPlay/reporting/v1?${q}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } });
 		if (!res.ok) {
 			const why = (await res.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 160);
