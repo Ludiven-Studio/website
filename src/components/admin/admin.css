@@ -34,6 +34,9 @@ a.ah-tile:hover, a.ah-tile:focus-visible { border-color: var(--sc-accent); box-s
 .as-retention { margin: 0; font-size: var(--text-sm); }
 .as-tag { display: inline-block; border: 1px solid var(--sc-line); border-radius: 999px; padding: 0 0.5rem; font-size: 0.75rem; color: var(--sc-muted); }
 .as-errors { overflow-wrap: anywhere; }
+.as-purchases .as-table tbody :is(th, td) { text-align: left; }
+.as-purchases .as-table tbody td:last-child { text-align: right; }
+.as-purchases .as-table small { font-weight: normal; }
 .as-signin { display: grid; gap: 0.75rem; justify-items: start; }
 .av-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr)); }
 .av-app { display: grid; gap: 0.75rem; align-content: start; }

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-	CACHE_KEY, REVENUE_KEY, num, readBoard, readRevenueRow, revenueRange, revenueSummary, readCounts, readHosts, readRetention, readStats, statsHandler, tapRates,
-	type Board, type BoardRow, type Overview, type Revenue,
+	CACHE_KEY, PURCHASES_KEY, REVENUE_KEY, num, readPurchase, readBoard, readRevenueRow, revenueRange, revenueSummary, readCounts, readHosts, readRetention, readStats, statsHandler, tapRates,
+	type Board, type BoardRow, type Overview, type Purchases, type Revenue,
 } from '../../supabase/functions/_shared/statsAdmin.mjs';
 
 const NOW = new Date('2026-11-20T12:00:00Z');
@@ -9,7 +9,7 @@ const BASE = 'https://stats.example';
 const ENV = { UMAMI_URL: BASE, UMAMI_USER: 'dashboard', UMAMI_PASSWORD: 'pw', PROMO_ADMIN_USER_ID: 'raph' };
 
 /** A fake Umami: two websites, v2 or v3 answer shapes, and the calls it got. */
-function fakeUmami(version: 2 | 3, opts: { fail?: RegExp; loginFails?: boolean; inTeam?: boolean; eventsOnly?: boolean } = {}) {
+function fakeUmami(version: 2 | 3, opts: { fail?: RegExp; loginFails?: boolean; inTeam?: boolean; eventsOnly?: boolean; iapEvents?: Record<string, unknown[]> } = {}) {
 	const calls: string[] = [];
 	const fetchFn = async (url: string | URL | Request, init: RequestInit = {}): Promise<Response> => {
 		const u = new URL(String(url));
@@ -60,6 +60,13 @@ function fakeUmami(version: 2 | 3, opts: { fail?: RegExp; loginFails?: boolean; 
 			};
 			return ok((rows[`${event}.${prop}`] ?? []).map(([value, total]) => ({ value, total })));
 		}
+		if (path.endsWith('/event-data')) {
+			// Umami 3 only: each event with its properties, newest first, one page of events at a time.
+			if (version === 2) return new Response('{}', { status: 404 });
+			const all = (opts.iapEvents ?? IAP_EVENTS)[site] ?? [];
+			const size = Number(q.get('pageSize') ?? 20), page = Number(q.get('page') ?? 1);
+			return ok({ data: all.slice((page - 1) * size, page * size), count: all.length, page, pageSize: size });
+		}
 		if (path === '/reports/retention') {
 			const b = JSON.parse(String(init.body));
 			// Each version refuses the other's shape, with the field it wanted.
@@ -75,6 +82,25 @@ function fakeUmami(version: 2 | 3, opts: { fail?: RegExp; loginFails?: boolean; 
 	};
 	return { fetchFn: fetchFn as typeof fetch, calls };
 }
+
+/** An iap_result event as Umami 3's event-data list gives it. */
+const iap = (at: string, props: Record<string, string>, eventName = 'iap_result') => ({
+	websiteId: 'w', eventId: `e-${at}`, eventName,
+	eventProperties: Object.entries(props).map(([dataKey, stringValue]) => ({ dataKey, stringValue, numberValue: null, dateValue: null, dataType: 1, createdAt: at })),
+});
+const IAP_EVENTS: Record<string, unknown[]> = {
+	'w-pg': [
+		iap('2026-11-19T10:00:00Z', { item: 'coins_s', result: 'ok', store: 'play', asked: 'yes', test: 'no' }),
+		iap('2026-11-18T09:00:00Z', { item: 'no_ads', result: 'cancel', store: 'play', asked: 'yes' }),
+		iap('2026-11-17T09:00:00Z', { item: 'coins_l', result: 'ok', store: 'play', asked: 'yes', test: 'yes' }),
+		iap('2026-11-16T09:00:00Z', { item: 'no_ads', result: 'ok', store: 'appstore', asked: 'no' }),
+		iap('2026-11-15T09:00:00Z', { item: 'coins_m', result: 'ok', store: 'play' }, 'iap_tap'),
+	],
+	'w-meet': [
+		iap('2026-11-20T08:00:00Z', { item: 'hearts', result: 'ok', store: 'dev', asked: 'yes' }),
+		iap('2026-11-18T12:00:00Z', { item: 'full', result: 'ok', store: 'play', asked: 'yes' }),
+	],
+};
 
 /** A fake admin_stats_cache: one row per key, with its time. */
 function fakeCache(broken = false) {
@@ -377,5 +403,72 @@ describe('the revenue action', () => {
 		const refused = await handle(post({ action: 'revenue' }));
 		expect(refused.status).toBe(502);
 		expect(await refused.json()).toEqual({ error: 'LevelPlay did not answer', detail: 'LevelPlay auth: 401' });
+	});
+});
+
+describe('the purchases action', () => {
+	it('keeps a purchase that went through only, without any id', () => {
+		const ok = { item: 'coins_s', result: 'ok', store: 'play', asked: 'yes' };
+		expect(readPurchase(iap('2026-11-19T10:00:00Z', ok), 'Pétanque Game')).toEqual({ at: '2026-11-19T10:00:00.000Z', app: 'Pétanque Game', item: 'coins_s', store: 'play', later: false });
+		expect(readPurchase(iap('2026-11-19T10:00:00Z', { ...ok, result: 'fail' }), 'x')).toBeNull();
+		expect(readPurchase(iap('2026-11-19T10:00:00Z', { ...ok, test: 'yes' }), 'x')).toBeNull();
+		expect(readPurchase(iap('2026-11-19T10:00:00Z', { ...ok, store: 'dev' }), 'x')).toBeNull();
+		expect(readPurchase(iap('2026-11-19T10:00:00Z', ok, 'iap_tap'), 'x')).toBeNull();
+		expect(readPurchase(iap('not a date', ok), 'x')).toBeNull();
+		expect(readPurchase(null, 'x')).toBeNull();
+		expect(readPurchase({ eventProperties: 'nope' }, 'x')).toBeNull();
+		const odd = readPurchase(iap('2026-11-19T10:00:00Z', { result: 'OK', item: 'k'.repeat(99), asked: 'no', sessionId: 's-1' }), 'x');
+		expect(odd).toEqual({ at: '2026-11-19T10:00:00.000Z', app: 'x', item: 'k'.repeat(40), store: '', later: true });
+	});
+
+	it("lists every app's purchases of 30 days, newest first, and caches them 10 minutes", async () => {
+		const { fetchFn, calls } = fakeUmami(3);
+		const cache = fakeCache();
+		let now = NOW;
+		const handle = statsHandler({ env: ENV, isAdmin, cache, fetch: fetchFn, now: () => now });
+		const body = await (await handle(post({ action: 'purchases' }))).json() as Purchases;
+		expect(body.purchases).toEqual([
+			{ at: '2026-11-19T10:00:00.000Z', app: 'Pétanque Game', item: 'coins_s', store: 'play', later: false },
+			{ at: '2026-11-18T12:00:00.000Z', app: 'Pétanque Meet', item: 'full', store: 'play', later: false },
+			{ at: '2026-11-16T09:00:00.000Z', app: 'Pétanque Game', item: 'no_ads', store: 'appstore', later: true },
+		]);
+		expect(body).toMatchObject({ from: '2026-10-21T12:00:00.000Z', errors: [], cached: false });
+		expect(JSON.stringify(body)).not.toMatch(/eventId|sessionId|e-2026/);
+		const asked = calls.filter((c) => c.includes('/event-data?'));
+		expect(asked).toHaveLength(2);
+		expect(asked[0]).toContain('event=iap_result');
+		expect(cache.rows.has(PURCHASES_KEY)).toBe(true);
+		now = new Date(NOW.getTime() + 9 * 60_000);
+		expect((await (await handle(post({ action: 'purchases' }))).json()).cached).toBe(true);
+		expect((await (await handle(post({ action: 'purchases', refresh: true }))).json()).cached).toBe(false);
+	});
+
+	it('reads the pages it needs, and says when it stopped before the oldest', async () => {
+		const many = (n: number) => Array.from({ length: n }, (_, i) => iap(new Date(NOW.getTime() - (i + 1) * 60_000).toISOString(), { item: 'coins_s', result: 'ok', store: 'play' }));
+		const { fetchFn, calls } = fakeUmami(3, { iapEvents: { 'w-pg': many(250), 'w-meet': many(700) } });
+		const body = await (await statsHandler({ env: ENV, isAdmin, cache: fakeCache(), fetch: fetchFn, now: () => NOW })(post({ action: 'purchases' }))).json() as Purchases;
+		expect(calls.filter((c) => c.includes('w-pg/event-data?'))).toHaveLength(3);
+		expect(calls.filter((c) => c.includes('w-meet/event-data?'))).toHaveLength(5);
+		expect(body.purchases).toHaveLength(750);
+		expect(body.errors).toEqual(["Pétanque Meet : plus de 500 issues d'achat, seules les plus récentes sont lues"]);
+	});
+
+	it('names an app it could not read and keeps the others; an Umami without the list says so', async () => {
+		const { fetchFn } = fakeUmami(3, { fail: /w-meet\/event-data\?/ });
+		const body = await (await statsHandler({ env: ENV, isAdmin, cache: fakeCache(), fetch: fetchFn, now: () => NOW })(post({ action: 'purchases' }))).json() as Purchases;
+		expect(body.purchases.map((p) => p.app)).toEqual(['Pétanque Game', 'Pétanque Game']);
+		expect(body.errors).toEqual(['Pétanque Meet : Umami GET /websites/w-meet/event-data: 500']);
+		const v2 = await (await statsHandler({ env: ENV, isAdmin, cache: fakeCache(), fetch: fakeUmami(2).fetchFn, now: () => NOW })(post({ action: 'purchases' }))).json() as Purchases;
+		expect(v2.purchases).toEqual([]);
+		expect(v2.errors).toHaveLength(2);
+	});
+
+	it('lets Raphaël only, and says 502 when Umami refuses the login', async () => {
+		const { fetchFn } = fakeUmami(3, { loginFails: true });
+		const handle = statsHandler({ env: ENV, isAdmin, cache: fakeCache(), fetch: fetchFn, now: () => NOW });
+		expect((await handle(post({ action: 'purchases' }, 'someone'))).status).toBe(403);
+		const res = await handle(post({ action: 'purchases' }));
+		expect(res.status).toBe(502);
+		expect(JSON.stringify(await res.json())).not.toContain('pw');
 	});
 });

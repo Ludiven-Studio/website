@@ -1,8 +1,8 @@
 // /admin/stats/: each app's figures from Umami through stats-admin, with each house ad's weights from the
-// catalogue online next to its shows and taps.
+// catalogue online next to its shows and taps, and the purchases that went through over 30 days.
 import { useEffect, useState } from 'react';
 import { signIn } from '../../lib/meetupAuth';
-import { STATS_LOCAL, overview, statsMessage, type AppStats, type Count, type Overview } from '../../lib/statsAdmin';
+import { PRODUCTS, STATS_LOCAL, STORES, StatsError, overview, purchases, statsMessage, type AppStats, type Count, type Overview, type Purchases } from '../../lib/statsAdmin';
 import { baseAppId, shares } from '../../lib/promoShares';
 import type { Catalog } from '../../../supabase/functions/_shared/promoRules.mjs';
 import { useAdminSession } from './useAdminSession';
@@ -10,6 +10,7 @@ import { useAdminSession } from './useAdminSession';
 const int = new Intl.NumberFormat('fr-FR');
 const pct = (x: number | null | undefined): string => (x == null ? '–' : `${(x * 100).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} %`);
 const when = (iso: string): string => new Date(iso).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
+const SHOWN_PURCHASES = 50;
 const RESULT_NAMES: Record<string, string> = { ok: 'réussis', success: 'réussis', fail: 'échoués', failed: 'échoués', error: 'échoués', cancel: 'annulés', cancelled: 'annulés', canceled: 'annulés' };
 
 function Counts({ rows, names, empty = 'aucun' }: { rows: Count[] | null; names?: Record<string, string>; empty?: string }) {
@@ -25,6 +26,51 @@ function Counts({ rows, names, empty = 'aucun' }: { rows: Count[] | null; names?
 		<ul className="as-counts">
 			{[...merged].sort((a, b) => b[1] - a[1]).map(([name, count]) => <li key={name}><span>{name}</span> <strong>{int.format(count)}</strong></li>)}
 		</ul>
+	);
+}
+
+function purchasesMessage(e: unknown): string {
+	if (e instanceof StatsError && e.status === 400) return "stats-admin n'a pas encore l'action « purchases » : elle attend son redéploiement.";
+	return statsMessage(e);
+}
+
+/** Purchases only: the time, the app, the product, the store. Never a session, an account or an event id. */
+function RecentPurchases({ data, message }: { data: Purchases | null; message: string | null }) {
+	const product = (item: string) => (Object.hasOwn(PRODUCTS, item) ? PRODUCTS[item] : null);
+	const shown = data?.purchases.slice(0, SHOWN_PURCHASES) ?? [];
+	return (
+		<section className="pa-card as-app as-purchases">
+			<header>
+				<h2>Derniers achats</h2>
+				<small>{data ? `${int.format(data.purchases.length)} réussis sur 30 jours, du plus récent au plus ancien` : 'achats réussis sur 30 jours'}</small>
+			</header>
+			{message && <p className="as-error">{message}</p>}
+			{data && data.purchases.length === 0 && <p className="as-muted">Aucun achat réussi sur ces 30 jours.</p>}
+			{shown.length > 0 && (
+				<div className="as-scroll">
+					<table className="as-table">
+						<thead><tr><th scope="col">Date</th><th scope="col">Appli</th><th scope="col">Article</th><th scope="col">Store</th><th scope="col">Prix catalogue</th></tr></thead>
+						<tbody>
+							{shown.map((p, i) => (
+								<tr key={`${p.at}-${i}`}>
+									<th scope="row">{when(p.at)}{p.later && <small className="as-muted" title="Le store l'a rendu plus tard (après une relance, ou un paiement validé ensuite)."> · rendu plus tard</small>}</th>
+									<td>{p.app}</td>
+									<td>{product(p.item)?.name ?? p.item}</td>
+									<td>{STORES[p.store] ?? (p.store || '–')}</td>
+									<td>{product(p.item)?.price ?? '–'}</td>
+								</tr>
+							))}
+						</tbody>
+					</table>
+				</div>
+			)}
+			{data && data.purchases.length > SHOWN_PURCHASES && <p className="as-muted">Et {int.format(data.purchases.length - SHOWN_PURCHASES)} plus anciens.</p>}
+			<p className="as-muted">
+				D'après l'événement iap_result des applis : achats réussis seulement, sans les cartes de test ni les builds de dev.
+				Le prix est celui du catalogue en France, pas celui payé dans la monnaie de l'acheteur ; un achat remboursé ensuite reste dans la liste.
+			</p>
+			{data && data.errors.length > 0 && <p className="as-muted as-errors">Non lus : {data.errors.join(' ; ')}</p>}
+		</section>
 	);
 }
 
@@ -109,6 +155,8 @@ export default function AdminStats() {
 	const { session, ready, error } = useAdminSession(STATS_LOCAL);
 	const [data, setData] = useState<Overview | null>(null);
 	const [catalog, setCatalog] = useState<Catalog | null>(null);
+	const [bought, setBought] = useState<Purchases | null>(null);
+	const [boughtMessage, setBoughtMessage] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
 	const [message, setMessage] = useState<string | null>(null);
 	const signedIn = STATS_LOCAL || !!session;
@@ -116,11 +164,14 @@ export default function AdminStats() {
 	async function load(refresh = false) {
 		setBusy(true);
 		setMessage(null);
+		setBoughtMessage(null);
+		const recent = purchases(refresh).then(setBought).catch((e) => setBoughtMessage(purchasesMessage(e)));
 		try {
 			setData(await overview(refresh));
 		} catch (e) {
 			setMessage(statsMessage(e));
 		} finally {
+			await recent;
 			setBusy(false);
 		}
 	}
@@ -153,6 +204,7 @@ export default function AdminStats() {
 				<button type="button" className="pa-btn" disabled={busy} onClick={() => void load(true)}>Actualiser</button>
 			</div>
 			{message && <p className="pa-card as-error">{message}</p>}
+			{(bought || boughtMessage) && <RecentPurchases data={bought} message={boughtMessage} />}
 			{data?.apps.map((a) => <AppCard key={a.id} app={a} catalog={catalog} />)}
 		</div>
 	);

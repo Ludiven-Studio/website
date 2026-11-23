@@ -2,9 +2,9 @@
 // PUBLIC_STATS_ADMIN_URL, set in dev only, points at a local mock, with a fixed token and no sign-in.
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from '../data/site';
 import { accessToken } from './meetupAuth';
-import type { Board, Overview, Revenue } from '../../supabase/functions/_shared/statsAdmin.mjs';
+import type { Board, Overview, Purchases, Revenue } from '../../supabase/functions/_shared/statsAdmin.mjs';
 
-export type { AppStats, Board, BoardApp, Count, Overview, Revenue, RevenueApp, RevenueDay } from '../../supabase/functions/_shared/statsAdmin.mjs';
+export type { AppStats, Board, BoardApp, Count, Overview, Purchase, Purchases, Revenue, RevenueApp, RevenueDay } from '../../supabase/functions/_shared/statsAdmin.mjs';
 
 const LOCAL = import.meta.env.PUBLIC_STATS_ADMIN_URL as string | undefined;
 export const STATS_URL = LOCAL || `${SUPABASE_URL}/functions/v1/stats-admin`;
@@ -19,6 +19,28 @@ export class StatsError extends Error {
 export function overview(refresh = false): Promise<Overview> {
 	return call<Overview>({ action: 'overview', refresh });
 }
+
+/** The purchases that went through over the last 30 days, newest first (Umami's iap_result events). */
+export function purchases(refresh = false): Promise<Purchases> {
+	return call<Purchases>({ action: 'purchases', refresh });
+}
+
+/** The apps' paid products by the short id their iap_result events carry, with the catalogue price in France
+ *  (the apps' Shop catalogues and docs/store.md), not what the buyer paid in their own currency. */
+export const PRODUCTS: Record<string, { name: string; price: string }> = {
+	hearts: { name: 'Cœurs illimités', price: '6,99 €' },
+	coins1: { name: '2 000 pièces', price: '1,99 €' },
+	coins2: { name: '6 000 pièces', price: '4,99 €' },
+	coins3: { name: '15 000 pièces', price: '9,99 €' },
+	coins_s: { name: '1 000 pièces', price: '0,99 €' },
+	coins_m: { name: '3 000 pièces', price: '2,49 €' },
+	coins_l: { name: '8 000 pièces', price: '4,99 €' },
+	no_ads: { name: 'Sans publicité', price: '2,99 €' },
+	full: { name: "L'aventure complète", price: '4,99 € (3,99 € au lancement)' },
+	wardrobe: { name: 'Le grand dressing', price: '1,99 €' },
+};
+
+export const STORES: Record<string, string> = { play: 'Google Play', appstore: 'App Store' };
 
 /** The studio board of /admin/versions/. */
 export function board(): Promise<Board> {

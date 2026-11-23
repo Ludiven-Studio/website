@@ -1,5 +1,5 @@
 // stats-admin's logic: the studio's figures per app, read from the self-hosted Umami (one website per app),
-// for /admin/stats/ and the tiles of /admin/, the studio board of /admin/versions/ and the ad revenue of /admin/revenus/ (LevelPlay). Plain JavaScript with its fetch, cache and admin check passed in,
+// for /admin/stats/ and the tiles of /admin/, the recent purchases, the studio board of /admin/versions/ and the ad revenue of /admin/revenus/ (LevelPlay). Plain JavaScript with its fetch, cache and admin check passed in,
 // so vitest runs it against a fake Umami and a fake table, and Deno serves it (stats-admin/index.ts).
 //
 // Umami differs between v2 and v3 in a few names (stats as { value } or plain numbers, `eventName` or `event`,
@@ -174,11 +174,12 @@ export async function appStats(u, site, now) {
 	};
 }
 
-/** The whole overview: every website the Umami user sees, then each one's figures. */
-export async function overview(env, fetchFn, now) {
+const rows = (r) => (Array.isArray(r) ? r : Array.isArray(r?.data) ? r.data : []);
+
+/** A logged-in Umami client and every website its user sees. */
+export async function umamiSites(env, fetchFn) {
 	const u = umami(env.UMAMI_URL, fetchFn);
 	await u.login(env.UMAMI_USER, env.UMAMI_PASSWORD);
-	const rows = (r) => (Array.isArray(r) ? r : Array.isArray(r?.data) ? r.data : []);
 	// The user's own websites, then each of its teams' websites: this Umami does not mix team websites into
 	// /websites, and the studio's sites belong to a team the dashboard user only views (2026-11-20).
 	const own = rows(await u.get(`/websites?${query({ includeTeams: 'true', pageSize: 200 })}`));
@@ -189,6 +190,12 @@ export async function overview(env, fetchFn, now) {
 	const sites = [...own, ...teamSites.flat()]
 		.filter((s) => s && (typeof s.id === 'string' || typeof s.id === 'number'))
 		.filter((s) => !seen.has(s.id) && seen.add(s.id));
+	return { u, sites };
+}
+
+/** The whole overview: every website the Umami user sees, then each one's figures. */
+export async function overview(env, fetchFn, now) {
+	const { u, sites } = await umamiSites(env, fetchFn);
 	const apps = await Promise.all(sites.map((s) => appStats(u, s, now)));
 	apps.sort((a, b) => (b.periods.d28?.visitors ?? 0) - (a.periods.d28?.visitors ?? 0) || a.name.localeCompare(b.name));
 	return { generatedAt: now.toISOString(), apps };
@@ -333,6 +340,70 @@ export async function levelPlayRows(env, fetchFn, now) {
 	return rows;
 }
 
+// Recent purchases: the apps' iap_result events (ShopEvents in LudivenTools), read one by one with their
+// properties through Umami's event-data list (Umami 3, newest first). Never the event's or session's id.
+export const PURCHASES_KEY = 'purchases';
+export const PURCHASES_DAYS = 30;
+const PURCHASE_PAGE = 100;
+const PURCHASE_PAGES = 5;
+const NOT_REAL = new Set(['yes', 'true', '1']);
+
+/** One event-data entry as a purchase that went through, or null: another event, another result, a tester's
+ *  card or a dev build's fake store. */
+export function readPurchase(entry, app) {
+	if (!entry || typeof entry !== 'object') return null;
+	const name = entry.eventName ?? entry.event;
+	if (name !== undefined && name !== 'iap_result') return null;
+	const props = new Map();
+	let at = '';
+	for (const p of Array.isArray(entry.eventProperties) ? entry.eventProperties : []) {
+		if (!p || typeof p.dataKey !== 'string') continue;
+		const v = p.stringValue ?? p.numberValue ?? p.value;
+		if (v != null) props.set(p.dataKey, str(v).toLowerCase());
+		if (!at && p.createdAt) at = String(p.createdAt);
+	}
+	const time = Date.parse(at || entry.createdAt);
+	if (props.get('result') !== 'ok' || NOT_REAL.has(props.get('test') ?? '') || props.get('store') === 'dev' || !Number.isFinite(time)) return null;
+	return {
+		at: new Date(time).toISOString(),
+		app,
+		item: (props.get('item') || '?').slice(0, 40),
+		store: (props.get('store') ?? '').slice(0, 20),
+		later: props.get('asked') === 'no',
+	};
+}
+
+/** Every app's purchases of the last 30 days, newest first; an app that could not be read is named in errors. */
+export async function recentPurchases(env, fetchFn, now) {
+	const { u, sites } = await umamiSites(env, fetchFn);
+	const end = now.getTime();
+	const startAt = end - PURCHASES_DAYS * DAY;
+	const errors = [];
+	const perSite = await Promise.all(sites.map(async (site) => {
+		const name = String(site.name ?? site.domain ?? site.id);
+		const found = [];
+		try {
+			for (let page = 1; page <= PURCHASE_PAGES; page++) {
+				const q = query({ startAt, endAt: end, event: 'iap_result', page, pageSize: PURCHASE_PAGE });
+				const body = await u.get(`/websites/${encodeURIComponent(site.id)}/event-data?${q}`);
+				const data = rows(body);
+				for (const e of data) {
+					const p = readPurchase(e, name);
+					if (p) found.push(p);
+				}
+				const count = Number(body?.count);
+				if (data.length < PURCHASE_PAGE || !Number.isFinite(count) || page * PURCHASE_PAGE >= count) break;
+				if (page === PURCHASE_PAGES) errors.push(`${name} : plus de ${PURCHASE_PAGE * PURCHASE_PAGES} issues d'achat, seules les plus récentes sont lues`);
+			}
+		} catch (e) {
+			errors.push(`${name} : ${String(e?.message ?? e).slice(0, 200)}`);
+		}
+		return found;
+	}));
+	const purchases = perSite.flat().sort((a, b) => b.at.localeCompare(a.at) || a.app.localeCompare(b.app));
+	return { generatedAt: now.toISOString(), from: new Date(startAt).toISOString(), purchases, errors };
+}
+
 /**
  * The function's request handler. deps:
  * - env: UMAMI_URL, UMAMI_USER, UMAMI_PASSWORD, PROMO_ADMIN_USER_ID, LEVELPLAY_SECRET_KEY, LEVELPLAY_REFRESH_TOKEN;
@@ -379,20 +450,19 @@ export function statsHandler({ env, isAdmin, cache, board, fetch: fetchFn = fetc
 			await Promise.resolve().then(() => cache.put(REVENUE_KEY, data)).catch(() => undefined);
 			return json({ ...data, cached: false });
 		}
-		if (body?.action !== 'overview') return json({ error: 'unknown action' }, 400);
+		const read = body?.action === 'overview' ? { key: CACHE_KEY, load: overview } : body?.action === 'purchases' ? { key: PURCHASES_KEY, load: recentPurchases } : null;
+		if (!read) return json({ error: 'unknown action' }, 400);
 		if (!env.UMAMI_URL || !env.UMAMI_USER || !env.UMAMI_PASSWORD) return json({ error: 'not configured' }, 503);
 		const at = now();
-		try {
-			const hit = body.refresh === true ? null : await Promise.resolve().then(() => cache.get(CACHE_KEY)).catch(() => null);
-			if (hit && at.getTime() - new Date(hit.fetchedAt).getTime() < CACHE_MINUTES * 60_000) return json({ ...hit.body, cached: true });
-		} catch { /* a cache that fails is a miss */ }
+		const hit = body.refresh === true ? null : await Promise.resolve().then(() => cache.get(read.key)).catch(() => null);
+		if (hit && at.getTime() - new Date(hit.fetchedAt).getTime() < CACHE_MINUTES * 60_000) return json({ ...hit.body, cached: true });
 		let data;
 		try {
-			data = await overview(env, fetchFn, at);
+			data = await read.load(env, fetchFn, at);
 		} catch (e) {
 			return json({ error: 'Umami did not answer', detail: String(e?.message ?? e).slice(0, 200) }, 502);
 		}
-		await Promise.resolve().then(() => cache.put(CACHE_KEY, data)).catch(() => undefined);
+		await Promise.resolve().then(() => cache.put(read.key, data)).catch(() => undefined);
 		return json({ ...data, cached: false });
 	};
 }

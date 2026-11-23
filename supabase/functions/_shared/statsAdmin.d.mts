@@ -59,6 +59,9 @@ export interface Revenue {
 	cached?: boolean;
 }
 
+export interface Purchase { at: string; app: string; item: string; store: string; later: boolean }
+export interface Purchases { generatedAt: string; from: string; purchases: Purchase[]; errors: string[]; cached?: boolean }
+
 export interface Cache {
 	get(key: string): Promise<{ body: unknown; fetchedAt: string } | null> | { body: unknown; fetchedAt: string } | null;
 	put(key: string, body: unknown): Promise<unknown> | unknown;
@@ -91,6 +94,7 @@ export function umami(base: string, fetchFn: typeof fetch): {
 	post(path: string, body: unknown): Promise<unknown>;
 };
 export function appStats(u: ReturnType<typeof umami>, site: { id: string; name?: string; domain?: string }, now: Date): Promise<AppStats>;
+export function umamiSites(env: StatsEnv, fetchFn: typeof fetch): Promise<{ u: ReturnType<typeof umami>; sites: { id: string; name?: string; domain?: string }[] }>;
 export function overview(env: StatsEnv, fetchFn: typeof fetch, now: Date): Promise<Overview>;
 export const BOARD_FIELDS: string[];
 export function readBoard(rows: unknown, now: Date): Board;
@@ -102,6 +106,10 @@ export function revenueRange(now: Date): { today: string; monthStart: string; fr
 export function readRevenueRow(row: unknown): { date: string; key: string; name: string; platform: string; revenue: number; impressions: number } | null;
 export function revenueSummary(rows: unknown[], now: Date): Revenue;
 export function levelPlayRows(env: StatsEnv, fetchFn: typeof fetch, now: Date): Promise<unknown[]>;
+export const PURCHASES_KEY: string;
+export const PURCHASES_DAYS: number;
+export function readPurchase(entry: unknown, app: string): Purchase | null;
+export function recentPurchases(env: StatsEnv, fetchFn: typeof fetch, now: Date): Promise<Purchases>;
 export function statsHandler(deps: {
 	env: StatsEnv;
 	isAdmin: (req: Request) => Promise<boolean>;
