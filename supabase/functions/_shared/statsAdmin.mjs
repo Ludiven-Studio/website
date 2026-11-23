@@ -256,7 +256,7 @@ export function readRevenueRow(row) {
 	const key = str(row.appKey ?? row.app_key ?? row.applicationKey ?? row.appId);
 	const name = str(row.appName ?? row.app_name ?? row.applicationName ?? row.app ?? row.title) || key || '?';
 	const platform = str(row.platform ?? row.os).toLowerCase();
-	const network = str(row.networkName ?? row.adNetwork ?? row.network);
+	const network = str(row.networkName ?? row.adNetwork ?? row.network ?? row.adSource ?? row.adSourceName ?? row.providerName ?? row.instanceName);
 	return { date, key, name, platform, network, revenue: money(row.revenue), impressions: money(row.impressions) };
 }
 
@@ -317,6 +317,8 @@ export function revenueSummary(rows, now) {
 	return {
 		generatedAt: now.toISOString(),
 		currency: 'USD',
+		// The first row's field names: they show which one LevelPlay uses for the network when none matches.
+		fields: Object.keys(rows.find((x) => x && typeof x === 'object') ?? {}).sort().slice(0, 40),
 		monthStart: r.monthStart,
 		from: r.from30,
 		to: r.today,

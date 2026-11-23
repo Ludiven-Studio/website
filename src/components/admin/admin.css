@@ -53,6 +53,7 @@ a.ah-tile:hover, a.ah-tile:focus-visible { box-shadow: 0 0 0 2px var(--sc-accent
 .ak-bars li, .ak-meter { display: grid; grid-template-columns: minmax(5rem, 9rem) minmax(0, 1fr) 4.5rem; gap: 0.6rem; align-items: center; }
 .ak-bars strong, .ak-meter strong { text-align: right; font-variant-numeric: tabular-nums; }
 .ak-bar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ak-netbars .ak-bar-label { white-space: normal; overflow-wrap: anywhere; }
 .ak-bar-track { height: 0.6rem; border-radius: 999px; background: var(--sc-surface-2); overflow: hidden; }
 .ak-bar { display: block; height: 100%; border-radius: 999px; background: var(--app, var(--sc-accent)); }
 

@@ -3,12 +3,11 @@
 import { useEffect, useState } from 'react';
 import { signIn } from '../../lib/meetupAuth';
 import { appColor } from '../../lib/appColors';
+import { networkLabel, unityShare } from '../../lib/adNetworks';
 import { STATS_LOCAL, StatsError, revenue, statsMessage, type Revenue, type RevenueApp, type RevenueDay, type RevenueNetwork } from '../../lib/statsAdmin';
 import { useAdminSession } from './useAdminSession';
 import { AppName, Bars, DayStack, Help, Tile, appStyle } from './AdminParts';
 
-// LevelPlay's networkName for Unity Ads: its share is the figure Unity's own dashboard shows.
-const UNITY_ADS = 'unityAds';
 const PLATFORMS: Record<string, string> = { android: 'Android', ios: 'iOS' };
 const int = new Intl.NumberFormat('fr-FR');
 const at = (d: string) => new Date(`${d}T12:00:00Z`);
@@ -34,10 +33,10 @@ function revenueMessage(e: unknown): string {
 	return statsMessage(e);
 }
 
-/** « dont Unity Ads x » for a period; nothing for a report cached before the split by network. */
+/** « dont Unity Ads x », the figure Unity's own dashboard shows; nothing for a report cached before the split. */
 function unityPart(networks: RevenueNetwork[] | undefined, period: 'month' | 'last30', fmt: (n: number) => string): string | undefined {
-	if (!networks) return undefined;
-	return `dont Unity Ads ${fmt(networks.find((n) => n.network === UNITY_ADS)?.[period] ?? 0)}`;
+	const share = unityShare(networks, period);
+	return share === null ? undefined : `dont Unity Ads ${fmt(share)}`;
 }
 
 const byDay = (days: RevenueDay[]) => new Map(days.map((d) => [d.date, d.revenue]));
@@ -78,7 +77,12 @@ function Studio({ data, fmt }: { data: Revenue; fmt: (n: number) => string }) {
 				{yesterday && <Tile label={`Hier · ${dayLabel(yesterday.date)}`} value={fmt(yesterday.revenue)} sub={`${fmt(week.reduce((s, d) => s + d.revenue, 0) / Math.max(1, week.length))} par jour sur 7 jours`} />}
 				<Tile label="Affichages · 30 jours" value={int.format(shows)} sub={`${apps.length} ${apps.length > 1 ? 'applis' : 'appli'}`} />
 			</div>
-			{nothingBefore && <p className="ak-note">LevelPlay ne compte aucun revenu avant le {firstLabel(data.monthStart)}</p>}
+			{nothingBefore && (
+				<p className="ak-note">
+					LevelPlay ne compte aucun revenu avant le {firstLabel(data.monthStart)} : ce mois et les 30 jours sont donc égaux, et ce
+					que Unity compte en octobre a été gagné hors LevelPlay.
+				</p>
+			)}
 			<section className="pa-card ak-card">
 				<header><h2>Par jour <small>en dollars US, jours UTC</small></h2></header>
 				<DayStack days={days} unit={fmt} partial
@@ -107,10 +111,10 @@ function Studio({ data, fmt }: { data: Revenue; fmt: (n: number) => string }) {
 					<h2>Par appli <small>30 jours</small></h2>
 					<Bars format={fmt} empty="aucun revenu" rows={apps.map((a) => ({ key: a.name, label: a.name, value: a.last30, color: appColor(a.name) }))} />
 				</section>
-				<section>
-					<h2>Par régie <small>30 jours</small></h2>
+				<section className="ak-netbars">
+					<h2>Par régie <small>30 jours, noms de LevelPlay</small></h2>
 					{total.networks ? (
-						<Bars format={fmt} empty="aucun revenu" rows={total.networks.map((n) => ({ key: n.network, label: n.name, value: n.last30, color: 'var(--sc-muted)' }))} />
+						<Bars format={fmt} empty="aucun revenu" rows={total.networks.map((n) => ({ key: n.network, label: networkLabel(n), value: n.last30, color: 'var(--sc-muted)' }))} />
 					) : <p className="as-muted">Relevé d'avant le détail par régie : « Actualiser » le relit.</p>}
 				</section>
 			</div>
@@ -121,6 +125,7 @@ function Studio({ data, fmt }: { data: Revenue; fmt: (n: number) => string }) {
 					de bord Unity, qui ne compte que sa régie.
 				</p>
 				<p>Le solde disponible au versement (« available balance » de Unity) n'est dans aucune API : il reste à lire dans le tableau de bord.</p>
+				{!!data.fields?.length && <p>Champs reçus de LevelPlay : {data.fields.join(', ')}.</p>}
 			</Help>
 		</>
 	);

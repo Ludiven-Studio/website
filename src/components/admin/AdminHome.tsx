@@ -6,6 +6,7 @@ import { STATS_LOCAL, board, overview, revenue, statsMessage, totals, type Reven
 import type { Catalog } from '../../../supabase/functions/_shared/promoRules.mjs';
 import { useAdminSession } from './useAdminSession';
 import { AppName } from './AdminParts';
+import { unityShare } from '../../lib/adNetworks';
 
 const int = new Intl.NumberFormat('fr-FR');
 const usd = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
@@ -34,7 +35,7 @@ export default function AdminHome() {
 			.catch(() => setAds(null));
 	}, [signedIn]);
 
-	const unity = money?.total.networks?.find((n) => n.network === 'unityAds');
+	const unity = unityShare(money?.total.networks, 'month');
 	const tiles: Tile[] = [
 		{
 			href: '/admin/stats/', title: 'Statistiques', text: 'Visiteurs, achats, connexions et pubs maison, appli par appli.',
@@ -42,7 +43,7 @@ export default function AdminHome() {
 		},
 		{
 			href: '/admin/revenus/', title: 'Revenus', text: 'La publicité par appli et par régie (LevelPlay).',
-			figure: money ? usd.format(money.total.month) : undefined, sub: money ? `ce mois${unity ? ` · dont Unity Ads ${usd.format(unity.month)}` : ''}` : undefined,
+			figure: money ? usd.format(money.total.month) : undefined, sub: money ? `ce mois${unity === null ? '' : ` · dont Unity Ads ${usd.format(unity)}`}` : undefined,
 		},
 		{
 			href: '/admin/versions/', title: 'Versions', text: 'Chaque appli sur les stores, chez les testeurs et sur main.',

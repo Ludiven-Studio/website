@@ -55,6 +55,8 @@ export interface RevenueApp {
 export interface Revenue {
 	generatedAt: string;
 	currency: string;
+	/** The first report row's field names; missing from a report cached before them. */
+	fields?: string[];
 	monthStart: string;
 	from: string;
 	to: string;
