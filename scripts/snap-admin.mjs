@@ -151,7 +151,25 @@ process.env.PUBLIC_PROMO_ADMIN_URL = `http://localhost:${port + 1}/`;
 mkdirSync(out, { recursive: true });
 const VIEWPORTS = { desk: { width: 1366, height: 900 }, phone: { width: 390, height: 844 } };
 const errors = [];
-const server = await startServer(port, { mode: 'dev' });
+// --preview serves a build made with PUBLIC_STATS_ADMIN_URL and PUBLIC_PROMO_ADMIN_URL set to http://localhost:<port+1>/.
+// --live <url> loads that site's real bundle signed in with a fake session, its function calls answered by the mocks.
+const live = opt('live', '');
+const server = live ? { base: live.replace(/\/$/, ''), stop() {} } : await startServer(port, { mode: args.includes('--preview') ? 'preview' : 'dev' });
+const FAKE_SESSION = (() => {
+	const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+	const exp = Math.floor(Date.now() / 1000) + 3600;
+	const user = { id: 'raph', aud: 'authenticated', role: 'authenticated', email: 'admin@example.com', app_metadata: { provider: 'google' }, user_metadata: {}, created_at: ago(1000) };
+	return { access_token: `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ sub: 'raph', exp, role: 'authenticated', aud: 'authenticated' })}.sig`, refresh_token: 'r', token_type: 'bearer', expires_in: 3600, expires_at: exp, user };
+})();
+async function answerFunctions(page) {
+	await page.addInitScript((s) => localStorage.setItem('ludiven-meetup-auth', s), JSON.stringify(FAKE_SESSION));
+	await page.route(/\/functions\/v1\/(stats-admin|promo-admin)/, (route) => {
+		if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*' } });
+		const { action } = JSON.parse(route.request().postData() || '{}');
+		const answer = ANSWERS[action];
+		return route.fulfill({ status: answer ? 200 : 400, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(answer ?? { error: 'unknown action' }) });
+	});
+}
 try {
 	const browser = await chromium.launch();
 	for (const path of paths) {
@@ -160,6 +178,7 @@ try {
 			// The page's CSP has no room for a localhost function.
 			const ctx = await browser.newContext({ viewport: VIEWPORTS[kind], deviceScaleFactor: kind === 'phone' ? 2 : 1, colorScheme: theme === 'dark' ? 'dark' : 'light', reducedMotion: 'reduce', bypassCSP: true });
 			const page = await ctx.newPage();
+			if (live) await answerFunctions(page);
 			page.on('pageerror', (e) => errors.push(`${path} ${view}: ${e.message}`));
 			page.on('console', (m) => m.type() === 'error' && !m.text().includes('fetching the script') && errors.push(`${path} ${view}: ${m.text()}`));
 			await page.goto(server.base + path, { waitUntil: 'networkidle' });
