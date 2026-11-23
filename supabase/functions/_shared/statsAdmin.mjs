@@ -1,5 +1,5 @@
 // stats-admin's logic: the studio's figures per app, read from the self-hosted Umami (one website per app),
-// for /admin/stats/ and the tiles of /admin/, and the studio board of /admin/versions/. Plain JavaScript with its fetch, cache and admin check passed in,
+// for /admin/stats/ and the tiles of /admin/, the studio board of /admin/versions/ and the ad revenue of /admin/revenus/ (LevelPlay). Plain JavaScript with its fetch, cache and admin check passed in,
 // so vitest runs it against a fake Umami and a fake table, and Deno serves it (stats-admin/index.ts).
 //
 // Umami differs between v2 and v3 in a few names (stats as { value } or plain numbers, `eventName` or `event`,
@@ -215,9 +215,127 @@ export function readBoard(rows, now) {
 	return { generatedAt: now.toISOString(), apps };
 }
 
+// Ad revenue from the LevelPlay Reporting API (every mediated network, Unity Ads included), per app and day.
+export const LEVELPLAY = 'https://platform.ironsrc.com';
+export const REVENUE_KEY = 'revenue';
+export const REVENUE_CACHE_MINUTES = 60;
+export const REVENUE_DAYS = 30;
+const MAX_PAGES = 20;
+
+const isoDay = (t) => new Date(t).toISOString().slice(0, 10);
+const money = (v) => {
+	const n = typeof v === 'number' ? v : typeof v === 'string' ? Number(v) : NaN;
+	return Number.isFinite(n) ? n : 0;
+};
+const round2 = (n) => Math.round(n * 100) / 100;
+const str = (v) => (typeof v === 'string' || typeof v === 'number' ? String(v).trim().slice(0, 120) : '');
+
+/** The report's dates: from the earlier of the month's first day and 29 days ago, to today (UTC, as LevelPlay). */
+export function revenueRange(now) {
+	const today = isoDay(now);
+	const monthStart = `${today.slice(0, 8)}01`;
+	const from30 = isoDay(now.getTime() - (REVENUE_DAYS - 1) * DAY);
+	return { today, monthStart, from30, startDate: from30 < monthStart ? from30 : monthStart };
+}
+
+/** One report row as { date, key, name, platform, revenue, impressions }; null when it has no date.
+ *  The docs show no example of the app breakdown's fields, so the likely names are all read. */
+export function readRevenueRow(row) {
+	if (!row || typeof row !== 'object') return null;
+	const date = str(row.date ?? row.day).slice(0, 10);
+	if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+	const key = str(row.appKey ?? row.app_key ?? row.applicationKey ?? row.appId);
+	const name = str(row.appName ?? row.app_name ?? row.applicationName ?? row.app ?? row.title) || key || '?';
+	const platform = str(row.platform ?? row.os).toLowerCase();
+	return { date, key, name, platform, revenue: money(row.revenue), impressions: money(row.impressions) };
+}
+
+/** The page's figures from the report rows: totals, and per app (its platforms merged under its name)
+ *  this month, the last 30 days and each of those days. */
+export function revenueSummary(rows, now) {
+	const r = revenueRange(now);
+	const days = [];
+	for (let t = new Date(`${r.from30}T00:00:00Z`).getTime(); isoDay(t) <= r.today; t += DAY) days.push(isoDay(t));
+	const apps = new Map();
+	const total = { month: 0, last30: 0, byDay: new Map(days.map((d) => [d, 0])) };
+	for (const row of rows.map(readRevenueRow).filter(Boolean)) {
+		const id = row.name.replace(/\s*\((android|ios)\)\s*$/i, '').toLowerCase();
+		let app = apps.get(id);
+		if (!app) {
+			app = { name: row.name.replace(/\s*\((android|ios)\)\s*$/i, ''), keys: new Set(), platforms: new Map(), month: 0, last30: 0, impressions30: 0, byDay: new Map(days.map((d) => [d, 0])) };
+			apps.set(id, app);
+		}
+		if (row.key) app.keys.add(row.key);
+		if (row.date >= r.monthStart && row.date <= r.today) {
+			app.month += row.revenue;
+			total.month += row.revenue;
+			if (row.platform) app.platforms.set(row.platform, (app.platforms.get(row.platform) ?? 0) + row.revenue);
+		}
+		if (app.byDay.has(row.date)) {
+			app.byDay.set(row.date, app.byDay.get(row.date) + row.revenue);
+			total.byDay.set(row.date, total.byDay.get(row.date) + row.revenue);
+			app.last30 += row.revenue;
+			app.impressions30 += row.impressions;
+			total.last30 += row.revenue;
+		}
+	}
+	const series = (m) => days.map((date) => ({ date, revenue: round2(m.get(date)) }));
+	return {
+		generatedAt: now.toISOString(),
+		currency: 'USD',
+		monthStart: r.monthStart,
+		from: r.from30,
+		to: r.today,
+		total: { month: round2(total.month), last30: round2(total.last30), days: series(total.byDay) },
+		apps: [...apps.values()]
+			.map((a) => ({
+				name: a.name,
+				keys: [...a.keys].sort(),
+				platforms: [...a.platforms].map(([platform, month]) => ({ platform, month: round2(month) })).sort((x, y) => y.month - x.month),
+				month: round2(a.month),
+				last30: round2(a.last30),
+				impressions30: Math.round(a.impressions30),
+				days: series(a.byDay),
+			}))
+			.sort((a, b) => b.last30 - a.last30 || b.month - a.month || a.name.localeCompare(b.name)),
+	};
+}
+
+/** The report rows for those dates: a bearer token from the secret key and refresh token, then every page. */
+export async function levelPlayRows(env, fetchFn, now) {
+	const auth = await fetchFn(`${LEVELPLAY}/partners/publisher/auth`, {
+		method: 'GET',
+		headers: { secretkey: env.LEVELPLAY_SECRET_KEY, refreshToken: env.LEVELPLAY_REFRESH_TOKEN },
+	});
+	if (!auth.ok) throw new Error(`LevelPlay auth: ${auth.status}`);
+	// The docs show the token as the bare body, which their own example strips of quotes.
+	const raw = (await auth.text()).trim();
+	let token = raw.replace(/^"|"$/g, '');
+	if (raw.startsWith('{')) {
+		try { token = JSON.parse(raw).token ?? JSON.parse(raw).access_token ?? ''; } catch { token = ''; }
+	}
+	if (!token) throw new Error('LevelPlay auth: no token');
+	const { startDate, today } = revenueRange(now);
+	const rows = [];
+	for (let page = 1; page <= MAX_PAGES; page++) {
+		const q = query({ startDate, endDate: today, breakdowns: 'date,app,platform', metrics: 'revenue,impressions', page, resultsPerPage: 5000 });
+		const res = await fetchFn(`${LEVELPLAY}/levelPlay/reporting/v1?${q}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } });
+		if (!res.ok) {
+			const why = (await res.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 160);
+			throw new Error(`LevelPlay report: ${res.status}${why ? ` ${why}` : ''}`);
+		}
+		const body = await res.json();
+		const data = Array.isArray(body) ? body : Array.isArray(body?.data) ? body.data : [];
+		rows.push(...data);
+		const total = Number(body?.totalResults);
+		if (!data.length || !Number.isFinite(total) || rows.length >= total) break;
+	}
+	return rows;
+}
+
 /**
  * The function's request handler. deps:
- * - env: UMAMI_URL, UMAMI_USER, UMAMI_PASSWORD, PROMO_ADMIN_USER_ID;
+ * - env: UMAMI_URL, UMAMI_USER, UMAMI_PASSWORD, PROMO_ADMIN_USER_ID, LEVELPLAY_SECRET_KEY, LEVELPLAY_REFRESH_TOKEN;
  * - isAdmin(req): true for Raphaël's account only (the same check as promo-admin);
  * - cache: { get(key) → { body, fetchedAt } | null, put(key, body) };
  * - board: { list() → studio_board rows } for /admin/versions/;
@@ -246,6 +364,20 @@ export function statsHandler({ env, isAdmin, cache, board, fetch: fetchFn = fetc
 			} catch {
 				return json({ error: 'board not readable' }, 502);
 			}
+		}
+		if (body?.action === 'revenue') {
+			if (!env.LEVELPLAY_SECRET_KEY || !env.LEVELPLAY_REFRESH_TOKEN) return json({ error: 'revenue not configured' }, 503);
+			const at = now();
+			const hit = body.refresh === true ? null : await Promise.resolve().then(() => cache.get(REVENUE_KEY)).catch(() => null);
+			if (hit && at.getTime() - new Date(hit.fetchedAt).getTime() < REVENUE_CACHE_MINUTES * 60_000) return json({ ...hit.body, cached: true });
+			let data;
+			try {
+				data = revenueSummary(await levelPlayRows(env, fetchFn, at), at);
+			} catch (e) {
+				return json({ error: 'LevelPlay did not answer', detail: String(e?.message ?? e).slice(0, 200) }, 502);
+			}
+			await Promise.resolve().then(() => cache.put(REVENUE_KEY, data)).catch(() => undefined);
+			return json({ ...data, cached: false });
 		}
 		if (body?.action !== 'overview') return json({ error: 'unknown action' }, 400);
 		if (!env.UMAMI_URL || !env.UMAMI_USER || !env.UMAMI_PASSWORD) return json({ error: 'not configured' }, 503);

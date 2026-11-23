@@ -2,9 +2,9 @@
 // PUBLIC_STATS_ADMIN_URL, set in dev only, points at a local mock, with a fixed token and no sign-in.
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from '../data/site';
 import { accessToken } from './meetupAuth';
-import type { Board, Overview } from '../../supabase/functions/_shared/statsAdmin.mjs';
+import type { Board, Overview, Revenue } from '../../supabase/functions/_shared/statsAdmin.mjs';
 
-export type { AppStats, Board, BoardApp, Count, Overview } from '../../supabase/functions/_shared/statsAdmin.mjs';
+export type { AppStats, Board, BoardApp, Count, Overview, Revenue, RevenueApp, RevenueDay } from '../../supabase/functions/_shared/statsAdmin.mjs';
 
 const LOCAL = import.meta.env.PUBLIC_STATS_ADMIN_URL as string | undefined;
 export const STATS_URL = LOCAL || `${SUPABASE_URL}/functions/v1/stats-admin`;
@@ -23,6 +23,11 @@ export function overview(refresh = false): Promise<Overview> {
 /** The studio board of /admin/versions/. */
 export function board(): Promise<Board> {
 	return call<Board>({ action: 'board' });
+}
+
+/** The ad revenue of /admin/revenus/ (LevelPlay), cached an hour unless refresh. */
+export function revenue(refresh = false): Promise<Revenue> {
+	return call<Revenue>({ action: 'revenue', refresh });
 }
 
 async function call<T>(payload: Record<string, unknown>): Promise<T> {

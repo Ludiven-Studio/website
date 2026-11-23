@@ -38,9 +38,30 @@ export interface BoardRow { app: string; data: unknown; updated_at: string }
 
 export interface Overview { generatedAt: string; apps: AppStats[]; cached?: boolean }
 
+export interface RevenueDay { date: string; revenue: number }
+export interface RevenueApp {
+	name: string;
+	keys: string[];
+	platforms: { platform: string; month: number }[];
+	month: number;
+	last30: number;
+	impressions30: number;
+	days: RevenueDay[];
+}
+export interface Revenue {
+	generatedAt: string;
+	currency: string;
+	monthStart: string;
+	from: string;
+	to: string;
+	total: { month: number; last30: number; days: RevenueDay[] };
+	apps: RevenueApp[];
+	cached?: boolean;
+}
+
 export interface Cache {
-	get(key: string): Promise<{ body: Overview; fetchedAt: string } | null> | { body: Overview; fetchedAt: string } | null;
-	put(key: string, body: Overview): Promise<unknown> | unknown;
+	get(key: string): Promise<{ body: unknown; fetchedAt: string } | null> | { body: unknown; fetchedAt: string } | null;
+	put(key: string, body: unknown): Promise<unknown> | unknown;
 }
 
 export interface StatsEnv {
@@ -48,6 +69,8 @@ export interface StatsEnv {
 	UMAMI_USER?: string;
 	UMAMI_PASSWORD?: string;
 	PROMO_ADMIN_USER_ID?: string;
+	LEVELPLAY_SECRET_KEY?: string;
+	LEVELPLAY_REFRESH_TOKEN?: string;
 }
 
 export const CACHE_MINUTES: number;
@@ -71,6 +94,14 @@ export function appStats(u: ReturnType<typeof umami>, site: { id: string; name?:
 export function overview(env: StatsEnv, fetchFn: typeof fetch, now: Date): Promise<Overview>;
 export const BOARD_FIELDS: string[];
 export function readBoard(rows: unknown, now: Date): Board;
+export const LEVELPLAY: string;
+export const REVENUE_KEY: string;
+export const REVENUE_CACHE_MINUTES: number;
+export const REVENUE_DAYS: number;
+export function revenueRange(now: Date): { today: string; monthStart: string; from30: string; startDate: string };
+export function readRevenueRow(row: unknown): { date: string; key: string; name: string; platform: string; revenue: number; impressions: number } | null;
+export function revenueSummary(rows: unknown[], now: Date): Revenue;
+export function levelPlayRows(env: StatsEnv, fetchFn: typeof fetch, now: Date): Promise<unknown[]>;
 export function statsHandler(deps: {
 	env: StatsEnv;
 	isAdmin: (req: Request) => Promise<boolean>;

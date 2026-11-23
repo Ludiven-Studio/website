@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-	CACHE_KEY, num, readBoard, readCounts, readHosts, readRetention, readStats, statsHandler, tapRates,
-	type Board, type BoardRow, type Overview,
+	CACHE_KEY, REVENUE_KEY, num, readBoard, readRevenueRow, revenueRange, revenueSummary, readCounts, readHosts, readRetention, readStats, statsHandler, tapRates,
+	type Board, type BoardRow, type Overview, type Revenue,
 } from '../../supabase/functions/_shared/statsAdmin.mjs';
 
 const NOW = new Date('2026-11-20T12:00:00Z');
@@ -78,14 +78,14 @@ function fakeUmami(version: 2 | 3, opts: { fail?: RegExp; loginFails?: boolean; 
 
 /** A fake admin_stats_cache: one row per key, with its time. */
 function fakeCache(broken = false) {
-	const rows = new Map<string, { body: Overview; fetchedAt: string }>();
+	const rows = new Map<string, { body: unknown; fetchedAt: string }>();
 	return {
 		rows,
 		get: async (key: string) => {
 			if (broken) throw new Error('db down');
 			return rows.get(key) ?? null;
 		},
-		put: async (key: string, body: Overview) => {
+		put: async (key: string, body: unknown) => {
 			if (broken) throw new Error('db down');
 			rows.set(key, { body, fetchedAt: NOW.toISOString() });
 		},
@@ -281,5 +281,101 @@ describe('the board action', () => {
 		expect(await res.json()).toEqual({ error: 'board not readable' });
 		const noAdmin = statsHandler({ env: { ...ENV, PROMO_ADMIN_USER_ID: '' }, isAdmin, cache: fakeCache(), board: { list: async () => ROWS } });
 		expect((await noAdmin(post({ action: 'board' }))).status).toBe(503);
+	});
+});
+
+/** A fake LevelPlay: the auth endpoint and the report, paged by resultsPerPage. */
+function fakeLevelPlay(rows: Record<string, unknown>[], opts: { authFails?: boolean; quoted?: boolean; pageSize?: number } = {}) {
+	const calls: string[] = [];
+	const fetchFn = async (url: string | URL | Request, init: RequestInit = {}): Promise<Response> => {
+		const u = new URL(String(url));
+		calls.push(`${u.pathname}${u.search}`);
+		const h = (init.headers ?? {}) as Record<string, string>;
+		if (u.pathname === '/partners/publisher/auth') {
+			if (opts.authFails || h.secretkey !== 'sk' || h.refreshToken !== 'rt') return new Response('unauthorized', { status: 401 });
+			return new Response(opts.quoted === false ? 'jwt-1' : '"jwt-1"', { status: 200 });
+		}
+		if (h.Authorization !== 'Bearer jwt-1') return new Response('{}', { status: 401 });
+		const size = opts.pageSize ?? 5000;
+		const page = Number(u.searchParams.get('page'));
+		return new Response(JSON.stringify({ data: rows.slice((page - 1) * size, page * size), page, pageSize: size, totalResults: rows.length }), { status: 200 });
+	};
+	return { fetchFn: fetchFn as typeof fetch, calls };
+}
+
+const LP_ENV = { PROMO_ADMIN_USER_ID: 'raph', LEVELPLAY_SECRET_KEY: 'sk', LEVELPLAY_REFRESH_TOKEN: 'rt' };
+const REV_ROWS = [
+	{ date: '2026-11-20', appKey: 'k-pg-a', appName: 'Pétanque Game', platform: 'Android', revenue: 1.5, impressions: 100 },
+	{ date: '2026-11-20', appKey: 'k-pg-i', appName: 'Pétanque Game', platform: 'iOS', revenue: '0.25', impressions: 10 },
+	{ date: '2026-11-02', appKey: 'k-pg-a', appName: 'Pétanque Game', platform: 'Android', revenue: 2, impressions: 150 },
+	// 31 October: in the last 30 days, not in November.
+	{ date: '2026-10-31', appKey: 'k-dg', appName: 'Dragon Gems Swipe', platform: 'Android', revenue: 4, impressions: 300 },
+	// 20 October: before both.
+	{ date: '2026-10-20', appKey: 'k-dg', appName: 'Dragon Gems Swipe', platform: 'Android', revenue: 9, impressions: 900 },
+	{ revenue: 5 },
+];
+
+describe('the revenue action', () => {
+	it('asks LevelPlay from the earlier of the month start and 29 days ago, to today (UTC)', () => {
+		expect(revenueRange(NOW)).toEqual({ today: '2026-11-20', monthStart: '2026-11-01', from30: '2026-10-22', startDate: '2026-10-22' });
+		expect(revenueRange(new Date('2026-12-31T23:00:00Z')).startDate).toBe('2026-12-01');
+	});
+
+	it('reads a row whatever the app field is called, and drops rows without a date', () => {
+		expect(readRevenueRow({ date: '2026-11-20', app: 'Nino Rush', os: 'ios', revenue: 'x' })).toEqual({ date: '2026-11-20', key: '', name: 'Nino Rush', platform: 'ios', revenue: 0, impressions: 0 });
+		expect(readRevenueRow({ revenue: 3 })).toBeNull();
+		expect(readRevenueRow('nope')).toBeNull();
+	});
+
+	it('sums each app over its platforms, this month and the last 30 days, day by day', () => {
+		const r = revenueSummary(REV_ROWS, NOW);
+		expect([r.from, r.to, r.monthStart, r.currency]).toEqual(['2026-10-22', '2026-11-20', '2026-11-01', 'USD']);
+		expect(r.total).toMatchObject({ month: 3.75, last30: 7.75 });
+		expect(r.total.days).toHaveLength(30);
+		const [dg, pg] = r.apps;
+		expect([dg.name, dg.month, dg.last30, dg.impressions30]).toEqual(['Dragon Gems Swipe', 0, 4, 300]);
+		expect([pg.name, pg.month, pg.last30, pg.keys]).toEqual(['Pétanque Game', 3.75, 3.75, ['k-pg-a', 'k-pg-i']]);
+		expect(pg.platforms).toEqual([{ platform: 'android', month: 3.5 }, { platform: 'ios', month: 0.25 }]);
+		expect(pg.days.find((d) => d.date === '2026-11-20')?.revenue).toBe(1.75);
+		expect(dg.days[0]).toEqual({ date: '2026-10-22', revenue: 0 });
+	});
+
+	it('gets a token, reads every page, then serves the cache for an hour', async () => {
+		const { fetchFn, calls } = fakeLevelPlay(REV_ROWS, { pageSize: 2 });
+		const cache = fakeCache();
+		const handle = statsHandler({ env: LP_ENV, isAdmin, cache, fetch: fetchFn, now: () => NOW });
+		const res = await handle(post({ action: 'revenue' }));
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as Revenue;
+		expect([body.cached, body.total.last30]).toEqual([false, 7.75]);
+		expect(calls[0]).toBe('/partners/publisher/auth');
+		expect(calls.slice(1).map((c) => new URL(`https://x${c}`).searchParams.get('page'))).toEqual(['1', '2', '3']);
+		const q = new URL(`https://x${calls[1]}`).searchParams;
+		expect([q.get('startDate'), q.get('endDate'), q.get('breakdowns'), q.get('metrics')]).toEqual(['2026-10-22', '2026-11-20', 'date,app,platform', 'revenue,impressions']);
+		expect(cache.rows.has(REVENUE_KEY)).toBe(true);
+		const again = (await (await handle(post({ action: 'revenue' }))).json()) as Revenue;
+		expect(again.cached).toBe(true);
+		expect(calls).toHaveLength(4);
+		await handle(post({ action: 'revenue', refresh: true }));
+		expect(calls).toHaveLength(8);
+	});
+
+	it('takes an unquoted token too', async () => {
+		const { fetchFn } = fakeLevelPlay(REV_ROWS, { quoted: false });
+		const res = await statsHandler({ env: LP_ENV, isAdmin, cache: fakeCache(), fetch: fetchFn, now: () => NOW })(post({ action: 'revenue' }));
+		expect(res.status).toBe(200);
+	});
+
+	it('says when the keys are missing or refused, and keeps others out', async () => {
+		const { fetchFn, calls } = fakeLevelPlay(REV_ROWS, { authFails: true });
+		const noKeys = statsHandler({ env: { PROMO_ADMIN_USER_ID: 'raph' }, isAdmin, cache: fakeCache(), fetch: fetchFn, now: () => NOW });
+		const missing = await noKeys(post({ action: 'revenue' }));
+		expect([missing.status, await missing.json()]).toEqual([503, { error: 'revenue not configured' }]);
+		expect(calls).toEqual([]);
+		const handle = statsHandler({ env: LP_ENV, isAdmin, cache: fakeCache(), fetch: fetchFn, now: () => NOW });
+		expect((await handle(post({ action: 'revenue' }, 'someone-else'))).status).toBe(403);
+		const refused = await handle(post({ action: 'revenue' }));
+		expect(refused.status).toBe(502);
+		expect(await refused.json()).toEqual({ error: 'LevelPlay did not answer', detail: 'LevelPlay auth: 401' });
 	});
 });
