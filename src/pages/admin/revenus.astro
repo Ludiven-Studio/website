@@ -1,0 +1,14 @@
+---
+// The ad revenue per app, from LevelPlay (Raphaël's account only).
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdminRevenue from '../../components/admin/AdminRevenue';
+import '../../components/admin/admin.css';
+---
+
+<BaseLayout title="Revenus — admin | Ludiven Studio" description="Revenus publicitaires des applis du studio." noindex>
+	<div class="wrapper stack gap-6">
+		<p class="pa-note"><a href="/admin/">← Admin du studio</a></p>
+		<h1 class="pa-h1">Revenus</h1>
+		<AdminRevenue client:only="react" />
+	</div>
+</BaseLayout>

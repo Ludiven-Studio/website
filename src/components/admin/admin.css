@@ -47,3 +47,24 @@ a.ah-tile:hover, a.ah-tile:focus-visible { border-color: var(--sc-accent); box-s
 .av-waits h3 { margin: 0 0 0.3rem; font-size: var(--text-base); }
 .av-waits ul { margin: 0; padding-left: 1.2rem; display: grid; gap: 0.25rem; font-size: var(--text-sm); }
 @media (max-width: 30rem) { .av-rows div { grid-template-columns: minmax(0, 1fr); gap: 0.1rem; } }
+
+/* /admin/revenus/ */
+.ar-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr)); }
+.ar-app { display: grid; gap: 0.75rem; align-content: start; }
+.ar-app header { display: grid; gap: 0.15rem; }
+.ar-app h2 { margin: 0; font-size: var(--text-lg); }
+.ar-app small { color: var(--sc-muted); font-size: var(--text-sm); }
+.ar-figures { margin: 0; display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; }
+.ar-figures dt { color: var(--sc-muted); font-size: var(--text-sm); }
+.ar-figures dd { margin: 0; font-size: var(--text-lg); font-weight: 700; font-variant-numeric: tabular-nums; }
+.ar-total .ar-figures dd { font-size: var(--text-xl); }
+.ar-chart { margin: 0; display: grid; gap: 0.25rem; }
+.ar-chart svg { width: 100%; height: 4.5rem; display: block; overflow: visible; }
+.ar-total .ar-chart svg { height: 8rem; }
+.ar-chart figcaption { display: flex; justify-content: space-between; gap: 0.5rem; color: var(--sc-muted); font-size: 0.75rem; }
+.ar-bar { fill: var(--sc-accent); }
+.ar-today .ar-bar { opacity: 0.45; }
+.ar-hit { fill: transparent; }
+.ar-hit:hover + .ar-bar, g:hover > .ar-bar { opacity: 0.75; }
+.ar-base { stroke: var(--sc-line); stroke-width: 1; }
+.ar-total details summary { cursor: pointer; font-size: var(--text-sm); color: var(--sc-muted); }
