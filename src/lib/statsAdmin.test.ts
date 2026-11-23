@@ -63,9 +63,18 @@ function fakeUmami(version: 2 | 3, opts: { fail?: RegExp; loginFails?: boolean; 
 		if (path.endsWith('/event-data')) {
 			// Umami 3 only: each event with its properties, newest first, one page of events at a time.
 			if (version === 2) return new Response('{}', { status: 404 });
-			const all = (opts.iapEvents ?? IAP_EVENTS)[site] ?? [];
+			const all = ((opts.iapEvents ?? IAP_EVENTS)[site] ?? []) as { session?: string }[];
 			const size = Number(q.get('pageSize') ?? 20), page = Number(q.get('page') ?? 1);
-			return ok({ data: all.slice((page - 1) * size, page * size), count: all.length, page, pageSize: size });
+			// This list carries no session: drop the fake's own field.
+			return ok({ data: all.slice((page - 1) * size, page * size).map(({ session: _session, ...e }) => e), count: all.length, page, pageSize: size });
+		}
+		if (path.endsWith('/events')) {
+			if (version === 2) return new Response('{}', { status: 404 });
+			const all = ((opts.iapEvents ?? IAP_EVENTS)[site] ?? []) as { eventId: string; eventName: string; session?: string }[];
+			const size = Number(q.get('pageSize') ?? 20), page = Number(q.get('page') ?? 1);
+			const data = all.slice((page - 1) * size, page * size)
+				.map((e) => ({ id: e.eventId, websiteId: site, sessionId: e.session, visitId: `v-${e.session}`, eventName: e.eventName, country: 'FR', device: 'mobile' }));
+			return ok({ data, count: all.length, page, pageSize: size });
 		}
 		if (path === '/reports/retention') {
 			const b = JSON.parse(String(init.body));
@@ -84,21 +93,21 @@ function fakeUmami(version: 2 | 3, opts: { fail?: RegExp; loginFails?: boolean; 
 }
 
 /** An iap_result event as Umami 3's event-data list gives it. */
-const iap = (at: string, props: Record<string, string>, eventName = 'iap_result') => ({
-	websiteId: 'w', eventId: `e-${at}`, eventName,
+const iap = (at: string, props: Record<string, string>, eventName = 'iap_result', session = 's-x') => ({
+	websiteId: 'w', eventId: `e-${at}`, eventName, session,
 	eventProperties: Object.entries(props).map(([dataKey, stringValue]) => ({ dataKey, stringValue, numberValue: null, dateValue: null, dataType: 1, createdAt: at })),
 });
 const IAP_EVENTS: Record<string, unknown[]> = {
 	'w-pg': [
-		iap('2026-11-19T10:00:00Z', { item: 'coins_s', result: 'ok', store: 'play', asked: 'yes', test: 'no' }),
+		iap('2026-11-19T10:00:00Z', { item: 'coins_s', result: 'ok', store: 'play', asked: 'yes', test: 'no' }, 'iap_result', 's-a'),
 		iap('2026-11-18T09:00:00Z', { item: 'no_ads', result: 'cancel', store: 'play', asked: 'yes' }),
 		iap('2026-11-17T09:00:00Z', { item: 'coins_l', result: 'ok', store: 'play', asked: 'yes', test: 'yes' }),
-		iap('2026-11-16T09:00:00Z', { item: 'no_ads', result: 'ok', store: 'appstore', asked: 'no' }),
+		iap('2026-11-16T09:00:00Z', { item: 'no_ads', result: 'ok', store: 'appstore', asked: 'no' }, 'iap_result', 's-a'),
 		iap('2026-11-15T09:00:00Z', { item: 'coins_m', result: 'ok', store: 'play' }, 'iap_tap'),
 	],
 	'w-meet': [
 		iap('2026-11-20T08:00:00Z', { item: 'hearts', result: 'ok', store: 'dev', asked: 'yes' }),
-		iap('2026-11-18T12:00:00Z', { item: 'full', result: 'ok', store: 'play', asked: 'yes' }),
+		iap('2026-11-18T12:00:00Z', { item: 'full', result: 'ok', store: 'play', asked: 'yes' }, 'iap_result', 's-a'),
 	],
 };
 
@@ -428,15 +437,17 @@ describe('the purchases action', () => {
 		const handle = statsHandler({ env: ENV, isAdmin, cache, fetch: fetchFn, now: () => now });
 		const body = await (await handle(post({ action: 'purchases' }))).json() as Purchases;
 		expect(body.purchases).toEqual([
-			{ at: '2026-11-19T10:00:00.000Z', app: 'Pétanque Game', item: 'coins_s', store: 'play', later: false },
-			{ at: '2026-11-18T12:00:00.000Z', app: 'Pétanque Meet', item: 'full', store: 'play', later: false },
-			{ at: '2026-11-16T09:00:00.000Z', app: 'Pétanque Game', item: 'no_ads', store: 'appstore', later: true },
+			{ at: '2026-11-19T10:00:00.000Z', app: 'Pétanque Game', item: 'coins_s', store: 'play', later: false, buyer: 1 },
+			{ at: '2026-11-18T12:00:00.000Z', app: 'Pétanque Meet', item: 'full', store: 'play', later: false, buyer: 2 },
+			{ at: '2026-11-16T09:00:00.000Z', app: 'Pétanque Game', item: 'no_ads', store: 'appstore', later: true, buyer: 1 },
 		]);
-		expect(body).toMatchObject({ from: '2026-10-21T12:00:00.000Z', errors: [], cached: false });
-		expect(JSON.stringify(body)).not.toMatch(/eventId|sessionId|e-2026/);
+		expect(body).toMatchObject({ from: '2026-10-21T12:00:00.000Z', buyers: 2, errors: [], cached: false });
+		expect(JSON.stringify(body)).not.toMatch(/eventId|session|s-a|v-s|e-2026|country|mobile/);
+		expect(JSON.stringify(cache.rows.get(PURCHASES_KEY))).not.toMatch(/session|s-a/);
 		const asked = calls.filter((c) => c.includes('/event-data?'));
 		expect(asked).toHaveLength(2);
 		expect(asked[0]).toContain('event=iap_result');
+		expect(calls.filter((c) => c.includes('/events?'))).toHaveLength(2);
 		expect(cache.rows.has(PURCHASES_KEY)).toBe(true);
 		now = new Date(NOW.getTime() + 9 * 60_000);
 		expect((await (await handle(post({ action: 'purchases' }))).json()).cached).toBe(true);
@@ -450,6 +461,8 @@ describe('the purchases action', () => {
 		expect(calls.filter((c) => c.includes('w-pg/event-data?'))).toHaveLength(3);
 		expect(calls.filter((c) => c.includes('w-meet/event-data?'))).toHaveLength(5);
 		expect(body.purchases).toHaveLength(750);
+		expect(body.buyers).toBe(2);
+		expect(calls.filter((c) => c.includes('w-pg/events?'))).toHaveLength(3);
 		expect(body.errors).toEqual(["Pétanque Meet : plus de 500 issues d'achat, seules les plus récentes sont lues"]);
 	});
 
@@ -461,6 +474,17 @@ describe('the purchases action', () => {
 		const v2 = await (await statsHandler({ env: ENV, isAdmin, cache: fakeCache(), fetch: fakeUmami(2).fetchFn, now: () => NOW })(post({ action: 'purchases' }))).json() as Purchases;
 		expect(v2.purchases).toEqual([]);
 		expect(v2.errors).toHaveLength(2);
+	});
+
+	it('keeps the purchases without a buyer when the events list fails, and asks it nothing without a purchase', async () => {
+		const { fetchFn } = fakeUmami(3, { fail: /w-pg\/events\?/ });
+		const body = await (await statsHandler({ env: ENV, isAdmin, cache: fakeCache(), fetch: fetchFn, now: () => NOW })(post({ action: 'purchases' }))).json() as Purchases;
+		expect(body.purchases.map((p) => [p.app, p.buyer])).toEqual([['Pétanque Game', null], ['Pétanque Meet', 1], ['Pétanque Game', null]]);
+		expect(body.buyers).toBe(1);
+		expect(body.errors).toEqual(['Pétanque Game : acheteurs non lus (Umami GET /websites/w-pg/events: 500)']);
+		const none = fakeUmami(3, { iapEvents: { 'w-pg': [iap('2026-11-19T10:00:00Z', { item: 'coins_s', result: 'cancel' })] } });
+		await statsHandler({ env: ENV, isAdmin, cache: fakeCache(), fetch: none.fetchFn, now: () => NOW })(post({ action: 'purchases' }));
+		expect(none.calls.filter((c) => c.includes('/events?'))).toHaveLength(0);
 	});
 
 	it('lets Raphaël only, and says 502 when Umami refuses the login', async () => {

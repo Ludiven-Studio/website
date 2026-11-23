@@ -59,8 +59,8 @@ export interface Revenue {
 	cached?: boolean;
 }
 
-export interface Purchase { at: string; app: string; item: string; store: string; later: boolean }
-export interface Purchases { generatedAt: string; from: string; purchases: Purchase[]; errors: string[]; cached?: boolean }
+export interface Purchase { at: string; app: string; item: string; store: string; later: boolean; buyer: number | null }
+export interface Purchases { generatedAt: string; from: string; purchases: Purchase[]; buyers: number; errors: string[]; cached?: boolean }
 
 export interface Cache {
 	get(key: string): Promise<{ body: unknown; fetchedAt: string } | null> | { body: unknown; fetchedAt: string } | null;
@@ -108,7 +108,7 @@ export function revenueSummary(rows: unknown[], now: Date): Revenue;
 export function levelPlayRows(env: StatsEnv, fetchFn: typeof fetch, now: Date): Promise<unknown[]>;
 export const PURCHASES_KEY: string;
 export const PURCHASES_DAYS: number;
-export function readPurchase(entry: unknown, app: string): Purchase | null;
+export function readPurchase(entry: unknown, app: string): Omit<Purchase, 'buyer'> | null;
 export function recentPurchases(env: StatsEnv, fetchFn: typeof fetch, now: Date): Promise<Purchases>;
 export function statsHandler(deps: {
 	env: StatsEnv;

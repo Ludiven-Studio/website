@@ -42,14 +42,14 @@ function RecentPurchases({ data, message }: { data: Purchases | null; message: s
 		<section className="pa-card as-app as-purchases">
 			<header>
 				<h2>Derniers achats</h2>
-				<small>{data ? `${int.format(data.purchases.length)} réussis sur 30 jours, du plus récent au plus ancien` : 'achats réussis sur 30 jours'}</small>
+				<small>{data ? `${int.format(data.purchases.length)} réussis sur 30 jours, ${int.format(data.buyers ?? 0)} acheteurs, du plus récent au plus ancien` : 'achats réussis sur 30 jours'}</small>
 			</header>
 			{message && <p className="as-error">{message}</p>}
 			{data && data.purchases.length === 0 && <p className="as-muted">Aucun achat réussi sur ces 30 jours.</p>}
 			{shown.length > 0 && (
 				<div className="as-scroll">
 					<table className="as-table">
-						<thead><tr><th scope="col">Date</th><th scope="col">Appli</th><th scope="col">Article</th><th scope="col">Store</th><th scope="col">Prix catalogue</th></tr></thead>
+						<thead><tr><th scope="col">Date</th><th scope="col">Appli</th><th scope="col">Article</th><th scope="col">Store</th><th scope="col">Acheteur</th><th scope="col">Prix catalogue</th></tr></thead>
 						<tbody>
 							{shown.map((p, i) => (
 								<tr key={`${p.at}-${i}`}>
@@ -57,6 +57,7 @@ function RecentPurchases({ data, message }: { data: Purchases | null; message: s
 									<td>{p.app}</td>
 									<td>{product(p.item)?.name ?? p.item}</td>
 									<td>{STORES[p.store] ?? (p.store || '–')}</td>
+									<td>{p.buyer ? `Acheteur ${p.buyer}` : '–'}</td>
 									<td>{product(p.item)?.price ?? '–'}</td>
 								</tr>
 							))}
@@ -68,6 +69,7 @@ function RecentPurchases({ data, message }: { data: Purchases | null; message: s
 			<p className="as-muted">
 				D'après l'événement iap_result des applis : achats réussis seulement, sans les cartes de test ni les builds de dev.
 				Le prix est celui du catalogue en France, pas celui payé dans la monnaie de l'acheteur ; un achat remboursé ensuite reste dans la liste.
+				Acheteur : même appareil ce mois-ci, approximatif (Umami reconnaît un appareil à son adresse IP et à son modèle, et repart de zéro chaque mois ; un changement de réseau en fait un autre acheteur, deux téléphones d'un même compte en font deux).
 			</p>
 			{data && data.errors.length > 0 && <p className="as-muted as-errors">Non lus : {data.errors.join(' ; ')}</p>}
 		</section>

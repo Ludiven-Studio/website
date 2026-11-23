@@ -341,7 +341,8 @@ export async function levelPlayRows(env, fetchFn, now) {
 }
 
 // Recent purchases: the apps' iap_result events (ShopEvents in LudivenTools), read one by one with their
-// properties through Umami's event-data list (Umami 3, newest first). Never the event's or session's id.
+// properties through Umami's event-data list (Umami 3, newest first). The buyer is the Umami session (one device,
+// salted anew each month), read from the events list and turned into « 1, 2, 3… » here: no id leaves the function.
 export const PURCHASES_KEY = 'purchases';
 export const PURCHASES_DAYS = 30;
 const PURCHASE_PAGE = 100;
@@ -382,14 +383,15 @@ export async function recentPurchases(env, fetchFn, now) {
 	const perSite = await Promise.all(sites.map(async (site) => {
 		const name = String(site.name ?? site.domain ?? site.id);
 		const found = [];
+		const id = encodeURIComponent(site.id);
 		try {
 			for (let page = 1; page <= PURCHASE_PAGES; page++) {
 				const q = query({ startAt, endAt: end, event: 'iap_result', page, pageSize: PURCHASE_PAGE });
-				const body = await u.get(`/websites/${encodeURIComponent(site.id)}/event-data?${q}`);
+				const body = await u.get(`/websites/${id}/event-data?${q}`);
 				const data = rows(body);
 				for (const e of data) {
 					const p = readPurchase(e, name);
-					if (p) found.push(p);
+					if (p) found.push({ p, event: typeof e.eventId === 'string' ? e.eventId : '' });
 				}
 				const count = Number(body?.count);
 				if (data.length < PURCHASE_PAGE || !Number.isFinite(count) || page * PURCHASE_PAGE >= count) break;
@@ -398,10 +400,33 @@ export async function recentPurchases(env, fetchFn, now) {
 		} catch (e) {
 			errors.push(`${name} : ${String(e?.message ?? e).slice(0, 200)}`);
 		}
-		return found;
+		const sessions = new Map();
+		const wanted = new Set(found.map((f) => f.event).filter(Boolean));
+		try {
+			for (let page = 1; page <= PURCHASE_PAGES && wanted.size > 0; page++) {
+				const q = query({ startAt, endAt: end, event: 'iap_result', page, pageSize: PURCHASE_PAGE });
+				const body = await u.get(`/websites/${id}/events?${q}`);
+				const data = rows(body);
+				for (const e of data) {
+					if (!e || !wanted.has(e.id) || (typeof e.sessionId !== 'string' && typeof e.sessionId !== 'number')) continue;
+					sessions.set(e.id, `${site.id}|${e.sessionId}`);
+					wanted.delete(e.id);
+				}
+				if (data.length < PURCHASE_PAGE) break;
+			}
+		} catch (e) {
+			errors.push(`${name} : acheteurs non lus (${String(e?.message ?? e).slice(0, 160)})`);
+		}
+		return found.map((f) => ({ ...f.p, session: sessions.get(f.event) ?? null }));
 	}));
-	const purchases = perSite.flat().sort((a, b) => b.at.localeCompare(a.at) || a.app.localeCompare(b.app));
-	return { generatedAt: now.toISOString(), from: new Date(startAt).toISOString(), purchases, errors };
+	const sorted = perSite.flat().sort((a, b) => b.at.localeCompare(a.at) || a.app.localeCompare(b.app));
+	// Numbered in order of the newest purchase, within this answer only: the session never reaches the page.
+	const buyers = new Map();
+	const purchases = sorted.map(({ session, ...p }) => {
+		if (session && !buyers.has(session)) buyers.set(session, buyers.size + 1);
+		return { ...p, buyer: session ? buyers.get(session) : null };
+	});
+	return { generatedAt: now.toISOString(), from: new Date(startAt).toISOString(), purchases, buyers: buyers.size, errors };
 }
 
 /**
