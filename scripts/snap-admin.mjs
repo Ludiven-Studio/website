@@ -129,7 +129,17 @@ const PROMO = {
 	] },
 };
 
-const ANSWERS = { overview: OVERVIEW, orders: ORDERS, purchases: PURCHASES, revenue: REVENUE, board: BOARD, ...PROMO };
+const appleSale = (date, app, proceeds, currency = 'EUR', gross = proceeds / 0.7) => ({ date, app, units: 1, proceeds, currency, gross: Math.round(gross * 100) / 100, grossCurrency: currency });
+const APPSTORE = {
+	generatedAt: ago(0.5), from: '2026-10-25', to: '2026-11-22', errors: [], cached: true,
+	sales: [
+		appleSale('2026-11-03', 'Pétanque Game', 3.49), appleSale('2026-11-09', 'Pétanque Scan', 6.99), appleSale('2026-11-14', "Dragon's Gems", 4.89),
+		appleSale('2026-11-18', 'Pétanque Game', 2.09, 'USD', 2.99), appleSale('2026-11-21', 'Pétanque Scan', 6.99), appleSale('2026-10-29', 'Pétanque Game', 1.39),
+	],
+};
+const RATES = { generatedAt: ago(2), date: '2026-11-20', perEur: { EUR: 1, USD: 1.0512, CHF: 0.9381, CAD: 1.4702 }, cached: true };
+
+const ANSWERS = { overview: OVERVIEW, orders: ORDERS, purchases: PURCHASES, revenue: REVENUE, board: BOARD, appstore: APPSTORE, rates: RATES, ...PROMO };
 
 const mock = createServer((req, res) => {
 	res.setHeader('Access-Control-Allow-Origin', '*');

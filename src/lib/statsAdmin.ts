@@ -4,8 +4,10 @@ import { SUPABASE_ANON_KEY, SUPABASE_URL } from '../data/site';
 import { accessToken } from './meetupAuth';
 import type { Board, Overview, PurchaseKind, Purchases, Revenue } from '../../supabase/functions/_shared/statsAdmin.mjs';
 import type { PlayOrders } from '../../supabase/functions/_shared/playSales.mjs';
+import type { AppStoreSales, Rates } from '../../supabase/functions/_shared/appStoreSales.mjs';
 
 export type { PlayOrder, PlayOrders, PlayTotal } from '../../supabase/functions/_shared/playSales.mjs';
+export type { AppStoreSale, AppStoreSales, Rates } from '../../supabase/functions/_shared/appStoreSales.mjs';
 export type { AppStats, Board, BoardApp, Count, Overview, Purchase, PurchaseKind, Purchases, Revenue, RevenueApp, RevenueDay, RevenueNetwork } from '../../supabase/functions/_shared/statsAdmin.mjs';
 
 const LOCAL = import.meta.env.PUBLIC_STATS_ADMIN_URL as string | undefined;
@@ -64,6 +66,16 @@ export function board(): Promise<Board> {
 /** The ad revenue of /admin/revenus/ (LevelPlay), cached an hour unless refresh. */
 export function revenue(refresh = false): Promise<Revenue> {
 	return call<Revenue>({ action: 'revenue', refresh });
+}
+
+/** The App Store's in-app sales of the last 30 days and this month (App Store Connect's Sales reports). */
+export function appStore(refresh = false): Promise<AppStoreSales> {
+	return call<AppStoreSales>({ action: 'appstore', refresh });
+}
+
+/** The ECB's euro reference rates of the day. */
+export function rates(): Promise<Rates> {
+	return call<Rates>({ action: 'rates' });
 }
 
 async function call<T>(payload: Record<string, unknown>): Promise<T> {

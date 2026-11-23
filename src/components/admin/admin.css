@@ -28,11 +28,20 @@ a.ah-tile:hover, a.ah-tile:focus-visible { box-shadow: 0 0 0 2px var(--sc-accent
 :root {
 	--app-petanque-game: #2a78d6; --app-dragon-gems: #d1468f; --app-petanque-meet: #0e93b0; --app-nino-rush: #b8860b; --app-petanque-scan: #6250d6; --app-other: #8a84a3;
 	--st-ok: #0ca30c; --st-warn: #e0701f; --st-bad: #d03b3b;
+	/* The income's sources: one slate from dark to light, apart from the app colours. */
+	--src-ads: #2f3a4f; --src-play: #6d7a91; --src-appstore: #b3bccb;
 }
 :root.theme-dark {
 	--app-petanque-game: #3987e5; --app-dragon-gems: #e0629f; --app-petanque-meet: #1c9ab8; --app-nino-rush: #b8860b; --app-petanque-scan: #9085e9; --app-other: #8f89a8;
 	--st-ok: #2fbf2f; --st-warn: #f08a3c; --st-bad: #e66767;
+	--src-ads: #d5dbe6; --src-play: #8d98ab; --src-appstore: #55607a;
 }
+
+/* /admin/revenus/: the income in euros above the ads. */
+.ak-income { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+.ak-section h2 { margin: 0.75rem 0 0; font-size: var(--text-xl); }
+.ak-sources .ak-pill { margin-left: 0.5rem; }
+.ak-table .ak-total :is(th, td) { font-weight: 700; color: var(--sc-ink); border-top: 1px solid var(--sc-line); }
 
 /* /admin/stats/: no borders, big figures, small charts. */
 .as-root { gap: 1.25rem; }

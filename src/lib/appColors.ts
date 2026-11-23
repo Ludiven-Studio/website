@@ -3,12 +3,17 @@
 export const APP_KEYS = ['petanque-game', 'dragon-gems', 'petanque-meet', 'nino-rush', 'petanque-scan'] as const;
 export type AppKey = (typeof APP_KEYS)[number];
 
+/** Each studio app's name as the admin pages write it. */
+export const APP_NAMES: Record<AppKey, string> = {
+	'petanque-game': 'Pétanque Game', 'dragon-gems': "Dragon's Gems", 'petanque-meet': 'Pétanque Meet', 'nino-rush': 'Nino Rush', 'petanque-scan': 'Pétanque Scan',
+};
+
 const MATCH: [RegExp, AppKey][] = [
 	[/petanque[ -]?game/, 'petanque-game'],
 	[/dragon/, 'dragon-gems'],
 	[/meet/, 'petanque-meet'],
 	[/nino/, 'nino-rush'],
-	[/scan/, 'petanque-scan'],
+	[/scan|petanque ?ar\b/, 'petanque-scan'],
 ];
 
 const plain = (s: string): string => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();

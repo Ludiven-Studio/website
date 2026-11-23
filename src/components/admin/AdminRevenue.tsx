@@ -1,12 +1,17 @@
-// /admin/revenus/: the ad revenue per app from the LevelPlay Reporting API (every mediated network), through
-// stats-admin: this month, the last 30 days and each of those days, with Unity Ads' own share.
-import { useEffect, useState } from 'react';
+// /admin/revenus/: the studio's income in euros first (ads, Google Play and App Store in-app sales, net and gross),
+// then the ad revenue per app from the LevelPlay Reporting API (every mediated network), through stats-admin: this
+// month, the last 30 days and each of those days, with Unity Ads' own share.
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { signIn } from '../../lib/meetupAuth';
 import { appColor } from '../../lib/appColors';
 import { networkLabel, unityShare } from '../../lib/adNetworks';
-import { STATS_LOCAL, StatsError, revenue, statsMessage, type Revenue, type RevenueApp, type RevenueDay, type RevenueNetwork } from '../../lib/statsAdmin';
+import {
+	STATS_LOCAL, StatsError, appStore, playOrders, rates, revenue, statsMessage,
+	type AppStoreSales, type PlayOrders, type Rates, type Revenue, type RevenueApp, type RevenueDay, type RevenueNetwork,
+} from '../../lib/statsAdmin';
+import { PLAY_CUT, SOURCES, income, type Source } from '../../lib/income';
 import { useAdminSession } from './useAdminSession';
-import { AppName, Bars, DayStack, Help, Tile, appStyle } from './AdminParts';
+import { AppName, Bars, DayStack, Help, Pill, Tile, appStyle } from './AdminParts';
 
 const PLATFORMS: Record<string, string> = { android: 'Android', ios: 'iOS' };
 const int = new Intl.NumberFormat('fr-FR');
@@ -40,6 +45,94 @@ function unityPart(networks: RevenueNetwork[] | undefined, period: 'month' | 'la
 }
 
 const byDay = (days: RevenueDay[]) => new Map(days.map((d) => [d.date, d.revenue]));
+
+const SOURCE_NAMES: Record<Source, string> = { ads: 'Publicité', play: 'Google Play', appstore: 'App Store' };
+const SOURCE_COLORS: Record<Source, string> = { ads: 'var(--src-ads)', play: 'var(--src-play)', appstore: 'var(--src-appstore)' };
+const eur = money('EUR');
+
+/** What a source loaded, or why not. */
+type Loaded<T> = { data: T | null; problem: string | null };
+
+function sourceProblem(e: unknown, notSet: string): string {
+	if (e instanceof StatsError && e.status === 503) return notSet;
+	if (e instanceof StatsError && e.status === 400) return 'attend le redéploiement de stats-admin';
+	if (e instanceof StatsError && e.status === 502) return "n'a pas répondu";
+	return statsMessage(e);
+}
+
+/** The studio's income in euros: each source this month and over 30 days, a bar per day, then per app. */
+function Income({ ads, orders, apple, fx }: { ads: Revenue | null; orders: Loaded<PlayOrders>; apple: Loaded<AppStoreSales>; fx: Loaded<Rates> }) {
+	const r = income({ revenue: ads, orders: orders.data, apple: apple.data, rates: fx.data, now: new Date() });
+	const total = (period: 'month' | 'last30', kind: 'net' | 'gross') => SOURCES.reduce((n, s) => n + r[period][s][kind], 0);
+	const problems: Record<Source, string | null> = { ads: ads ? null : 'pas lu', play: orders.problem, appstore: apple.problem };
+	const status = (s: Source): ReactNode => (problems[s] ? <Pill tone="warn">{problems[s]}</Pill> : null);
+	const first = r.days[0];
+	const last = r.days[r.days.length - 1];
+	return (
+		<section className="ak-income">
+			<header className="ak-section"><h2>Tout compris <small>en euros, net</small></h2></header>
+			<div className="ak-tiles">
+				<Tile label={`Ce mois · ${range(r.monthStart, last)}`} value={eur(total('month', 'net'))} sub={`${eur(total('month', 'gross'))} brut`} />
+				<Tile label={`30 derniers jours · ${range(first, last)}`} value={eur(total('last30', 'net'))} sub={`${eur(total('last30', 'gross'))} brut`} />
+				<Tile label="Publicité · ce mois" value={eur(r.month.ads.net)} sub="LevelPlay, toutes régies" />
+				<Tile label="Achats intégrés · ce mois" value={eur(r.month.play.net + r.month.appstore.net)} sub={`Google Play ${eur(r.month.play.net)} · App Store ${eur(r.month.appstore.net)}`} />
+			</div>
+			<div className="pa-card ak-card">
+				<div className="as-scroll">
+					<table className="ak-table ak-num ak-sources">
+						<thead><tr><th scope="col">Source</th><th scope="col">Ce mois</th><th scope="col">30 jours</th><th scope="col" className="ak-wide">30 jours brut</th></tr></thead>
+						<tbody>
+							{SOURCES.map((s) => (
+								<tr key={s}>
+									<th scope="row"><span className="ak-app" style={{ '--app': SOURCE_COLORS[s] } as CSSProperties}><i aria-hidden="true" />{SOURCE_NAMES[s]}</span>{status(s)}</th>
+									<td>{eur(r.month[s].net)}</td>
+									<td>{eur(r.last30[s].net)}</td>
+									<td className="ak-wide">{eur(r.last30[s].gross)}</td>
+								</tr>
+							))}
+							<tr className="ak-total">
+								<th scope="row">Total</th><td>{eur(total('month', 'net'))}</td><td>{eur(total('last30', 'net'))}</td><td className="ak-wide">{eur(total('last30', 'gross'))}</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+				<DayStack days={r.days} unit={eur} partial series={SOURCES.map((s) => ({ key: s, label: SOURCE_NAMES[s], color: SOURCE_COLORS[s], byDay: r.byDay[s] }))} />
+				{r.apps.length > 0 && (
+					<div className="as-scroll">
+						<table className="ak-table ak-num">
+							<thead><tr><th scope="col">Par appli · 30 jours</th><th scope="col" className="ak-wide">Publicité</th><th scope="col" className="ak-wide">Google Play</th><th scope="col" className="ak-wide">App Store</th><th scope="col">Total</th></tr></thead>
+							<tbody>
+								{r.apps.map((a) => (
+									<tr key={a.key}>
+										<th scope="row"><AppName name={a.name} /></th>
+										<td className="ak-wide">{a.ads ? eur(a.ads) : '–'}</td>
+										<td className="ak-wide">{a.play ? eur(a.play) : '–'}</td>
+										<td className="ak-wide">{a.appstore ? eur(a.appstore) : '–'}</td>
+										<td>{eur(a.total)}</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
+				)}
+				<Help>
+					<p>
+						Net : ce qui revient au studio. Publicité : le chiffre de LevelPlay tel quel. App Store : les « Developer Proceeds »
+						d'Apple, après sa part et la TVA. Google Play : une estimation, le prix hors taxes moins les {Math.round(PLAY_CUT * 100)} % de
+						Google ; le chiffre exact n'arrive qu'avec son relevé de gains mensuel. Brut : ce que les acheteurs ont payé.
+					</p>
+					<p>
+						{fx.data
+							? `Converti au taux BCE du ${dayLabel(fx.data.date)} : 1 € = ${(fx.data.perEur.USD ?? 0).toLocaleString('fr-FR', { maximumFractionDigits: 4 })} $US.`
+							: `Taux BCE ${fx.problem ?? 'pas lu'} : seuls les montants en euros comptent.`}
+						{r.unconverted.length > 0 && ` Sans taux, donc laissés de côté : ${r.unconverted.join(', ')}.`}
+						{' '}L'App Store compte en jours du Pacifique et s'arrête à hier ; les autres en jours UTC, jusqu'à aujourd'hui.
+					</p>
+				</Help>
+			</div>
+		</section>
+	);
+}
 
 function AppCard({ app, fmt }: { app: RevenueApp; fmt: (n: number) => string }) {
 	return (
@@ -134,6 +227,9 @@ function Studio({ data, fmt }: { data: Revenue; fmt: (n: number) => string }) {
 export default function AdminRevenue() {
 	const { session, ready, error } = useAdminSession(STATS_LOCAL);
 	const [data, setData] = useState<Revenue | null>(null);
+	const [orders, setOrders] = useState<Loaded<PlayOrders>>({ data: null, problem: null });
+	const [apple, setApple] = useState<Loaded<AppStoreSales>>({ data: null, problem: null });
+	const [fx, setFx] = useState<Loaded<Rates>>({ data: null, problem: null });
 	const [busy, setBusy] = useState(false);
 	const [message, setMessage] = useState<string | null>(null);
 	const signedIn = STATS_LOCAL || !!session;
@@ -141,13 +237,15 @@ export default function AdminRevenue() {
 	async function load(refresh = false) {
 		setBusy(true);
 		setMessage(null);
-		try {
-			setData(await revenue(refresh));
-		} catch (e) {
-			setMessage(revenueMessage(e));
-		} finally {
-			setBusy(false);
-		}
+		const settle = <T,>(p: Promise<T>, set: (l: Loaded<T>) => void, notSet: string) =>
+			p.then((d) => set({ data: d, problem: null })).catch((e: unknown) => set({ data: null, problem: sourceProblem(e, notSet) }));
+		await Promise.all([
+			revenue(refresh).then(setData).catch((e: unknown) => setMessage(revenueMessage(e))),
+			settle(playOrders(refresh), setOrders, 'clé Google Play non posée'),
+			settle(appStore(refresh), setApple, 'clé App Store non posée'),
+			settle(rates(), setFx, 'pas lu'),
+		]);
+		setBusy(false);
 	}
 
 	useEffect(() => {
@@ -177,6 +275,8 @@ export default function AdminRevenue() {
 				<button type="button" className="pa-btn" disabled={busy} onClick={() => void load(true)}>Actualiser</button>
 			</div>
 			{message && <p className="pa-card as-error">{message}</p>}
+			{!busy && (data || orders.data || apple.data) && <Income ads={data} orders={orders} apple={apple} fx={fx} />}
+			{data && <header className="ak-section"><h2>Publicité <small>LevelPlay, en dollars US</small></h2></header>}
 			{data && <Studio data={data} fmt={fmt} />}
 			{data && !data.apps.length && <p className="pa-card as-muted">LevelPlay ne donne aucun revenu sur ces 30 jours.</p>}
 			{data && data.apps.length > 0 && (
