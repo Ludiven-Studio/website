@@ -2,9 +2,10 @@
 // (PUBLIC_STATS_ADMIN_URL, no sign-in), then desk and phone shots in both themes.
 // node scripts/snap-admin.mjs --out shots/admin [--path /admin/stats/] [--port 4398]
 import { createServer } from 'node:http';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { chromium } from 'playwright';
 import { startServer } from './preview-server.mjs';
+import { revenueSummary } from '../supabase/functions/_shared/statsAdmin.mjs';
 
 const args = process.argv.slice(2);
 const opt = (name, def) => {
@@ -91,7 +92,44 @@ const bought = KIND_PLAN.map((kind, i) => ({
 }));
 const PURCHASES = { generatedAt: ago(0.1), from: ago(720), purchases: bought, counted: bought.filter((p) => ['real', 'unchecked'].includes(p.kind)).length, buyers: 8, errors: [] };
 
-const ANSWERS = { overview: OVERVIEW, orders: ORDERS, purchases: PURCHASES };
+// LevelPlay rows from 1 November only, as the live report: « Ce mois » then equals the 30 days.
+const REV_APPS = [['Pétanque Game', 0.052], ["Dragon's Gems", 0.021], ['Pétanque Meet', 0.012]];
+const revRows = [];
+for (let d = 0; d < 23; d++) {
+	const date = `2026-11-${String(d + 1).padStart(2, '0')}`;
+	REV_APPS.forEach(([appName, base], i) => {
+		const day = base * (0.6 + ((d * 7 + i * 3) % 9) / 10) * (d === 22 ? 0.35 : 1);
+		revRows.push({ date, appName, platform: 'Android', networkName: 'unityAds', revenue: Math.round(day * 0.85 * 1000) / 1000, impressions: Math.round(day * 900) });
+		revRows.push({ date, appName, platform: 'Android', networkName: 'ironSource', revenue: Math.round(day * 0.15 * 1000) / 1000, impressions: Math.round(day * 200) });
+		if (i === 0 && d % 3 === 0) revRows.push({ date, appName, platform: 'iOS', networkName: 'unityAds', revenue: 0.01, impressions: 4 });
+	});
+}
+const REVENUE = { ...revenueSummary(revRows, new Date(NOW)), cached: true };
+
+const board = (app, order, name, f) => ({ app, order, name, updatedAt: ago(f.h ?? 5), play_prod: '', play_test: '', ios: '', beta: '', main: '', waits: [], ...f });
+const BOARD = {
+	generatedAt: ago(0.1),
+	apps: [
+		board('petanque-game', 1, 'Pétanque Game', { play_prod: '0.1.21 (121) en ligne', play_test: '0.1.22 (122) piste interne', ios: '0.1.21 en ligne', beta: '0.1.22 beta4', main: '0.1.22 · 4e1c2aa', waits: ['Valider les notes de version 0.1.22'] }),
+		board('dragon-gems', 2, "Dragon's Gems", { play_prod: '', play_test: '1.1.8 (118) test fermé', ios: '1.1.8 en examen', beta: '1.1.8 beta3', main: '1.1.8 · 925eabf', waits: ['Répondre au questionnaire Data safety', 'Publier la fiche App Store'], h: 2 }),
+		board('petanque-meet', 3, 'Pétanque Meet', { play_prod: '1.0.6 (16) en ligne', play_test: '1.0.7 (17) piste interne', ios: '1.0.6 en ligne', beta: '1.0.7', main: '1.0.7 · c09a15d' }),
+		board('nino-rush', 4, 'Nino Rush', { play_test: '0.3.0 (30) piste interne', beta: '0.3.0 beta1', main: '0.3.1 · 7b2d901', waits: ['Choisir le prix de lancement'], h: 30 }),
+		board('petanque-scan', 5, 'Pétanque Scan', { play_prod: '2.4.0 (240) en ligne', ios: '2.4.0 en ligne', main: '2.4.1 · 51aa0c3', h: 70 }),
+	],
+};
+
+const CATALOG = JSON.parse(readFileSync('public/promo/v1/catalog.json', 'utf8'));
+const promoFiles = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((f) => (f.isDirectory() ? promoFiles(`${dir}${f.name}/`) : [{ path: `${dir}${f.name}`, size: 1 }]));
+const PROMO = {
+	get: { head: '8a081890000000000000000000000000000000ab', catalog: CATALOG, blob: 'b0', files: promoFiles('public/promo/v1/'), missing: [] },
+	history: { versions: [
+		{ sha: '692fcfb0000000000000000000000000000000aa', date: ago(26), message: '[CHANGED] House ads weights: keyed by the base app id only' },
+		{ sha: '3b7921e0000000000000000000000000000000bb', date: ago(50), message: '[ADDED] House ads admin: a weights table' },
+		{ sha: 'f7bb1830000000000000000000000000000000cc', date: ago(75), message: "[CHANGED] House ads catalogue: dragon-gems changed (admin page)" },
+	] },
+};
+
+const ANSWERS = { overview: OVERVIEW, orders: ORDERS, purchases: PURCHASES, revenue: REVENUE, board: BOARD, ...PROMO };
 
 const mock = createServer((req, res) => {
 	res.setHeader('Access-Control-Allow-Origin', '*');
@@ -108,6 +146,7 @@ const mock = createServer((req, res) => {
 });
 await new Promise((r) => mock.listen(port + 1, r));
 process.env.PUBLIC_STATS_ADMIN_URL = `http://localhost:${port + 1}/`;
+process.env.PUBLIC_PROMO_ADMIN_URL = `http://localhost:${port + 1}/`;
 
 mkdirSync(out, { recursive: true });
 const VIEWPORTS = { desk: { width: 1366, height: 900 }, phone: { width: 390, height: 844 } };
