@@ -40,6 +40,7 @@ export const PRODUCTS: Record<string, { name: string; price: string }> = {
 	no_ads: { name: 'Sans publicité', price: '2,99 €' },
 	full: { name: "L'aventure complète", price: '4,99 € (3,99 € au lancement)' },
 	wardrobe: { name: 'Le grand dressing', price: '1,99 €' },
+	premium: { name: 'Premium (Pétanque Scan)', price: '9,99 €' },
 };
 
 export const STORES: Record<string, string> = { play: 'Google Play', appstore: 'App Store' };
