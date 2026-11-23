@@ -2,11 +2,14 @@
 // only: each app's visitors, purchases, sign-ins, house ads and retention, read from the self-hosted Umami with a
 // view-only user, cached 10 minutes in admin_stats_cache; and the studio board of /admin/versions/ (studio_board,
 // written by the studio's board.py); and the ad revenue of /admin/revenus/, read from the LevelPlay Reporting API
-// and cached an hour in admin_stats_cache. The logic is in _shared/statsAdmin.mjs.
+// and cached an hour in admin_stats_cache; and the Google Play orders of /admin/stats/, read from the Play Console's
+// sales reports in Cloud Storage and cached an hour. The logic is in _shared/statsAdmin.mjs and _shared/playSales.mjs.
 //
 // Secrets: UMAMI_URL (https://stats.ludiven-studio.fr), UMAMI_USER and UMAMI_PASSWORD (the view-only
 // « dashboard » user), PROMO_ADMIN_USER_ID (Raphaël's Supabase user id, the same as promo-admin),
-// LEVELPLAY_SECRET_KEY and LEVELPLAY_REFRESH_TOKEN (LevelPlay, My Account).
+// LEVELPLAY_SECRET_KEY and LEVELPLAY_REFRESH_TOKEN (LevelPlay, My Account), PLAY_REPORTS_KEY (the JSON key, or
+// its base64, of a service account with only « View financial data » in the Play Console) and PLAY_REPORTS_BUCKET
+// (pubsite_prod_…, Play Console → Download reports → Financial → Copy Cloud Storage URI).
 // Deploy: supabase functions deploy stats-admin --project-ref mzrdfahmzllgbpudpsdi
 
 import { createClient } from 'jsr:@supabase/supabase-js@2.117.0';

@@ -1,8 +1,8 @@
 // /admin/stats/: each app's figures from Umami through stats-admin, with each house ad's weights from the
-// catalogue online next to its shows and taps, and the purchases that went through over 30 days.
+// catalogue online next to its shows and taps, Google Play's orders (sales reports) and the purchases the apps saw.
 import { useEffect, useState } from 'react';
 import { signIn } from '../../lib/meetupAuth';
-import { COUNTED_KINDS, KINDS, PRODUCTS, STATS_LOCAL, STORES, StatsError, overview, purchases, statsMessage, type AppStats, type Count, type Overview, type Purchases } from '../../lib/statsAdmin';
+import { COUNTED_KINDS, KINDS, PRODUCTS, STATS_LOCAL, STORES, StatsError, overview, playOrders, purchases, statsMessage, type AppStats, type Count, type Overview, type PlayOrders, type Purchases } from '../../lib/statsAdmin';
 import { baseAppId, shares } from '../../lib/promoShares';
 import type { Catalog } from '../../../supabase/functions/_shared/promoRules.mjs';
 import { useAdminSession } from './useAdminSession';
@@ -26,6 +26,71 @@ function Counts({ rows, names, empty = 'aucun' }: { rows: Count[] | null; names?
 		<ul className="as-counts">
 			{[...merged].sort((a, b) => b[1] - a[1]).map(([name, count]) => <li key={name}><span>{name}</span> <strong>{int.format(count)}</strong></li>)}
 		</ul>
+	);
+}
+
+const ORDER_STATUS: Record<string, string> = { charged: 'payée', refund: 'remboursée', refunded: 'remboursée', 'partial refund': 'remboursée en partie', cancelled: 'annulée', canceled: 'annulée' };
+const SHOWN_ORDERS = 50;
+
+function priceIn(currency: string, n: number): string {
+	try {
+		return new Intl.NumberFormat('fr-FR', { style: 'currency', currency }).format(n);
+	} catch {
+		return `${n.toLocaleString('fr-FR')} ${currency}`;
+	}
+}
+
+function ordersMessage(e: unknown): string {
+	if (e instanceof StatsError && e.status === 400) return "stats-admin n'a pas encore l'action « orders » : elle attend son redéploiement.";
+	if (e instanceof StatsError && e.status === 503 && e.message === 'orders not configured')
+		return "Le rapport de ventes Google Play n'est pas encore branché (secrets PLAY_REPORTS_KEY et PLAY_REPORTS_BUCKET de stats-admin).";
+	if (e instanceof StatsError && e.status === 502)
+		return "Google n'a pas donné le rapport de ventes (clé du compte de service, droit « Voir les données financières » dans la Play Console, ou nom du bucket).";
+	return statsMessage(e);
+}
+
+/** Google Play's own orders: the real price, its currency and the buyer's country; nothing else about the buyer. */
+function PlayOrdersCard({ data, message }: { data: PlayOrders | null; message: string | null }) {
+	const shown = data?.orders.slice(0, SHOWN_ORDERS) ?? [];
+	return (
+		<section className="pa-card as-app as-purchases">
+			<header>
+				<h2>Commandes Google Play</h2>
+				<small>
+					{data
+						? data.totals.length
+							? `${data.totals.map((t) => `${int.format(t.orders)} payées, ${priceIn(t.currency, t.charged)}`).join(' · ')} sur 30 jours`
+							: 'aucune commande payée sur 30 jours'
+						: 'le rapport de ventes de la Play Console, 30 jours'}
+				</small>
+			</header>
+			{message && <p className="as-error">{message}</p>}
+			{shown.length > 0 && (
+				<div className="as-scroll">
+					<table className="as-table">
+						<thead><tr><th scope="col">Date</th><th scope="col">Appli</th><th scope="col">Produit</th><th scope="col">Statut</th><th scope="col">Pays</th><th scope="col">Prix payé</th></tr></thead>
+						<tbody>
+							{shown.map((o, i) => (
+								<tr key={`${o.at}-${i}`} className={/^charged/.test(o.status) ? undefined : 'as-not-real'}>
+									<th scope="row">{when(o.at)}</th>
+									<td>{o.app}</td>
+									<td>{o.product || '–'}</td>
+									<td>{ORDER_STATUS[o.status] ?? (o.status || '–')}</td>
+									<td>{o.country || '–'}</td>
+									<td>{o.currency ? priceIn(o.currency, o.charged) : '–'}</td>
+								</tr>
+							))}
+						</tbody>
+					</table>
+				</div>
+			)}
+			{data && data.orders.length > SHOWN_ORDERS && <p className="as-muted">Et {int.format(data.orders.length - SHOWN_ORDERS)} plus anciennes.</p>}
+			<p className="as-muted">
+				Le rapport de ventes de la Play Console, mis à jour une fois par jour : les vraies commandes, sans celles des testeurs, au prix payé taxes comprises dans la monnaie de l'acheteur.
+				Rien sur l'acheteur que son pays. L'App Store n'y est pas.
+			</p>
+			{data && data.errors.length > 0 && <p className="as-muted as-errors">Non lus : {data.errors.join(' ; ')}</p>}
+		</section>
 	);
 }
 
@@ -171,6 +236,8 @@ export default function AdminStats() {
 	const [catalog, setCatalog] = useState<Catalog | null>(null);
 	const [bought, setBought] = useState<Purchases | null>(null);
 	const [boughtMessage, setBoughtMessage] = useState<string | null>(null);
+	const [orders, setOrders] = useState<PlayOrders | null>(null);
+	const [ordersError, setOrdersError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
 	const [message, setMessage] = useState<string | null>(null);
 	const signedIn = STATS_LOCAL || !!session;
@@ -179,13 +246,15 @@ export default function AdminStats() {
 		setBusy(true);
 		setMessage(null);
 		setBoughtMessage(null);
+		setOrdersError(null);
 		const recent = purchases(refresh).then(setBought).catch((e) => setBoughtMessage(purchasesMessage(e)));
+		const sold = playOrders(refresh).then(setOrders).catch((e) => setOrdersError(ordersMessage(e)));
 		try {
 			setData(await overview(refresh));
 		} catch (e) {
 			setMessage(statsMessage(e));
 		} finally {
-			await recent;
+			await Promise.all([recent, sold]);
 			setBusy(false);
 		}
 	}
@@ -218,6 +287,7 @@ export default function AdminStats() {
 				<button type="button" className="pa-btn" disabled={busy} onClick={() => void load(true)}>Actualiser</button>
 			</div>
 			{message && <p className="pa-card as-error">{message}</p>}
+			{(orders || ordersError) && <PlayOrdersCard data={orders} message={ordersError} />}
 			{(bought || boughtMessage) && <RecentPurchases data={bought} message={boughtMessage} />}
 			{data?.apps.map((a) => <AppCard key={a.id} app={a} catalog={catalog} />)}
 		</div>

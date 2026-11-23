@@ -6,6 +6,8 @@
 // `host` or `hostname`): every read below accepts both, and a call that fails leaves its figure empty, named
 // in `errors`, instead of failing the page.
 
+import { ORDERS_CACHE_MINUTES, ORDERS_KEY, playOrders } from './playSales.mjs';
+
 export const CACHE_MINUTES = 10;
 export const CACHE_KEY = 'overview';
 export const PERIODS = { d1: 1, d7: 7, d28: 28 };
@@ -465,7 +467,8 @@ export async function recentPurchases(env, fetchFn, now) {
 
 /**
  * The function's request handler. deps:
- * - env: UMAMI_URL, UMAMI_USER, UMAMI_PASSWORD, PROMO_ADMIN_USER_ID, LEVELPLAY_SECRET_KEY, LEVELPLAY_REFRESH_TOKEN;
+ * - env: UMAMI_URL, UMAMI_USER, UMAMI_PASSWORD, PROMO_ADMIN_USER_ID, LEVELPLAY_SECRET_KEY, LEVELPLAY_REFRESH_TOKEN,
+ *   PLAY_REPORTS_KEY, PLAY_REPORTS_BUCKET;
  * - isAdmin(req): true for Raphaël's account only (the same check as promo-admin);
  * - cache: { get(key) → { body, fetchedAt } | null, put(key, body) };
  * - board: { list() → studio_board rows } for /admin/versions/;
@@ -494,6 +497,20 @@ export function statsHandler({ env, isAdmin, cache, board, fetch: fetchFn = fetc
 			} catch {
 				return json({ error: 'board not readable' }, 502);
 			}
+		}
+		if (body?.action === 'orders') {
+			if (!env.PLAY_REPORTS_KEY || !env.PLAY_REPORTS_BUCKET) return json({ error: 'orders not configured' }, 503);
+			const at = now();
+			const hit = body.refresh === true ? null : await Promise.resolve().then(() => cache.get(ORDERS_KEY)).catch(() => null);
+			if (hit && at.getTime() - new Date(hit.fetchedAt).getTime() < ORDERS_CACHE_MINUTES * 60_000) return json({ ...hit.body, cached: true });
+			let data;
+			try {
+				data = await playOrders(env, fetchFn, at);
+			} catch (e) {
+				return json({ error: 'Google Play did not answer', detail: String(e?.message ?? e).slice(0, 200) }, 502);
+			}
+			await Promise.resolve().then(() => cache.put(ORDERS_KEY, data)).catch(() => undefined);
+			return json({ ...data, cached: false });
 		}
 		if (body?.action === 'revenue') {
 			if (!env.LEVELPLAY_SECRET_KEY || !env.LEVELPLAY_REFRESH_TOKEN) return json({ error: 'revenue not configured' }, 503);

@@ -75,6 +75,8 @@ export interface StatsEnv {
 	PROMO_ADMIN_USER_ID?: string;
 	LEVELPLAY_SECRET_KEY?: string;
 	LEVELPLAY_REFRESH_TOKEN?: string;
+	PLAY_REPORTS_KEY?: string;
+	PLAY_REPORTS_BUCKET?: string;
 }
 
 export const CACHE_MINUTES: number;
