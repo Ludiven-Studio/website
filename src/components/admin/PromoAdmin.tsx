@@ -8,6 +8,7 @@ import {
 	type Catalog, type CatalogEntry, type Loaded, type Published, type Upload, type Version,
 } from '../../lib/promoAdmin';
 import PromoWeights from './PromoWeights';
+import { Help, Pill, appStyle } from './AdminParts';
 import { applyRow, type Platform } from '../../lib/promoShares';
 import { BANNER_TEXT_MAX, CATALOG_URL, LANGUAGES, PROMO_DIR, catalogUrl, checkCatalog, sitePath } from '../../../supabase/functions/_shared/promoRules.mjs';
 
@@ -263,11 +264,11 @@ export default function PromoAdmin() {
 				<div className="pa-grid">
 					<div className="pa-list">
 						{shown.entries.map((e, i) => (
-							<button type="button" key={`${e.id}-${i}`} className={`pa-item ${i === selected ? 'pa-item--on' : ''}`} onClick={() => setSelected(i)}>
+							<button type="button" key={`${e.id}-${i}`} className={`pa-item ${i === selected ? 'pa-item--on' : ''}`} style={appStyle(e.id, ...(e.app ?? []))} onClick={() => setSelected(i)}>
 								{e.image && <img src={fileUrl(e.image)} alt="" width="40" height="40" />}
 								<span>
 									<strong>{e.title.fr || e.title[shown.defaultLanguage ?? 'fr'] || e.id}</strong>
-									<small>{e.id} · {(e.weight ?? 1) > 0 ? `active, poids ${e.weight ?? 1}` : 'désactivée'}</small>
+									{(e.weight ?? 1) > 0 ? <Pill tone="ok">{`active · poids ${e.weight ?? 1}`}</Pill> : <Pill tone="plain">désactivée</Pill>}
 								</span>
 							</button>
 						))}
@@ -317,7 +318,7 @@ export default function PromoAdmin() {
 			)}
 
 			<details className="pa-card pa-history">
-				<summary>Historique des versions</summary>
+				<summary><h2>Historique des versions</h2></summary>
 				{history?.length ? (
 					<ul>
 						{history.map((v) => (
@@ -439,7 +440,9 @@ function Editor({ entry, readOnly, lang, setLang, edit, pick, fileUrl, toggle, r
 					<button type="button" className="pa-btn pa-danger" onClick={remove}>Supprimer</button>
 				</div>
 			)}
-			<p className="pa-note">Fichiers : {entry.image || '—'}{entry.clips ? ` · vidéos : ${Object.entries(entry.clips).map(([l, c]) => `${l} ${c}`).join(', ')}` : ''}</p>
+			<Help label="Fichiers">
+				<p className="ak-foot">{entry.image || '—'}{entry.clips ? ` · vidéos : ${Object.entries(entry.clips).map(([l, c]) => `${l} ${c}`).join(', ')}` : ''}</p>
+			</Help>
 		</div>
 	);
 }

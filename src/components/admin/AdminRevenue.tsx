@@ -1,13 +1,25 @@
 // /admin/revenus/: the ad revenue per app from the LevelPlay Reporting API (every mediated network), through
-// stats-admin: this month, the last 30 days and each of those days.
+// stats-admin: this month, the last 30 days and each of those days, with Unity Ads' own share.
 import { useEffect, useState } from 'react';
 import { signIn } from '../../lib/meetupAuth';
-import { STATS_LOCAL, StatsError, revenue, statsMessage, type Revenue, type RevenueApp, type RevenueDay } from '../../lib/statsAdmin';
+import { appColor } from '../../lib/appColors';
+import { STATS_LOCAL, StatsError, revenue, statsMessage, type Revenue, type RevenueApp, type RevenueDay, type RevenueNetwork } from '../../lib/statsAdmin';
 import { useAdminSession } from './useAdminSession';
+import { AppName, Bars, DayStack, Help, Tile, appStyle } from './AdminParts';
 
+// LevelPlay's networkName for Unity Ads: its share is the figure Unity's own dashboard shows.
+const UNITY_ADS = 'unityAds';
 const PLATFORMS: Record<string, string> = { android: 'Android', ios: 'iOS' };
-const dayLabel = (d: string): string => new Date(`${d}T12:00:00Z`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+const int = new Intl.NumberFormat('fr-FR');
+const at = (d: string) => new Date(`${d}T12:00:00Z`);
+const dayLabel = (d: string): string => at(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+const firstLabel = (d: string): string => (d.endsWith('-01') ? `1er ${at(d).toLocaleDateString('fr-FR', { month: 'short', timeZone: 'UTC' })}` : dayLabel(d));
 const when = (iso: string): string => new Date(iso).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
+
+/** « 1–23 nov. », or « 25 oct.–23 nov. » across two months. */
+function range(from: string, to: string): string {
+	return from.slice(0, 7) === to.slice(0, 7) ? `${Number(from.slice(8))}–${dayLabel(to)}` : `${dayLabel(from)}–${dayLabel(to)}`;
+}
 
 function money(currency: string) {
 	const f = new Intl.NumberFormat('fr-FR', { style: 'currency', currency, maximumFractionDigits: 2 });
@@ -22,53 +34,95 @@ function revenueMessage(e: unknown): string {
 	return statsMessage(e);
 }
 
-/** One bar per day, the last one (today) lighter as it is partial. Hover gives the day and its amount. */
-function DayBars({ days, fmt, label }: { days: RevenueDay[]; fmt: (n: number) => string; label: string }) {
-	const W = 300, H = 72, GAP = 2;
-	const max = Math.max(...days.map((d) => d.revenue), 0);
-	const bw = (W - GAP * (days.length - 1)) / days.length;
-	return (
-		<figure className="ar-chart">
-			<svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label={`${label} : revenus par jour du ${dayLabel(days[0].date)} au ${dayLabel(days[days.length - 1].date)}, au plus ${fmt(max)} par jour`}>
-				<line x1="0" x2={W} y1={H - 0.5} y2={H - 0.5} className="ar-base" />
-				{days.map((d, i) => {
-					const h = max > 0 ? Math.max((d.revenue / max) * (H - 4), d.revenue > 0 ? 2 : 0) : 0;
-					const x = i * (bw + GAP);
-					return (
-						<g key={d.date} className={i === days.length - 1 ? 'ar-today' : undefined}>
-							<rect x={x} y={0} width={bw + GAP} height={H} className="ar-hit">
-								<title>{`${dayLabel(d.date)} : ${fmt(d.revenue)}${i === days.length - 1 ? ' (journée en cours)' : ''}`}</title>
-							</rect>
-							{h > 0 && <rect x={x} y={H - 1 - h} width={bw} height={h} rx={Math.min(2, bw / 2)} className="ar-bar" />}
-						</g>
-					);
-				})}
-			</svg>
-			<figcaption>
-				<span>{dayLabel(days[0].date)}</span>
-				<span>max {fmt(max)} / jour</span>
-				<span>{dayLabel(days[days.length - 1].date)}</span>
-			</figcaption>
-		</figure>
-	);
+/** « dont Unity Ads x » for a period; nothing for a report cached before the split by network. */
+function unityPart(networks: RevenueNetwork[] | undefined, period: 'month' | 'last30', fmt: (n: number) => string): string | undefined {
+	if (!networks) return undefined;
+	return `dont Unity Ads ${fmt(networks.find((n) => n.network === UNITY_ADS)?.[period] ?? 0)}`;
 }
+
+const byDay = (days: RevenueDay[]) => new Map(days.map((d) => [d.date, d.revenue]));
 
 function AppCard({ app, fmt }: { app: RevenueApp; fmt: (n: number) => string }) {
 	return (
-		<article className="pa-card ar-app">
+		<article className="pa-card ak-appcard" style={appStyle(app.name)}>
 			<header>
-				<h2>{app.name}</h2>
-				{app.platforms.length > 0 && (
+				<h2><i aria-hidden="true" />{app.name}</h2>
+				{app.platforms.length > 1 && (
 					<small>{app.platforms.map((p) => `${PLATFORMS[p.platform] ?? p.platform} ${fmt(p.month)}`).join(' · ')} ce mois</small>
 				)}
 			</header>
-			<dl className="ar-figures">
-				<div><dt>Ce mois</dt><dd>{fmt(app.month)}</dd></div>
-				<div><dt>30 derniers jours</dt><dd>{fmt(app.last30)}</dd></div>
-				<div><dt>Affichages (30 j)</dt><dd>{new Intl.NumberFormat('fr-FR').format(app.impressions30)}</dd></div>
-			</dl>
-			<DayBars days={app.days} fmt={fmt} label={app.name} />
+			<div className="ak-nums">
+				<div><span>Ce mois</span><strong>{fmt(app.month)}</strong><small>{unityPart(app.networks, 'month', fmt)}</small></div>
+				<div><span>30 jours</span><strong>{fmt(app.last30)}</strong><small>{unityPart(app.networks, 'last30', fmt)}</small></div>
+				<div><span>Affichages</span><strong>{int.format(app.impressions30)}</strong><small>sur 30 jours</small></div>
+			</div>
+			<DayStack days={app.days.map((d) => d.date)} series={[{ key: app.name, label: app.name, color: appColor(app.name), byDay: byDay(app.days) }]} unit={fmt} partial />
 		</article>
+	);
+}
+
+function Studio({ data, fmt }: { data: Revenue; fmt: (n: number) => string }) {
+	const { total, apps } = data;
+	const days = total.days.map((d) => d.date);
+	const yesterday = total.days[total.days.length - 2];
+	const week = total.days.slice(-8, -1);
+	const shows = apps.reduce((n, a) => n + a.impressions30, 0);
+	// The report starts on the month's first day when nothing came in before it: both totals are then the same.
+	const before = total.days.filter((d) => d.date < data.monthStart);
+	const nothingBefore = before.length > 0 && before.every((d) => d.revenue === 0) && total.last30 > 0;
+	return (
+		<>
+			<div className="ak-tiles">
+				<Tile label={`Ce mois · ${range(data.monthStart, data.to)}`} value={fmt(total.month)} sub={unityPart(total.networks, 'month', fmt)} />
+				<Tile label={`30 derniers jours · ${range(data.from, data.to)}`} value={fmt(total.last30)} sub={unityPart(total.networks, 'last30', fmt)} />
+				{yesterday && <Tile label={`Hier · ${dayLabel(yesterday.date)}`} value={fmt(yesterday.revenue)} sub={`${fmt(week.reduce((s, d) => s + d.revenue, 0) / Math.max(1, week.length))} par jour sur 7 jours`} />}
+				<Tile label="Affichages · 30 jours" value={int.format(shows)} sub={`${apps.length} ${apps.length > 1 ? 'applis' : 'appli'}`} />
+			</div>
+			{nothingBefore && <p className="ak-note">LevelPlay ne compte aucun revenu avant le {firstLabel(data.monthStart)}</p>}
+			<section className="pa-card ak-card">
+				<header><h2>Par jour <small>en dollars US, jours UTC</small></h2></header>
+				<DayStack days={days} unit={fmt} partial
+					series={apps.map((a) => ({ key: a.name, label: a.name, color: appColor(a.name), byDay: byDay(a.days) }))} />
+				{apps.length > 0 && (
+					<Help label="Jour par jour">
+						<div className="as-scroll">
+							<table className="ak-table ak-num">
+								<thead><tr><th scope="col">Jour</th>{apps.map((a) => <th scope="col" key={a.name}><AppName name={a.name} /></th>)}<th scope="col">Total</th></tr></thead>
+								<tbody>
+									{[...total.days].reverse().map((d) => (
+										<tr key={d.date}>
+											<th scope="row">{dayLabel(d.date)}</th>
+											{apps.map((a) => <td key={a.name}>{fmt(a.days.find((x) => x.date === d.date)?.revenue ?? 0)}</td>)}
+											<td>{fmt(d.revenue)}</td>
+										</tr>
+									))}
+								</tbody>
+							</table>
+						</div>
+					</Help>
+				)}
+			</section>
+			<div className="pa-card ak-pair">
+				<section>
+					<h2>Par appli <small>30 jours</small></h2>
+					<Bars format={fmt} empty="aucun revenu" rows={apps.map((a) => ({ key: a.name, label: a.name, value: a.last30, color: appColor(a.name) }))} />
+				</section>
+				<section>
+					<h2>Par régie <small>30 jours</small></h2>
+					{total.networks ? (
+						<Bars format={fmt} empty="aucun revenu" rows={total.networks.map((n) => ({ key: n.network, label: n.name, value: n.last30, color: 'var(--sc-muted)' }))} />
+					) : <p className="as-muted">Relevé d'avant le détail par régie : « Actualiser » le relit.</p>}
+				</section>
+			</div>
+			<Help>
+				<p>
+					Les revenus publicitaires gagnés selon LevelPlay, toutes régies comprises (ironSource Ads, Unity Ads…), en dollars
+					US, par jour UTC ; le dernier jour, plus clair, est en cours. « Dont Unity Ads » est le chiffre à comparer au tableau
+					de bord Unity, qui ne compte que sa régie.
+				</p>
+				<p>Le solde disponible au versement (« available balance » de Unity) n'est dans aucune API : il reste à lire dans le tableau de bord.</p>
+			</Help>
+		</>
 	);
 }
 
@@ -118,46 +172,12 @@ export default function AdminRevenue() {
 				<button type="button" className="pa-btn" disabled={busy} onClick={() => void load(true)}>Actualiser</button>
 			</div>
 			{message && <p className="pa-card as-error">{message}</p>}
-			<p className="pa-card as-muted">
-				Revenus publicitaires gagnés selon LevelPlay, toutes régies comprises (ironSource Ads, Unity Ads…), en dollars US,
-				jours en heure UTC ; la journée en cours est partielle. Le solde disponible au versement (« available balance » du
-				tableau de bord Unity) n'est dans aucune API : il reste à lire dans le tableau de bord.
-			</p>
-			{data && (
-				<>
-					<section className="pa-card ar-app ar-total">
-						<header><h2>Tout le studio</h2><small>du {dayLabel(data.from)} au {dayLabel(data.to)}</small></header>
-						<dl className="ar-figures">
-							<div><dt>Ce mois</dt><dd>{fmt(data.total.month)}</dd></div>
-							<div><dt>30 derniers jours</dt><dd>{fmt(data.total.last30)}</dd></div>
-							<div><dt>Applis</dt><dd>{data.apps.length}</dd></div>
-						</dl>
-						<DayBars days={data.total.days} fmt={fmt} label="Tout le studio" />
-						{data.apps.length > 0 && (
-							<details>
-								<summary>Jour par jour</summary>
-								<div className="as-scroll">
-									<table className="as-table">
-										<thead><tr><th>Jour</th>{data.apps.map((a) => <th key={a.name}>{a.name}</th>)}<th>Total</th></tr></thead>
-										<tbody>
-											{[...data.total.days].reverse().map((d) => (
-												<tr key={d.date}>
-													<th>{dayLabel(d.date)}</th>
-													{data.apps.map((a) => <td key={a.name}>{fmt(a.days.find((x) => x.date === d.date)?.revenue ?? 0)}</td>)}
-													<td>{fmt(d.revenue)}</td>
-												</tr>
-											))}
-										</tbody>
-									</table>
-								</div>
-							</details>
-						)}
-					</section>
-					{!data.apps.length && <p className="pa-card as-muted">LevelPlay ne donne aucun revenu sur ces 30 jours.</p>}
-					<div className="ar-grid">
-						{data.apps.map((a) => <AppCard key={a.name} app={a} fmt={fmt} />)}
-					</div>
-				</>
+			{data && <Studio data={data} fmt={fmt} />}
+			{data && !data.apps.length && <p className="pa-card as-muted">LevelPlay ne donne aucun revenu sur ces 30 jours.</p>}
+			{data && data.apps.length > 0 && (
+				<div className="ak-apps">
+					{data.apps.map((a) => <AppCard key={a.name} app={a} fmt={fmt} />)}
+				</div>
 			)}
 		</div>
 	);

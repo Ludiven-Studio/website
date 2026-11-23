@@ -1,46 +1,62 @@
-// /admin/: one tile per admin page. Once signed in, the tiles show a few figures: the house ads from the
-// catalogue online, the visitors and taps and this month's ad revenue from stats-admin. Versions links the studio board.
-import { useEffect, useState } from 'react';
+// /admin/: one tile per admin page. Once signed in, the tiles show each page's key figure: the visitors from
+// stats-admin, this month's ad revenue, what waits on the studio board, and the house ads from the catalogue online.
+import { useEffect, useState, type ReactNode } from 'react';
 import { accountLabel, signIn, signOut } from '../../lib/meetupAuth';
-import { STATS_LOCAL, overview, revenue, statsMessage, totals } from '../../lib/statsAdmin';
+import { STATS_LOCAL, board, overview, revenue, statsMessage, totals, type Revenue } from '../../lib/statsAdmin';
 import type { Catalog } from '../../../supabase/functions/_shared/promoRules.mjs';
 import { useAdminSession } from './useAdminSession';
+import { AppName } from './AdminParts';
 
 const int = new Intl.NumberFormat('fr-FR');
-const usd = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+const usd = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
+// The studio's apps in the order of their colours.
+const APPS = ['Pétanque Game', "Dragon's Gems", 'Pétanque Meet', 'Nino Rush', 'Pétanque Scan'];
 
-interface Tile { href?: string; title: string; text: string; figure?: string }
+interface Tile { href: string; title: string; text: string; figure?: ReactNode; sub?: string }
 
 export default function AdminHome() {
 	const { session, ready, error } = useAdminSession(STATS_LOCAL);
 	const [stats, setStats] = useState<ReturnType<typeof totals> | null>(null);
 	const [statsError, setStatsError] = useState<string | null>(null);
 	const [ads, setAds] = useState<number | null>(null);
-	const [month, setMonth] = useState<number | null>(null);
+	const [money, setMoney] = useState<Revenue | null>(null);
+	const [waits, setWaits] = useState<number | null>(null);
 	const signedIn = STATS_LOCAL || !!session;
 
 	useEffect(() => {
 		if (!signedIn) return;
 		overview().then((o) => setStats(totals(o))).catch((e) => setStatsError(statsMessage(e)));
-		revenue().then((r) => setMonth(r.total.month)).catch(() => setMonth(null));
+		revenue().then(setMoney).catch(() => setMoney(null));
+		board().then((b) => setWaits(b.apps.reduce((n, a) => n + a.waits.length, 0))).catch(() => setWaits(null));
 		fetch('/promo/v1/catalog.json', { cache: 'no-cache' })
 			.then((r) => (r.ok ? r.json() : null))
 			.then((c: Catalog | null) => setAds(c ? c.entries.filter((e) => (e.weight ?? 1) > 0).length : null))
 			.catch(() => setAds(null));
 	}, [signedIn]);
 
+	const unity = money?.total.networks?.find((n) => n.network === 'unityAds');
 	const tiles: Tile[] = [
-		{ href: '/admin/pubs/', title: 'Pubs maison', text: 'Le catalogue que lisent les applis, leurs poids par appli et par plateforme.', figure: ads === null ? undefined : `${ads} pubs actives` },
-		{ href: '/admin/versions/', title: 'Versions', text: "Chaque appli sur Google Play, l'App Store, chez les testeurs et sur main, et ce qui t'attend." },
 		{
-			href: '/admin/stats/', title: 'Statistiques', text: 'Visiteurs, achats, connexions et pubs maison, appli par appli (Umami).',
-			figure: stats ? `${int.format(stats.visitors7)} visiteurs sur 7 j · ${stats.apps} applis` : statsError ?? undefined,
+			href: '/admin/stats/', title: 'Statistiques', text: 'Visiteurs, achats, connexions et pubs maison, appli par appli.',
+			figure: stats ? int.format(stats.visitors7) : undefined, sub: stats ? `visiteurs sur 7 jours · ${stats.apps} applis` : statsError ?? undefined,
 		},
-		{ href: '/admin/revenus/', title: 'Revenus', text: 'La publicité par appli (LevelPlay) : ce mois, les 30 derniers jours, jour par jour.', figure: month === null ? undefined : `${usd.format(month)} ce mois` },
+		{
+			href: '/admin/revenus/', title: 'Revenus', text: 'La publicité par appli et par régie (LevelPlay).',
+			figure: money ? usd.format(money.total.month) : undefined, sub: money ? `ce mois${unity ? ` · dont Unity Ads ${usd.format(unity.month)}` : ''}` : undefined,
+		},
+		{
+			href: '/admin/versions/', title: 'Versions', text: 'Chaque appli sur les stores, chez les testeurs et sur main.',
+			figure: waits === null ? undefined : <span className={waits ? 'ak-warn-text' : undefined}>{waits}</span>,
+			sub: waits === null ? undefined : waits ? `chose${waits > 1 ? 's' : ''} t'attend${waits > 1 ? 'ent' : ''}` : "rien ne t'attend",
+		},
+		{
+			href: '/admin/pubs/', title: 'Pubs maison', text: 'Le catalogue des applis et leurs poids.',
+			figure: ads === null ? undefined : ads, sub: ads === null ? undefined : `pub${ads > 1 ? 's' : ''} active${ads > 1 ? 's' : ''}`,
+		},
 	];
 
 	return (
-		<div className="ah-root">
+		<div className="as-root">
 			<div className="pa-bar">
 				{!ready ? <span className="pa-note">Chargement…</span> : signedIn ? (
 					<>
@@ -49,7 +65,7 @@ export default function AdminHome() {
 					</>
 				) : (
 					<>
-						<span className="pa-note">Connecte-toi pour voir les chiffres ; chaque page vérifie l'accès de ton compte.</span>
+						<span className="pa-note">Connecte-toi pour voir les chiffres.</span>
 						<button type="button" className="pa-btn pa-primary" onClick={() => void signIn('google', window.location.href)}>Se connecter avec Google</button>
 					</>
 				)}
@@ -58,22 +74,17 @@ export default function AdminHome() {
 			<ul className="ah-tiles">
 				{tiles.map((t) => (
 					<li key={t.title}>
-						{t.href ? (
-							<a className="pa-card ah-tile" href={t.href}>
-								<strong>{t.title}</strong>
-								<span>{t.text}</span>
-								{t.figure && <em>{t.figure}</em>}
-							</a>
-						) : (
-							<div className="pa-card ah-tile ah-soon" aria-disabled="true">
-								<strong>{t.title}</strong>
-								<span>{t.text}</span>
-								<em>{t.figure}</em>
-							</div>
-						)}
+						<a className="ak-tile ah-tile" href={t.href}>
+							<span>{t.title}</span>
+							{t.figure !== undefined ? <strong>{t.figure}</strong> : <em>{t.text}</em>}
+							{t.sub && <small>{t.sub}</small>}
+						</a>
 					</li>
 				))}
 			</ul>
+			<p className="ak-legend ah-apps" aria-label="La couleur de chaque appli, la même sur toutes les pages">
+				{APPS.map((a) => <AppName key={a} name={a} />)}
+			</p>
 		</div>
 	);
 }

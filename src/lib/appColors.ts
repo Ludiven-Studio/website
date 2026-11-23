@@ -4,7 +4,7 @@ export const APP_KEYS = ['petanque-game', 'dragon-gems', 'petanque-meet', 'nino-
 export type AppKey = (typeof APP_KEYS)[number];
 
 const MATCH: [RegExp, AppKey][] = [
-	[/petanque ?game|petanquegame/, 'petanque-game'],
+	[/petanque[ -]?game/, 'petanque-game'],
 	[/dragon/, 'dragon-gems'],
 	[/meet/, 'petanque-meet'],
 	[/nino/, 'nino-rush'],

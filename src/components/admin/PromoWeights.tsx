@@ -2,6 +2,7 @@
 // the ad's weight in that app and its share of the draws, as the apps compute it (lib/promoShares).
 import { useMemo, useState } from 'react';
 import type { Catalog } from '../../../supabase/functions/_shared/promoRules.mjs';
+import { AppName, Help, appStyle } from './AdminParts';
 import { isWeighted, perPlatform, rowChanged, setWeightIn, shares, showingApps, weightIn, type Platform, type Spot } from '../../lib/promoShares';
 
 // Apps that show the ads without an entry of their own.
@@ -68,7 +69,7 @@ export default function PromoWeights({ catalog, published, readOnly, busy, chang
 							<tr>
 								<th scope="col">Appli qui affiche</th>
 								<th scope="col">Pondéré</th>
-								{catalog.entries.map((e) => <th scope="col" key={e.id}>{e.title.fr ?? e.id}</th>)}
+								{catalog.entries.map((e) => <th scope="col" key={e.id}><AppName name={e.title.fr ?? e.id} of={e.id} /></th>)}
 								<th scope="col">Enregistrer</th>
 							</tr>
 						</thead>
@@ -79,7 +80,7 @@ export default function PromoWeights({ catalog, published, readOnly, busy, chang
 								const flips = !!published && isWeighted(published, app) !== weighted;
 								return (
 									<tr key={app} className={changed ? 'pw-changed' : undefined}>
-										<th scope="row">{name(app)}<small>{app}</small></th>
+										<th scope="row"><AppName name={name(app)} of={app} /><small>{app}</small></th>
 										<td>
 											<label className="pw-switch">
 												<input type="checkbox" checked={weighted} disabled={readOnly} onChange={(ev) => setWeighted(app, ev.target.checked)} />
@@ -87,7 +88,7 @@ export default function PromoWeights({ catalog, published, readOnly, busy, chang
 											</label>
 										</td>
 										{rows.map((r) => (
-											<td key={r.id} className={`pw-cell pw-${r.state}`} title={r.reason}>
+											<td key={r.id} className={`pw-cell pw-${r.state}`} title={r.reason} style={appStyle(r.id)}>
 												{r.state === 'self' ? <span className="pa-note">sa pub</span> : (
 													<>
 														{weighted && !readOnly ? (
@@ -95,6 +96,7 @@ export default function PromoWeights({ catalog, published, readOnly, busy, chang
 																value={r.weight} onChange={(ev) => setWeight(app, platform, r.id, ev.target.value)} />
 														) : <span className="pw-weight">{r.weight}</span>}
 														<strong>{r.state === 'shown' ? percent(r.share) : '0 %'}</strong>
+														<span className="ak-bar-track" aria-hidden="true"><span className="ak-bar" style={{ width: `${r.state === 'shown' ? Math.round(r.share * 100) : 0}%` }} /></span>
 														{r.reason && <small>{r.reason}</small>}
 													</>
 												)}
@@ -118,16 +120,22 @@ export default function PromoWeights({ catalog, published, readOnly, busy, chang
 
 	return (
 		<details className="pa-card pw-root" open>
-			<summary>Poids par appli</summary>
-			<p className="pa-note">
-				Chaque case : le poids de la pub dans l'appli de la ligne, sur cette plateforme, et la part des affichages qui en
-				sort. En mode pondéré, l'appli ignore les groupes et tire selon ces poids ; 0 éteint la pub dans cette appli
-				seulement. Sinon elle garde la règle actuelle : ses groupes d'abord, puis le poids général de la pub.
-			</p>
-			<p className="pa-note">
-				« Valider » publie tout de suite cette ligne seule (cette appli, cette plateforme), sans le reste de tes changements.
-				L'interrupteur « Pondéré » vaut pour Android et iOS à la fois.
-			</p>
+			<summary><h2>Poids par appli</h2></summary>
+			<Help>
+				<p>
+					Chaque case : le poids de la pub dans l'appli de la ligne, sur cette plateforme, et la part des affichages qui en
+					sort. En mode pondéré, l'appli ignore les groupes et tire selon ces poids ; 0 éteint la pub dans cette appli
+					seulement. Sinon elle garde la règle actuelle : ses groupes d'abord, puis le poids général de la pub.
+				</p>
+				<p>
+					« Valider » publie tout de suite cette ligne seule (cette appli, cette plateforme), sans le reste de tes changements.
+					L'interrupteur « Pondéré » vaut pour Android et iOS à la fois.
+				</p>
+				<p>
+					Parts sans compter la règle qui ne remontre jamais la même pub deux fois de suite. « À défaut » : la pub ne sort que
+					quand celles d'avant manquent.
+				</p>
+			</Help>
 			<p className="pa-note pw-warn">
 				Le mode pondéré ne vaut que pour les versions des applis qui lisent « weights » (LudivenTools, depuis le 20-11-2026).
 				Les versions déjà publiées gardent la règle actuelle, quel que soit l'interrupteur.
@@ -159,10 +167,6 @@ export default function PromoWeights({ catalog, published, readOnly, busy, chang
 			</div>
 			{table('android')}
 			{table('ios')}
-			<p className="pa-note">
-				Parts sans compter la règle qui ne remontre jamais la même pub deux fois de suite. « À défaut » : la pub ne sort que
-				quand celles d'avant manquent.
-			</p>
 		</details>
 	);
 }

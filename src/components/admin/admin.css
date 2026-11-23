@@ -1,4 +1,4 @@
-/* The admin pages' shared look (/admin/, /admin/stats/); /admin/pubs/ keeps its own copy of the pa-* base. */
+/* The admin pages' shared look; /admin/pubs/ keeps its own pa-* editor base in its page, restyled below. */
 .pa-h1 { font-size: var(--text-xl); margin-top: 1.5rem; }
 .pa-note, .as-muted { color: var(--sc-muted); font-size: var(--text-sm); }
 .pa-card { border: 1px solid var(--sc-line); border-radius: 0.75rem; padding: 1rem 1.25rem; background: var(--sc-surface); }
@@ -6,73 +6,23 @@
 .pa-btn { border: 1px solid var(--sc-line); border-radius: 999px; padding: 0.4rem 1rem; background: var(--sc-surface); color: var(--sc-ink); font: inherit; font-size: var(--text-sm); cursor: pointer; }
 .pa-btn:disabled { opacity: 0.5; cursor: default; }
 .pa-primary { background: var(--sc-accent); border-color: var(--sc-accent); color: #fff; font-weight: 700; }
-.as-error { border-color: #dc2626; color: #b91c1c; }
+.as-error { color: var(--st-bad); box-shadow: inset 4px 0 0 var(--st-bad) !important; }
 
-.ah-root, .as-root { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; margin-bottom: 3rem; }
-.ah-tiles { list-style: none; margin: 0; padding: 0; display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); }
-.ah-tile { display: grid; gap: 0.4rem; height: 100%; color: var(--sc-ink); text-decoration: none; }
-a.ah-tile:hover, a.ah-tile:focus-visible { border-color: var(--sc-accent); box-shadow: 0 0 0 2px var(--sc-accent); }
-.ah-tile strong { font-size: var(--text-lg); }
-.ah-tile span { color: var(--sc-muted); font-size: var(--text-sm); }
-.ah-tile em { font-style: normal; font-weight: 700; color: var(--sc-accent); }
-.ah-soon { opacity: 0.55; }
-.ah-soon em { color: var(--sc-muted); }
-
-.as-app { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.9rem; }
-.as-app header { display: grid; gap: 0.15rem; }
-.as-app h2 { margin: 0; font-size: var(--text-lg); }
-.as-app h3 { margin: 0 0 0.3rem; font-size: var(--text-base); }
-.as-app small { color: var(--sc-muted); }
+.as-root { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; margin-bottom: 3rem; }
 .as-scroll { overflow-x: auto; }
-.as-table { border-collapse: collapse; font-size: var(--text-sm); min-width: 100%; }
-.as-table th, .as-table td { border: 1px solid var(--sc-line); padding: 0.35rem 0.6rem; text-align: right; white-space: nowrap; }
-.as-table thead th { background: var(--sc-surface-2); text-align: center; }
-.as-table tbody th { text-align: left; font-weight: 600; }
-.as-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); }
-.as-counts { list-style: none; margin: 0 0 0.4rem; padding: 0; display: grid; gap: 0.15rem; font-size: var(--text-sm); }
-.as-counts li { display: flex; justify-content: space-between; gap: 1rem; border-bottom: 1px dotted var(--sc-line); }
-.as-retention { margin: 0; font-size: var(--text-sm); }
-.as-tag { display: inline-block; border: 1px solid var(--sc-line); border-radius: 999px; padding: 0 0.5rem; font-size: 0.75rem; color: var(--sc-muted); }
 .as-errors { overflow-wrap: anywhere; }
-.as-purchases .as-table tbody :is(th, td) { text-align: left; }
-.as-purchases .as-table tbody td:last-child { text-align: right; }
-.as-purchases .as-table small { font-weight: normal; }
-.as-purchases .as-not-real { color: var(--sc-muted); }
+.as-not-real { color: var(--sc-muted); }
 .as-check { display: flex; gap: 0.4rem; align-items: center; font-size: var(--text-sm); }
 .as-signin { display: grid; gap: 0.75rem; justify-items: start; }
-.av-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr)); }
-.av-app { display: grid; gap: 0.75rem; align-content: start; }
-.av-app header { display: grid; gap: 0.15rem; }
-.av-app h2 { margin: 0; font-size: var(--text-lg); }
-.av-app small { color: var(--sc-muted); font-size: var(--text-sm); }
-.av-rows { margin: 0; display: grid; gap: 0.4rem; font-size: var(--text-sm); }
-.av-rows div { display: grid; grid-template-columns: 8.5rem minmax(0, 1fr); gap: 0.6rem; border-bottom: 1px dotted var(--sc-line); padding-bottom: 0.3rem; }
-.av-rows dt { color: var(--sc-muted); }
-.av-rows dd { margin: 0; overflow-wrap: anywhere; }
-.av-waits h3 { margin: 0 0 0.3rem; font-size: var(--text-base); }
-.av-waits ul { margin: 0; padding-left: 1.2rem; display: grid; gap: 0.25rem; font-size: var(--text-sm); }
-@media (max-width: 30rem) { .av-rows div { grid-template-columns: minmax(0, 1fr); gap: 0.1rem; } }
 
-/* /admin/revenus/ */
-.ar-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr)); }
-.ar-app { display: grid; gap: 0.75rem; align-content: start; }
-.ar-app header { display: grid; gap: 0.15rem; }
-.ar-app h2 { margin: 0; font-size: var(--text-lg); }
-.ar-app small { color: var(--sc-muted); font-size: var(--text-sm); }
-.ar-figures { margin: 0; display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; }
-.ar-figures dt { color: var(--sc-muted); font-size: var(--text-sm); }
-.ar-figures dd { margin: 0; font-size: var(--text-lg); font-weight: 700; font-variant-numeric: tabular-nums; }
-.ar-total .ar-figures dd { font-size: var(--text-xl); }
-.ar-chart { margin: 0; display: grid; gap: 0.25rem; }
-.ar-chart svg { width: 100%; height: 4.5rem; display: block; overflow: visible; }
-.ar-total .ar-chart svg { height: 8rem; }
-.ar-chart figcaption { display: flex; justify-content: space-between; gap: 0.5rem; color: var(--sc-muted); font-size: 0.75rem; }
-.ar-bar { fill: var(--sc-accent); }
-.ar-today .ar-bar { opacity: 0.45; }
-.ar-hit { fill: transparent; }
-.ar-hit:hover + .ar-bar, g:hover > .ar-bar { opacity: 0.75; }
-.ar-base { stroke: var(--sc-line); stroke-width: 1; }
-.ar-total details summary { cursor: pointer; font-size: var(--text-sm); color: var(--sc-muted); }
+/* /admin/: one tile per page, its key figure large. */
+.ah-tiles { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr)); }
+.ah-tiles li { display: grid; }
+.ah-tile { color: var(--sc-ink); text-decoration: none; min-height: 7.5rem; transition: box-shadow 0.15s; }
+.ak-tile.ah-tile > span { font-weight: 700; font-size: var(--text-base); color: var(--sc-ink); }
+.ah-tile em { font-style: normal; font-size: var(--text-sm); color: var(--sc-muted); }
+a.ah-tile:hover, a.ah-tile:focus-visible { box-shadow: 0 0 0 2px var(--sc-accent); outline: none; }
+.ak-legend.ah-apps { justify-content: flex-start; font-size: var(--text-sm); color: var(--sc-muted); }
 
 /* Colours: one per app (same everywhere, checked for colour-blind separation in this order), then states only. */
 :root {
@@ -93,7 +43,7 @@ a.ah-tile:hover, a.ah-tile:focus-visible { border-color: var(--sc-accent); box-s
 
 .ak-tiles { display: grid; gap: 0.75rem; grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .ak-tile { display: grid; gap: 0.2rem; align-content: start; padding: 1rem 1.1rem; border-radius: 1rem; background: var(--sc-surface); box-shadow: 0 1px 2px rgb(26 21 51 / 0.06), 0 4px 16px rgb(26 21 51 / 0.05); }
-.ak-tile span { font-size: var(--text-sm); color: var(--sc-muted); }
+.ak-tile > span { font-size: var(--text-sm); color: var(--sc-muted); }
 .ak-tile strong { font-size: var(--text-2xl); line-height: 1.1; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
 .ak-tile small { font-size: var(--text-sm); color: var(--sc-muted); }
 
@@ -140,7 +90,9 @@ a.ah-tile:hover, a.ah-tile:focus-visible { border-color: var(--sc-accent); box-s
 .ak-help summary, .ak-unread summary { cursor: pointer; width: fit-content; }
 .ak-unread summary { list-style: none; }
 .ak-unread summary::-webkit-details-marker { display: none; }
-.ak-help p, .ak-unread p { margin: 0.4rem 0 0; max-width: 70ch; }
+.ak-help > div { display: grid; gap: 0.5rem; margin-top: 0.5rem; }
+.ak-help p { margin: 0; max-width: 70ch; }
+.ak-unread p { margin: 0.4rem 0 0; max-width: 70ch; }
 
 .ak-apps { display: grid; gap: 1.25rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 30rem), 1fr)); }
 .ak-appcard { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.1rem; align-content: start; border-top: 4px solid var(--app) !important; }
@@ -158,6 +110,49 @@ a.ah-tile:hover, a.ah-tile:focus-visible { border-color: var(--sc-accent); box-s
 .ak-split .ak-bars li { grid-template-columns: minmax(4rem, 7.5rem) minmax(0, 1fr) 2.5rem; }
 .ak-foot { color: var(--sc-muted); font-size: 0.75rem; overflow-wrap: anywhere; }
 
+.ak-partial rect:not([fill="transparent"]) { opacity: 0.45; }
+.ak-note { margin: 0; padding: 0.55rem 0.9rem; border-radius: 0.75rem; background: var(--sc-surface-2); color: var(--sc-ink-2); font-size: var(--text-sm); }
+.ak-warn-text { color: var(--st-warn); }
+.ak-apps--narrow { grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr)); }
+
+/* /admin/versions/: one line per store, its state as a pill; what waits, first. */
+.ak-rows { margin: 0; display: grid; font-size: var(--text-sm); }
+.ak-rows div { display: grid; grid-template-columns: 8rem minmax(0, 1fr); gap: 0.6rem; align-items: center; padding: 0.4rem 0; border-bottom: 1px solid color-mix(in srgb, var(--sc-line) 55%, transparent); }
+.ak-rows div:last-child { border-bottom: none; }
+.ak-rows dt { color: var(--sc-muted); }
+.ak-rows dd { margin: 0; overflow-wrap: anywhere; }
+.ak-rows .ak-pill { white-space: normal; }
+.ak-waits { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; font-size: var(--text-sm); }
+.ak-waits li { display: grid; grid-template-columns: 9rem minmax(0, 1fr); gap: 0.75rem; align-items: baseline; padding-left: 0.75rem; border-left: 3px solid var(--st-warn); }
+.ak-waits a { color: var(--sc-ink); text-decoration: none; font-weight: 600; }
+
+/* /admin/pubs/: the editor in the same look. */
+.pa-root .pa-card, .pa-root .pa-editor { border: none; border-radius: 1rem; box-shadow: 0 1px 2px rgb(26 21 51 / 0.06), 0 4px 16px rgb(26 21 51 / 0.05); }
+.pa-root .pa-ok { box-shadow: inset 4px 0 0 var(--st-ok), 0 4px 16px rgb(26 21 51 / 0.05); }
+.pa-root .pa-error { box-shadow: inset 4px 0 0 var(--st-bad), 0 4px 16px rgb(26 21 51 / 0.05); }
+.pa-root .pa-error :is(p, li) { color: var(--st-bad); }
+.pa-root .pa-peek { box-shadow: inset 4px 0 0 var(--st-warn), 0 4px 16px rgb(26 21 51 / 0.05); }
+.pa-root .pa-item { border: none; border-left: 4px solid var(--app, var(--sc-line)); border-radius: 0.75rem; padding: 0.55rem 0.6rem; box-shadow: 0 1px 2px rgb(26 21 51 / 0.06); }
+.pa-root .pa-item span { gap: 0.25rem; justify-items: start; }
+.pa-root .pa-item .ak-pill { display: inline-flex; }
+.pa-root .pw-table { border: 0; }
+.pa-root .pw-table thead .ak-app { white-space: nowrap; }
+.pa-root .pa-item--on { box-shadow: 0 0 0 2px var(--app, var(--sc-accent)); }
+.pa-root .pa-tab { border: none; border-radius: 999px; }
+.pa-root .pa-tab--on { background: var(--sc-surface-2); }
+.pa-root summary h2 { display: inline; margin: 0; font-size: var(--text-lg); }
+.pa-root .pw-root > summary { font-weight: 400; }
+.pa-root .pw-warn { border-left-color: var(--st-warn); }
+.pa-root .pw-table th, .pa-root .pw-table td { border: 0; border-bottom: 1px solid color-mix(in srgb, var(--sc-line) 55%, transparent); }
+.pa-root .pw-table thead th { background: none; font-size: 0.75rem; font-weight: 600; color: var(--sc-muted); vertical-align: bottom; border-bottom-color: var(--sc-line); }
+.pa-root .pw-table thead .ak-app { justify-content: center; color: var(--sc-ink-2); }
+.pa-root .pw-table tbody tr:last-child :is(th, td) { border-bottom: none; }
+.pa-root .pw-table tbody th small { margin-left: 1rem; }
+.pa-root .pw-cell .ak-bar-track { display: block; width: 4.5rem; height: 0.35rem; margin: 0.25rem auto 0; }
+.pa-root :is(.pw-self, .pw-off, .pw-out) { background: none; }
+.pa-root .pa-history li { padding: 0.4rem 0; border-bottom: 1px solid color-mix(in srgb, var(--sc-line) 55%, transparent); }
+.pa-root .pa-history li:last-child { border-bottom: none; }
+
 @media (max-width: 52rem) {
 	.ak-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 	.ak-pair { grid-template-columns: minmax(0, 1fr); }
@@ -170,6 +165,8 @@ a.ah-tile:hover, a.ah-tile:focus-visible { border-color: var(--sc-accent); box-s
 	.ak-bars li { grid-template-columns: minmax(4rem, 7rem) minmax(0, 1fr) 4rem; }
 	.ak-nums strong { font-size: var(--text-lg); }
 	.ak-wide { display: none; }
+	.ak-rows div { grid-template-columns: 6.5rem minmax(0, 1fr); }
+	.ak-waits li { grid-template-columns: minmax(0, 1fr); gap: 0.15rem; }
 	.ak-num tbody th { white-space: normal; }
 	/* A list table becomes one block per row: date and price, then the rest on a second line. */
 	.ak-list thead { display: none; }

@@ -6,7 +6,7 @@ import type { Board, Overview, PurchaseKind, Purchases, Revenue } from '../../su
 import type { PlayOrders } from '../../supabase/functions/_shared/playSales.mjs';
 
 export type { PlayOrder, PlayOrders, PlayTotal } from '../../supabase/functions/_shared/playSales.mjs';
-export type { AppStats, Board, BoardApp, Count, Overview, Purchase, PurchaseKind, Purchases, Revenue, RevenueApp, RevenueDay } from '../../supabase/functions/_shared/statsAdmin.mjs';
+export type { AppStats, Board, BoardApp, Count, Overview, Purchase, PurchaseKind, Purchases, Revenue, RevenueApp, RevenueDay, RevenueNetwork } from '../../supabase/functions/_shared/statsAdmin.mjs';
 
 const LOCAL = import.meta.env.PUBLIC_STATS_ADMIN_URL as string | undefined;
 export const STATS_URL = LOCAL || `${SUPABASE_URL}/functions/v1/stats-admin`;

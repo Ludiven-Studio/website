@@ -262,7 +262,6 @@ export function readRevenueRow(row) {
 
 // LevelPlay's networkName values (docs: naming and configurations), as the page shows them.
 export const NETWORK_NAMES = { unityAds: 'Unity Ads', ironSource: 'ironSource Ads', ironSourceExchange: 'ironSource Ads' };
-export const UNITY_ADS = 'unityAds';
 
 const appName = (name) => name.replace(/\s*\((android|ios)\)\s*$/i, '');
 // One app whatever the accents, apostrophes or case of its name on each platform.

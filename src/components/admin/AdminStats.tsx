@@ -7,7 +7,7 @@ import { appColor } from '../../lib/appColors';
 import { baseAppId, shares } from '../../lib/promoShares';
 import type { Catalog } from '../../../supabase/functions/_shared/promoRules.mjs';
 import { useAdminSession } from './useAdminSession';
-import { Bars, DayStack, Meter, Pill, Tile, type DaySeries, type Tone } from './AdminParts';
+import { AppName, Bars, DayStack, Help, Meter, Pill, Tile, type DaySeries, type Tone } from './AdminParts';
 
 const int = new Intl.NumberFormat('fr-FR');
 const pct = (x: number | null | undefined): string => (x == null ? '–' : `${(x * 100).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} %`);
@@ -20,7 +20,6 @@ const RESULT_TONE: Record<string, Tone> = { réussis: 'ok', annulés: 'warn', é
 const ORDER_STATUS: Record<string, [string, Tone]> = {
 	charged: ['payée', 'ok'], refund: ['remboursée', 'warn'], refunded: ['remboursée', 'warn'], 'partial refund': ['remboursée en partie', 'warn'], cancelled: ['annulée', 'bad'], canceled: ['annulée', 'bad'],
 };
-const appStyle = (...names: (string | null | undefined)[]) => ({ '--app': appColor(...names) }) as CSSProperties;
 const productName = (item: string) => (Object.hasOwn(PRODUCTS, item) ? PRODUCTS[item].name : item);
 
 function priceIn(currency: string, n: number): string {
@@ -46,10 +45,6 @@ function Outcomes({ rows }: { rows: Count[] | null }) {
 	const merged = merge(rows, RESULT_NAMES);
 	if (!merged.length) return null;
 	return <p className="ak-pills">{merged.map(([name, n]) => <Pill key={name} tone={RESULT_TONE[name] ?? 'plain'}>{`${int.format(n)} ${name}`}</Pill>)}</p>;
-}
-
-function AppName({ name }: { name: string }) {
-	return <span className="ak-app" style={appStyle(name)}><i aria-hidden="true" />{name}</span>;
 }
 
 /** A table showing its first rows, the rest one tap away. */
@@ -79,14 +74,6 @@ function ShortTable({ head, rows, more }: { head: string[]; rows: { key: string;
 	);
 }
 
-function Help({ children }: { children: ReactNode }) {
-	return (
-		<details className="ak-help">
-			<summary>Comment lire</summary>
-			<p>{children}</p>
-		</details>
-	);
-}
 
 function Unread({ errors }: { errors: string[] }) {
 	if (!errors.length) return null;

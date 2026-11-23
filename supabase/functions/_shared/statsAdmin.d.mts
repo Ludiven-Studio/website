@@ -112,7 +112,6 @@ export const REVENUE_DAYS: number;
 export function revenueRange(now: Date): { today: string; monthStart: string; from30: string; startDate: string };
 export function readRevenueRow(row: unknown): { date: string; key: string; name: string; platform: string; network: string; revenue: number; impressions: number } | null;
 export const NETWORK_NAMES: Record<string, string>;
-export const UNITY_ADS: string;
 export function revenueSummary(rows: unknown[], now: Date): Revenue;
 export function levelPlayRows(env: StatsEnv, fetchFn: typeof fetch, now: Date): Promise<unknown[]>;
 export const PURCHASES_KEY: string;
