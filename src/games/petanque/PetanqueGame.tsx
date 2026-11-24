@@ -342,7 +342,13 @@ interface Scene3D {
 
 /* Halo colours are the HUD's, not the boules': a steel boule and a bronze one are the same grey
    dot at 10 m, and the player has to know whose is whose to read the point. */
-const HALO = [0x30d158, 0xff5f56, 0xffc107]; // you · opponent · jack
+/* Ours · theirs · the jack, seen from this player (Pétanque Game): blue and orange, since green and red ran together
+   for the colour-blind, some 8 % of men. */
+const HALO = [0x3a9cff, 0xff7a2e, 0xffe14d];
+const haloOf = (side: number, me: Side): number => (side === -1 ? HALO[2] : HALO[side === me ? 0 : 1]);
+/* Once all is still, each side's nearest boule rings wider, the one holding the point beating: with every ring
+   alike a beginner could not tell who had the point (Pétanque Game, after Codex's review). */
+const BEST_WIDE = 1.25, BEST_BEAT = 0.25, BEST_HZ = 0.9;
 const HALO_PER_M = 0.016; // ring radius per metre of camera distance — ~20 px on a 700 px canvas
 const HALO_MIN_R = 0.09; // m, so it never shrinks inside a boule up close
 const hex = (c: number): string => `#${c.toString(16).padStart(6, '0')}`;
@@ -431,7 +437,7 @@ function BouleTable({ rows, mySide, t }: { rows: readonly BouleRow[]; mySide: Si
 			<ol>
 				{rows.map((r, i) => (
 					<li key={i} className={r.counts ? 'won' : ''}>
-						<span style={{ color: hex(HALO[r.side]) }}>●</span>
+						<span style={{ color: hex(haloOf(r.side, mySide)) }}>●</span>
 						<span>{r.side === mySide ? t.you : t.adv}</span>
 						<span className="pe-table-d">{r.d < TOUCH_GAP ? t.touches : r.d < 1 ? `${Math.round(r.d * 100)} cm` : `${r.d.toFixed(2)} m`}</span>
 						<span className="pe-table-pt">{r.counts ? '★' : ''}</span>
@@ -872,7 +878,7 @@ export default function PetanqueGame({ gameId, event, gameAd }: { gameId: string
 			: makeBouleMesh(b.side, looksRef.current[b.side], b.r);
 		g.bodies.add(m);
 		g.meshes.push(m);
-		const h = makeHalo(b.side === -1 ? HALO[2] : HALO[b.side]);
+		const h = makeHalo(haloOf(b.side, mySideRef.current));
 		g.bodies.add(h);
 		g.halos.push(h);
 		const sh = makeContactShadow(b.r);
@@ -2830,6 +2836,19 @@ export default function PetanqueGame({ gameId, event, gameAd }: { gameId: string
 
 		/* --- meshes --- */
 		const a = alphaRef.current;
+		const best: (Boule | null)[] = [null, null];
+		let holderBest: Boule | null = null;
+		const bestJack = jackRef.current;
+		if (statusRef.current !== 'rolling' && !dailyRef.current && bestJack?.live) {
+			const gaps = [Infinity, Infinity];
+			for (const b of s.bs) {
+				if (!b.live || (b.side !== 0 && b.side !== 1)) continue;
+				const d = edgeGap(b, bestJack);
+				if (d < gaps[b.side]) { gaps[b.side] = d; best[b.side] = b; }
+			}
+			holderBest = gaps[0] < gaps[1] ? best[0] : gaps[1] < gaps[0] ? best[1] : null;
+		}
+		const beat = BEST_WIDE + BEST_BEAT * (0.5 + 0.5 * Math.sin((now / 1000) * BEST_HZ * Math.PI * 2));
 		for (let i = 0; i < s.bs.length; i++) {
 			const b = s.bs[i], mesh = g.meshes[i], p = prevRef.current[i];
 			if (!mesh) continue;
@@ -2867,7 +2886,8 @@ export default function PetanqueGame({ gameId, event, gameAd }: { gameId: string
 			// The floor is a world size though, so it has to be un-divided by the field or a zoomed
 			// ring shrinks to exactly the boule radius and disappears into its silhouette.
 			const rr = haloRadius(halo.position.distanceTo(g.camera.position), g.camera.fov,
-				HALO_PER_M, haloFloorFor(HALO_MIN_R, g.camera.fov));
+				HALO_PER_M, haloFloorFor(HALO_MIN_R, g.camera.fov))
+				* (b === holderBest ? beat : b === best[0] || b === best[1] ? BEST_WIDE : 1);
 			halo.scale.set(rr, 1, rr);
 		}
 
@@ -2919,7 +2939,7 @@ export default function PetanqueGame({ gameId, event, gameAd }: { gameId: string
 				killGroup(g.dists);
 				for (const b of s.bs) {
 					if (!b.live || b === jk || (b.side !== 0 && b.side !== 1)) continue;
-					g.dists.add(groundRing(s.t, jk.x, jk.y, dist2(b, jk), HALO[b.side], DIST_TUBE, DIST_ALPHA));
+					g.dists.add(groundRing(s.t, jk.x, jk.y, dist2(b, jk), haloOf(b.side, mySideRef.current), DIST_TUBE, DIST_ALPHA));
 				}
 			}
 		}
@@ -3642,7 +3662,7 @@ export default function PetanqueGame({ gameId, event, gameAd }: { gameId: string
 					<div className="pe-board">
 						<div className={`pe-side ${myTurn && status !== 'rolling' ? 'on' : ''}`}>
 							<span className="pe-side-name">😎 {t.you}</span>
-							<span className="pe-dots" style={{ color: hex(HALO[mySide]) }}>
+							<span className="pe-dots" style={{ color: hex(HALO[0]) }}>
 								{'●'.repeat(match.left[mySide])}{'○'.repeat(BOULES_PER_SIDE - match.left[mySide])}
 							</span>
 							<span className="pe-pt">{holder === mySide ? '🎯' : ''}</span>
@@ -3653,7 +3673,7 @@ export default function PetanqueGame({ gameId, event, gameAd }: { gameId: string
 						</div>
 						<div className={`pe-side foe ${!myTurn && status !== 'rolling' ? 'on' : ''}`}>
 							<span className="pe-pt">{holder === foeSide ? '🎯' : ''}</span>
-							<span className="pe-dots" style={{ color: hex(HALO[foeSide]) }}>
+							<span className="pe-dots" style={{ color: hex(HALO[1]) }}>
 								{'●'.repeat(match.left[foeSide])}{'○'.repeat(BOULES_PER_SIDE - match.left[foeSide])}
 							</span>
 							<span className="pe-side-name">
