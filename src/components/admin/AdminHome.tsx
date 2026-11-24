@@ -3,8 +3,8 @@
 // the house ads from the catalogue online.
 import { useEffect, useState, type ReactNode } from 'react';
 import { accountLabel, signIn, signOut } from '../../lib/meetupAuth';
-import { STATS_LOCAL, StatsError, appStore, board, overview, playOrders, rates, revenue, statsMessage, totals, type AppStoreSales, type PlayOrders, type Rates, type Revenue } from '../../lib/statsAdmin';
-import { income } from '../../lib/income';
+import { STATS_LOCAL, StatsError, board, overview, purchases, revenue, statsMessage, totals, type Purchases, type Revenue } from '../../lib/statsAdmin';
+import { inAppWeek } from '../../lib/inAppWeek';
 import type { Catalog } from '../../../supabase/functions/_shared/promoRules.mjs';
 import { useAdminSession } from './useAdminSession';
 import { AppName } from './AdminParts';
@@ -17,27 +17,21 @@ const eur = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR',
 const APPS = ['Pétanque Game', "Dragon's Gems", 'Pétanque Meet', 'Nino Rush', 'Pétanque Scan'];
 
 interface Tile { href: string; title: string; text: string; figure?: ReactNode; sub?: string; extra?: string }
-/** Each store's report, or why it is missing. */
-interface InApp { orders: PlayOrders | null; apple: AppStoreSales | null; rates: Rates | null; playWhy: string; appleWhy: string }
-
-/** Why a store's report did not come: its key not set yet, the function not redeployed, or no answer. */
+/** Why the purchases did not come: the stats not set up, the function not redeployed, or no answer. */
 export function whyMissing(e: unknown): string {
-	if (e instanceof StatsError && e.status === 503) return 'clé non posée';
+	if (e instanceof StatsError && e.status === 503) return 'statistiques non branchées';
 	if (e instanceof StatsError && e.status === 400) return 'attend le redéploiement';
-	return "n'a pas répondu";
+	return "n'ont pas répondu";
 }
 
-/** In-app sales of the last 7 days in euros, net, from Google Play's orders and Apple's Sales reports. Always a
- *  line: a store that did not answer is named with the reason, so a missing figure never just vanishes. */
-export function inAppLine({ orders, apple, rates: r, playWhy, appleWhy }: InApp): string {
-	const missing = [!orders && `Google Play ${playWhy}`, !apple && `App Store ${appleWhy}`].filter(Boolean).join(' · ');
-	if (!orders && !apple) return `Achats intégrés : ${missing}`;
-	const { last7: week, unconverted: left } = income({ revenue: null, orders, apple, rates: r, now: new Date() });
-	const net = Math.round((week.play.net + week.appstore.net) * 100) / 100;
-	const gross = Math.round((week.play.gross + week.appstore.gross) * 100) / 100;
-	return `Achats intégrés · 7 j : ${eur.format(net)} net (${eur.format(gross)} brut)`
-		+ (missing ? ` · ${missing}` : '')
-		+ (left.length ? ` · sans ${left.join(', ')}` : '');
+/** The real in-app purchases of the last 7 days, as the stats page lists them, at the catalogue price. Always a
+ *  line, 0 € included, or the reason it is missing. */
+export function inAppLine(seen: Purchases | null, why: string, now = new Date()): string {
+	if (!seen) return `Achats intégrés : ${why}`;
+	const w = inAppWeek(seen, now);
+	const n = `${int.format(w.count)} achat${w.count > 1 ? 's' : ''}`;
+	return `Achats intégrés · 7 j : ${eur.format(w.gross)} TTC, ≈ ${eur.format(w.net)} net (${n})`
+		+ (w.unpriced ? ` · ${int.format(w.unpriced)} sans prix` : '');
 }
 
 export default function AdminHome() {
@@ -47,20 +41,14 @@ export default function AdminHome() {
 	const [ads, setAds] = useState<number | null>(null);
 	const [money, setMoney] = useState<Revenue | null>(null);
 	const [waits, setWaits] = useState<number | null>(null);
-	const [inApp, setInApp] = useState<InApp | null>(null);
+	const [inApp, setInApp] = useState<string | undefined>(undefined);
 	const signedIn = STATS_LOCAL || !!session;
 
 	useEffect(() => {
 		if (!signedIn) return;
 		overview().then((o) => setStats(totals(o))).catch((e) => setStatsError(statsMessage(e)));
 		revenue().then(setMoney).catch(() => setMoney(null));
-		void Promise.allSettled([playOrders(), appStore(), rates()]).then(([o, a, r]) => setInApp({
-			orders: o.status === 'fulfilled' ? o.value : null,
-			apple: a.status === 'fulfilled' ? a.value : null,
-			rates: r.status === 'fulfilled' ? r.value : null,
-			playWhy: o.status === 'rejected' ? whyMissing(o.reason) : '',
-			appleWhy: a.status === 'rejected' ? whyMissing(a.reason) : '',
-		}));
+		purchases().then((p) => setInApp(inAppLine(p, ''))).catch((e) => setInApp(inAppLine(null, whyMissing(e))));
 		board().then((b) => setWaits(b.apps.reduce((n, a) => n + a.waits.length, 0))).catch(() => setWaits(null));
 		fetch('/promo/v1/catalog.json', { cache: 'no-cache' })
 			.then((r) => (r.ok ? r.json() : null))
@@ -73,7 +61,7 @@ export default function AdminHome() {
 		{
 			href: '/admin/stats/', title: 'Statistiques', text: 'Visiteurs, achats, connexions et pubs maison, appli par appli.',
 			figure: stats ? int.format(stats.visitors7) : undefined, sub: stats ? `visiteurs sur 7 jours · ${stats.apps} applis` : statsError ?? undefined,
-			extra: inApp ? inAppLine(inApp) : undefined,
+			extra: inApp,
 		},
 		{
 			href: '/admin/revenus/', title: 'Revenus', text: 'La publicité par appli et par régie (LevelPlay).',

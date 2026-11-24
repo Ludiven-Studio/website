@@ -1,29 +1,29 @@
 import { describe, expect, it } from 'vitest';
 import { inAppLine, whyMissing } from './AdminHome';
-import { StatsError, type PlayOrders } from '../../lib/statsAdmin';
+import { StatsError, type Purchase, type Purchases } from '../../lib/statsAdmin';
 
-const today = new Date().toISOString().slice(0, 10);
-const ORDERS: PlayOrders = {
-	generatedAt: '', from: '', errors: [], totals: [],
-	orders: [{ at: `${today}T08:00:00Z`, app: 'Nino Rush', package: '', product: 'x', status: 'charged', currency: 'EUR', price: 10, charged: 12, country: 'FR' }],
-};
+const buy = (at: string, item: string, kind: Purchase['kind']): Purchase =>
+	({ at, app: 'Pétanque Game', item, store: 'play', later: false, kind, buyer: null });
+const NOW = new Date('2026-11-24T10:30:00Z');
 
 describe('the in-app line on the Statistiques tile', () => {
-	it('names each store that did not answer, and why, instead of vanishing', () => {
-		expect(whyMissing(new StatsError(503, 'orders not configured'))).toBe('clé non posée');
+	it('says 17,47 € for the three real purchases Raphaël saw on 24 Nov, testers and simulated left out', () => {
+		const seen: Purchases = {
+			generatedAt: '', from: '', counted: 3, buyers: 3, errors: [],
+			purchases: [
+				buy('2026-11-23T12:03:00Z', 'coins_l', 'real'), buy('2026-11-22T21:33:00Z', 'premium', 'real'),
+				buy('2026-11-21T10:00:00Z', 'coins_l', 'tester'), buy('2026-11-20T18:00:00Z', 'hearts', 'dev'),
+				buy('2026-11-19T12:37:00Z', 'coins_m', 'real'),
+			],
+		};
+		expect(inAppLine(seen, '', NOW)).toMatch(/^Achats intégrés · 7 j : 17,47\s€ TTC, ≈ 12,37\s€ net \(3 achats\)$/);
+	});
+
+	it('shows 0 € on a week without purchases, and the reason when they did not come', () => {
+		expect(inAppLine({ generatedAt: '', from: '', counted: 0, buyers: 0, errors: [], purchases: [] }, '', NOW))
+			.toMatch(/^Achats intégrés · 7 j : 0,00\s€ TTC, ≈ 0,00\s€ net \(0 achat\)$/);
+		expect(whyMissing(new StatsError(503, 'not configured'))).toBe('statistiques non branchées');
 		expect(whyMissing(new StatsError(400, 'unknown action'))).toBe('attend le redéploiement');
-		expect(whyMissing(new Error('network'))).toBe("n'a pas répondu");
-		expect(inAppLine({ orders: null, apple: null, rates: null, playWhy: 'clé non posée', appleWhy: 'clé non posée' }))
-			.toBe('Achats intégrés : Google Play clé non posée · App Store clé non posée');
-	});
-
-	it('gives the total of the stores that answered, the other one named', () => {
-		const line = inAppLine({ orders: ORDERS, apple: null, rates: null, playWhy: '', appleWhy: 'clé non posée' });
-		expect(line).toMatch(/^Achats intégrés · 7 j : 8,50\s€ net \(12,00\s€ brut\) · App Store clé non posée$/);
-	});
-
-	it('shows 0 € rather than nothing on a week without sales', () => {
-		const line = inAppLine({ orders: { ...ORDERS, orders: [] }, apple: { generatedAt: '', from: '', to: '', errors: [], sales: [] }, rates: null, playWhy: '', appleWhy: '' });
-		expect(line).toMatch(/^Achats intégrés · 7 j : 0,00\s€ net \(0,00\s€ brut\)$/);
+		expect(inAppLine(null, whyMissing(new Error('network')), NOW)).toBe("Achats intégrés : n'ont pas répondu");
 	});
 });
