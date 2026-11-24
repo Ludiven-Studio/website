@@ -10,4 +10,4 @@ export const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 /** The « Ludiven Studio » Google Cloud project's Web client: the admin pages sign in with Google's own button under
  *  the studio's name (src/lib/googleIdentity.ts). Empty: they keep the redirect through Supabase. Public, not a secret;
  *  it must also be in Supabase's Google provider « Client IDs ». */
-export const GOOGLE_WEB_CLIENT_ID = '1045333769148-kfjckothdt740v82bspsi35u50pvpkr9.apps.googleusercontent.com';
+export const GOOGLE_WEB_CLIENT_ID: string = '1045333769148-kfjckothdt740v82bspsi35u50pvpkr9.apps.googleusercontent.com';

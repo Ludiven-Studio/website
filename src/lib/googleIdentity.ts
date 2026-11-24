@@ -36,6 +36,18 @@ export interface GoogleId {
 	renderButton(el: HTMLElement, o: Record<string, string | number>): void;
 }
 
+/** How long Google's button has to show before the site's own button and the redirect come back. */
+export const GIS_SHOW_MS = 4000;
+
+/** Did Google draw its button in `host`? A refused origin or client leaves its iframe there, hidden, at no size. */
+export function gisButtonShown(host: Pick<Element, 'querySelectorAll'> | null): boolean {
+	if (!host) return false;
+	return [...host.querySelectorAll('iframe')].some((f) => {
+		const r = f.getBoundingClientRect();
+		return r.width > 0 && r.height > 0;
+	});
+}
+
 let loading: Promise<GoogleId> | null = null;
 
 /** The GIS script, loaded once per page. Rejects when it cannot load, so the caller falls back to the redirect. */

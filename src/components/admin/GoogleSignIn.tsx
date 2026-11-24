@@ -3,7 +3,7 @@
 // cannot load, the site's button and the redirect through Supabase, as before.
 import { useEffect, useRef, useState } from 'react';
 import { GOOGLE_WEB_CLIENT_ID } from '../../data/site';
-import { loadGis, makeNonce } from '../../lib/googleIdentity';
+import { GIS_SHOW_MS, gisButtonShown, loadGis, makeNonce } from '../../lib/googleIdentity';
 import { signIn, signInWithGoogleToken } from '../../lib/meetupAuth';
 
 export default function GoogleSignIn({ onError, clientId = GOOGLE_WEB_CLIENT_ID }: { onError: (why: string) => void; clientId?: string }) {
@@ -15,6 +15,7 @@ export default function GoogleSignIn({ onError, clientId = GOOGLE_WEB_CLIENT_ID 
 	useEffect(() => {
 		if (!clientId) return;
 		let live = true;
+		let timer = 0;
 		void (async () => {
 			try {
 				const [gis, nonce] = await Promise.all([loadGis(), makeNonce()]);
@@ -31,11 +32,14 @@ export default function GoogleSignIn({ onError, clientId = GOOGLE_WEB_CLIENT_ID 
 					},
 				});
 				gis.renderButton(host.current, { type: 'standard', theme: 'filled_blue', size: 'large', text: 'signin_with', shape: 'pill', locale: 'fr' });
+				// Google refuses an origin or a client by leaving its button hidden, with no error to catch: without
+				// a button after a few seconds, the redirect comes back so the admin can always sign in.
+				timer = window.setTimeout(() => { if (live && !gisButtonShown(host.current)) setFallback(true); }, GIS_SHOW_MS);
 			} catch {
 				if (live) setFallback(true);
 			}
 		})();
-		return () => { live = false; };
+		return () => { live = false; window.clearTimeout(timer); };
 	}, [clientId]);
 
 	if (fallback) {

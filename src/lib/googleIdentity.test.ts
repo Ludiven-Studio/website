@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GIS_CSP, makeNonce, sha256Hex, usesGoogleButton } from './googleIdentity';
+import { GIS_CSP, GIS_SHOW_MS, gisButtonShown, makeNonce, sha256Hex, usesGoogleButton } from './googleIdentity';
 import { GOOGLE_WEB_CLIENT_ID } from '../data/site';
 
 describe('the admin pages’ Google button', () => {
@@ -18,6 +18,17 @@ describe('the admin pages’ Google button', () => {
 
 	it('opens only Google’s sign-in paths in the policy', () => {
 		for (const v of Object.values(GIS_CSP)) expect(v.startsWith('https://accounts.google.com/gsi/')).toBe(true);
+	});
+
+	it('tells a drawn button from one Google refused (its iframe left at no size)', () => {
+		const host = (...sizes: [number, number][]) => ({
+			querySelectorAll: () => sizes.map(([width, height]) => ({ getBoundingClientRect: () => ({ width, height }) })),
+		}) as unknown as Pick<Element, 'querySelectorAll'>;
+		expect(gisButtonShown(host([240, 40]))).toBe(true);
+		expect(gisButtonShown(host([0, 0]))).toBe(false); // refused origin: the iframe is there, hidden
+		expect(gisButtonShown(host())).toBe(false); // nothing drawn yet
+		expect(gisButtonShown(null)).toBe(false);
+		expect(GIS_SHOW_MS).toBeLessThanOrEqual(5000);
 	});
 
 	it('is a client ID or nothing: nothing keeps every page on the redirect', () => {
