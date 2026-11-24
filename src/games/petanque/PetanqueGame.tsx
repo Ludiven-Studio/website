@@ -8,7 +8,7 @@ import {
 	type Sim, type Boule, type Impact, type Velocity, type Kit,
 } from './engine';
 import {
-	initMatch13, applyJack, applyPlacedJack, applySettled, finishEnd, jackCheck, pointHolder, endScore, other,
+	initMatch13, applyJack, applyPlacedJack, applySettled, finishEnd, jackCheck, pointHolder, endScore, other, countNow, edgeGap, TOUCH_GAP,
 	MIN_JACK, MAX_JACK, JACK_LO, JACK_HI, EDGE, BOULES_PER_SIDE, type Match13, type Side, type Played,
 } from './rules13';
 import { planThrow, planJack, jackThrow, JACK_SPREAD_PLAYER, launch } from './ai';
@@ -376,9 +376,9 @@ type IntroStage = 'out' | 'hold' | 'back';
  *  different clocks. */
 interface Intro { stage: IntroStage; until: number; hold: number; back: number }
 
-/** One boule in the end-of-end table: how far from the jack, and whether it scored. */
+/** One boule in the end-of-end table: how far from the jack, edge to edge, and whether it scored. */
 interface BouleRow { side: Side; d: number; counts: boolean }
-interface EndCard { text: string; mine: boolean; rows: BouleRow[] }
+interface EndCard { text: string; mine: boolean; rows: BouleRow[]; note?: string } // note: why the match ended early
 
 /**
  * The end-of-end table, in the umpire's order. Which boules count is asked of `endScore` rather
@@ -389,7 +389,7 @@ function bouleTable(bs: readonly Played[], jack: Played): BouleRow[] {
 	if (!jack.live) return [];
 	const rows = bs
 		.filter((b) => b.live && (b.side === 0 || b.side === 1))
-		.map((b) => ({ side: b.side as Side, d: dist2(b, jack), counts: false }))
+		.map((b) => ({ side: b.side as Side, d: edgeGap(b, jack), counts: false }))
 		.sort((a, b) => a.d - b.d);
 	const res = endScore(bs as Played[], jack);
 	let left = res.points;
@@ -433,7 +433,7 @@ function BouleTable({ rows, mySide, t }: { rows: readonly BouleRow[]; mySide: Si
 					<li key={i} className={r.counts ? 'won' : ''}>
 						<span style={{ color: hex(HALO[r.side]) }}>●</span>
 						<span>{r.side === mySide ? t.you : t.adv}</span>
-						<span className="pe-table-d">{r.d < 1 ? `${Math.round(r.d * 100)} cm` : `${r.d.toFixed(2)} m`}</span>
+						<span className="pe-table-d">{r.d < TOUCH_GAP ? t.touches : r.d < 1 ? `${Math.round(r.d * 100)} cm` : `${r.d.toFixed(2)} m`}</span>
 						<span className="pe-table-pt">{r.counts ? '★' : ''}</span>
 					</li>
 				))}
@@ -678,6 +678,7 @@ export default function PetanqueGame({ gameId, event, gameAd }: { gameId: string
 	// What just changed, said on the pitch: who holds the point, whose turn it is. `key` replays it.
 	const [announce, setAnnounce] = useState<{ lines: string[]; tone: 'me' | 'foe' | 'even'; key: number } | null>(null);
 	const holderRef = useRef<Side | 'tie' | null>(null); // who held the point before the last boule
+	const offeredRef = useRef(-1); // the end whose count-now offer was made: once an end
 	const [promoShut, setPromoShut] = useState(() => {
 		try { return sessionStorage.getItem(PROMO_KEY) === '1'; } catch { return false; }
 	});
@@ -692,6 +693,7 @@ export default function PetanqueGame({ gameId, event, gameAd }: { gameId: string
 	const [zoom, setZoom] = useState(0);
 	const [mag, setMag] = useState(1);
 	const [card, setCard] = useState<EndCard | null>(null);
+	const [countOffer, setCountOffer] = useState<number | null>(null); // points this side may count now, winning
 	const [webglError, setWebglError] = useState(false);
 	const [placeOk, setPlaceOk] = useState(false);
 	// Mirrors `jackAimRef` for the confirm button. Written from gesture handlers only, never `tick`.
@@ -1262,6 +1264,7 @@ export default function PetanqueGame({ gameId, event, gameAd }: { gameId: string
 	const doThrow = useCallback((side: Side, v: Velocity, asJack: boolean) => {
 		const s = simRef.current, g = g3Ref.current;
 		if (!s || !g) return;
+		setCountOffer(null); // a boule thrown plays them out
 		throwFromRef.current = asJack ? null : { side, at: s.bs.filter((o) => o.live).map((o) => ({ b: o, x: o.x, y: o.y })) };
 		const b = launch(s, matchRef.current.circle, side, v, asJack);
 		movesRef.current++;
@@ -1617,6 +1620,54 @@ export default function PetanqueGame({ gameId, event, gameAd }: { gameId: string
 		setAnnounce((a) => ({ lines: [...lines, who], tone: holder === null ? 'even' : holder === me ? 'me' : 'foe', key: (a?.key ?? 0) + 1 }));
 	}, []);
 
+	/** Score the end and show its card, or the match's end. `next` is the match before `finishEnd` advanced it;
+	 *  `lead` goes before the verdict on the card; `note` says on the end panel that a side counted now. */
+	const closeEnd = useCallback((next: Match13, bs: Played[], j: Played, lead: string | null, note?: string) => {
+		const before = next.scores[0] + next.scores[1];
+		const done = finishEnd(next, bs, j);
+		const me = mySideRef.current;
+		const mine = done.scores[me] > next.scores[me];
+		const got = done.scores[0] + done.scores[1] - before;
+		matchRef.current = done;
+		setMatch(done);
+		// The table is read off the ground BEFORE it is cleared for the next end, and off the same
+		// distances the score came from — see `bouleTable`.
+		const rows = bouleTable(bs, j);
+		const tt = tRef.current;
+		const verdict = done.lastEvent ? tt.event(done.lastEvent, me) : got ? tt.points(got) : tt.nullEnd;
+		setCard({ text: lead ? `${lead} ${verdict}` : verdict, mine, rows, note });
+		statusRef.current = done.phase === 'match-done' ? 'over' : 'end';
+		setStatus(statusRef.current);
+		endAtRef.current = performance.now() + (rows.length ? END_TABLE_MS : END_CARD_MS);
+		/* Hold the layout the card is about. `next` is the match BEFORE `finishEnd` advanced it, so
+		   `next.circle` is the circle this end was actually thrown from — `done.circle` is already
+		   the next one, and standing there is what left the boules behind the eye. */
+		viewBeforeEndRef.current = viewRef.current;
+		frameEnd(next.circle);
+		if (done.phase === 'match-done') {
+			setOver(true);
+			const win = done.winner === me;
+			if (win) sfx.win(); else sfx.lose();
+			// A level is a match against the AI; an online win must never bank one.
+			if (lvActiveRef.current && !onlineRef.current) {
+				const conceded = done.scores[other(me)];
+				lvFinishRef.current({ won: win, score: targetRef.current - conceded, stat: conceded });
+			}
+			trackGame(gameId, win ? 'game_won' : 'game_over',
+				onlineRef.current ? { mode: 'en-ligne' }
+				: lvActiveRef.current ? { mode: 'niveaux' }
+				: { mode: 'libre', diff: diffRef.current });
+		}
+	}, [frameEnd, gameId]);
+
+	/** The player takes the count-now offer: the end closes, the boules in hand unplayed. */
+	const countNowClick = useCallback(() => {
+		const s = simRef.current, j = jackRef.current, m = matchRef.current;
+		setCountOffer(null);
+		if (!s || !j || statusRef.current !== 'aim' || countNow(m, s.bs, j) === null) return;
+		closeEnd(m, s.bs, j, null, tRef.current.youCount);
+	}, [closeEnd]);
+
 	const settle = useCallback(() => {
 		const s = simRef.current, g = g3Ref.current;
 		if (!s || !g) return;
@@ -1702,6 +1753,17 @@ export default function PetanqueGame({ gameId, event, gameAd }: { gameId: string
 		matchRef.current = next;
 		setMatch(next);
 		if (next.phase !== 'end-done') {
+			// A side alone with boules that holds the point may count at once when that wins the match: the
+			// computer does, the player is offered it once an end. Not online, where the other peer rules too.
+			const stop = onlineRef.current ? null : countNow(next, s.bs, j);
+			if (stop !== null && next.turn !== mySideRef.current) {
+				closeEnd(next, s.bs, j, carreauLine, tRef.current.foeCounts);
+				return;
+			}
+			if (stop !== null && offeredRef.current !== next.endNo) {
+				offeredRef.current = next.endNo;
+				setCountOffer(stop);
+			}
 			const me = mySideRef.current, foe = other(me);
 			const h = pointHolder(s.bs, j), was = holderRef.current;
 			holderRef.current = h;
@@ -1718,42 +1780,8 @@ export default function PetanqueGame({ gameId, event, gameAd }: { gameId: string
 			reviewHead(performance.now());
 			return;
 		}
-		const before = next.scores[0] + next.scores[1];
-		const done = finishEnd(next, s.bs, j);
-		const me = mySideRef.current;
-		const mine = done.scores[me] > next.scores[me];
-		const got = done.scores[0] + done.scores[1] - before;
-		matchRef.current = done;
-		setMatch(done);
-		// The table is read off the ground BEFORE it is cleared for the next end, and off the same
-		// distances the score came from — see `bouleTable`.
-		const rows = bouleTable(s.bs, j);
-		const tt = tRef.current;
-		const verdict = done.lastEvent ? tt.event(done.lastEvent, me) : got ? tt.points(got) : tt.nullEnd;
-		setCard({ text: carreauLine ? `${carreauLine} ${verdict}` : verdict, mine, rows });
-		statusRef.current = done.phase === 'match-done' ? 'over' : 'end';
-		setStatus(statusRef.current);
-		endAtRef.current = performance.now() + (rows.length ? END_TABLE_MS : END_CARD_MS);
-		/* Hold the layout the card is about. `next` is the match BEFORE `finishEnd` advanced it, so
-		   `next.circle` is the circle this end was actually thrown from — `done.circle` is already
-		   the next one, and standing there is what left the boules behind the eye. */
-		viewBeforeEndRef.current = viewRef.current;
-		frameEnd(next.circle);
-		if (done.phase === 'match-done') {
-			setOver(true);
-			const win = done.winner === me;
-			if (win) sfx.win(); else sfx.lose();
-			// A level is a match against the AI; an online win must never bank one.
-			if (lvActiveRef.current && !onlineRef.current) {
-				const conceded = done.scores[other(me)];
-				lvFinishRef.current({ won: win, score: targetRef.current - conceded, stat: conceded });
-			}
-			trackGame(gameId, win ? 'game_won' : 'game_over',
-				onlineRef.current ? { mode: 'en-ligne' }
-				: lvActiveRef.current ? { mode: 'niveaux' }
-				: { mode: 'libre', diff: diffRef.current });
-		}
-	}, [enterJackView, frameEnd, gameId, reviewHead, say]);
+		closeEnd(next, s.bs, j, carreauLine);
+	}, [closeEnd, enterJackView, gameId, reviewHead, say]);
 
 	/**
 	 * The host rules at rest. Positions and the state it derived go out together, so a float that
@@ -3285,6 +3313,20 @@ export default function PetanqueGame({ gameId, event, gameAd }: { gameId: string
 		return () => { delete (window as unknown as { __petanqueOver?: unknown }).__petanqueOver; };
 	}, []);
 
+	/* Set the score. Measurement only: count-now is offered only on the end that wins the match, so its
+	 * guard (check-petanque-count) starts that end at 12-12 instead of playing its way there. */
+	useEffect(() => {
+		const w = window as unknown as { __petanqueScores?: (mine: number, foe: number) => void };
+		w.__petanqueScores = (mine, foe) => {
+			const scores: [number, number] = [0, 0];
+			scores[mySideRef.current] = mine;
+			scores[other(mySideRef.current)] = foe;
+			matchRef.current = { ...matchRef.current, scores };
+			setMatch(matchRef.current);
+		};
+		return () => { delete (window as unknown as { __petanqueScores?: unknown }).__petanqueScores; };
+	}, []);
+
 	// Read-only snapshot for the smoke check.
 	useEffect(() => {
 		const w = window as unknown as { __petanque?: () => unknown };
@@ -3866,6 +3908,10 @@ export default function PetanqueGame({ gameId, event, gameAd }: { gameId: string
 					<button className="pe-placeok" onClick={confirmPlace}>{t.placeHere}</button>
 				)}
 
+				{status === 'aim' && myTurn && match.phase === 'play' && countOffer !== null && (
+					<button className="pe-placeok" onClick={countNowClick}>{t.countNow(countOffer)}</button>
+				)}
+
 				{status === 'aim' && myTurn && match.phase === 'throw-jack' && jackAim && (
 					<button className="pe-placeok" onClick={throwJackAt}>{t.throwJackHere}</button>
 				)}
@@ -3908,6 +3954,7 @@ export default function PetanqueGame({ gameId, event, gameAd }: { gameId: string
 							{event && <img className="pe-event-logo" src={event.logo} alt={event.title} />}
 							{match.winner === mySide ? t.youWin : t.foeWins}
 							<strong>{match.scores[mySide]} — {match.scores[foeSide]}</strong>
+							{card?.note && <span className="pe-endnote">{card.note}</span>}
 							{/* The last end's table: the boule that ended the match is the one people argue about. */}
 							{card && card.rows.length > 0 && <BouleTable rows={card.rows} mySide={mySide} t={t} />}
 							{online
@@ -4381,6 +4428,7 @@ const CSS = `
 
 .pe-placeok { position: absolute; left: 50%; bottom: calc(max(12px, env(safe-area-inset-bottom)) + 56px); transform: translateX(-50%); z-index: 5; border: 2px solid rgba(255,255,255,0.5); background: linear-gradient(180deg, #30d158, #1e963c); color: #fff; font: inherit; font-weight: 800; font-size: 15px; padding: 9px 22px; border-radius: 999px; cursor: pointer; box-shadow: var(--shadow-md); white-space: nowrap; }
 .pe-placeok:hover { filter: brightness(1.08); }
+.pe-endnote { font-size: 14px; font-weight: 500; opacity: 0.85; max-width: 26ch; text-align: center; }
 
 /* The end-of-end verdict. It used to sit dead centre, which was wrong twice over: it covered the
    pitch, and the pitch behind it was the NEXT end's empty lane anyway, because finishEnd moves the

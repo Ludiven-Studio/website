@@ -9,7 +9,7 @@
  */
 
 import { PITCH_L, PITCH_W, inPitch } from './terrain';
-import { BOULE_R } from './engine';
+import { BOULE_R, JACK_R } from './engine';
 
 export type Side = 0 | 1;
 export type Phase = 'throw-jack' | 'place-jack' | 'play' | 'end-done' | 'match-done';
@@ -73,6 +73,11 @@ const dist = (a: { x: number; y: number }, b: { x: number; y: number }): number 
 /** The umpire measures to the boule's edge: a bigger boule reaches closer. The plain distance for
  *  the standard size, so only the gap between two makes shows. */
 const gap = (b: Played, jack: Played): number => dist(b, jack) - ((b.r ?? BOULE_R) - BOULE_R);
+
+/** What the players read: the gap between the boule and the jack, edge to edge, as Pétanque Game says it. */
+export const edgeGap = (b: Played, jack: Played): number => Math.max(0, gap(b, jack) - BOULE_R - (jack.r ?? JACK_R));
+/** Below half a millimetre the boule touches the jack, and is said so. */
+export const TOUCH_GAP = 0.0005;
 
 /**
  * Keep the circle a metre from the boards and where a legal throw still fits on the pitch. Real
@@ -164,6 +169,20 @@ export function whoPlays(state: Match13, bs: Played[], jack: Played): Side | nul
 	if (state.left[want] > 0) return want;
 	const o = other(want);
 	return state.left[o] > 0 ? o : null;
+}
+
+/**
+ * The points the side to play scores by counting now, its boules left unplayed: it alone has boules,
+ * holds the point, and those points win it the match. Null otherwise, so mid-match the boules are
+ * played out. Nothing in the FIPJP's rules obliges a team to play its boules out (Pétanque Game,
+ * Rules13.CountNow).
+ */
+export function countNow(state: Match13, bs: Played[], jack: Played): number | null {
+	if (state.phase !== 'play' || !jack.live) return null;
+	const side = state.turn;
+	if (state.left[side] === 0 || state.left[other(side)] > 0) return null;
+	const { side: holder, points } = endScore(bs, jack);
+	return holder === side && points > 0 && state.scores[side] + points >= state.target ? points : null;
 }
 
 /** The jack has landed. Valid → play; invalid → the opponent places it by hand. */

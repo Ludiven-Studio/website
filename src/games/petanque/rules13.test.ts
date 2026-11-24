@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
 	initMatch13, applyJack, applyPlacedJack, applySettled, finishEnd,
-	jackCheck, pointHolder, endScore, whoPlays, nextCircle, other,
+	jackCheck, pointHolder, endScore, whoPlays, nextCircle, other, countNow, edgeGap, TOUCH_GAP,
 	MIN_JACK, JACK_LO, JACK_HI, EDGE, CIRCLE_EDGE, BOULES_PER_SIDE, type Match13, type Played, type Side,
 } from './rules13';
 import { PITCH_L, PITCH_W } from './terrain';
@@ -287,6 +287,44 @@ describe('the match', () => {
 		expect(res.points).toBeGreaterThanOrEqual(1);
 		expect(final.scores[res.side as Side]).toBe(res.points);
 		expect(final.jackThrower).toBe(res.side);
+	});
+});
+
+describe('counting now', () => {
+	// Side 0 to play, two boules in hand, the other side's all thrown; side 0 holds the point by one.
+	const state = (score0: number, target = 13): Match13 =>
+		({ ...initMatch13(target, 0), phase: 'play', turn: 0, left: [2, 0], scores: [score0, 9] });
+	const j = jackAt(2, 8);
+	const bs = [at(2, 8.2, 0), at(2, 8.5, 1), at(2, 8.7, 0), at(2, 8.9, 1)];
+
+	it('is offered only when the points on the ground win the match (Pétanque Game, Rules13.CountNow)', () => {
+		expect(countNow(state(12), bs, j)).toBe(1);
+		expect(countNow(state(4), bs, j)).toBeNull(); // mid-match the boules are played out
+		expect(countNow(state(11), bs, j)).toBeNull(); // 11 and 1 do not reach 13
+		expect(countNow(state(6, 7), bs, j)).toBe(1); // a short match counts to its own target
+	});
+
+	it('needs the other side out of boules, the point held, and the jack in play', () => {
+		expect(countNow({ ...state(12), left: [2, 1] }, bs, j)).toBeNull();
+		expect(countNow(state(12), [at(2, 8.6, 0), at(2, 8.3, 1)], j)).toBeNull();
+		expect(countNow(state(12), bs, { ...j, live: false })).toBeNull();
+		expect(countNow({ ...state(12), phase: 'end-done' }, bs, j)).toBeNull();
+	});
+
+	it('closes the end with the same points finishEnd gives, so the match is won', () => {
+		const done = finishEnd(state(12), bs, j);
+		expect(done.phase).toBe('match-done');
+		expect(done.scores[0]).toBe(13);
+	});
+});
+
+describe('the gap the players read', () => {
+	it('runs edge to edge, never below zero', () => {
+		const j = jackAt(2, 8);
+		// 10 cm centre to centre, less a 37.5 mm boule and a 15 mm jack: 47.5 mm.
+		expect(edgeGap(at(2, 8.1, 0), j)).toBeCloseTo(0.0475, 6);
+		expect(edgeGap(at(2, 8.05, 0), j)).toBe(0);
+		expect(edgeGap(at(2, 8.0525, 0), j)).toBeLessThan(TOUCH_GAP);
 	});
 });
 
