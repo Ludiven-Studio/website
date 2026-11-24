@@ -1,17 +1,15 @@
 // /admin/: one tile per admin page. Once signed in, the tiles show each page's key figure: the visitors from
-// stats-admin with the in-app sales of the last 7 days, the month's revenue in euros (ads and in-app purchases), what waits on the studio board, and
-// the house ads from the catalogue online.
+// stats-admin with the in-app sales of the last 7 days, the month's revenue in euros (ads and in-app purchases, the
+// same count as /admin/revenus/), what waits on the studio board, and the house ads from the catalogue online.
 import { useEffect, useState, type ReactNode } from 'react';
 import { accountLabel, signIn, signOut } from '../../lib/meetupAuth';
-import { STATS_LOCAL, StatsError, board, overview, purchases, rates, revenue, statsMessage, totals, type Purchases, type Rates, type Revenue } from '../../lib/statsAdmin';
-import { revenueTile } from '../../lib/homeRevenue';
-import { inAppWeek } from '../../lib/inAppWeek';
+import { STATS_LOCAL, StatsError, appStore, board, overview, playOrders, purchases, rates, revenue, statsMessage, totals } from '../../lib/statsAdmin';
+import { homeIncome, revenueTile, weekLine, type HomeMoney } from '../../lib/homeRevenue';
 import type { Catalog } from '../../../supabase/functions/_shared/promoRules.mjs';
 import { useAdminSession } from './useAdminSession';
 import { AppName } from './AdminParts';
 
 const int = new Intl.NumberFormat('fr-FR');
-const eur = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 });
 // The studio's apps in the order of their colours.
 const APPS = ['Pétanque Game', "Dragon's Gems", 'Pétanque Meet', 'Nino Rush', 'Pétanque Scan'];
 
@@ -23,34 +21,23 @@ export function whyMissing(e: unknown): string {
 	return "n'ont pas répondu";
 }
 
-/** The real in-app purchases of the last 7 days, as the stats page lists them, at the catalogue price. Always a
- *  line, 0 € included, or the reason it is missing. */
-export function inAppLine(seen: Purchases | null, why: string, now = new Date()): string {
-	if (!seen) return `Achats intégrés : ${why}`;
-	const w = inAppWeek(seen, now);
-	const n = `${int.format(w.count)} achat${w.count > 1 ? 's' : ''}`;
-	return `Achats intégrés · 7 j : ${eur.format(w.gross)} TTC, ≈ ${eur.format(w.net)} net (${n})`
-		+ (w.unpriced ? ` · ${int.format(w.unpriced)} sans prix` : '');
-}
-
 export default function AdminHome() {
 	const { session, ready, error } = useAdminSession(STATS_LOCAL);
 	const [stats, setStats] = useState<ReturnType<typeof totals> | null>(null);
 	const [statsError, setStatsError] = useState<string | null>(null);
 	const [ads, setAds] = useState<number | null>(null);
-	const [money, setMoney] = useState<Revenue | null>(null);
 	const [waits, setWaits] = useState<number | null>(null);
-	const [seen, setSeen] = useState<Purchases | null>(null);
-	const [seenWhy, setSeenWhy] = useState<string | null>(null);
-	const [euroRates, setEuroRates] = useState<Rates | null>(null);
+	// Every money source at once, so a figure never switches source as the answers come in.
+	const [money, setMoney] = useState<(HomeMoney & { why: string }) | null>(null);
 	const signedIn = STATS_LOCAL || !!session;
 
 	useEffect(() => {
 		if (!signedIn) return;
 		overview().then((o) => setStats(totals(o))).catch((e) => setStatsError(statsMessage(e)));
-		revenue().then(setMoney).catch(() => setMoney(null));
-		purchases().then(setSeen).catch((e) => setSeenWhy(whyMissing(e)));
-		rates().then(setEuroRates).catch(() => setEuroRates(null));
+		void Promise.allSettled([revenue(), playOrders(), appStore(), purchases(), rates()]).then(([ad, o, a, p, r]) => {
+			const ok = <T,>(x: PromiseSettledResult<T>): T | null => (x.status === 'fulfilled' ? x.value : null);
+			setMoney({ money: ok(ad), orders: ok(o), apple: ok(a), seen: ok(p), rates: ok(r), now: new Date(), why: p.status === 'rejected' ? whyMissing(p.reason) : '' });
+		});
 		board().then((b) => setWaits(b.apps.reduce((n, a) => n + a.waits.length, 0))).catch(() => setWaits(null));
 		fetch('/promo/v1/catalog.json', { cache: 'no-cache' })
 			.then((r) => (r.ok ? r.json() : null))
@@ -58,12 +45,13 @@ export default function AdminHome() {
 			.catch(() => setAds(null));
 	}, [signedIn]);
 
-	const month = revenueTile({ money, rates: euroRates, seen, now: new Date() });
+	const counted = money ? homeIncome(money) : null;
+	const month = counted ? revenueTile(counted) : {};
 	const tiles: Tile[] = [
 		{
 			href: '/admin/stats/', title: 'Statistiques', text: 'Visiteurs, achats, connexions et pubs maison, appli par appli.',
 			figure: stats ? int.format(stats.visitors7) : undefined, sub: stats ? `visiteurs sur 7 jours · ${stats.apps} applis` : statsError ?? undefined,
-			extra: seen ? inAppLine(seen, '') : seenWhy ? inAppLine(null, seenWhy) : undefined,
+			extra: counted && money ? weekLine(counted, money.why) : undefined,
 		},
 		{
 			href: '/admin/revenus/', title: 'Revenus', text: 'La publicité et les achats intégrés, en euros.',

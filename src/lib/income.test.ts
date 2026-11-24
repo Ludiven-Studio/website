@@ -16,7 +16,7 @@ function revenue(): Revenue {
 	};
 	return {
 		generatedAt: '', currency: 'USD', monthStart: '2026-11-01', from: '2026-10-25', to: '2026-11-23',
-		total: { month: 0, last30: 0, days: [] },
+		total: { month: 3.75, last30: 5, days: [{ date: '2026-10-30', revenue: 1.25 }, { date: '2026-11-20', revenue: 2.5 }, { date: '2026-11-21', revenue: 1.25 }] },
 		apps: [
 			{ name: 'Pétanque Game', keys: [], platforms: [], month: 0, last30: 0, impressions30: 0, days: days([['2026-11-20', 2.5], ['2026-10-30', 1.25]]) },
 			{ name: "Dragon's Gems", keys: [], platforms: [], month: 0, last30: 0, impressions30: 0, days: days([['2026-11-21', 1.25]]) },

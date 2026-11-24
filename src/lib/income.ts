@@ -1,14 +1,18 @@
-// The studio's income on /admin/revenus/, in euros: ads (LevelPlay, in US dollars), Google Play's in-app sales (its
-// sales report, in the buyers' currencies) and the App Store's (Apple's Sales reports), each converted at the ECB's
-// rate of the day. Net is what reaches the studio: LevelPlay's figure as it is, Apple's proceeds, and for Google
-// Play an estimate, the price before tax less Google's 15 %, since only its monthly earnings report has the real one.
+// The studio's income in euros, the one count behind /admin/revenus/ and the admin home's tiles: ads (LevelPlay, in
+// US dollars), Google Play's and the App Store's in-app sales, each converted at the ECB's rate of the day.
+// Net is what reaches the studio: LevelPlay's figure as it is (paid business to business, no VAT), Apple's proceeds,
+// and for Google Play an estimate, the price before tax less Google's 15 %. Each store's own report is used when it
+// answers; without it, the purchases its apps saw, at the catalogue price (`inAppFrom` says which).
 import { APP_NAMES, appKey } from './appColors';
-import type { AppStoreSales, PlayOrders, Rates, Revenue } from './statsAdmin';
+import { COUNTED_KINDS, type AppStoreSales, type PlayOrders, type Purchases, type Rates, type Revenue } from './statsAdmin';
+import { NET_SHARE, cataloguePrice } from './inAppWeek';
 
 export const PLAY_CUT = 0.15;
 export const SOURCES = ['ads', 'play', 'appstore'] as const;
 export type Source = (typeof SOURCES)[number];
+/** `gross`: what was paid, in euros. For the ads, what LevelPlay pays, so the same as net. */
 export interface Amount { net: number; gross: number }
+export type InAppFrom = 'report' | 'apps' | null;
 export interface IncomeApp { key: string; name: string; ads: number; play: number; appstore: number; total: number }
 export interface Income {
 	days: string[];
@@ -22,6 +26,10 @@ export interface Income {
 	apps: IncomeApp[];
 	/** Currencies met without a rate: their amounts are left out. */
 	unconverted: string[];
+	/** The ads in their own currency, as LevelPlay gives them. */
+	adsPaid: { currency: string; month: number; last30: number; last7: number } | null;
+	/** Where each store's figures come from: its own report, the purchases its apps saw, or nowhere. */
+	inAppFrom: { play: InAppFrom; appstore: InAppFrom };
 }
 
 const DAY = 86_400_000;
@@ -43,7 +51,9 @@ export function toEur(amount: number, currency: string, rates: Pick<Rates, 'perE
 	return rate ? amount / rate : null;
 }
 
-export function income({ revenue, orders, apple, rates, now }: { revenue: Revenue | null; orders: PlayOrders | null; apple: AppStoreSales | null; rates: Rates | null; now: Date }): Income {
+export function income({ revenue, orders, apple, seen = null, rates, now }: {
+	revenue: Revenue | null; orders: PlayOrders | null; apple: AppStoreSales | null; seen?: Purchases | null; rates: Rates | null; now: Date;
+}): Income {
 	const to = revenue?.to ?? isoDay(now.getTime());
 	const from = revenue?.from ?? isoDay(Date.parse(`${to}T00:00:00Z`) - 29 * DAY);
 	const monthStart = `${to.slice(0, 8)}01`;
@@ -60,6 +70,8 @@ export function income({ revenue, orders, apple, rates, now }: { revenue: Revenu
 		last7: { ads: zero(), play: zero(), appstore: zero() },
 		apps: [],
 		unconverted: [],
+		adsPaid: null,
+		inAppFrom: { play: orders ? 'report' : seen ? 'apps' : null, appstore: apple ? 'report' : seen ? 'apps' : null },
 	};
 	const apps = new Map<string, IncomeApp>();
 	const missing = new Set<string>();
@@ -92,6 +104,13 @@ export function income({ revenue, orders, apple, rates, now }: { revenue: Revenu
 		const app = appOf(a.name);
 		for (const d of a.days) if (d.revenue) add('ads', d.date, app, d.revenue, revenue!.currency, d.revenue, revenue!.currency);
 	}
+	// A store without its report: the purchases its apps saw, real ones, at the catalogue price in euros.
+	for (const b of seen?.purchases ?? []) {
+		const store = b.store === 'appstore' ? 'appstore' : 'play';
+		if (out.inAppFrom[store] !== 'apps' || !COUNTED_KINDS.includes(b.kind)) continue;
+		const price = cataloguePrice(b.item);
+		if (price !== null) add(store, b.at.slice(0, 10), appOf(b.app), round(price * NET_SHARE), 'EUR', price, 'EUR');
+	}
 	for (const o of orders?.orders ?? []) {
 		if (!/^charged/.test(o.status) || !o.currency) continue;
 		add('play', o.at.slice(0, 10), appOf(o.app, o.package), o.price * (1 - PLAY_CUT), o.currency, o.charged, o.currency);
@@ -106,5 +125,32 @@ export function income({ revenue, orders, apple, rates, now }: { revenue: Revenu
 		.map((a) => ({ ...a, ads: round(a.ads), play: round(a.play), appstore: round(a.appstore), total: round(a.total) }))
 		.sort((x, y) => y.total - x.total || x.name.localeCompare(y.name));
 	out.unconverted = [...missing].sort();
+	/* The periods' ads from LevelPlay's own totals, as the Publicité block shows them: each app's days are rounded
+	   to the cent, and their sum drifted a few cents from it. The days still draw the bars and the apps. */
+	if (revenue) {
+		const last7 = round(revenue.total.days.filter((d) => in7.has(d.date)).reduce((n, d) => n + d.revenue, 0));
+		out.adsPaid = { currency: revenue.currency, month: revenue.total.month, last30: revenue.total.last30, last7 };
+		for (const [period, usd] of [['month', revenue.total.month], ['last30', revenue.total.last30], ['last7', last7]] as const) {
+			const e = toEur(usd, revenue.currency, rates);
+			if (e !== null) out[period].ads = { net: round(e), gross: round(e) };
+		}
+	}
 	return out;
+}
+
+/** A period's total, net, and what it is made of, in the words each part needs: « Pubs 1,88 € net (2,06 $US) ·
+ *  Achats 12,37 € net (17,47 € payés, vus par les applis) ». The home and /admin/revenus/ both show it. */
+export function periodLine(r: Income, period: 'month' | 'last30' | 'last7'): { total: number; parts: string } {
+	const eur = (n: number) => n.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
+	const p = r[period];
+	const buyNet = round(p.play.net + p.appstore.net), buyPaid = round(p.play.gross + p.appstore.gross);
+	const paid = r.adsPaid;
+	const ads = paid
+		? `Pubs ${eur(p.ads.net)} net (${paid[period].toLocaleString('fr-FR', { style: 'currency', currency: paid.currency })})`
+		: 'Pubs non relevées';
+	const { play, appstore } = r.inAppFrom;
+	const word = (f: InAppFrom) => (f === 'report' ? 'relevé du store' : f === 'apps' ? 'vus par les applis' : 'non relevé');
+	const how = play === appstore ? (play === 'report' ? 'relevés des stores' : word(play)) : `Google Play ${word(play)}, App Store ${word(appstore)}`;
+	const buys = !play && !appstore ? 'Achats non relevés' : `Achats ${eur(buyNet)} net (${eur(buyPaid)} payés, ${how})`;
+	return { total: round(p.ads.net + buyNet), parts: `${ads} · ${buys}` };
 }
