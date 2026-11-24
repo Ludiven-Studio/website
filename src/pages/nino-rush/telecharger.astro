@@ -3,7 +3,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import AppStage from '../../components/AppStage.astro';
 import MoreApps from '../../components/MoreApps.astro';
 import { HOME_GAMES } from '../../data/homeGames';
-import { APK_SIZE, APK_URL, APK_VERSION, ICON, SCREENS, SHARE_IMAGE } from '../../data/ninoRush';
+import { APK_SIZE, APK_URL, APK_VERSION, ICON, SCREENS, SHARE_IMAGE, copy } from '../../data/ninoRush';
 
 const stage = HOME_GAMES.find((g) => g.id === 'nino-rush')!.art;
 ---
@@ -34,7 +34,7 @@ const stage = HOME_GAMES.find((g) => g.id === 'nino-rush')!.art;
 			<section class="stack gap-6">
 				<h2>Dans le jeu</h2>
 				<div class="shots">
-					{SCREENS.map((shot) => <img src={shot.src} alt={shot.alt} width="1280" height="720" loading="lazy" decoding="async" />)}
+					{SCREENS.map((shot) => <img src={shot.src} alt={copy.fr.shotsAlt[shot.n - 1]} width="1170" height="540" loading="lazy" decoding="async" />)}
 				</div>
 			</section>
 

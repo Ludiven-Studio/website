@@ -51,12 +51,8 @@ export const ICON = `${A}/icon.webp`;
 export const LOGO = `${A}/logo.webp`;
 /** No text but the logo: one share image for every language. */
 export const SHARE_IMAGE = `${A}/share.jpg`;
-export const SCREENS = [
-	{ src: `${A}/hero.webp`, alt: 'Nino roule dans la forêt et attrape une étoile.' },
-	{ src: `${A}/workshop.webp`, alt: "L'atelier, où l'on dessine ses propres niveaux." },
-	{ src: `${A}/chase.webp`, alt: 'Un gros rocher poursuit Nino.' },
-	{ src: `${A}/worlds.webp`, alt: 'La carte des dix mondes du jeu.' },
-];
+/** The test page's pictures: four of the French store shots (1.0.23). */
+export const SCREENS = [1, 2, 3, 4].map((n) => ({ src: `${A}/screen-${n}-fr.webp`, n }));
 export const feature = (l: Lang): string => `${A}/feature-${l}.webp`;
 /** The iPhone store shots, captioned in each language. The volcano and world map shots stay out: their captions count levels and worlds. */
 export const screens = (l: Lang): string[] => [1, 2, 3, 4, 5, 6].map((n) => `${A}/screen-${n}-${l}.webp`);
@@ -115,12 +111,12 @@ export const copy: Record<Lang, Copy> = {
 		],
 		galleryTitle: 'Le jeu en images',
 		shotsAlt: [
-			'« Roule, saute, file au terrier » : Nino, roulé en boule, dévale une colline de la prairie sous les pièces et une étoile.',
+			'« Roule, saute, file au terrier » : Nino, roulé en boule, bondit dans un canyon de roche rouge, entre les arches et les cactus.',
 			'« Sème le rocher grincheux » : un énorme rocher à la mine renfrognée roule derrière Nino.',
 			"« Dessine tes propres niveaux » : l'atelier, avec une colline percée d'un tunnel et la barre des objets à poser.",
-			'« Rebondis sur les champignons » : Nino bondit au-dessus de champignons orange, dans une forêt baignée de soleil.',
+			"« Fais le looping à l'envers » : Nino file dans une boucle de terre et de feuillage, au cœur d'une forêt baignée de soleil.",
 			'« Habille Nino à ton goût » : le dressing et ses chapeaux, de la casquette à hélice à la couronne.',
-			"« Vole d'île en île » : Nino saute par-dessus des ronces violettes, entre des arbres en fleurs et des îles flottantes.",
+			"« Roule la tête en bas » : dans une zone où la gravité s'inverse, Nino roule au plafond d'une grotte de pierre.",
 		],
 		workshopTitle: "L'atelier de Nino",
 		workshop: [
@@ -167,12 +163,12 @@ export const copy: Record<Lang, Copy> = {
 		],
 		galleryTitle: 'The game in pictures',
 		shotsAlt: [
-			'"Roll, jump, rush home": Nino, curled into a ball, rolls down a meadow hill under coins and a star.',
+			'"Roll, jump, rush home": Nino, curled into a ball, bounds through a red rock canyon, among arches and cacti.',
 			'"Outrun the grumpy boulder": a huge scowling boulder rolls after Nino.',
 			'"Draw your own levels": the workshop, with a hill bored by a tunnel and the bar of items to place.',
-			'"Bounce on mushrooms": Nino leaps over orange mushrooms in a sunlit forest.',
+			'"Go round the loop backwards": Nino races through a loop of earth and leaves, deep in a sunlit forest.',
 			'"Dress Nino your way": the wardrobe and its hats, from the propeller cap to the crown.',
-			'"Fly from isle to isle": Nino jumps over purple brambles, among blossoming trees and floating islands.',
+			'"Roll upside down": in a zone where gravity flips, Nino rolls along the ceiling of a stone cave.',
 		],
 		workshopTitle: "Nino's workshop",
 		workshop: [
@@ -219,12 +215,12 @@ export const copy: Record<Lang, Copy> = {
 		],
 		galleryTitle: 'El juego en imágenes',
 		shotsAlt: [
-			'«Rueda, salta, vuelve a casa»: Nino, hecho una bola, baja por una colina de la pradera entre monedas y una estrella.',
+			'«Rueda, salta, vuelve a casa»: Nino, hecho una bola, salta por un cañón de roca roja, entre arcos y cactus.',
 			'«Escapa de la roca gruñona»: una roca enorme con cara de pocos amigos rueda detrás de Nino.',
 			'«Dibuja tus propios niveles»: el taller, con una colina atravesada por un túnel y la barra de objetos para colocar.',
-			'«Rebota en las setas»: Nino salta sobre setas naranjas en un bosque bañado de sol.',
+			'«Da la vuelta al rizo al revés»: Nino recorre un rizo de tierra y hojas, en un bosque bañado de sol.',
 			'«Viste a Nino a tu gusto»: el armario y sus sombreros, de la gorra con hélice a la corona.',
-			'«Vuela de isla en isla»: Nino salta sobre zarzas moradas, entre árboles en flor e islas flotantes.',
+			'«Rueda boca abajo»: en una zona donde la gravedad se invierte, Nino rueda por el techo de una cueva de piedra.',
 		],
 		workshopTitle: 'El taller de Nino',
 		workshop: [
@@ -271,12 +267,12 @@ export const copy: Record<Lang, Copy> = {
 		],
 		galleryTitle: 'Das Spiel in Bildern',
 		shotsAlt: [
-			'„Rollen, springen, heimsausen“: Nino rollt als Kugel einen Wiesenhügel hinab, unter Münzen und einem Stern.',
+			'„Rollen, springen, heimsausen“: Nino springt als Kugel durch einen Canyon aus rotem Fels, zwischen Bögen und Kakteen.',
 			'„Entkomm dem grantigen Felsen“: Ein riesiger, grimmiger Felsen rollt hinter Nino her.',
 			'„Zeichne deine eigenen Level“: das Atelier, mit einem Hügel samt Tunnel und der Leiste der Objekte zum Setzen.',
-			'„Hüpf auf Pilzen“: Nino springt über orangefarbene Pilze in einem sonnendurchfluteten Wald.',
+			'„Rückwärts durch den Looping“: Nino saust durch eine Schleife aus Erde und Laub, mitten in einem sonnendurchfluteten Wald.',
 			'„Style Nino, wie du magst“: der Kleiderschrank mit seinen Hüten, von der Propellermütze bis zur Krone.',
-			'„Flieg von Insel zu Insel“: Nino springt über violette Dornen, zwischen blühenden Bäumen und schwebenden Inseln.',
+			'„Roll kopfüber“: In einer Zone, in der die Schwerkraft kippt, rollt Nino an der Decke einer Steinhöhle.',
 		],
 		workshopTitle: 'Ninos Atelier',
 		workshop: [
@@ -323,12 +319,12 @@ export const copy: Record<Lang, Copy> = {
 		],
 		galleryTitle: 'Il gioco in immagini',
 		shotsAlt: [
-			'«Rotola, salta, corri a casa»: Nino, appallottolato, scende da una collina del prato tra monete e una stella.',
+			'«Rotola, salta, corri a casa»: Nino, appallottolato, balza in un canyon di roccia rossa, tra archi e cactus.',
 			"«Sfuggi al masso brontolone»: un enorme masso dall'aria imbronciata rotola dietro a Nino.",
 			"«Disegna i tuoi livelli»: l'atelier, con una collina attraversata da un tunnel e la barra degli oggetti da piazzare.",
-			'«Rimbalza sui funghi»: Nino salta sopra funghi arancioni in un bosco inondato di sole.',
+			'«Fai il giro della morte al contrario»: Nino corre in un anello di terra e foglie, in un bosco inondato di sole.',
 			"«Vesti Nino come vuoi»: il guardaroba e i suoi cappelli, dal berretto con l'elica alla corona.",
-			'«Vola di isola in isola»: Nino salta sopra rovi viola, tra alberi in fiore e isole sospese.',
+			'«Rotola a testa in giù»: in una zona dove la gravità si capovolge, Nino rotola sul soffitto di una grotta di pietra.',
 		],
 		workshopTitle: "L'atelier di Nino",
 		workshop: [

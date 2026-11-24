@@ -80,7 +80,7 @@ export const HOME_GAMES: HomeGame[] = [
 		kind: 'new',
 		type: 'game',
 		icon: NINO_ICON,
-		art: { src: same('/assets/home/stage-nino-rush.webp'), w: 1000, h: 1042, desk: '50% 50%', phone: '50% 50%' },
+		art: { src: same('/assets/home/stage-nino-rush.webp'), w: 1000, h: 1042, desk: '50% 72%', phone: '50% 70%' },
 		kicker: each((l) => `${NEW[l]} · ${MOBILE_GAME[l]}`),
 		pitch: {
 			fr: fr("Jeu de plateforme physique : aide Nino le panda roux à rouler jusqu'au terrier."),
