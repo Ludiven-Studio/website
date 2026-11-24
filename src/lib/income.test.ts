@@ -68,6 +68,14 @@ describe('the studio income in euros', () => {
 		expect(r.unconverted).toEqual(['JPY']);
 	});
 
+	it('sums the last 7 days, today included, for the home tile', () => {
+		const r = income({ revenue: revenue(), orders: ORDERS, apple: APPLE, rates: RATES, now: NOW });
+		// 17-23 Nov: every November item above, nothing from 2 Nov or October.
+		expect(r.last7.ads).toEqual({ net: 3, gross: 3 });
+		expect(r.last7.play).toEqual({ net: 15.3, gross: 22 });
+		expect(r.last7.appstore).toEqual({ net: 7, gross: 9.99 });
+	});
+
 	it('gives each day its net per source and each app its 30 days, under one name per app', () => {
 		const r = income({ revenue: revenue(), orders: ORDERS, apple: APPLE, rates: RATES, now: NOW });
 		expect(r.byDay.ads.get('2026-11-20')).toBe(2);

@@ -16,6 +16,8 @@ export interface Income {
 	byDay: Record<Source, Map<string, number>>;
 	month: Record<Source, Amount>;
 	last30: Record<Source, Amount>;
+	/** The last 7 of the 30 days, today included. */
+	last7: Record<Source, Amount>;
 	/** Net over 30 days, largest first. */
 	apps: IncomeApp[];
 	/** Currencies met without a rate: their amounts are left out. */
@@ -48,12 +50,14 @@ export function income({ revenue, orders, apple, rates, now }: { revenue: Revenu
 	const days: string[] = [];
 	for (let t = Date.parse(`${from}T00:00:00Z`); isoDay(t) <= to; t += DAY) days.push(isoDay(t));
 	const in30 = new Set(days);
+	const in7 = new Set(days.slice(-7));
 	const zero = (): Amount => ({ net: 0, gross: 0 });
 	const out: Income = {
 		days, monthStart,
 		byDay: { ads: new Map(), play: new Map(), appstore: new Map() },
 		month: { ads: zero(), play: zero(), appstore: zero() },
 		last30: { ads: zero(), play: zero(), appstore: zero() },
+		last7: { ads: zero(), play: zero(), appstore: zero() },
 		apps: [],
 		unconverted: [],
 	};
@@ -73,6 +77,10 @@ export function income({ revenue, orders, apple, rates, now }: { revenue: Revenu
 		if (!in30.has(date)) return;
 		out.last30[source].net += n;
 		out.last30[source].gross += g;
+		if (in7.has(date)) {
+			out.last7[source].net += n;
+			out.last7[source].gross += g;
+		}
 		out.byDay[source].set(date, (out.byDay[source].get(date) ?? 0) + n);
 		const a = apps.get(app.key) ?? { ...app, ads: 0, play: 0, appstore: 0, total: 0 };
 		a[source] += n;
@@ -91,7 +99,7 @@ export function income({ revenue, orders, apple, rates, now }: { revenue: Revenu
 	for (const s of apple?.sales ?? []) add('appstore', s.date, appOf(s.app), s.proceeds, s.currency, s.gross, s.grossCurrency);
 
 	for (const src of SOURCES) {
-		for (const period of [out.month, out.last30]) period[src] = { net: round(period[src].net), gross: round(period[src].gross) };
+		for (const period of [out.month, out.last30, out.last7]) period[src] = { net: round(period[src].net), gross: round(period[src].gross) };
 		for (const [d, v] of out.byDay[src]) out.byDay[src].set(d, round(v));
 	}
 	out.apps = [...apps.values()]
