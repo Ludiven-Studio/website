@@ -3912,3 +3912,14 @@
 - 13:31 : build complet OK (précache 414, liens 273)
 - 13:31 : commité et poussé sur « publie pour beta3 DG » de Raphaël (Producer, 23/11) relayé par le Producer : ma page
   et cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-24 — Nino Rush : APK de test 1.0.24 (session producer-release-publisher)
+- Statut : en cours (2026-11-24T12:03+01:00). Demande de l'utilisateur : Raphaël, dans le Producer : « publie » (APK de
+  test Nino Rush 1.0.24, d72e251)
+- Réservations actives : `src/data/ninoRush.ts`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 12:04 : APK 1.0.24 envoyé sur la prerelease nino-rush-dev par publish_test_apk.py, le lien sert sha256 79ee9a44… (81
+  398 464 octets). src/data/ninoRush.ts : 1.0.24, 81,4 Mo, depuis le worktree D:/tmp/site-publish-nino-1.0.24 ; eslint
+  et astro check OK (0 erreur).
+- 12:04 : commité et poussé sur le « publie » de Raphaël relayé par le Producer : src/data/ninoRush.ts et cette section
+  seulement. Réservations libérées.. Statut : terminé. Réservations libérées.
