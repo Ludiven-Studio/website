@@ -21,12 +21,19 @@ export interface CatalogEntry {
 	[key: string]: unknown;
 }
 
+export type MixFormat = 'banner' | 'interstitial';
+export type MixCase = 'consent' | 'noConsent';
+/** One row of "mix": per format, per consent case, the % of house ads. */
+export type MixRow = Partial<Record<MixFormat, Partial<Record<MixCase, number>>>>;
+
 export interface Catalog {
 	schema: number;
 	updated: string;
 	rotationSeconds?: number;
 	defaultLanguage?: string;
 	entries: CatalogEntry[];
+	/** "*" for every app, else a base app id. */
+	mix?: Record<string, MixRow>;
 	[key: string]: unknown;
 }
 
@@ -48,6 +55,11 @@ export function checkCatalog(catalog: unknown, options?: { strict?: boolean; bas
 	problems: string[];
 	files: { path: string; what: string }[];
 };
+export const MIX_FORMATS: MixFormat[];
+export const MIX_CASES: MixCase[];
+export const MIX_DEFAULTS: Record<MixFormat, number>;
+export const MIX_NO_CONSENT: number;
+export function checkMix(mix: unknown): string[];
 export function imageInfo(bytes: Uint8Array): { type: 'png' | 'jpeg'; width: number; height: number } | null;
 export function checkImage(bytes: Uint8Array, what?: string): string[];
 export const CLIP_MAX_SIDE: number;

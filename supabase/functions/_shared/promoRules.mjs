@@ -192,7 +192,50 @@ export function checkCatalog(catalog, { strict = false, base = CATALOG_URL, sche
 			else apps.set(id, name);
 		}
 	}
+	if (catalog.mix !== undefined) problems.push(...checkMix(catalog.mix));
 	return { problems, files };
+}
+
+/** The house-ad mix (LudivenTools' HouseMix.cs): per format, the % of house ads against network ads, with and
+ *  without consent. A row is "*" (every app) or a base app id; each value falls back to "*", then to the app's code. */
+export const MIX_FORMATS = ['banner', 'interstitial'];
+export const MIX_CASES = ['consent', 'noConsent'];
+/** What the apps' code does without a value: what the admin's form shows (banner: 30 s every 6 min). */
+export const MIX_DEFAULTS = { banner: 8, interstitial: 0 };
+/** Without consent no network starts, so the apps force 100 % house ads for now: any other value is refused. */
+export const MIX_NO_CONSENT = 100;
+const MIX_ROW = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/;
+const isPlainObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+
+/** The problems of a catalogue's "mix", each starting with "mix". */
+export function checkMix(mix) {
+	if (!isPlainObject(mix)) return ['mix is not an object of rows'];
+	const errors = [];
+	for (const [row, formats] of Object.entries(mix)) {
+		const name = JSON.stringify(row.slice(0, 60));
+		if (row !== '*' && (!MIX_ROW.test(row) || /\.(dev|beta)$/.test(row))) {
+			errors.push(`mix: ${name} is neither "*" nor a base app id`);
+			continue;
+		}
+		if (!isPlainObject(formats)) {
+			errors.push(`mix: ${name} is not an object of formats`);
+			continue;
+		}
+		for (const [format, cases] of Object.entries(formats)) {
+			const where = `mix: ${name}.${JSON.stringify(format.slice(0, 30))}`;
+			if (!MIX_FORMATS.includes(format)) errors.push(`${where} is not banner or interstitial`);
+			else if (!isPlainObject(cases)) errors.push(`${where} is not an object of consent cases`);
+			else {
+				for (const [c, v] of Object.entries(cases)) {
+					const at = `${where}.${JSON.stringify(c.slice(0, 30))}`;
+					if (!MIX_CASES.includes(c)) errors.push(`${at} is not consent or noConsent`);
+					else if (typeof v !== 'number' || !Number.isInteger(v) || v < 0 || v > 100) errors.push(`${at} is not a whole number from 0 to 100`);
+					else if (c === 'noConsent' && v !== MIX_NO_CONSENT) errors.push(`${at} must stay ${MIX_NO_CONSENT}: without consent the apps show house ads only`);
+				}
+			}
+		}
+	}
+	return errors;
 }
 
 /** PNG or JPEG size from the file's first bytes, or null. */
