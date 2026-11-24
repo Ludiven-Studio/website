@@ -6,6 +6,12 @@ export interface Host { host: string; visitors: number; test: boolean }
 export interface AdRate { ad: string; show: number; tap: number; rate: number | null }
 export interface RetentionDay { rate: number; visitors: number; cohorts: number }
 export interface Retention { d1: RetentionDay | null; d7: RetentionDay | null }
+export type ConsentPlatform = 'android' | 'ios';
+/** One platform's consent figures; visitors are Umami's 28-day visitors on that OS. */
+export interface ConsentSplit { platform: ConsentPlatform; visitors: number; answers: Count[]; opens: Count[] }
+/** answers: ad_consent's result (yes, no); opens: app_open's ads (yes, no, unasked); null when the call failed.
+ *  platforms: null when the app sends neither event, or Umami could not split them by OS. */
+export interface Consent { answers: Count[] | null; opens: Count[] | null; platforms: ConsentSplit[] | null }
 
 export interface AppStats {
 	id: string;
@@ -18,6 +24,8 @@ export interface AppStats {
 	signIn: { providers: Count[] | null; results: Count[] | null };
 	ads: AdRate[] | null;
 	retention: Retention | null;
+	/** Null when both consent reads failed; missing from figures cached before it. */
+	consent?: Consent | null;
 	errors: string[];
 }
 
@@ -97,6 +105,12 @@ export function readCounts(raw: unknown): Count[];
 export function readRetention(raw: unknown): Retention | null;
 export function tapRates(shows: Count[], taps: Count[]): AdRate[];
 export function readHosts(counts: Count[]): Host[];
+export function osPlatform(os: string): ConsentPlatform | null;
+export function readConsent(
+	values: (event: string, property: string, filters?: { os?: string }) => Promise<Count[] | null>,
+	osVisitors: Count[] | null,
+	errors: string[],
+): Promise<Consent | null>;
 export function umami(base: string, fetchFn: typeof fetch): {
 	login(username: string, password: string): Promise<void>;
 	get(path: string): Promise<unknown>;

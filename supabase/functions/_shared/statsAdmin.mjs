@@ -116,6 +116,55 @@ export function umami(base, fetchFn) {
 
 const query = (o) => new URLSearchParams(Object.entries(o).map(([k, v]) => [k, String(v)])).toString();
 
+/** The platform of an Umami OS name (read from the apps' User-Agent), or null for any other. */
+export function osPlatform(os) {
+	if (/android/i.test(os)) return 'android';
+	if (/^ios$|iphone|ipad/i.test(os)) return 'ios';
+	return null;
+}
+
+const total = (counts) => (counts ?? []).reduce((s, c) => s + c.count, 0);
+
+/** The ad consent figures of one app over 28 days: the answers to its window (ad_consent { result }), the state at
+ *  each launch for the apps that send it (app_open { ads: yes | no | unasked }), then the same per platform, read
+ *  with Umami's OS filter. `values(event, property, filters)` reads one property; `osVisitors` is [{ key, count }]. */
+export async function readConsent(values, osVisitors, errors) {
+	const [answers, opens] = await Promise.all([values('ad_consent', 'result'), values('app_open', 'ads')]);
+	if (answers === null && opens === null) return null;
+	const consent = { answers, opens, platforms: null };
+	if (!total(answers) && !total(opens)) return consent;
+	if (!osVisitors) return consent;
+	const byPlatform = new Map();
+	for (const { key, count } of osVisitors) {
+		const platform = osPlatform(key);
+		if (!platform) continue;
+		const row = byPlatform.get(platform) ?? { platform, os: [], visitors: 0 };
+		row.os.push(key);
+		row.visitors += count;
+		byPlatform.set(platform, row);
+	}
+	const sum = (lists) => {
+		const sums = new Map();
+		for (const list of lists) for (const c of list ?? []) sums.set(c.key, (sums.get(c.key) ?? 0) + c.count);
+		return [...sums].map(([key, count]) => ({ key, count })).sort((a, b) => b.count - a.count || a.key.localeCompare(b.key));
+	};
+	const platforms = await Promise.all([...byPlatform.values()].map(async (p) => {
+		const read = (event, property, has) => (has ? Promise.all(p.os.map((os) => values(event, property, { os }))) : Promise.resolve([[]]));
+		const [a, o] = await Promise.all([read('ad_consent', 'result', total(answers) > 0), read('app_open', 'ads', total(opens) > 0)]);
+		if (a.includes(null) || o.includes(null)) return null;
+		return { platform: p.platform, visitors: p.visitors, answers: sum(a), opens: sum(o) };
+	}));
+	if (platforms.includes(null)) return consent;
+	// An Umami that ignores the OS filter answers every platform with the app's totals: more than the whole.
+	const over = (field, all) => platforms.reduce((s, p) => s + total(p[field]), 0) > total(all);
+	if (over('answers', answers) || over('opens', opens)) {
+		errors.push('consent per platform: Umami did not filter by OS');
+		return consent;
+	}
+	consent.platforms = platforms.sort((x, y) => x.platform.localeCompare(y.platform));
+	return consent;
+}
+
 /** Everything the page shows for one Umami website; each failed call is named in `errors`. */
 export async function appStats(u, site, now) {
 	const errors = [];
@@ -130,9 +179,9 @@ export async function appStats(u, site, now) {
 			return null;
 		}
 	};
-	const values = (event, property) => safe(`${event}.${property}`, async () =>
-		readCounts(await u.get(`/websites/${id}/event-data/values?${query({ ...range(28), event, eventName: event, propertyName: property })}`)));
-	const [d1, d7, d28, events, hostname, iapItem, iapResult, signProvider, signResult, adShow, adTap, retention] = await Promise.all([
+	const values = (event, property, filters = {}) => safe(`${event}.${property}${filters.os ? ` (${filters.os})` : ''}`, async () =>
+		readCounts(await u.get(`/websites/${id}/event-data/values?${query({ ...range(28), event, eventName: event, propertyName: property, ...filters })}`)));
+	const [d1, d7, d28, events, hostname, iapItem, iapResult, signProvider, signResult, adShow, adTap, retention, os] = await Promise.all([
 		...Object.values(PERIODS).map((days) => safe(`stats ${days} j`, async () => {
 			// /stats counts pageviews only; the apps send events only, so their visitors come from the session
 			// stats, which count every event (Umami 2.14 and later). The larger of the two wins.
@@ -161,7 +210,9 @@ export async function appStats(u, site, now) {
 			return readRetention(await u.post('/reports/retention', v3).catch((e3) =>
 				u.post('/reports/retention', v2).catch((e2) => { throw new Error(`${e3.message} | ${e2.message}`); })));
 		}),
+		safe('os', async () => readCounts(await u.get(`/websites/${id}/metrics?${query({ ...range(28), type: 'os' })}`))),
 	]);
+	const consent = await readConsent(values, os, errors);
 	return {
 		id: String(site.id),
 		name: String(site.name ?? site.domain ?? site.id),
@@ -173,6 +224,7 @@ export async function appStats(u, site, now) {
 		signIn: { providers: signProvider, results: signResult },
 		ads: adShow && adTap ? tapRates(adShow, adTap) : null,
 		retention,
+		consent,
 		errors,
 	};
 }

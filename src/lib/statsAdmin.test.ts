@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-	CACHE_KEY, PURCHASES_KEY, REVENUE_KEY, num, purchaseKind, readPurchase, readBoard, readRevenueRow, revenueRange, revenueSummary, readCounts, readHosts, readRetention, readStats, statsHandler, tapRates,
+	CACHE_KEY, PURCHASES_KEY, REVENUE_KEY, num, osPlatform, purchaseKind, readPurchase, readBoard, readRevenueRow, revenueRange, revenueSummary, readCounts, readHosts, readRetention, readStats, statsHandler, tapRates,
 	type Board, type BoardRow, type Overview, type Purchases, type Revenue,
 } from '../../supabase/functions/_shared/statsAdmin.mjs';
 
@@ -9,7 +9,7 @@ const BASE = 'https://stats.example';
 const ENV = { UMAMI_URL: BASE, UMAMI_USER: 'dashboard', UMAMI_PASSWORD: 'pw', PROMO_ADMIN_USER_ID: 'raph' };
 
 /** A fake Umami: two websites, v2 or v3 answer shapes, and the calls it got. */
-function fakeUmami(version: 2 | 3, opts: { fail?: RegExp; loginFails?: boolean; inTeam?: boolean; eventsOnly?: boolean; iapEvents?: Record<string, unknown[]> } = {}) {
+function fakeUmami(version: 2 | 3, opts: { fail?: RegExp; loginFails?: boolean; inTeam?: boolean; eventsOnly?: boolean; iapEvents?: Record<string, unknown[]>; osIgnored?: boolean } = {}) {
 	const calls: string[] = [];
 	const fetchFn = async (url: string | URL | Request, init: RequestInit = {}): Promise<Response> => {
 		const u = new URL(String(url));
@@ -45,6 +45,7 @@ function fakeUmami(version: 2 | 3, opts: { fail?: RegExp; loginFails?: boolean; 
 			if (type === 'event') return ok([{ x: 'house_ad_show', y: 40 }, { x: 'iap_result', y: 3 }]);
 			if (version === 2 && type === 'hostname') return new Response('{}', { status: 400 });
 			if (type === (version === 2 ? 'host' : 'hostname')) return ok([{ x: 'com.ludivenstudio.petanquegame.dev', y: 2 }, { x: 'com.ludivenstudio.petanquegame', y: 70 }]);
+			if (type === 'os') return ok([{ x: 'Android OS', y: 40 }, { x: 'iOS', y: 20 }, { x: 'Windows 10', y: 1 }]);
 			return ok([]);
 		}
 		if (path.endsWith('/event-data/values')) {
@@ -58,6 +59,14 @@ function fakeUmami(version: 2 | 3, opts: { fail?: RegExp; loginFails?: boolean; 
 				'sign_in.provider': [['google', 4], ['apple', 1]],
 				'sign_in.result': [['ok', 4], ['fail', 1]],
 			};
+			// Pétanque Game answers its consent window and says its state at each launch; Meet sends neither.
+			const consent: Record<string, Record<string, [string, number][]>> = {
+				'': { 'ad_consent.result': [['yes', 30], ['no', 10]], 'app_open.ads': [['yes', 100], ['no', 20], ['unasked', 30]] },
+				'Android OS': { 'ad_consent.result': [['yes', 20], ['no', 8]], 'app_open.ads': [['yes', 70], ['no', 15], ['unasked', 20]] },
+				iOS: { 'ad_consent.result': [['yes', 10], ['no', 2]], 'app_open.ads': [['yes', 30], ['no', 5], ['unasked', 10]] },
+			};
+			const os = opts.osIgnored ? '' : q.get('os') ?? '';
+			if (big && consent[os]?.[`${event}.${prop}`]) return ok(consent[os][`${event}.${prop}`].map(([value, total]) => ({ value, total })));
 			return ok((rows[`${event}.${prop}`] ?? []).map(([value, total]) => ({ value, total })));
 		}
 		if (path.endsWith('/event-data')) {
@@ -252,6 +261,46 @@ describe('the stats-admin function', () => {
 		expect(pg.ads).toBeNull();
 		expect(pg.errors).toEqual(['house_ad_tap.ad: Umami GET /websites/w-pg/event-data/values: 500']);
 		expect(pg.periods.d28?.visitors).toBe(280);
+	});
+
+	it('reads the ad consent answers and launch states, per platform through the OS filter', async () => {
+		const { fetchFn, calls } = fakeUmami(3);
+		const body = await (await statsHandler({ env: ENV, isAdmin, cache: fakeCache(), fetch: fetchFn, now: () => NOW })(post({ action: 'overview' }))).json() as Overview;
+		const pg = body.apps.find((a) => a.id === 'w-pg')!;
+		expect(pg.errors).toEqual([]);
+		expect(pg.consent?.answers).toEqual([{ key: 'yes', count: 30 }, { key: 'no', count: 10 }]);
+		expect(pg.consent?.opens?.find((c) => c.key === 'unasked')?.count).toBe(30);
+		expect(pg.consent?.platforms).toEqual([
+			{ platform: 'android', visitors: 40, answers: [{ key: 'yes', count: 20 }, { key: 'no', count: 8 }], opens: [{ key: 'yes', count: 70 }, { key: 'unasked', count: 20 }, { key: 'no', count: 15 }] },
+			{ platform: 'ios', visitors: 20, answers: [{ key: 'yes', count: 10 }, { key: 'no', count: 2 }], opens: [{ key: 'yes', count: 30 }, { key: 'unasked', count: 10 }, { key: 'no', count: 5 }] },
+		]);
+		expect(calls.some((c) => c.includes('/w-pg/event-data/values') && c.includes('os=Android+OS') && c.includes('event=ad_consent'))).toBe(true);
+		// An app without either event: nothing per platform, and no call per OS.
+		const meet = body.apps.find((a) => a.id === 'w-meet')!;
+		expect(meet.consent).toEqual({ answers: [], opens: [], platforms: null });
+		expect(calls.some((c) => c.includes('/w-meet/event-data/values') && c.includes('os='))).toBe(false);
+	});
+
+	it('drops the platform split when Umami ignores the OS filter, and says so', async () => {
+		const { fetchFn } = fakeUmami(3, { osIgnored: true });
+		const body = await (await statsHandler({ env: ENV, isAdmin, cache: fakeCache(), fetch: fetchFn, now: () => NOW })(post({ action: 'overview' }))).json() as Overview;
+		const pg = body.apps.find((a) => a.id === 'w-pg')!;
+		expect(pg.consent?.answers).toEqual([{ key: 'yes', count: 30 }, { key: 'no', count: 10 }]);
+		expect(pg.consent?.platforms).toBeNull();
+		expect(pg.errors).toEqual(['consent per platform: Umami did not filter by OS']);
+	});
+
+	it('keeps the totals when a per-platform read fails', async () => {
+		const { fetchFn } = fakeUmami(3, { fail: /w-pg\/event-data\/values.*os=iOS/ });
+		const body = await (await statsHandler({ env: ENV, isAdmin, cache: fakeCache(), fetch: fetchFn, now: () => NOW })(post({ action: 'overview' }))).json() as Overview;
+		const pg = body.apps.find((a) => a.id === 'w-pg')!;
+		expect(pg.consent?.answers?.length).toBe(2);
+		expect(pg.consent?.platforms).toBeNull();
+		expect(pg.errors.every((e) => e.includes('(iOS)'))).toBe(true);
+	});
+
+	it('names the platform of the OS the apps send', () => {
+		expect(['Android OS', 'Android', 'iOS', 'iPadOS', 'Windows 10', 'Mac OS', ''].map(osPlatform)).toEqual(['android', 'android', 'ios', 'ios', null, null, null]);
 	});
 
 	it('sends no secret to the page and says 502 when Umami refuses the login', async () => {
