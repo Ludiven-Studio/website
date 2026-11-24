@@ -154,7 +154,7 @@ const first = t.screens[0];
 				{t.legal.map((l, i) => (
 					<>
 						{i > 0 && ' · '}
-						<a href={l.href} hreflang={lang === 'fr' ? undefined : 'fr'}>{l.label}</a>
+						<a href={l.href}>{l.label}</a>
 					</>
 				))}
 				{t.legalNote && ` ${t.legalNote}`}
