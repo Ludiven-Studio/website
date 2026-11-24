@@ -975,6 +975,9 @@ export interface Pitch3D {
  * Built once per deal and never touched again — nothing here is rebuilt per frame.
  * The sky is not here: it belongs to the sun, which outlives the pitch (see addLights).
  */
+/** How much deeper the ground's relief is lit than it is. */
+export const RELIEF_LIGHT = 6;
+
 export function buildPitch3D(t: Terrain, sun: SunSetup, boards?: readonly string[], banner?: string, bar = false, decor: DecorId = 'jardin'): Pitch3D {
 	const grp = new THREE.Group();
 	const junk: { dispose(): void }[] = [];
@@ -1016,7 +1019,13 @@ export function buildPitch3D(t: Terrain, sun: SunSetup, boards?: readonly string
 	if (banner) buildBanner(grp, banner, apronY, t, keep);
 	if (bar) buildBar(grp, apronY, keep);
 
+	/* The light reads the relief six times deeper than it is (Pétanque Game's _Relief 6): a 1 cm boss lit as it
+	   stands is flat under a high sun, and the player has to see where the ground will turn a boule. The
+	   positions go back to the true heights; only the normals keep the deeper relief. */
+	for (let i = 0; i < pos.count; i++) pos.setY(i, pos.getY(i) * RELIEF_LIGHT);
 	geo.computeVertexNormals();
+	for (let i = 0; i < pos.count; i++) pos.setY(i, pos.getY(i) / RELIEF_LIGHT);
+	pos.needsUpdate = true;
 	const uv = geo.attributes.uv as THREE.BufferAttribute;
 	for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * PITCH_W, uv.getY(i) * PITCH_L); // 1 tile = 1 m
 
