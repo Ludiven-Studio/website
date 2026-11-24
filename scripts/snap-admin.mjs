@@ -32,10 +32,17 @@ function app(id, name, domain, [d1, d7, d28], extra) {
 		signIn: { providers: counts(extra.providers ?? {}), results: counts(extra.signins ?? {}) },
 		ads: extra.ads ?? [],
 		retention: { d1: { rate: extra.r1, visitors: Math.round(d28 * 0.7), cohorts: 27 }, d7: { rate: extra.r7, visitors: Math.round(d28 * 0.6), cohorts: 21 } },
+		consent: extra.consent ?? { answers: [], opens: [], platforms: null },
 		errors: extra.errors ?? [],
 	};
 }
 const ad = (id, show, tap) => ({ ad: id, show, tap, rate: show ? tap / show : null });
+const split = (platform, visitors, answers, opens = {}) => ({ platform, visitors, answers: counts(answers), opens: counts(opens) });
+const consent = (platforms, all) => ({
+	answers: counts(all ?? platforms.reduce((o, p) => { for (const c of p.answers) o[c.key] = (o[c.key] ?? 0) + c.count; return o; }, {})),
+	opens: counts(platforms.reduce((o, p) => { for (const c of p.opens) o[c.key] = (o[c.key] ?? 0) + c.count; return o; }, {})),
+	platforms: all ? null : platforms,
+});
 
 const OVERVIEW = {
 	generatedAt: ago(0.1), cached: true,
@@ -45,10 +52,12 @@ const OVERVIEW = {
 			items: { coins2: 14, no_ads: 9, coins1: 6, coins3: 3 }, results: { ok: 21, cancel: 9, fail: 2 },
 			providers: { google: 96, apple: 11 }, signins: { ok: 98, cancel: 7, fail: 2 },
 			ads: [ad('dragon-gems', 4120, 61), ad('nino-rush', 3890, 44), ad('petanque-meet', 2210, 52)], r1: 0.152, r7: 0.099,
+			consent: consent([split('android', 905, { yes: 212, no: 61 }, { yes: 2480, no: 690, unasked: 410 }), split('ios', 299, { yes: 48, no: 37 }, { yes: 610, no: 420, unasked: 95 })]),
 		}),
 		app('dg', "Dragon's Gems", 'com.ludivenstudio.dragonsgems', [64, 251, 530], {
 			items: { hearts: 4, coins_m: 3 }, results: { ok: 6, cancel: 3 },
 			ads: [ad('petanque-game', 1830, 37), ad('nino-rush', 1505, 18)], r1: 0.214, r7: 0.081,
+			consent: consent([split('android', 402, { yes: 118, no: 30 }), split('ios', 128, { yes: 26, no: 19 })]),
 		}),
 		app('nino', 'Nino Rush', 'com.ludivenstudio.ninorush', [41, 170, 388], {
 			items: { full: 2, wardrobe: 1 }, results: { ok: 3, fail: 1 },
@@ -57,9 +66,11 @@ const OVERVIEW = {
 		}),
 		app('meet', 'Pétanque Meet', 'com.ludivenstudio.petanquemeet', [23, 118, 301], {
 			providers: { google: 41, apple: 9 }, signins: { ok: 47, cancel: 3 }, r1: 0.261, r7: 0.142,
+			consent: consent([split('android', 230, { yes: 61, no: 24 }, { yes: 540, no: 160, unasked: 88 }), split('ios', 71, { yes: 14, no: 9 }, { yes: 120, no: 61, unasked: 30 })]),
 		}),
 		app('scan', 'Pétanque Scan', 'com.ludivenstudio.petanquescan', [12, 66, 175], {
 			items: { premium: 3 }, results: { ok: 3, cancel: 2 }, r1: 0.122, r7: 0.051,
+			consent: consent([], { yes: 41, no: 22 }),
 		}),
 	],
 };

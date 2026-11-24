@@ -4,6 +4,7 @@ import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import GoogleSignIn from './GoogleSignIn';
 import { COUNTED_KINDS, KINDS, PRODUCTS, STATS_LOCAL, STORES, StatsError, overview, playOrders, purchases, statsMessage, type AppStats, type Count, type Overview, type PlayOrders, type Purchases } from '../../lib/statsAdmin';
 import { appColor } from '../../lib/appColors';
+import { consentTable, type ConsentRow } from '../../lib/adConsent';
 import { baseAppId, shares } from '../../lib/promoShares';
 import type { Catalog } from '../../../supabase/functions/_shared/promoRules.mjs';
 import { useAdminSession } from './useAdminSession';
@@ -145,6 +146,59 @@ function ByApp({ data, orders }: { data: Overview; orders: PlayOrders | null }) 
 				<h2>Ventes Play par appli <small>30 j, en euros</small></h2>
 				<Bars format={euros} empty={orders ? 'aucune vente' : 'rapport pas encore lu'} rows={[...sold].map(([app, v]) => ({ key: app, label: app, value: Math.round(v * 100) / 100, color: appColor(app) }))} />
 			</div>
+		</section>
+	);
+}
+
+/** Each app's answers to its ad consent window, per platform: the share that accepted or refused, and how many
+ *  have not answered yet. */
+function ConsentCard({ data }: { data: Overview }) {
+	const t = consentTable(data.apps);
+	const PLATFORM: Record<string, string> = { android: 'Android', ios: 'iPhone' };
+	const platform = (r: ConsentRow) => (r.platform ? PLATFORM[r.platform] : 'Android + iPhone');
+	const none = (r: ConsentRow) => {
+		if (!r.none) return '–';
+		return r.none.kind === 'exact'
+			? <span title={`${int.format(r.none.launches)} lancements sur 28 j`}>{pct(r.none.rate)}<small className="as-muted ak-wide"> des lancements</small></span>
+			: <span title={`Sur ${int.format(r.none.visitors)} visiteurs en 28 j`}>≈ {pct(r.none.rate)}<small className="as-muted ak-wide"> estimé</small></span>;
+	};
+	return (
+		<section className="pa-card ak-card">
+			<header><h2>Consentement pubs <small>28 j</small></h2></header>
+			{t.rows.length === 0 && <p className="as-muted">Aucune réponse à la fenêtre de consentement sur 28 jours.</p>}
+			{t.rows.length > 0 && (
+				<div className="as-scroll">
+					<table className="ak-table ak-num ak-consent">
+						<thead><tr><th scope="col">Appli</th><th scope="col" className="ak-wide">Plateforme</th><th scope="col" className="ak-wide">Réponses</th><th scope="col">Accepter</th><th scope="col">Refuser</th><th scope="col">Sans réponse</th></tr></thead>
+						<tbody>
+							{t.rows.map((r) => (
+								<tr key={r.key} style={{ '--app': appColor(r.app, r.domain) } as CSSProperties}>
+									<th scope="row"><AppName name={r.app} /><small className="ak-consent-plat">{platform(r)}</small></th>
+									<td className="ak-wide">{platform(r)}</td>
+									<td className="ak-wide">{int.format(r.yes + r.no)}</td>
+									<td>
+										<span className="ak-consent-cell" title={`${int.format(r.yes)} ont accepté`}>
+											<span className="ak-bar-track ak-wide"><span className="ak-bar" style={{ width: `${(r.accept ?? 0) * 100}%` }} /></span>
+											<strong>{pct(r.accept)}</strong>
+										</span>
+									</td>
+									<td title={`${int.format(r.no)} ont refusé`}>{pct(r.refuse)}</td>
+									<td>{none(r)}</td>
+								</tr>
+							))}
+						</tbody>
+					</table>
+				</div>
+			)}
+			{t.silent.length > 0 && <p className="as-muted">Sans événement de consentement sur 28 j : {t.silent.join(', ')}.</p>}
+			{t.unread.length > 0 && <p className="as-muted">Non lu : {t.unread.join(', ')} (Actualiser, ou stats-admin pas encore redéployée).</p>}
+			<Help>
+				Accepter et Refuser : les réponses à la fenêtre de consentement des pubs sur 28 jours (événement ad_consent), en part des réponses.
+				Un joueur à qui l'appli redemande (après 6 mois, ou depuis les options) compte une fois de plus.
+				Sans réponse « des lancements » : la part des lancements où le joueur n'avait pas encore répondu (Pétanque Game, Pétanque Meet, qui le disent à chaque lancement).
+				Sans réponse « estimé » (≈) : les visiteurs de la période sans réponse dans la période, approximatif (un joueur qui a répondu avant les 28 jours y compte).
+				Android et iPhone d'après le système qu'Umami lit dans chaque appel ; une ligne « Android + iPhone » quand il n'a pas pu les séparer.
+			</Help>
 		</section>
 	);
 }
@@ -374,6 +428,7 @@ export default function AdminStats() {
 			{message && <p className="pa-card as-error">{message}</p>}
 			<KeyFigures data={data} orders={orders} bought={bought} />
 			{data && <ByApp data={data} orders={orders} />}
+			{data && <ConsentCard data={data} />}
 			{(orders || ordersError) && <PlayOrdersCard data={orders} message={ordersError} />}
 			{(bought || boughtMessage) && <RecentPurchases data={bought} message={boughtMessage} />}
 			<div className="ak-apps">

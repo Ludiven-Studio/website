@@ -209,3 +209,15 @@ a.ah-tile:hover, a.ah-tile:focus-visible { box-shadow: 0 0 0 2px var(--sc-accent
 	.pa-root .pm-cell { min-width: 0; }
 	.pa-root .pm-cell input { width: 3.2rem; }
 }
+
+/* The consent card: the accept share as a short track in the app's colour, then its figure. */
+.ak-consent-cell { display: inline-grid; grid-template-columns: 4.5rem 3.5rem; gap: 0.5rem; align-items: center; }
+.ak-consent-cell strong { text-align: right; }
+.ak-consent td:nth-child(2) { text-align: left; }
+.ak-consent-plat { display: none; }
+@media (max-width: 30rem) {
+	.ak-consent-cell { grid-template-columns: auto; }
+	.ak-consent :is(th, td) { padding-inline: 0.35rem; }
+	.ak-consent :is(thead th, tbody th) { white-space: normal; }
+	.ak-consent-plat { display: block; color: var(--sc-muted); font-size: 0.75rem; }
+}
