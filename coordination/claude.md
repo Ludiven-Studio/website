@@ -3937,3 +3937,14 @@
 - 14:53 : commité et poussé sur le relais du Producer (« la pub de nino rush est avec d'anciens graphs aussi ») :
   catalog.json, l'image et les 5 clips de nino-rush, et cette section seulement. Statut : terminé. Réservations
   libérées.
+
+## 2026-11-25 — Nino Rush : version.json 1.0.24 (session NinoRush)
+- Statut : en cours (2026-11-25T00:48+01:00). Demande de l'utilisateur : Nino Rush 1.0.24 live sur les deux stores
+  (25-11) : latest_android et latest_ios à 1.0.24, min inchangé ; relais du Producer citant Raphaël
+- Réservations actives : `public/nino-rush/version.json`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 00:49 : latest_android et latest_ios à 1.0.24, min vide inchangé ; JSON valide, tests versionJson et publishedHistory
+  verts (55).
+- 00:49 : commité et poussé sur le relais du Producer (Raphaël : « c est bien live sur Apple », « oui j'ai publié ») :
+  version.json de nino-rush et cette section seulement. Réservations libérées.. Statut : terminé. Réservations
+  libérées.
