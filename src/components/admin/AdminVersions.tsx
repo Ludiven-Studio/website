@@ -1,7 +1,7 @@
 // /admin/versions/: each app's store, testers' and main versions and what waits for Raphaël, from the studio
 // board (studio_board, written by the studio's board.py after each send) through stats-admin.
 import { useEffect, useState } from 'react';
-import { signIn } from '../../lib/meetupAuth';
+import GoogleSignIn from './GoogleSignIn';
 import { STATS_LOCAL, StatsError, board, statsMessage, type Board, type BoardApp } from '../../lib/statsAdmin';
 import { useAdminSession } from './useAdminSession';
 import { AppName, Pill, Tile, appStyle, type Tone } from './AdminParts';
@@ -94,10 +94,7 @@ export default function AdminVersions() {
 		return (
 			<div className="pa-card as-signin">
 				<p>L'état des versions est réservé à l'administration du studio.</p>
-				<button type="button" className="pa-btn pa-primary" onClick={async () => {
-					const err = await signIn('google', window.location.href);
-					if (err) setMessage(err);
-				}}>Se connecter avec Google</button>
+				<GoogleSignIn onError={setMessage} />
 				{(message || error) && <p className="as-error">{message ?? error}</p>}
 			</div>
 		);

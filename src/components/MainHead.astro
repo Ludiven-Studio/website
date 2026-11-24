@@ -1,6 +1,7 @@
 ---
 import '../styles/global.css';
-import { UMAMI_HOST, UMAMI_WEBSITE_ID, SUPABASE_URL } from '../data/site';
+import { UMAMI_HOST, UMAMI_WEBSITE_ID, SUPABASE_URL, GOOGLE_WEB_CLIENT_ID } from '../data/site';
+import { GIS_CSP, usesGoogleButton } from '../lib/googleIdentity';
 import { getImage } from 'astro:assets';
 import logo from '../assets/LudivenStudioLogo.png';
 
@@ -32,14 +33,17 @@ const {
 // gain is elsewhere: no foreign script host, and nowhere to send stolen data.
 // Checked page by page with scripts/check-csp.mjs — run it after adding any outside host.
 const supabaseWs = SUPABASE_URL.replace(/^https:/, 'wss:');
+// The admin pages sign in with Google's own button, from Google's host; no other page loads it.
+const gis = GOOGLE_WEB_CLIENT_ID && usesGoogleButton(Astro.url.pathname) ? GIS_CSP : null;
 const csp = [
 	"default-src 'self'",
-	`script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' ${UMAMI_HOST}`,
-	"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+	`script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' ${UMAMI_HOST}${gis ? ` ${gis.script}` : ''}`,
+	`style-src 'self' 'unsafe-inline' https://fonts.googleapis.com${gis ? ` ${gis.style}` : ''}`,
 	"font-src 'self' data: https://fonts.gstatic.com",
 	// Tournament posters: approved ones (public bucket) and pending ones for the moderator (signed URLs).
 	`img-src 'self' data: blob: https://*.tile.openstreetmap.org ${SUPABASE_URL}/storage/v1/object/public/posters/ ${SUPABASE_URL}/storage/v1/object/sign/posters-pending/`,
-	`connect-src 'self' data: blob: ${SUPABASE_URL} ${supabaseWs} ${UMAMI_HOST} https://api.web3forms.com https://*.tile.openstreetmap.org`,
+	`connect-src 'self' data: blob: ${SUPABASE_URL} ${supabaseWs} ${UMAMI_HOST} https://api.web3forms.com https://*.tile.openstreetmap.org${gis ? ` ${gis.connect}` : ''}`,
+	...(gis ? [`frame-src ${gis.frame}`] : []),
 	"media-src 'self' data: blob:",
 	"worker-src 'self' blob:",
 	"object-src 'none'",

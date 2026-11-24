@@ -2,7 +2,8 @@
 // stats-admin with the in-app sales of the last 7 days, the month's revenue in euros (ads and in-app purchases, the
 // same count as /admin/revenus/), what waits on the studio board, and the house ads from the catalogue online.
 import { useEffect, useState, type ReactNode } from 'react';
-import { accountLabel, signIn, signOut } from '../../lib/meetupAuth';
+import { accountLabel, signOut } from '../../lib/meetupAuth';
+import GoogleSignIn from './GoogleSignIn';
 import { STATS_LOCAL, StatsError, appStore, board, overview, playOrders, purchases, rates, revenue, statsMessage, totals } from '../../lib/statsAdmin';
 import { homeIncome, revenueTile, weekLine, type HomeMoney } from '../../lib/homeRevenue';
 import type { Catalog } from '../../../supabase/functions/_shared/promoRules.mjs';
@@ -27,6 +28,7 @@ export default function AdminHome() {
 	const [statsError, setStatsError] = useState<string | null>(null);
 	const [ads, setAds] = useState<number | null>(null);
 	const [waits, setWaits] = useState<number | null>(null);
+	const [signInError, setSignInError] = useState<string | null>(null);
 	// Every money source at once, so a figure never switches source as the answers come in.
 	const [money, setMoney] = useState<(HomeMoney & { why: string }) | null>(null);
 	const signedIn = STATS_LOCAL || !!session;
@@ -79,11 +81,11 @@ export default function AdminHome() {
 				) : (
 					<>
 						<span className="pa-note">Connecte-toi pour voir les chiffres.</span>
-						<button type="button" className="pa-btn pa-primary" onClick={() => void signIn('google', window.location.href)}>Se connecter avec Google</button>
+						<GoogleSignIn onError={setSignInError} />
 					</>
 				)}
 			</div>
-			{error && <p className="pa-card as-error">{error}</p>}
+			{(error || signInError) && <p className="pa-card as-error">{error ?? signInError}</p>}
 			<ul className="ah-tiles">
 				{tiles.map((t) => (
 					<li key={t.title}>

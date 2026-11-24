@@ -7,3 +7,7 @@ export const WEB3FORMS_ACCESS_KEY = '64c95337-adf5-4a54-83de-28fd548efc48'; // w
 // leaderboard only activates when both are set. supabase.com → Project Settings → API.
 export const SUPABASE_URL = 'https://mzrdfahmzllgbpudpsdi.supabase.co';
 export const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im16cmRmYWhtemxsZ2JwdWRwc2RpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3OTE5OTAsImV4cCI6MjA5NzM2Nzk5MH0.1B934lBItIKCtapOO3b4sZ_9jt2FxIgwSEW8p9refig'; // anon public — safe to expose (protected by RLS)
+/** The « Ludiven Studio » Google Cloud project's Web client: the admin pages sign in with Google's own button under
+ *  the studio's name (src/lib/googleIdentity.ts). Empty: they keep the redirect through Supabase. Public, not a secret;
+ *  it must also be in Supabase's Google provider « Client IDs ». */
+export const GOOGLE_WEB_CLIENT_ID = '';

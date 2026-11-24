@@ -2,7 +2,8 @@
 // language and published through promo-admin, which commits it on main for Raphaël's account only.
 import { useEffect, useMemo, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { accountLabel, currentSession, onSessionChange, signIn, signOut, takeRedirectError } from '../../lib/meetupAuth';
+import { accountLabel, currentSession, onSessionChange, signOut, takeRedirectError } from '../../lib/meetupAuth';
+import GoogleSignIn from './GoogleSignIn';
 import {
 	AdminError, LOCAL_RUN, fileBase64, load, publish, revert, upload, versionAt, versions,
 	type Catalog, type CatalogEntry, type Loaded, type Published, type Upload, type Version,
@@ -213,10 +214,7 @@ export default function PromoAdmin() {
 		return (
 			<div className="pa-card pa-signin">
 				<p>Cette page est réservée à l'administration des pubs maison.</p>
-				<button type="button" className="pa-btn pa-primary" onClick={async () => {
-					const err = await signIn('google', window.location.href);
-					if (err) setMessage({ kind: 'error', text: err });
-				}}>Se connecter avec Google</button>
+				<GoogleSignIn onError={(text) => setMessage({ kind: 'error', text })} />
 				{message && <p className="pa-error">{message.text}</p>}
 			</div>
 		);

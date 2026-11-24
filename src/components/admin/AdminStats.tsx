@@ -1,7 +1,7 @@
 // /admin/stats/: each app's figures from Umami through stats-admin, with each house ad's weights from the
 // catalogue online next to its shows and taps, Google Play's orders (sales reports) and the purchases the apps saw.
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
-import { signIn } from '../../lib/meetupAuth';
+import GoogleSignIn from './GoogleSignIn';
 import { COUNTED_KINDS, KINDS, PRODUCTS, STATS_LOCAL, STORES, StatsError, overview, playOrders, purchases, statsMessage, type AppStats, type Count, type Overview, type PlayOrders, type Purchases } from '../../lib/statsAdmin';
 import { appColor } from '../../lib/appColors';
 import { baseAppId, shares } from '../../lib/promoShares';
@@ -358,10 +358,7 @@ export default function AdminStats() {
 		return (
 			<div className="pa-card as-signin">
 				<p>Le tableau de bord est réservé à l'administration du studio.</p>
-				<button type="button" className="pa-btn pa-primary" onClick={async () => {
-					const err = await signIn('google', window.location.href);
-					if (err) setMessage(err);
-				}}>Se connecter avec Google</button>
+				<GoogleSignIn onError={setMessage} />
 				{(message || error) && <p className="as-error">{message ?? error}</p>}
 			</div>
 		);

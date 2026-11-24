@@ -88,6 +88,17 @@ export async function signIn(provider: Provider, returnTo: string): Promise<stri
 	}
 }
 
+/** Google's own button handed back an ID token: Supabase checks it against the raw nonce whose SHA-256 Google put in
+ *  it, and opens the session (onSessionChange fires). null = signed in; a string = why not. */
+export async function signInWithGoogleToken(token: string, rawNonce: string): Promise<string | null> {
+	try {
+		const { error } = await auth().signInWithIdToken({ provider: 'google', token, nonce: rawNonce });
+		return error ? `La connexion avec Google a échoué (${error.message}).` : null;
+	} catch {
+		return NOT_READY('google');
+	}
+}
+
 export async function signOut(): Promise<void> {
 	try { await auth().signOut(); } catch { /* the local session is gone either way */ }
 }

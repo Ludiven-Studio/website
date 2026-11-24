@@ -2,7 +2,7 @@
 // then the ad revenue per app from the LevelPlay Reporting API (every mediated network), through stats-admin: this
 // month, the last 30 days and each of those days, with Unity Ads' own share.
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
-import { signIn } from '../../lib/meetupAuth';
+import GoogleSignIn from './GoogleSignIn';
 import { appColor } from '../../lib/appColors';
 import { networkLabel, unityShare } from '../../lib/adNetworks';
 import {
@@ -268,10 +268,7 @@ export default function AdminRevenue() {
 		return (
 			<div className="pa-card as-signin">
 				<p>Les revenus sont réservés à l'administration du studio.</p>
-				<button type="button" className="pa-btn pa-primary" onClick={async () => {
-					const err = await signIn('google', window.location.href);
-					if (err) setMessage(err);
-				}}>Se connecter avec Google</button>
+				<GoogleSignIn onError={setMessage} />
 				{(message || error) && <p className="as-error">{message ?? error}</p>}
 			</div>
 		);
