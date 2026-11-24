@@ -40,3 +40,13 @@ script tire alors sur le `dist` de quelqu'un d'autre — ça ressort en timeout 
 balisage pourtant correct.
 
 Pas besoin de boucle d'attente : `startServer` ne rend la main que quand le serveur répond.
+
+## Porter une amélioration des jeux mobiles vers un mini-jeu du site
+
+Raphaël, 2026-11-24, après l'essai de la vue « derrière le joueur » de Pétanque Game sur le mini-jeu (abandonnée :
+le mini-jeu n'a pas de joueur en 3D) : « il faut prendre que les améliorations du jeu mobile et non pas copier
+coller sans réflexion ».
+
+Avant chaque lot porté d'une appli Unity vers un mini-jeu (`src/games/<jeu>/`), dire en deux lignes ce qu'il
+apporte à un joueur du mini-jeu web, et ce qu'il coûte : temps, poids de la page, chargement sur téléphone. S'il
+apporte peu, proposer de ne pas le faire. Ne rien reprendre seulement parce que l'appli l'a.
