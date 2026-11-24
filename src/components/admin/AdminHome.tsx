@@ -1,17 +1,16 @@
 // /admin/: one tile per admin page. Once signed in, the tiles show each page's key figure: the visitors from
-// stats-admin with the in-app sales of the last 7 days, this month's ad revenue, what waits on the studio board, and
+// stats-admin with the in-app sales of the last 7 days, the month's revenue in euros (ads and in-app purchases), what waits on the studio board, and
 // the house ads from the catalogue online.
 import { useEffect, useState, type ReactNode } from 'react';
 import { accountLabel, signIn, signOut } from '../../lib/meetupAuth';
-import { STATS_LOCAL, StatsError, board, overview, purchases, revenue, statsMessage, totals, type Purchases, type Revenue } from '../../lib/statsAdmin';
+import { STATS_LOCAL, StatsError, board, overview, purchases, rates, revenue, statsMessage, totals, type Purchases, type Rates, type Revenue } from '../../lib/statsAdmin';
+import { revenueTile } from '../../lib/homeRevenue';
 import { inAppWeek } from '../../lib/inAppWeek';
 import type { Catalog } from '../../../supabase/functions/_shared/promoRules.mjs';
 import { useAdminSession } from './useAdminSession';
 import { AppName } from './AdminParts';
-import { unityShare } from '../../lib/adNetworks';
 
 const int = new Intl.NumberFormat('fr-FR');
-const usd = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
 const eur = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 });
 // The studio's apps in the order of their colours.
 const APPS = ['Pétanque Game', "Dragon's Gems", 'Pétanque Meet', 'Nino Rush', 'Pétanque Scan'];
@@ -41,14 +40,17 @@ export default function AdminHome() {
 	const [ads, setAds] = useState<number | null>(null);
 	const [money, setMoney] = useState<Revenue | null>(null);
 	const [waits, setWaits] = useState<number | null>(null);
-	const [inApp, setInApp] = useState<string | undefined>(undefined);
+	const [seen, setSeen] = useState<Purchases | null>(null);
+	const [seenWhy, setSeenWhy] = useState<string | null>(null);
+	const [euroRates, setEuroRates] = useState<Rates | null>(null);
 	const signedIn = STATS_LOCAL || !!session;
 
 	useEffect(() => {
 		if (!signedIn) return;
 		overview().then((o) => setStats(totals(o))).catch((e) => setStatsError(statsMessage(e)));
 		revenue().then(setMoney).catch(() => setMoney(null));
-		purchases().then((p) => setInApp(inAppLine(p, ''))).catch((e) => setInApp(inAppLine(null, whyMissing(e))));
+		purchases().then(setSeen).catch((e) => setSeenWhy(whyMissing(e)));
+		rates().then(setEuroRates).catch(() => setEuroRates(null));
 		board().then((b) => setWaits(b.apps.reduce((n, a) => n + a.waits.length, 0))).catch(() => setWaits(null));
 		fetch('/promo/v1/catalog.json', { cache: 'no-cache' })
 			.then((r) => (r.ok ? r.json() : null))
@@ -56,16 +58,16 @@ export default function AdminHome() {
 			.catch(() => setAds(null));
 	}, [signedIn]);
 
-	const unity = unityShare(money?.total.networks, 'month');
+	const month = revenueTile({ money, rates: euroRates, seen, now: new Date() });
 	const tiles: Tile[] = [
 		{
 			href: '/admin/stats/', title: 'Statistiques', text: 'Visiteurs, achats, connexions et pubs maison, appli par appli.',
 			figure: stats ? int.format(stats.visitors7) : undefined, sub: stats ? `visiteurs sur 7 jours · ${stats.apps} applis` : statsError ?? undefined,
-			extra: inApp,
+			extra: seen ? inAppLine(seen, '') : seenWhy ? inAppLine(null, seenWhy) : undefined,
 		},
 		{
-			href: '/admin/revenus/', title: 'Revenus', text: 'La publicité par appli et par régie (LevelPlay).',
-			figure: money ? usd.format(money.total.month) : undefined, sub: money ? `ce mois${unity === null ? '' : ` · dont Unity Ads ${usd.format(unity)}`}` : undefined,
+			href: '/admin/revenus/', title: 'Revenus', text: 'La publicité et les achats intégrés, en euros.',
+			figure: month.figure, sub: month.sub,
 		},
 		{
 			href: '/admin/versions/', title: 'Versions', text: 'Chaque appli sur les stores, chez les testeurs et sur main.',

@@ -16,13 +16,12 @@ export function cataloguePrice(item: string): number | null {
 
 export interface InAppWeek { count: number; gross: number; net: number; unpriced: number }
 
-/** The real purchases of the last 7 days, rolling, up to `now`. */
-export function inAppWeek(p: Purchases, now: Date): InAppWeek {
-	const since = now.getTime() - WEEK;
+/** The real purchases between `since` and `until`, in ms. */
+export function inAppBetween(p: Purchases, since: number, until: number): InAppWeek {
 	let count = 0, gross = 0, unpriced = 0;
 	for (const b of p.purchases) {
 		const t = Date.parse(b.at);
-		if (!COUNTED_KINDS.includes(b.kind) || !(t >= since && t <= now.getTime())) continue;
+		if (!COUNTED_KINDS.includes(b.kind) || !(t >= since && t <= until)) continue;
 		count++;
 		const price = cataloguePrice(b.item);
 		if (price === null) unpriced++;
@@ -31,3 +30,6 @@ export function inAppWeek(p: Purchases, now: Date): InAppWeek {
 	gross = Math.round(gross * 100) / 100;
 	return { count, gross, net: Math.round(gross * NET_SHARE * 100) / 100, unpriced };
 }
+
+/** The real purchases of the last 7 days, rolling, up to `now`. */
+export const inAppWeek = (p: Purchases, now: Date): InAppWeek => inAppBetween(p, now.getTime() - WEEK, now.getTime());
