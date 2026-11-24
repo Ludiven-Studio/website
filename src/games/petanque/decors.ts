@@ -1,6 +1,6 @@
 /**
  * PETANQUE — the decors the shop sells, ported from the Unity game (VillageBuilder, PortBuilder,
- * Scenery): the village square by day, the same square at dusk, the harbour. The garden ('jardin')
+ * Scenery, VillageCountry): the village square by day, the same square at dusk, the country ground, the harbour. The garden ('jardin')
  * is the website's own decor and stays in render3d.ts. A decor plays nothing: the pitch, its planks
  * and everything the engine reads are the same under every one of them.
  *
@@ -14,8 +14,8 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { hashN } from './terrain';
 import type { SunSetup } from './render3d';
 
-export type DecorId = 'jardin' | 'place' | 'soir' | 'port';
-export const DECOR_IDS: DecorId[] = ['jardin', 'place', 'soir', 'port'];
+export type DecorId = 'jardin' | 'place' | 'soir' | 'campagne' | 'port';
+export const DECOR_IDS: DecorId[] = ['jardin', 'place', 'soir', 'campagne', 'port'];
 export type TownId = Exclude<DecorId, 'jardin'>;
 
 export const isDecorId = (v: unknown): v is DecorId => typeof v === 'string' && (DECOR_IDS as string[]).includes(v);
@@ -72,6 +72,13 @@ const clamp01 = (t: number): number => (t < 0 ? 0 : t > 1 ? 1 : t);
 const lerp = (a: number, b: number, t: number): number => a + (b - a) * clamp01(t);
 const lerpRGB = (a: RGB, b: RGB, t: number): RGB => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
 const scaleRGB = (c: RGB, k: number): RGB => [c[0] * k, c[1] * k, c[2] * k];
+/** Smooth value noise in 0..1, Unity's Mathf.PerlinNoise's role: broad drifts across a field. */
+function drift(x: number, z: number): number {
+	const ix = Math.floor(x), iz = Math.floor(z), fx = x - ix, fz = z - iz;
+	const at = (i: number, j: number): number => hashN((i * 73856093) ^ (j * 19349663), 0x5eed);
+	const sx = fx * fx * (3 - 2 * fx), sz = fz * fz * (3 - 2 * fz);
+	return lerp(lerp(at(ix, iz), at(ix + 1, iz), sx), lerp(at(ix, iz + 1), at(ix + 1, iz + 1), sx), sz);
+}
 const srgbToLinear = (c: number): number => (c < 0.04045 ? c * 0.0773993808 : Math.pow(c * 0.9478672986 + 0.0521327014, 2.4));
 /** Unity's Color.linear: a colour written as seen, as the shader reads it. */
 const toLinear = (c: RGB): RGB => [srgbToLinear(c[0]), srgbToLinear(c[1]), srgbToLinear(c[2])];
@@ -199,8 +206,9 @@ const TEXTURES: Record<TownId, string[]> = {
 	place: ['paving.webp', 'facades.webp', 'facades-mask.webp', 'roof.webp', 'bark.webp', 'leaves.webp', 'leaf-card.webp', 'leaf-shadow.webp', 'awning.webp'],
 	soir: ['paving.webp', 'facades.webp', 'facades-mask.webp', 'facades-glow.webp', 'roof.webp', 'bark.webp', 'leaves.webp', 'leaf-card.webp', 'awning.webp'],
 	port: ['paving.webp', 'facades.webp', 'facades-mask.webp', 'roof.webp', 'bark.webp', 'leaves.webp', 'leaf-card.webp', 'leaf-shadow.webp'],
+	campagne: ['meadow.webp', 'drystone.webp', 'hills.webp', 'facades.webp', 'facades-mask.webp', 'roof.webp', 'bark.webp', 'leaves.webp', 'leaf-card.webp', 'leaf-shadow.webp'],
 };
-const CLAMPED = new Set(['facades.webp', 'facades-mask.webp', 'facades-glow.webp', 'awning.webp', 'leaf-card.webp']);
+const CLAMPED = new Set(['hills.webp', 'facades.webp', 'facades-mask.webp', 'facades-glow.webp', 'awning.webp', 'leaf-card.webp']);
 const LINEAR = new Set(['facades-mask.webp']);
 
 /** Fetch a decor's textures ahead of its first deal, so it does not lay its square untextured. */
@@ -375,7 +383,7 @@ function seaMaterial(sun: SunSetup, fog: { color: number; near: number }): THREE
 /* ---------- the build ---------- */
 
 type Hash = (k: number, salt: number) => number;
-type Bucket = 'paving' | 'facade' | 'roof' | 'bark' | 'crown' | 'cards' | 'iron' | 'wood' | 'fabric' | 'bulb' | 'awning'
+type Bucket = 'paving' | 'facade' | 'roof' | 'bark' | 'crown' | 'cards' | 'iron' | 'wood' | 'fabric' | 'bulb' | 'awning' | 'meadow' | 'drystone' | 'hills'
 	| 'painted' | 'rock' | 'red' | 'stone' | 'shade' | 'pool';
 
 /**
@@ -384,7 +392,7 @@ type Bucket = 'paving' | 'facade' | 'roof' | 'bark' | 'crown' | 'cards' | 'iron'
  * just under the pitch's lowest point.
  */
 export function buildTown(id: TownId, seed: number, y: number, sun: SunSetup): TownDecor {
-	const dusk = id === 'soir', port = id === 'port';
+	const dusk = id === 'soir', port = id === 'port', country = id === 'campagne';
 	const fog = dusk ? DUSK_FOG : DAY_FOG;
 	const H: Hash = (k, salt) => hashN(k, (seed ^ salt) | 0);
 	const group = new THREE.Group();
@@ -410,7 +418,8 @@ export function buildTown(id: TownId, seed: number, y: number, sun: SunSetup): T
 
 	/* ----- ground ----- */
 
-	{
+	// The country ground has its meadow instead of the square's paving (Country, below).
+	if (!country) {
 		// A flat disc, cut straight at the quay on a harbour. 2 m a texture tile, eight setts of 25 cm.
 		const p = parts(false, true);
 		const n = 72, maxX = port ? QUAY_X : PAVING_R;
@@ -476,7 +485,7 @@ export function buildTown(id: TownId, seed: number, y: number, sun: SunSetup): T
 		roof(front.clone().addScaledVector(inward, -depth / 2).add(v3(0, h, 0)), right, inward, width + 0.3, depth + 0.6, 1.6, tiles);
 	};
 
-	{
+	if (!country) {
 		// Fronts along the ring, three short streets each closed by a house. The café faces the long side.
 		const count = 18, depth = 9, step = 360 / count;
 		for (let i = 0; i < count; i++) {
@@ -500,7 +509,7 @@ export function buildTown(id: TownId, seed: number, y: number, sun: SunSetup): T
 	const leafGreen = (k: number): RGB => lerpRGB([1, 1, 0.86], [0.86, 0.98, 0.96], H(k, 0x5d));
 
 	/** The trunk, flared at the foot and tapering to the fork, and three branches into the crown. */
-	const wood = (foot: V, top: V, k: number): void => {
+	const wood = (foot: V, top: V, k: number, scale = 1): void => {
 		const p = parts(true, true);
 		const limb = (a: V, b: V, ra: number, rb: number, flare: number): void => {
 			const sides = 10, rings = 6;
@@ -528,22 +537,22 @@ export function buildTown(id: TownId, seed: number, y: number, sun: SunSetup): T
 					p.idx.push(i0, i0 + 1, i1, i0 + 1, i1 + 1, i1);
 				}
 		};
-		limb(foot, top, 0.27, 0.19, 0.5);
+		limb(foot, top, 0.27 * scale, 0.19 * scale, 0.5);
 		const fork = foot.clone().lerp(top, 0.85);
 		for (let b = 0; b < 3; b++) {
 			const ang = (b / 3 + H(k * 5 + b, 0x5b) * 0.25) * Math.PI * 2;
 			const dir = v3(Math.cos(ang), 1.3, Math.sin(ang)).normalize();
-			limb(fork, fork.clone().addScaledVector(dir, 1.6 + H(k * 5 + b, 0x5c) * 0.8), 0.14, 0.06, 0);
+			limb(fork, fork.clone().addScaledVector(dir, (1.6 + H(k * 5 + b, 0x5c) * 0.8) * scale), 0.14 * scale, 0.06 * scale, 0);
 		}
 		add('bark', toGeo(p));
 	};
 
 	/** A crown: a dozen lumpy blobs in a dome, lit as one volume (each normal bent toward the
 	 *  crown's), darker inside and underneath. No UVs: the leaves are mapped by world position. */
-	const crown = (k: number, centre: V, rxz: number, ry: number): void => {
+	const crown = (k: number, centre: V, rxz: number, ry: number, tint: RGB = [1, 1, 1]): void => {
 		fillIco();
 		const p = parts(true, false, true);
-		const green = leafGreen(k);
+		const green = leafGreen(k).map((c, i) => c * tint[i]) as RGB;
 		for (let b = 0; b < 17; b++) {
 			const h1 = H(k * 24 + b, 0x5e), h2 = H(k * 24 + b, 0x5f), h3 = H(k * 24 + b, 0x60);
 			// One in the middle, a ring of seven round it, four on top, then five small tufts on its rim.
@@ -576,9 +585,9 @@ export function buildTown(id: TownId, seed: number, y: number, sun: SunSetup): T
 
 	/** Sprigs of leaves round a crown's rim: cut-out cards standing half out of its shell, on its sides
 	 *  and top, lit as the crown and darker low down. */
-	const cards = (k: number, centre: V, rxz: number, ry: number, count: number, size: number): void => {
+	const cards = (k: number, centre: V, rxz: number, ry: number, count: number, size: number, tint: RGB = [1, 1, 1]): void => {
 		const p = parts(true, true, true);
-		const green = leafGreen(k);
+		const green = leafGreen(k).map((c, i) => c * tint[i]) as RGB;
 		for (let i = 0; i < count; i++) {
 			const h1 = H(k * 64 + i, 0x6a1), h2 = H(k * 64 + i, 0x6a2), h3 = H(k * 64 + i, 0x6a3);
 			const a = h1 * Math.PI * 2, up = lerp(-0.25, 0.95, Math.sqrt(h2));
@@ -796,7 +805,7 @@ export function buildTown(id: TownId, seed: number, y: number, sun: SunSetup): T
 
 	/* ----- the café, or the harbour ----- */
 
-	if (!port) {
+	if (!port && !country) {
 		// House 0 stands at angle 0: its front faces -x at x = RING. The slope takes the top three
 		// quarters of the awning texture, the valance under its edge the bottom one.
 		const fx = RING - 0.05;
@@ -899,6 +908,132 @@ export function buildTown(id: TownId, seed: number, y: number, sun: SunSetup): T
 		}
 	}
 
+	/* ----- the country ground (Unity's VillageCountry) ----- */
+
+	if (country) {
+		const MEADOW_R = 118, WALL_R = 25, WALL_H = 0.85, WALL_W = 0.5, HILLS_R = 112, HILLS_H = 30;
+		{
+			// The meadow out under the hills: dry grass in 4 m tiles, tinted in broad drifts (greener,
+			// yellower) so the tiles do not repeat to the eye.
+			const seg = 96;
+			const radii = [0];
+			for (let r = 3; r < MEADOW_R; r *= 1.18) radii.push(r);
+			radii.push(MEADOW_R);
+			const p = parts(true, true, true);
+			for (const r of radii)
+				for (let i = 0; i < seg; i++) {
+					const a = (i / seg) * Math.PI * 2;
+					const x = Math.cos(a) * r, z = Math.sin(a) * r;
+					p.pos.push(x, y + 0.002, z);
+					p.nor!.push(0, 1, 0);
+					p.uv!.push(x / 4, z / 4);
+					const green = drift(x * 0.045 + 11, z * 0.045 + 7), dry = drift(x * 0.11 + 3, z * 0.11 + 29);
+					const tone = scaleRGB(lerpRGB([1.08, 1.03, 0.84], [0.88, 1.02, 0.9], green), 0.9 + 0.18 * dry);
+					p.col!.push(tone[0], tone[1], tone[2]);
+				}
+			for (let ring = 0; ring + 1 < radii.length; ring++)
+				for (let i = 0; i < seg; i++) {
+					const a = ring * seg + i, b = ring * seg + ((i + 1) % seg), c = a + seg, d = b + seg;
+					p.idx.push(a, b, c, b, d, c);
+				}
+			add('meadow', toGeo(p));
+		}
+		{
+			// A dry-stone wall round the trees, its top uneven, an opening on the far side.
+			const seg = 72;
+			const p = parts(false, true);
+			const quad = (a: V, b: V, c: V, d: V, uv: number[]): void => {
+				const o = p.pos.length / 3;
+				for (const q of [a, b, c, d]) put(p.pos, q);
+				p.uv!.push(...uv);
+				p.idx.push(o, o + 1, o + 2, o, o + 2, o + 3);
+			};
+			for (let i = 0; i < seg; i++) {
+				const a0 = (i / seg) * Math.PI * 2, a1 = ((i + 1) / seg) * Math.PI * 2;
+				if (Math.abs(((a0 / D2R - 180 + 540) % 360) - 180) < 5) continue; // the way in
+				const h0 = WALL_H * (0.88 + 0.24 * H(i, 0xb1)), h1 = WALL_H * (0.88 + 0.24 * H((i + 1) % seg, 0xb1));
+				const d0 = v3(Math.cos(a0), 0, Math.sin(a0)), d1 = v3(Math.cos(a1), 0, Math.sin(a1));
+				const arc = WALL_R * (a1 - a0), u0 = (i * arc) / 2, u1 = ((i + 1) * arc) / 2;
+				for (const r of [WALL_R - WALL_W / 2, WALL_R + WALL_W / 2]) {
+					const p0 = d0.clone().multiplyScalar(r).setY(y), p1 = d1.clone().multiplyScalar(r).setY(y);
+					quad(p0, p1, p1.clone().setY(y + h1), p0.clone().setY(y + h0), [u0, 0, u1, 0, u1, h1, u0, h0]);
+				}
+				const i0 = d0.clone().multiplyScalar(WALL_R - WALL_W / 2).setY(y + h0), i1 = d1.clone().multiplyScalar(WALL_R - WALL_W / 2).setY(y + h1);
+				const o0 = d0.clone().multiplyScalar(WALL_R + WALL_W / 2).setY(y + h0), o1 = d1.clone().multiplyScalar(WALL_R + WALL_W / 2).setY(y + h1);
+				quad(i0, i1, o1, o0, [u0, 0.1, u1, 0.1, u1, 0.35, u0, 0.35]);
+			}
+			add('drystone', toGeo(p));
+		}
+		// A farmhouse facing the ground across the field, its barn beside it.
+		building(v3(22, y, 48), 9.6, 9, 1, 0, [0.98, 0.88, 0.7], [0.95, 0.9, 0.86]);
+		building(v3(34, y, 38), 7, 7, 0, 0, [0.92, 0.86, 0.78], [0.85, 0.8, 0.78]);
+
+		const stem = new THREE.CylinderGeometry(0.5, 0.5, 2, 8);
+		junk.push(stem);
+		/** An olive: a short twisted trunk, a rounded silver-green crown, at `scale` of a plane tree. */
+		const olive = (foot: V, scale: number, k: number): void => {
+			const top = foot.clone().add(v3((H(k, 0x54) - 0.5) * 1.2, 3, (H(k, 0x55) - 0.5) * 1.2).multiplyScalar(scale));
+			wood(foot, top, k, scale);
+			const rxz = (2.6 + H(k, 0x56) * 0.6) * scale, ry = (1.8 + H(k, 0x57) * 0.4) * scale;
+			const centre = top.clone().add(v3(0, ry * 0.4, 0));
+			const silver: RGB = [1.35, 1.05, 1.9];
+			crown(k, centre, rxz, ry, silver);
+			cards(k, centre, rxz, ry, 30, 1.2 * scale, silver);
+		};
+		/** A cypress: a tall flame of dark foliage, widest a third of the way up, on a short trunk. */
+		const cypress = (foot: V, h: number, r: number, k: number): void => {
+			fillIco();
+			const p = parts(true, false, true);
+			const p1 = H(k, 0x91) * 6.3, p2 = H(k, 0x92) * 6.3;
+			const green = scaleRGB([0.55, 0.72, 0.6], 0.85 + 0.2 * H(k, 0x93));
+			const trunk = 0.5;
+			for (const u of ico.v) {
+				const t = u.y * 0.5 + 0.5; // 0 at the foliage's foot, 1 at its tip
+				const width = r * Math.sqrt(clamp01(1 - t)) * clamp01(0.45 + t * 2.2);
+				const bump = 1 + 0.14 * Math.sin(5.3 * u.x + 12 * u.y + p1) * Math.sin(4.7 * u.z - 11 * u.y + p2);
+				const len = Math.max(0.3, Math.sqrt(u.x * u.x + u.z * u.z));
+				put(p.pos, foot.clone().add(v3((u.x / len) * width * bump, trunk + t * (h - trunk), (u.z / len) * width * bump)));
+				put(p.nor!, v3(u.x, u.y * 0.3, u.z).normalize());
+				const ao = 0.62 + 0.38 * t;
+				p.col!.push(green[0] * ao, green[1] * ao, green[2] * ao);
+			}
+			p.idx.push(...ico.t);
+			add('crown', toGeo(p));
+			add('bark', stem.clone().applyMatrix4(m4.compose(foot.clone().add(v3(0, trunk * 0.6, 0)), NO_TURN, v3(0.22, trunk * 0.6, 0.22))));
+		};
+
+		for (let k = 0; k < 18; k++) {
+			// Olive trees round the wall, none in front of the farm.
+			const a = ((k + H(k, 0xa1) * 0.7) / 18) * Math.PI * 2;
+			const r = 31 + H(k, 0xa2) * 26;
+			const at = v3(Math.cos(a) * r, y, Math.sin(a) * r);
+			if (at.distanceTo(v3(22, y, 48)) < 14) continue;
+			olive(at, 0.55 + H(k, 0xa3) * 0.25, 300 + k);
+		}
+		// A windbreak of cypresses on one side, a few more scattered.
+		for (let k = 0; k < 8; k++) cypress(v3(-34 + (H(k, 0xa4) - 0.5), y, -24 + k * 6.5), 7 + H(k, 0xa5) * 2.5, 0.75, 400 + k);
+		for (let k = 0; k < 6; k++) {
+			const a = ((k + 0.3 + H(k, 0xa6) * 0.5) / 6) * Math.PI * 2;
+			const r = 44 + H(k, 0xa7) * 24;
+			cypress(v3(Math.cos(a) * r, y, Math.sin(a) * r), 6 + H(k, 0xa8) * 3, 0.7, 420 + k);
+		}
+		{
+			// The horizon: hills, a perched village and cypresses painted inside a far cylinder, four times round.
+			const seg = 64;
+			const p = parts(false, true);
+			for (let i = 0; i < seg; i++) {
+				const a0 = (i / seg) * Math.PI * 2, a1 = ((i + 1) / seg) * Math.PI * 2;
+				const o = p.pos.length / 3;
+				p.pos.push(Math.cos(a0) * HILLS_R, y - 2, Math.sin(a0) * HILLS_R, Math.cos(a1) * HILLS_R, y - 2, Math.sin(a1) * HILLS_R,
+					Math.cos(a1) * HILLS_R, y - 2 + HILLS_H, Math.sin(a1) * HILLS_R, Math.cos(a0) * HILLS_R, y - 2 + HILLS_H, Math.sin(a0) * HILLS_R);
+				const u0 = (i * 4) / seg, u1 = ((i + 1) * 4) / seg;
+				p.uv!.push(u0, 0, u1, 0, u1, 1, u0, 1);
+				p.idx.push(o, o + 1, o + 2, o, o + 2, o + 3);
+			}
+			add('hills', toGeo(p));
+		}
+	}
+
 	/* ----- materials, one draw per bucket ----- */
 
 	const later = (mat: THREE.Material, file: string, slot: 'map' | 'alphaMap' | 'emissiveMap'): void => {
@@ -947,6 +1082,14 @@ export function buildTown(id: TownId, seed: number, y: number, sun: SunSetup): T
 				later(m, 'leaf-shadow.webp', 'map');
 				return m;
 			}
+			case 'meadow': { const m = tinted({}); later(m, 'meadow.webp', 'map'); return m; }
+			case 'drystone': { const m = new THREE.MeshStandardMaterial({ roughness: 0.95, side: THREE.DoubleSide }); later(m, 'drystone.webp', 'map'); return m; }
+			case 'hills': {
+				// Painted, its sky cut away: lit by nothing, as Unity's unlit Mat_Hills.
+				const m = new THREE.MeshBasicMaterial({ alphaTest: 0.5, side: THREE.DoubleSide, fog: false });
+				later(m, 'hills.webp', 'map');
+				return m;
+			}
 			case 'pool': return new THREE.MeshBasicMaterial({
 				map: blob(), color: new THREE.Color(1, 0.7, 0.4), transparent: true, opacity: 0.32, depthWrite: false,
 				blending: THREE.AdditiveBlending, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
@@ -969,7 +1112,7 @@ export function buildTown(id: TownId, seed: number, y: number, sun: SunSetup): T
 		junk.push(geo, mat);
 		const mesh = new THREE.Mesh(geo, mat);
 		mesh.castShadow = false;
-		mesh.receiveShadow = b === 'paving';
+		mesh.receiveShadow = b === 'paving' || b === 'meadow';
 		if (b === 'shade') mesh.renderOrder = 1; // over the paving, under every ring the HUD draws
 		if (b === 'pool') mesh.renderOrder = 2;
 		group.add(mesh);
