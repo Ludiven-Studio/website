@@ -14,7 +14,7 @@ import {
 import { planThrow, planJack, jackThrow, JACK_SPREAD_PLAYER, launch } from './ai';
 import { swayAt, swayAmp } from './sway';
 import {
-	buildPitch3D, bakeBouleEnv, makeBouleMesh, groundRing, groundLabel, makeMarker, makeHalo, arcMesh, predictThrow, pathTint,
+	buildPitch3D, bakeBouleEnv, makeBouleMesh, groundRing, groundLabel, makeMarker, makeHalo, arcMesh, arcRibbon, slideChevrons, predictThrow, pathTint,
 	aimCamera, headCamera, topCamera, laneFrame, verticalFov, haloRadius, haloFloorFor, zoomWalk,
 	elevationForBoard, boardForElevation, addLights, makeFx, wx, wz, makeContactShadow, layFlat, makeMarks, sinkOf, MARK_SPEED,
 	HEAD_DIST_MIN, HEAD_DIST_MAX, HEAD_PITCH_MIN, HEAD_PITCH_MAX,
@@ -2716,9 +2716,10 @@ export default function PetanqueGame({ gameId, event, gameAd }: { gameId: string
 		// What it meets first in the air colours the path (Pétanque Game): the player lets go as it shows.
 		const tint = pathTint(pred, m.turn);
 		arcPtsRef.current = pred.air;
-		g.arcAir = arcMesh(pred.air, tint, 0.022);
+		// Chevrons in a 7 cm band, the roll's piece a little narrower (Pétanque Game).
+		g.arcAir = arcRibbon(pred.air, tint, 0.07, g.camera.position);
 		if (g.arcAir) g.scene.add(g.arcAir);
-		g.arcRoll = arcMesh(pred.roll, 0xfff3bf, 0.016);
+		g.arcRoll = arcRibbon(pred.roll, tint, 0.05, g.camera.position);
 		if (g.arcRoll) g.scene.add(g.arcRoll);
 		if (pred.land) {
 			g.marker.position.copy(pred.land);
@@ -2835,6 +2836,7 @@ export default function PetanqueGame({ gameId, event, gameAd }: { gameId: string
 		if (aimDirtyRef.current || (swayRef.current && powerRef.current >= 0.06)) { aimDirtyRef.current = false; rebuildArc(); }
 
 		/* --- meshes --- */
+		slideChevrons(now / 1000);
 		const a = alphaRef.current;
 		const best: (Boule | null)[] = [null, null];
 		let holderBest: Boule | null = null;

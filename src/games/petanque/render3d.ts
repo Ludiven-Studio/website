@@ -1694,6 +1694,78 @@ export function arcMesh(pts: THREE.Vector3[], color: number, r: number): THREE.M
 	return m;
 }
 
+/* The aim path as Pétanque Game draws it: a 7 cm band facing the eye, chevrons along it, two to a tile of
+   ARROW_STEP metres, sliding forward by themselves (`slideChevrons`), tinted by what the throw meets. */
+export const ARROW_STEP = 0.3; // m of path per tile
+export const ARROW_SLIDE = 1; // tiles a second
+let chevrons: THREE.CanvasTexture | null = null;
+
+/** One texture for every path, made once: its offset is the slide. */
+export function chevronTexture(): THREE.CanvasTexture {
+	if (chevrons) return chevrons;
+	const c = document.createElement('canvas');
+	c.width = 128; c.height = 32;
+	const g = c.getContext('2d')!;
+	g.fillStyle = 'rgba(255,255,255,0.22)';
+	g.fillRect(0, 0, 128, 32);
+	g.strokeStyle = '#fff';
+	g.lineWidth = 7;
+	g.lineCap = 'round';
+	g.lineJoin = 'round';
+	for (const x of [10, 74]) {
+		g.beginPath();
+		g.moveTo(x, 5); g.lineTo(x + 30, 16); g.lineTo(x, 27);
+		g.stroke();
+	}
+	chevrons = new THREE.CanvasTexture(c);
+	chevrons.wrapS = THREE.RepeatWrapping;
+	chevrons.colorSpace = THREE.SRGBColorSpace;
+	chevrons.anisotropy = 4;
+	return chevrons;
+}
+
+/** Slide the chevrons forward, `t` in seconds. */
+export function slideChevrons(t: number): void {
+	if (chevrons) chevrons.offset.x = -(t * ARROW_SLIDE) % 1;
+}
+
+/** The band along `pts`, `width` metres, turned to face `eye` (the aiming camera holds still while the pad is held). */
+export function arcRibbon(pts: THREE.Vector3[], color: number, width: number, eye: THREE.Vector3): THREE.Mesh | null {
+	if (pts.length < 2) return null;
+	const curve = new THREE.CatmullRomCurve3(pts);
+	const n = Math.max(2, Math.min(200, Math.ceil(curve.getLength() / 0.05)));
+	const at = curve.getSpacedPoints(n);
+	const pos = new Float32Array(at.length * 6), uv = new Float32Array(at.length * 4);
+	const side = new THREE.Vector3(), tan = new THREE.Vector3(), toEye = new THREE.Vector3();
+	let run = 0;
+	for (let i = 0; i < at.length; i++) {
+		const p = at[i];
+		if (i > 0) run += p.distanceTo(at[i - 1]);
+		tan.subVectors(at[Math.min(i + 1, at.length - 1)], at[Math.max(i - 1, 0)]).normalize();
+		toEye.subVectors(eye, p).normalize();
+		side.crossVectors(tan, toEye);
+		if (side.lengthSq() < 1e-8) side.set(1, 0, 0);
+		side.normalize().multiplyScalar(width / 2);
+		pos.set([p.x - side.x, p.y - side.y, p.z - side.z, p.x + side.x, p.y + side.y, p.z + side.z], i * 6);
+		const u = run / ARROW_STEP;
+		uv.set([u, 0, u, 1], i * 4);
+	}
+	const index: number[] = [];
+	for (let i = 0; i < at.length - 1; i++) {
+		const a = i * 2;
+		index.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+	}
+	const geo = new THREE.BufferGeometry();
+	geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+	geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+	geo.setIndex(index);
+	const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+		map: chevronTexture(), color, transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide,
+	}));
+	m.renderOrder = 8;
+	return m;
+}
+
 /**
  * A ground ring that keeps a body findable at the far end of the lane. At the aim camera's 58 deg
  * over a 700 px canvas, a jack sitting 10 m out is 1.9 px across and a boule 4.7 px — unreadable,
