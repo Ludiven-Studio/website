@@ -9,6 +9,7 @@ import {
 	type Catalog, type CatalogEntry, type Loaded, type Published, type Upload, type Version,
 } from '../../lib/promoAdmin';
 import PromoWeights from './PromoWeights';
+import PromoMix from './PromoMix';
 import { Help, Pill, appStyle } from './AdminParts';
 import { applyRow, type Platform } from '../../lib/promoShares';
 import { BANNER_TEXT_MAX, CATALOG_URL, LANGUAGES, PROMO_DIR, catalogUrl, checkCatalog, sitePath } from '../../../supabase/functions/_shared/promoRules.mjs';
@@ -38,6 +39,7 @@ function summary(before: Catalog, after: Catalog): string {
 	if (off.length) parts.push(`${off.join(', ')} turned off`);
 	if (on.length) parts.push(`${on.join(', ')} turned on`);
 	if (changed.length) parts.push(`${changed.join(', ')} changed`);
+	if (JSON.stringify(before.mix ?? null) !== JSON.stringify(after.mix ?? null)) parts.push('house and network mix changed');
 	return `[CHANGED] House ads catalogue: ${parts.join('; ') || 'settings'} (admin page)`;
 }
 
@@ -307,6 +309,16 @@ export default function PromoAdmin() {
 			{shown && (
 				<PromoWeights catalog={shown} published={peek ? null : loaded?.catalog ?? null} readOnly={!!peek} busy={!!busy}
 					validate={(app, platform) => void doValidate(app, platform)}
+					change={(fn) => setDraft((d) => {
+						if (!d) return d;
+						const next = clone(d);
+						fn(next);
+						return next;
+					})} />
+			)}
+
+			{shown && (
+				<PromoMix catalog={shown} published={peek ? null : loaded?.catalog ?? null} readOnly={!!peek}
 					change={(fn) => setDraft((d) => {
 						if (!d) return d;
 						const next = clone(d);

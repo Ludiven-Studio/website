@@ -189,3 +189,23 @@ a.ah-tile:hover, a.ah-tile:focus-visible { box-shadow: 0 0 0 2px var(--sc-accent
 	.ak-list td:not(:last-child) { order: 2; font-size: 0.8rem; color: var(--sc-muted); }
 	.ak-list tbody tr:last-child { border-bottom: none; }
 }
+
+/* The house and network mix table (PromoMix): « Toutes les applis » first, set values in ink, inherited ones muted. */
+.pa-root .pm-all th[scope="row"] { font-weight: 700; }
+.pa-root .pm-cell label { white-space: nowrap; }
+.pa-root .pm-cell input.pm-inherit::placeholder { color: var(--sc-muted); font-style: italic; opacity: 1; }
+.pa-root .pm-cell input.pm-own { font-weight: 700; border-color: var(--sc-accent); }
+.pa-root .pm-cell .pm-set { color: var(--sc-ink-2); }
+.pa-root .pm-table thead small { display: block; font-weight: 400; text-transform: none; letter-spacing: 0; }
+.pa-root .pm-locked { background: var(--sc-surface-2); }
+.pa-root .pm-locked strong { color: var(--sc-muted); }
+.pa-root .pm-lock-note { display: none; }
+@media (max-width: 30rem) {
+	.pa-root .pm-lockcol { display: none; }
+	.pa-root .pm-lock-note { display: block; }
+	.pa-root .pm-table :is(tbody th, thead th) { white-space: normal; }
+	.pa-root .pm-table tbody th small, .pa-root .pm-table thead small { display: none; }
+	.pa-root .pm-table :is(th, td) { padding: 0.35rem 0.25rem; }
+	.pa-root .pm-cell { min-width: 0; }
+	.pa-root .pm-cell input { width: 3.2rem; }
+}

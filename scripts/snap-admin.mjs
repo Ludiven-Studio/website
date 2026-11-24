@@ -119,6 +119,8 @@ const BOARD = {
 };
 
 const CATALOG = JSON.parse(readFileSync('public/promo/v1/catalog.json', 'utf8'));
+// SNAP_MIX=1: a few house and network mix values, to see the table's set and inherited cells.
+if (process.env.SNAP_MIX) CATALOG.mix = { '*': { banner: { consent: 10 } }, 'com.ludivenstudio.ninorush': { banner: { consent: 25 }, interstitial: { consent: 20 } } };
 const promoFiles = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((f) => (f.isDirectory() ? promoFiles(`${dir}${f.name}/`) : [{ path: `${dir}${f.name}`, size: 1 }]));
 const PROMO = {
 	get: { head: '8a081890000000000000000000000000000000ab', catalog: CATALOG, blob: 'b0', files: promoFiles('public/promo/v1/'), missing: [] },

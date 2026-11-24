@@ -6,8 +6,8 @@ import { AppName, Help, appStyle } from './AdminParts';
 import { isWeighted, perPlatform, rowChanged, setWeightIn, shares, showingApps, weightIn, type Platform, type Spot } from '../../lib/promoShares';
 
 // Apps that show the ads without an entry of their own.
-const OTHERS = ['com.ludivenstudio.dominoland'];
-const NAMES: Record<string, string> = {
+export const SHOWING_OTHERS = ['com.ludivenstudio.dominoland'];
+export const APP_NAMES: Record<string, string> = {
 	'com.ludivenstudio.petanquegame': 'Pétanque Game',
 	'com.ludivenstudio.petanquemeet': 'Pétanque Meet',
 	'com.raphbenpro.petanquear': 'Pétanque Scan',
@@ -32,8 +32,8 @@ interface Props {
 export default function PromoWeights({ catalog, published, readOnly, busy, change, validate }: Props) {
 	const [spot, setSpot] = useState<Spot>('banner');
 	const [installed, setInstalled] = useState<Set<string>>(new Set());
-	const apps = useMemo(() => showingApps(catalog, OTHERS), [catalog]);
-	const name = (app: string): string => NAMES[app] ?? catalog.entries.find((e) => e.app?.includes(app))?.title.fr ?? app;
+	const apps = useMemo(() => showingApps(catalog, SHOWING_OTHERS), [catalog]);
+	const name = (app: string): string => APP_NAMES[app] ?? catalog.entries.find((e) => e.app?.includes(app))?.title.fr ?? app;
 	const split = catalog.entries.some(perPlatform);
 
 	function setWeighted(app: string, on: boolean) {
