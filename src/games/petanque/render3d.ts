@@ -1591,6 +1591,8 @@ export interface ThrowPrediction {
 	land: THREE.Vector3 | null; // where it first touches down — the donnee
 	roll: THREE.Vector3[]; // a DELIBERATELY short piece of the roll
 	blocked: boolean; // it would hit a boule before landing
+	struck: number | null; // the side of the body it would meet first in the air: 0 or 1, -1 the jack
+	out: boolean; // it would leave the pitch before landing
 }
 
 const PREVIEW_ROLL = 0.6; // m of roll shown. Showing all of it would solve the game for the player.
@@ -1615,6 +1617,8 @@ export function predictThrow(s: Sim, from: { x: number; y: number }, v: Velocity
 	let rolled = 0;
 	let px = b.x, py = b.y;
 	let blocked = false;
+	let struck: number | null = null;
+	let out = false;
 
 	/* Only THIS body's contacts count. StepResult flags any body: on the guest a synced boule could
 	   sit a hair above the ground, drop on the first step, and read as our boule landing at the
@@ -1624,11 +1628,11 @@ export function predictThrow(s: Sim, from: { x: number; y: number }, v: Velocity
 	for (let k = 0; k < PRED_MAX; k++) {
 		imp.length = 0;
 		stepSim(c, PRED_DT, imp);
-		if (!b.live) break;
+		if (!b.live) { out = !land; break; }
 		const hit = imp.some((e) => e.kind === 'boule' && mine(e, b.r + BOULE_R + 0.02));
 		if (!land) {
 			air.push(new THREE.Vector3(wx(b.x), b.z, wz(b.y)));
-			if (hit) { blocked = true; break; }
+			if (hit) { blocked = true; struck = nearestSide(c.bs, b); break; }
 			if (imp.some((e) => e.kind === 'ground' && mine(e, 0.25))) { land = new THREE.Vector3(wx(b.x), b.z - b.r, wz(b.y)); px = b.x; py = b.y; }
 			continue;
 		}
@@ -1637,7 +1641,27 @@ export function predictThrow(s: Sim, from: { x: number; y: number }, v: Velocity
 		roll.push(new THREE.Vector3(wx(b.x), b.z - b.r * 0.6, wz(b.y)));
 		if (rolled > PREVIEW_ROLL || speed2(b) === 0 || hit) break;
 	}
-	return { air, land, roll, blocked };
+	return { air, land, roll, blocked, struck, out };
+}
+
+/** The side of the live body nearest to `b`, edge to edge: the one it has just met. */
+function nearestSide(bs: Boule[], b: Boule): number | null {
+	let best = Infinity, side: number | null = null;
+	for (const o of bs) {
+		if (o === b || !o.live) continue;
+		const d = Math.sqrt((o.x - b.x) ** 2 + (o.y - b.y) ** 2) - o.r - b.r;
+		if (d < best) { best = d; side = o.side; }
+	}
+	return side;
+}
+
+/** The aim path's colour, as Pétanque Game draws it: green onto the jack or the other side's boule, orange
+ *  onto one of ours or off the pitch, plain otherwise. */
+export const PATH_PLAIN = 0xf1f3f5, PATH_HIT = 0x8ce99a, PATH_OUT = 0xffa94d;
+export function pathTint(p: Pick<ThrowPrediction, 'struck' | 'out'>, side: number): number {
+	if (p.out) return PATH_OUT;
+	if (p.struck === null) return PATH_PLAIN;
+	return p.struck === side ? PATH_OUT : PATH_HIT;
 }
 
 /**

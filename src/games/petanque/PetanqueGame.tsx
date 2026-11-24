@@ -14,7 +14,7 @@ import {
 import { planThrow, planJack, jackThrow, JACK_SPREAD_PLAYER, launch } from './ai';
 import { swayAt, swayAmp } from './sway';
 import {
-	buildPitch3D, bakeBouleEnv, makeBouleMesh, groundRing, groundLabel, makeMarker, makeHalo, arcMesh, predictThrow,
+	buildPitch3D, bakeBouleEnv, makeBouleMesh, groundRing, groundLabel, makeMarker, makeHalo, arcMesh, predictThrow, pathTint,
 	aimCamera, headCamera, topCamera, laneFrame, verticalFov, haloRadius, haloFloorFor, zoomWalk,
 	elevationForBoard, boardForElevation, addLights, makeFx, wx, wz, makeContactShadow, layFlat, makeMarks, sinkOf, MARK_SPEED,
 	HEAD_DIST_MIN, HEAD_DIST_MAX, HEAD_PITCH_MIN, HEAD_PITCH_MAX,
@@ -2707,7 +2707,8 @@ export default function PetanqueGame({ gameId, event, gameAd }: { gameId: string
 		const pred = predictThrow(s, from, v, (c) =>
 			place(c.t, asJack ? makeJack(from.x, from.y) : makeBoule(from.x, from.y, m.turn, c.kits?.[m.turn])));
 
-		const tint = pred.blocked ? 0xff6b6b : 0x8ce99a;
+		// What it meets first in the air colours the path (Pétanque Game): the player lets go as it shows.
+		const tint = pathTint(pred, m.turn);
 		arcPtsRef.current = pred.air;
 		g.arcAir = arcMesh(pred.air, tint, 0.022);
 		if (g.arcAir) g.scene.add(g.arcAir);
@@ -3804,7 +3805,8 @@ export default function PetanqueGame({ gameId, event, gameAd }: { gameId: string
 				<div ref={foeHandRef} className="pe-foe-hand" />
 				</div>
 
-				<div className={`pe-power${jackTime || over ? ' gone' : ''}`} style={padStyle} aria-hidden="true">
+				{/* The power, where no path shows it: in the throwing view the path's length is the range (Pétanque Game). */}
+				<div className={`pe-power${jackTime || over || view === 'jeu' ? ' gone' : ''}`} style={padStyle} aria-hidden="true">
 					<div className="pe-power-fill" style={{ width: `${Math.round(power * 100)}%` }} />
 				</div>
 
