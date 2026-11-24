@@ -1,11 +1,12 @@
 /* The shop's decor pictures: public/assets/jeux/petanque/decor/preview-<id>.webp, one per decor
-   (jardin, place, soir, port), taken from the game itself through the `__petanqueDecor` hook. Same
+   (jardin, place, soir, campagne, port), taken from the game itself through the `__petanqueDecor` hook. Same
    deal, same camera for all four, the HUD hidden. Each on a fresh page: the afternoon sun the day
    decors share is forced through `__petanqueSun`, which cannot be unset and would override the
    dusk light, and the camera drag adds to wherever the eye already is.
 
      node scripts/snap-petanque-decor.mjs            (dev server on port 4433)
-     PET_DECOR_OUT=D:/tmp node scripts/...           (also keep the full-size PNGs there) */
+     PET_DECOR_OUT=D:/tmp node scripts/...           (also keep the full-size PNGs there)
+     PET_DECOR_ONLY=campagne node scripts/...        (only these, comma-separated: the others keep their bytes) */
 import { chromium } from 'playwright';
 import sharp from 'sharp';
 import { startServer } from './preview-server.mjs';
@@ -13,7 +14,7 @@ import { startServer } from './preview-server.mjs';
 const PORT = 4433;
 const DIR = 'public/assets/jeux/petanque/decor';
 const KEEP = process.env.PET_DECOR_OUT || '';
-const ORDER = ['soir', 'place', 'port', 'jardin'];
+const ORDER = ['soir', 'place', 'campagne', 'port', 'jardin'].filter((id) => !process.env.PET_DECOR_ONLY || process.env.PET_DECOR_ONLY.split(',').includes(id));
 // Unity's afternoon sun (Scenery.cs): 38 deg up, from across the lane.
 const SUN = { el: 38, az: 170 };
 // The gaze lifted over the lane and turned a little toward the harbour's side, so the port's

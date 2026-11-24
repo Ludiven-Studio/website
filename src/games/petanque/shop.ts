@@ -103,6 +103,7 @@ export const CATALOG: ShopItem[] = [
 	{ id: 'decor_jardin', kind: 'decor', price: 0, decor: 'jardin' },
 	{ id: 'decor_place', kind: 'decor', price: 100, decor: 'place' },
 	{ id: 'decor_soir', kind: 'decor', price: 120, decor: 'soir' },
+	{ id: 'decor_campagne', kind: 'decor', price: 150, decor: 'campagne' },
 	{ id: 'decor_port', kind: 'decor', price: 180, decor: 'port' },
 ];
 
