@@ -64,6 +64,7 @@ export default defineConfig({
                 !page.includes('/jeux/petanque/test') &&
                 !page.includes('/jeux/eclats/test') &&
                 !page.includes('/dominoland/test') &&
+                !page.includes('/drone-battle/test') &&
                 !page.includes('/suivi-familial/') &&
                 !page.includes('/cap-etoile/test-') &&
                 !page.includes('/jeux/eclats/nuit') &&
@@ -104,6 +105,7 @@ export default defineConfig({
                     'jeux/petanque/test/**',
                     'jeux/eclats/test/**',
                     'dominoland/test/**',
+                    'drone-battle/test/**',
                     'rencontres/test/**',
                     'suivi-familial/**',
                     'cap-etoile/test-*/**',

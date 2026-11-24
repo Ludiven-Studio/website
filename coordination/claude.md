@@ -3948,3 +3948,16 @@
 - 00:49 : commité et poussé sur le relais du Producer (Raphaël : « c est bien live sur Apple », « oui j'ai publié ») :
   version.json de nino-rush et cette section seulement. Réservations libérées.. Statut : terminé. Réservations
   libérées.
+
+## 2026-11-24 — DroneBattle : page testeurs /drone-battle/test/ (session DroneBattle)
+- Statut : en cours (2026-11-24T17:35+01:00). Demande de l'utilisateur : « tu pourrais faire une page sur le site avec
+  un premier lien de téléchargement pour tester ? un peu comme dominoland » ; poussée seulement quand l'APK est en
+  ligne (choix de Raphaël)
+- Réservations actives : `src/pages/drone-battle/test.astro`, `astro.config.mjs` (2 lignes drone-battle/test).
+- Ressources : serveur de dev sur le port 4337 ; eslint, `astro check`. Build annoncé ici avant.
+- 17:38 : Page faite sur le modèle de Dominoland (lit builds/dronebattle/latest.json), avec une partie « Jouer en duel
+  » ; drone-battle/test ajouté au filtre du sitemap et aux exclusions de sw.js. eslint et astro check OK (0 erreur).
+  Commit sur la branche drone-battle-test du worktree website-worktrees/drone-battle-test, pas sur main : poussé quand
+  l'APK sera en ligne (choix de Raphaël). Réservations maintenues.
+- 01:11 : commité et poussé à la demande de l'utilisateur (APK dev 0.1.1 en ligne) : mes 2 fichiers et cette section
+  seulement. Statut : terminé. Réservations libérées.
