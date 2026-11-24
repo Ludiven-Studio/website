@@ -3923,3 +3923,17 @@
   et astro check OK (0 erreur).
 - 12:04 : commité et poussé sur le « publie » de Raphaël relayé par le Producer : src/data/ninoRush.ts et cette section
   seulement. Réservations libérées.. Statut : terminé. Réservations libérées.
+
+## 2026-11-24 — Nino Rush : pub maison au nouveau Nino (session NinoRush)
+- Statut : en cours (2026-11-24T14:43+01:00). Demande de l'utilisateur : Relais du Producer : « la pub de nino rush est
+  avec d'anciens graphs aussi » (Raphaël) ; rafraîchir l'entrée nino-rush du catalogue promo/v1 (icône, clips et cartes
+  de fin en 5 langues), push sur relais
+- Réservations actives : `public/promo/v1/catalog.json` (entrée nino-rush), `public/promo/v1/img/nino-rush*`,
+  `public/promo/v1/clips/nino-rush*`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 14:53 : Entrée nino-rush : icône style A (img/nino-rush-202611241352.png) et 5 clips filmés à nouveau sur les niveaux
+  refaits avec le Nino style A, carte de fin depuis le nouvel en-tête (NinoRush 2e389c9) ; anciens fichiers gardés pour
+  les catalogues en cache ; check-promo OK (5 entrées).
+- 14:53 : commité et poussé sur le relais du Producer (« la pub de nino rush est avec d'anciens graphs aussi ») :
+  catalog.json, l'image et les 5 clips de nino-rush, et cette section seulement. Statut : terminé. Réservations
+  libérées.

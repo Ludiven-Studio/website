@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated": "2026-11-14T07:59:00Z",
+  "updated": "2026-11-24T13:52:00Z",
   "rotationSeconds": 30,
   "defaultLanguage": "fr",
   "entries": [
@@ -179,13 +179,13 @@
         "de": "Nino, der Rote Panda, rast nach Hause",
         "it": "Nino il panda rosso corre verso la tana"
       },
-      "image": "img/nino-rush.png",
+      "image": "img/nino-rush-202611241352.png",
       "clips": {
-        "fr": "clips/nino-rush_fr-202611140759.mp4",
-        "en": "clips/nino-rush_en-202611140759.mp4",
-        "es": "clips/nino-rush_es-202611140759.mp4",
-        "de": "clips/nino-rush_de-202611140759.mp4",
-        "it": "clips/nino-rush_it-202611140759.mp4"
+        "fr": "clips/nino-rush_fr-202611241352.mp4",
+        "en": "clips/nino-rush_en-202611241352.mp4",
+        "es": "clips/nino-rush_es-202611241352.mp4",
+        "de": "clips/nino-rush_de-202611241352.mp4",
+        "it": "clips/nino-rush_it-202611241352.mp4"
       },
       "link": {
         "android": "com.ludivenstudio.ninorush",
