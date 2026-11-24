@@ -1188,14 +1188,14 @@ export default function RencontresApp({ lang = 'fr' }: { lang?: Lang }) {
 						Fonds de carte&nbsp;: <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>.
 						Regarder ne demande rien&nbsp;; publier, rejoindre ou signaler se fait dans{' '}
 						<a href={paths.app}>l'appli Pétanque Meet</a>.{' '}
-						<a href="/petanque-meet/confidentialite/">Ce qui est stocké</a> · <a href="/petanque-meet/cgu/">Conditions</a>.
+						<a href="/petanque-meet/confidentialite/">Politique de confidentialité</a> · <a href="/petanque-meet/cgu/">Conditions d'utilisation</a>.
 					</>,
 					<>
 						Base map: <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>.
 						Browsing asks for nothing; posting, joining or reporting happens in{' '}
 						<a href={paths.app}>the Pétanque Meet app</a>.{' '}
-						<a href="/en/petanque-meet/confidentialite/">What is stored</a> ·{' '}
-						<a href="/en/petanque-meet/cgu/">Terms</a>.
+						<a href="/en/petanque-meet/confidentialite/">Privacy policy</a> ·{' '}
+						<a href="/en/petanque-meet/cgu/">Terms of use</a>.
 					</>,
 				)}
 			</p>
