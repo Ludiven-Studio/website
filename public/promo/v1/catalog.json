@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated": "2026-11-25T09:04:24Z",
+  "updated": "2026-11-25T09:04:42Z",
   "rotationSeconds": 30,
   "defaultLanguage": "fr",
   "entries": [
@@ -44,7 +44,8 @@
         "com.ludivenstudio.ninorush"
       ],
       "weights": {
-        "com.ludivenstudio.petanquemeet": 1
+        "com.ludivenstudio.petanquemeet": 1,
+        "com.ludivenstudio.ninorush": 1
       }
     },
     {
@@ -86,7 +87,8 @@
         "com.ludivenstudio.petanquegame"
       ],
       "weights": {
-        "com.ludivenstudio.petanquemeet": 1
+        "com.ludivenstudio.petanquemeet": 1,
+        "com.ludivenstudio.ninorush": 1
       }
     },
     {
@@ -129,7 +131,8 @@
         "com.ludivenstudio.ninorush"
       ],
       "weights": {
-        "com.ludivenstudio.petanquemeet": 1
+        "com.ludivenstudio.petanquemeet": 1,
+        "com.ludivenstudio.ninorush": 1
       }
     },
     {
@@ -172,7 +175,8 @@
         "com.raphbenpro.petanquear"
       ],
       "weights": {
-        "com.ludivenstudio.petanquemeet": 1
+        "com.ludivenstudio.petanquemeet": 1,
+        "com.ludivenstudio.ninorush": 1
       }
     },
     {
@@ -215,7 +219,8 @@
         "com.raphbenpro.petanquear"
       ],
       "weights": {
-        "com.ludivenstudio.petanquemeet": 1
+        "com.ludivenstudio.petanquemeet": 1,
+        "com.ludivenstudio.ninorush": 1
       }
     }
   ]
