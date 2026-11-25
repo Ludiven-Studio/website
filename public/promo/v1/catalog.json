@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated": "2026-11-25T09:13:24Z",
+  "updated": "2026-11-25T09:52:47Z",
   "rotationSeconds": 30,
   "defaultLanguage": "fr",
   "entries": [
@@ -45,15 +45,9 @@
       ],
       "weights": {
         "com.ludivenstudio.petanquemeet": 1,
-        "com.ludivenstudio.ninorush": {
-          "android": 0,
-          "ios": 1
-        },
+        "com.ludivenstudio.ninorush": 0,
         "com.ludivenstudio.petanquegame": 1,
-        "com.ludivenstudio.dragonsgems": {
-          "android": 0,
-          "ios": 1
-        },
+        "com.ludivenstudio.dragonsgems": 0,
         "com.raphbenpro.petanquear": {
           "android": 2,
           "ios": 1
@@ -150,15 +144,9 @@
       ],
       "weights": {
         "com.ludivenstudio.petanquemeet": 2,
-        "com.ludivenstudio.ninorush": {
-          "android": 0,
-          "ios": 1
-        },
+        "com.ludivenstudio.ninorush": 0,
         "com.ludivenstudio.petanquegame": 1,
-        "com.ludivenstudio.dragonsgems": {
-          "android": 0,
-          "ios": 1
-        },
+        "com.ludivenstudio.dragonsgems": 0,
         "com.raphbenpro.petanquear": 1
       }
     },
@@ -256,5 +244,15 @@
         "com.raphbenpro.petanquear": 1
       }
     }
-  ]
+  ],
+  "mix": {
+    "*": {
+      "banner": {
+        "consent": 5
+      },
+      "interstitial": {
+        "consent": 5
+      }
+    }
+  }
 }
