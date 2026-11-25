@@ -38,7 +38,7 @@ function app(id, name, domain, [d1, d7, d28], extra) {
 }
 const ad = (id, show, tap) => ({ ad: id, show, tap, rate: show ? tap / show : null });
 const oc = (key, ok, fail = 0, cancel = 0, later = 0, mixed = 0, again = 0) => ({ key, ok, fail, mixed, cancel, later, other: 0, again });
-const outcomes = (split, failures = []) => ({ split, failures, read: 0, total: 0, partial: false });
+const outcomes = (split, failures = [], cancels = []) => ({ split, failures, cancels, read: 0, total: 0, partial: false });
 const fail = (key, reason, platform, build, count, version = '1.0.16', outcome = 'fail') => ({ key, outcome, reason, platform, build, version, count });
 const split = (platform, visitors, answers, opens = {}) => ({ platform, visitors, answers: counts(answers), opens: counts(opens) });
 const consent = (platforms, all) => ({
@@ -59,7 +59,11 @@ const OVERVIEW = {
 				fail('google', '', 'android', 'beta', 28, '1.0.14', 'mixed'), fail('google', 'native:12500', 'android', 'store', 12),
 				fail('google', 'no_token', 'android', 'beta', 9, '1.0.17'), fail('apple', 'no_session', 'ios', 'store', 3),
 			]),
-			buyOut: outcomes([oc('coins2', 12, 0, 2), oc('no_ads', 5, 0, 3, 0, 1), oc('coins1', 3, 1, 2), oc('coins3', 1, 0, 2)], [fail('no_ads', '', 'android', 'store', 1, '1.0.14', 'mixed'), fail('coins1', 'pending', 'ios', 'store', 1, '1.0.18')]),
+			buyOut: outcomes([oc('coins2', 12, 0, 2), oc('no_ads', 5, 0, 3, 0, 1), oc('coins1', 3, 1, 2), oc('coins3', 1, 0, 2)], [fail('no_ads', '', 'android', 'store', 1, '1.0.14', 'mixed'), fail('coins1', 'pending', 'ios', 'store', 1, '1.0.18')], [
+				fail('coins2', 'store_sheet', 'android', 'store', 1, '1.0.18', 'cancel'), fail('no_ads', 'usercancelled', 'android', 'store', 2, '1.0.17', 'cancel'),
+				fail('coins1', 'our_wait', 'ios', 'store', 2, '1.0.18', 'cancel'), fail('coins3', '', 'android', 'store', 2, '1.0.14', 'cancel'),
+				fail('no_ads', 'store_sheet', 'ios', 'store', 1, '1.0.18', 'cancel'), fail('coins2', 'store_sheet', 'android', 'beta', 1, '1.0.18', 'cancel'),
+			]),
 			ads: [ad('dragon-gems', 4120, 61), ad('nino-rush', 3890, 44), ad('petanque-meet', 2210, 52)], r1: 0.152, r7: 0.099,
 			consent: consent([split('android', 905, { yes: 212, no: 61 }, { yes: 2480, no: 690, unasked: 410 }), split('ios', 299, { yes: 48, no: 37 }, { yes: 610, no: 420, unasked: 95 })]),
 		}),

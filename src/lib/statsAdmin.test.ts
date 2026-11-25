@@ -134,6 +134,11 @@ const IAP_EVENTS: Record<string, unknown[]> = {
 		iap('2026-11-14T09:00:00Z', { item: 'coins_m', result: 'ok', store: 'play', test: 'no' }, 'iap_result', 's-d', 'com.ludivenstudio.petanquegame.beta'),
 	],
 	'w-meet': [
+		// A cancel with its reason (template, next versions), and a store's « UserCancelled » sent as a failure.
+		iap('2026-11-21T08:00:00Z', { item: 'hearts', result: 'cancel', reason: 'store_sheet', app_version: '1.1.6' }),
+		iap('2026-11-21T07:00:00Z', { item: 'hearts', result: 'cancel', reason: 'our_wait', app_version: '1.1.6' }),
+		iap('2026-11-21T06:00:00Z', { item: 'full', result: 'failed', reason: 'UserCancelled', app_version: '1.1.4' }),
+		iap('2026-11-21T05:00:00Z', { item: 'full', result: 'fail', reason: 'product_unavailable', app_version: '1.1.4' }),
 		iap('2026-11-20T08:00:00Z', { item: 'hearts', result: 'ok', store: 'dev', asked: 'yes' }),
 		iap('2026-11-18T12:00:00Z', { item: 'full', result: 'ok', store: 'play', asked: 'yes' }, 'iap_result', 's-a'),
 		iap('2026-11-19T12:00:00Z', { item: 'wardrobe', result: 'ok', store: 'play', test: 'no', app_version: '1.0.15-Beta3' }, 'iap_result', 's-b'),
@@ -308,8 +313,18 @@ describe('the stats-admin function', () => {
 		// No hostname leaves the function, only the build's kind.
 		expect(JSON.stringify(pg.signIn.outcomes)).not.toMatch(/ludivenstudio|s-x|e-2026/);
 		// Meet's list is empty: nothing to split, and no failure to look up in the event list.
-		expect(body.apps.find((a) => a.id === 'w-meet')!.signIn.outcomes).toEqual({ split: [], failures: [], read: 0, total: 0, partial: false });
-		expect(calls.some((c) => c.includes('w-meet/events?'))).toBe(false);
+		expect(body.apps.find((a) => a.id === 'w-meet')!.signIn.outcomes).toEqual({ split: [], failures: [], cancels: [], read: 0, total: 0, partial: false });
+		expect(calls.some((c) => c.includes('w-meet/events?') && c.includes('event=sign_in'))).toBe(false);
+	});
+
+	it('counts a store\'s « UserCancelled » as a cancel, and lists the cancels by reason', async () => {
+		const { fetchFn } = fakeUmami(3);
+		const body = await (await statsHandler({ env: ENV, isAdmin, cache: fakeCache(), fetch: fetchFn, now: () => NOW })(post({ action: 'overview' }))).json() as Overview;
+		const o = body.apps.find((a) => a.id === 'w-meet')!.purchases.outcomes!;
+		expect(o.split.find((s) => s.key === 'full')).toMatchObject({ ok: 1, fail: 1, cancel: 1 });
+		expect(o.split.find((s) => s.key === 'hearts')).toMatchObject({ ok: 1, cancel: 2 });
+		expect(o.failures).toEqual([{ key: 'full', outcome: 'fail', reason: 'product_unavailable', platform: '?', build: 'store', version: '1.1.4', count: 1 }]);
+		expect(o.cancels?.map((c) => [c.key, c.reason, c.version])).toEqual([['full', 'usercancelled', '1.1.4'], ['hearts', 'store_sheet', '1.1.6'], ['hearts', 'our_wait', '1.1.6']]);
 	});
 
 	it('reads a version from its first three numbers, and compares them as numbers', () => {

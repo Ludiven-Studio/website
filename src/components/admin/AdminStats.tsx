@@ -133,6 +133,44 @@ function Failures({ what, o, label }: { what: string; o: Outcomes | null | undef
 	);
 }
 
+// The cancel reasons the apps send (LudivenTools' template), and the store's own.
+const CANCEL_NAMES: Record<string, string> = {
+	store_sheet: 'fenêtre du store fermée', our_wait: 'attente abandonnée', usercancelled: 'fenêtre du store fermée', user_cancelled: 'fenêtre du store fermée',
+};
+
+/** The cancels by reason, platform and version, folded under the failures; only once some carry a reason. */
+function Cancels({ what, o, label }: { what: string; o: Outcomes | null | undefined; label: (key: string) => string }) {
+	const rows = o?.cancels ?? [];
+	if (!rows.some((c) => c.reason)) return null;
+	const n = o!.split.reduce((s, x) => s + x.cancel, 0);
+	return (
+		<details className="ak-fails ak-cancels">
+			<summary>{`Annulations ${what} : ${int.format(n)}, par raison`}</summary>
+			<div className="as-scroll">
+				<table className="ak-table ak-list">
+					<thead><tr><th scope="col">Quoi</th><th scope="col">Raison</th><th scope="col">Système</th><th scope="col">Version</th><th scope="col">Nombre</th></tr></thead>
+					<tbody>
+						{rows.map((c) => (
+							<tr key={`${c.key}|${c.reason}|${c.platform}|${c.build}|${c.version}`}>
+								<th scope="row">{label(c.key)}</th>
+								<td>{CANCEL_NAMES[c.reason] ? <>{CANCEL_NAMES[c.reason]} <code>{c.reason}</code></> : <code>{c.reason || 'non dite'}</code>}</td>
+								<td>{PLATFORM_NAMES[c.platform] ?? c.platform}</td>
+								<td>{`${c.version ?? '?'} · ${BUILD_NAMES[c.build] ?? c.build}`}</td>
+								<td>{int.format(c.count)}</td>
+							</tr>
+						))}
+					</tbody>
+				</table>
+			</div>
+			<Help>
+				store_sheet : le joueur a fermé la fenêtre de Google Play ou de l'App Store ; our_wait : il a quitté notre écran d'attente.
+				UserCancelled (anciennes versions de Pétanque Game, envoyé comme un échec) : compté ici comme une annulation. « Non dite » :
+				une version qui n'envoyait pas encore la raison.
+			</Help>
+		</details>
+	);
+}
+
 /** A table showing its first rows, the rest one tap away. */
 function ShortTable({ head, rows, more }: { head: string[]; rows: { key: string; muted?: boolean; cells: ReactNode[] }[]; more: (n: number) => string }) {
 	const [open, setOpen] = useState(false);
@@ -431,7 +469,9 @@ function AppCard({ app, catalog }: { app: AppStats; catalog: Catalog | null }) {
 				</section>
 			</div>
 			<Failures what="des achats" o={app.purchases.outcomes} label={productName} />
+			<Cancels what="des achats" o={app.purchases.outcomes} label={productName} />
 			<Failures what="des connexions" o={app.signIn.outcomes} label={provider} />
+			<Cancels what="des connexions" o={app.signIn.outcomes} label={provider} />
 			{app.ads !== null && app.ads.length > 0 && (
 				<section>
 					<h3>Pubs maison montrées ici <small>28 j</small></h3>

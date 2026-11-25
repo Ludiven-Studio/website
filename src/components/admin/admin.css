@@ -251,5 +251,7 @@ a.ah-tile:hover, a.ah-tile:focus-visible { box-shadow: 0 0 0 2px var(--sc-accent
 .ak-bars .ak-bar-note { grid-column: 2 / -1; margin-top: -0.3rem; color: var(--sc-muted); font-size: 0.75rem; }
 .ak-fails { margin-top: 0.6rem; font-size: var(--text-sm); }
 .ak-fails > summary { cursor: pointer; color: var(--st-bad); font-weight: 600; }
+.ak-cancels > summary { color: var(--st-warn); }
+.ak-cancels td code { display: block; }
 .ak-fails table { margin-top: 0.4rem; }
 .ak-fails code { font-size: 0.75rem; overflow-wrap: anywhere; }

@@ -174,6 +174,9 @@ const OUTCOMES = { ok: 'ok', success: 'ok', fail: 'fail', failed: 'fail', error:
 /** ok, fail, cancel, later, or other: the apps word the same outcome differently. */
 export const outcomeOf = (result) => OUTCOMES[String(result ?? '').toLowerCase()] ?? 'other';
 
+// The reason a store gives when the player closed its sheet: a cancel, whatever the result says.
+const USER_CANCEL = /^user_?cancel/;
+
 // Store builds that sent a closed Google or Apple sheet, or a cancelled purchase, as a failure: up to these versions
 // included, their fail reads « échoués ou annulés ». An event without a version stays a failure.
 export const NO_CANCEL = {
@@ -229,13 +232,16 @@ export async function readOutcomes(u, id, range, event, keyProp, { noCancelUpTo 
 			const props = eventProps(e);
 			const version = props.get('app_version') ?? '';
 			const base = baseVersion(version);
+			const reason = (props.get('reason') || props.get('error') || '').slice(0, 60);
 			let outcome = outcomeOf(props.get('result'));
-			if (outcome === 'fail' && noCancelUpTo && base && versionAtMost(base, noCancelUpTo)) outcome = 'mixed';
+			// A store that said the player cancelled (« UserCancelled », Pétanque Game up to 1.0.17) is a cancel.
+			if (outcome === 'fail' && USER_CANCEL.test(reason)) outcome = 'cancel';
+			else if (outcome === 'fail' && noCancelUpTo && base && versionAtMost(base, noCancelUpTo)) outcome = 'mixed';
 			found.push({
 				event: typeof e?.eventId === 'string' ? e.eventId : '',
 				key: (props.get(keyProp) || '?').slice(0, 40),
 				outcome,
-				reason: (props.get('reason') || props.get('error') || '').slice(0, 60),
+				reason,
 				version,
 				base: base ?? '?',
 				again: props.get('again') === 'yes',
@@ -250,7 +256,8 @@ export async function readOutcomes(u, id, range, event, keyProp, { noCancelUpTo 
 	// The hostname and OS of the failures only, from the event list (newest first, like the event-data list).
 	const meta = new Map();
 	const failed = (f) => f.outcome === 'fail' || f.outcome === 'mixed';
-	const wanted = new Set(found.filter((f) => failed(f) && f.event).map((f) => f.event));
+	const broken = (f) => failed(f) || f.outcome === 'cancel';
+	const wanted = new Set(found.filter((f) => broken(f) && f.event).map((f) => f.event));
 	for (let page = 1; page <= OUTCOME_PAGES && wanted.size > 0; page++) {
 		const data = rows(await u.get(`/websites/${id}/events?${query({ ...range, event, page, pageSize: OUTCOME_PAGE })}`));
 		for (const e of data) {
@@ -263,25 +270,29 @@ export async function readOutcomes(u, id, range, event, keyProp, { noCancelUpTo 
 
 	const split = new Map();
 	const failures = new Map();
+	const cancels = new Map();
 	for (const f of found) {
 		const s = split.get(f.key) ?? { key: f.key, ok: 0, fail: 0, mixed: 0, cancel: 0, later: 0, other: 0, again: 0 };
 		s[f.outcome]++;
 		split.set(f.key, s);
-		if (!failed(f)) continue;
+		if (!broken(f)) continue;
 		// « Réessayer » after a failure (again=yes, Pétanque Game from 1.0.18).
-		if (f.again) s.again++;
+		if (f.again && failed(f)) s.again++;
 		const m = meta.get(f.event);
 		const platform = m ? (osPlatform(m.os) ?? (m.os ? 'other' : '?')) : '?';
 		const build = buildOf(m?.host, f.version);
+		const into = failed(f) ? failures : cancels;
 		const k = `${f.key}|${f.outcome}|${f.reason}|${platform}|${build}|${f.base}`;
-		const row = failures.get(k) ?? { key: f.key, outcome: f.outcome, reason: f.reason, platform, build, version: f.base, count: 0 };
+		const row = into.get(k) ?? { key: f.key, outcome: f.outcome, reason: f.reason, platform, build, version: f.base, count: 0 };
 		row.count++;
-		failures.set(k, row);
+		into.set(k, row);
 	}
+	const byCount = (rows) => [...rows.values()].sort((a, b) => b.count - a.count || a.key.localeCompare(b.key)).slice(0, 40);
 	const sum = (s) => s.ok + s.fail + s.mixed + s.cancel + s.later + s.other;
 	return {
 		split: [...split.values()].sort((a, b) => sum(b) - sum(a) || a.key.localeCompare(b.key)),
-		failures: [...failures.values()].sort((a, b) => b.count - a.count || a.key.localeCompare(b.key)).slice(0, 40),
+		failures: byCount(failures),
+		cancels: byCount(cancels),
 		read: found.length,
 		total,
 		partial,

@@ -17,8 +17,9 @@ export type Outcome = 'ok' | 'fail' | 'mixed' | 'cancel' | 'later' | 'other';
 /** again: the failures followed by « Réessayer »; mixed and again are missing from a cache written before them. */
 export type OutcomeSplit = { key: string; mixed?: number; again?: number } & Record<Exclude<Outcome, 'mixed'>, number>;
 /** platform: android, ios, other or ? (unknown); build: store, dev, beta or ?; version: x.y.z or ?. */
-export interface Failure { key: string; outcome?: 'fail' | 'mixed'; reason: string; platform: string; build: string; version?: string; count: number }
-export interface Outcomes { split: OutcomeSplit[]; failures: Failure[]; read: number; total: number; partial: boolean }
+export interface Failure { key: string; outcome?: 'fail' | 'mixed' | 'cancel'; reason: string; platform: string; build: string; version?: string; count: number }
+/** cancels: the cancels by reason, platform and version; missing from a cache written before them. */
+export interface Outcomes { split: OutcomeSplit[]; failures: Failure[]; cancels?: Failure[]; read: number; total: number; partial: boolean }
 
 export interface AppStats {
 	id: string;
