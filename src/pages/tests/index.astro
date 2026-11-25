@@ -1,0 +1,278 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Icon from '../../components/Icon.astro';
+import { TEST_APPS } from '../../data/testBuilds';
+import { PROTOTYPES } from '../../data/prototypes';
+---
+
+<BaseLayout
+	title="Versions de test | Ludiven Studio"
+	description="Les versions de test Android des applis de Ludiven Studio et les prototypes, au même endroit."
+	noindex
+>
+	<div class="wrapper tests-page stack gap-8">
+		<header class="tests-head stack gap-2">
+			<h1>Versions de test</h1>
+			<p>
+				Les applis en cours de développement, à installer sur Android avant tout le monde. La plus récente en premier.
+				Chaque version s'installe par-dessus la précédente.
+			</p>
+		</header>
+
+		<ul class="tests-list" id="tests">
+			{
+				TEST_APPS.map((a, i) => (
+					<li class="test-card" data-latest={a.latest ?? undefined} data-order={i} style={`--app: ${a.color}`}>
+						<div class="test-top">
+							{a.icon ? (
+								<img class="test-icon" src={a.icon} alt="" width="56" height="56" loading="lazy" />
+							) : (
+								<span class="test-icon test-initials" aria-hidden="true">{a.initials}</span>
+							)}
+							<div class="stack">
+								<h2>{a.name}</h2>
+								<p class="test-tag">{a.tag}</p>
+							</div>
+						</div>
+						{a.apk ? (
+							<p class="test-meta">Version {a.apk.version}</p>
+						) : (
+							<>
+								<p class="test-meta" data-state="loading">Chargement de la dernière version…</p>
+								<p class="test-meta" data-state="ready" hidden>
+									Version <strong data-field="version" /> · <span data-field="date" />
+								</p>
+								<ul class="test-notes" data-state="ready" data-field="notes" hidden />
+								<p class="test-meta" data-state="error" hidden>Aucune version de test publiée pour l'instant.</p>
+							</>
+						)}
+						<div class="test-actions">
+							<a class="test-install" data-field="url" href={a.apk?.url ?? a.page} hidden={!a.apk}>
+								<Icon icon="mobile" size="1.1em" /> Installer
+							</a>
+							<a class="test-page-link" href={a.page}>
+								Page de test <Icon icon="arrow-right" size="1em" />
+							</a>
+						</div>
+					</li>
+				))
+			}
+		</ul>
+
+		<section class="tests-protos stack gap-4">
+			<h2>Prototypes</h2>
+			<p class="tests-lead">Des jeux à essayer dans le navigateur, encore en fabrication.</p>
+			<ul class="protos-mini">
+				{
+					PROTOTYPES.map((p) => (
+						<li>
+							<a href={p.href}>
+								<img src={p.cover} alt="" width="64" height="64" loading="lazy" />
+								<span>
+									<strong>{p.name}</strong>
+									<small>{p.tag}</small>
+								</span>
+							</a>
+						</li>
+					))
+				}
+			</ul>
+			<p><a href="/prototypes/">Tous les prototypes, avec leur description</a></p>
+		</section>
+	</div>
+</BaseLayout>
+
+<script>
+	import { readBetaBuild } from '../../lib/betaBuild';
+	import { newestFirst } from '../../lib/testHub';
+
+	const NOTES = 3;
+	const list = document.getElementById('tests');
+	const cards = [...(list?.querySelectorAll<HTMLElement>('.test-card') ?? [])];
+
+	async function fill(card: HTMLElement): Promise<{ card: HTMLElement; date: number | null }> {
+		const show = (state: string) => card.querySelectorAll<HTMLElement>('[data-state]').forEach((el) => (el.hidden = el.dataset.state !== state));
+		const field = (name: string) => card.querySelector<HTMLElement>(`[data-field="${name}"]`);
+		if (!card.dataset.latest) return { card, date: null };
+		try {
+			const res = await fetch(`${card.dataset.latest}?t=${Date.now()}`, { cache: 'no-store' });
+			if (!res.ok) throw new Error(String(res.status));
+			const b = readBetaBuild(await res.json());
+			if (!b) throw new Error('no build to offer');
+			field('version')!.textContent = b.version;
+			field('date')!.textContent = b.date ? b.date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : 'date inconnue';
+			field('notes')!.replaceChildren(...b.notes.slice(0, NOTES).map((n) => {
+				const li = document.createElement('li');
+				li.textContent = n;
+				return li;
+			}));
+			const install = field('url') as HTMLAnchorElement;
+			install.href = b.url;
+			install.hidden = false;
+			show('ready');
+			return { card, date: b.date?.getTime() ?? null };
+		} catch {
+			show('error');
+			return { card, date: null };
+		}
+	}
+
+	Promise.all(cards.map(fill)).then((done) => {
+		const order = newestFirst(done.map((d) => ({ ...d, order: Number(d.card.dataset.order) })));
+		list?.replaceChildren(...order.map((d) => d.card));
+	});
+</script>
+
+<style>
+	.tests-page {
+		align-items: center;
+	}
+	.tests-head {
+		text-align: center;
+		align-items: center;
+		max-width: 60ch;
+	}
+	.tests-head h1 {
+		font-size: var(--text-3xl);
+	}
+	.tests-head p,
+	.tests-lead,
+	.test-tag,
+	.test-meta {
+		color: var(--sc-muted);
+	}
+	.tests-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		width: 100%;
+		max-width: 56rem;
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 1fr));
+		gap: 1.25rem;
+	}
+	.test-card {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		padding: 1.25rem;
+		border: 1px solid var(--sc-line);
+		border-top: 4px solid var(--app);
+		border-radius: 1rem;
+		background: var(--sc-surface);
+	}
+	/* display rules would beat the hidden attribute. */
+	.test-card [hidden] {
+		display: none;
+	}
+	.test-top {
+		display: flex;
+		gap: 0.9rem;
+		align-items: center;
+	}
+	.test-icon {
+		width: 56px;
+		height: 56px;
+		flex: none;
+		border-radius: 14px;
+	}
+	.test-initials {
+		display: grid;
+		place-items: center;
+		background: var(--app);
+		color: #fff;
+		font-family: var(--font-brand);
+		font-weight: 700;
+		font-size: 1.2rem;
+	}
+	.test-card h2 {
+		font-size: var(--text-xl);
+		margin: 0;
+	}
+	.test-tag,
+	.test-meta {
+		font-size: var(--text-sm);
+		margin: 0;
+	}
+	.test-meta strong {
+		color: var(--sc-ink);
+	}
+	.test-notes {
+		margin: 0;
+		padding-inline-start: 1.1rem;
+		font-size: var(--text-sm);
+		display: grid;
+		gap: 0.3rem;
+	}
+	.test-actions {
+		margin-top: auto;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.6rem 1rem;
+		align-items: center;
+	}
+	.test-install {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		padding: 0.6rem 1.1rem;
+		border-radius: 999px;
+		background: var(--accent-regular);
+		color: var(--accent-text-over);
+		font-weight: 600;
+		text-decoration: none;
+	}
+	.test-install:hover,
+	.test-install:focus-visible {
+		background: var(--accent-dark);
+	}
+	.test-page-link {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+		font-size: var(--text-sm);
+	}
+	.tests-protos {
+		width: 100%;
+		max-width: 56rem;
+	}
+	.tests-protos h2 {
+		font-size: var(--text-2xl);
+	}
+	.protos-mini {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
+		gap: 0.75rem;
+	}
+	.protos-mini a {
+		display: flex;
+		gap: 0.75rem;
+		align-items: center;
+		padding: 0.6rem;
+		border: 1px solid var(--sc-line);
+		border-radius: 0.75rem;
+		background: var(--sc-surface);
+		text-decoration: none;
+		color: inherit;
+	}
+	.protos-mini a:hover,
+	.protos-mini a:focus-visible {
+		border-color: var(--sc-accent);
+	}
+	.protos-mini img {
+		width: 64px;
+		height: 64px;
+		border-radius: 0.5rem;
+		object-fit: cover;
+		flex: none;
+	}
+	.protos-mini span {
+		display: grid;
+	}
+	.protos-mini small {
+		color: var(--sc-muted);
+	}
+</style>

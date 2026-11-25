@@ -68,6 +68,7 @@ export default function AdminHome() {
 			href: '/admin/pubs/', title: 'Pubs maison', text: 'Le catalogue des applis et leurs poids.',
 			figure: ads === null ? undefined : ads, sub: ads === null ? undefined : `pub${ads > 1 ? 's' : ''} active${ads > 1 ? 's' : ''}`,
 		},
+		{ href: '/tests/', title: 'Versions de test', text: 'Les APK de test des applis et les prototypes, au même endroit.' },
 	];
 
 	return (

@@ -61,6 +61,7 @@ export default defineConfig({
                 !page.includes('/petanque-meet/test') &&
                 !page.includes('/petanque-scanner/test') &&
                 !page.includes('/prototypes') &&
+                !page.includes('/tests/') &&
                 !page.includes('/jeux/petanque/test') &&
                 !page.includes('/jeux/eclats/test') &&
                 !page.includes('/dominoland/test') &&
