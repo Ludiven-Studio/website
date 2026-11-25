@@ -238,3 +238,15 @@ a.ah-tile:hover, a.ah-tile:focus-visible { box-shadow: 0 0 0 2px var(--sc-accent
 .pa-root .pa-savebar--blocked .pa-savebar-note { color: var(--st-bad); }
 .pa-root .pa-savebar .pa-actions { margin-left: auto; }
 .pa-root .pw-table tbody th small.pw-flip { display: block; margin-left: 0; color: var(--st-warn); }
+/* /admin/stats/: a gauge split by outcome (ok in the app's colour, failed red, cancelled orange), its note under it,
+   and the failures' table folded below. */
+.ak-bar--parts { display: flex; gap: 2px; background: none; }
+.ak-part { flex: 1 1 0; min-width: 3px; height: 100%; border-radius: 999px; }
+.ak-part--fail { background: var(--st-bad); }
+.ak-part--cancel { background: var(--st-warn); }
+.ak-part--muted { background: color-mix(in srgb, var(--sc-muted) 45%, transparent); }
+.ak-bars .ak-bar-note { grid-column: 2 / -1; margin-top: -0.3rem; color: var(--sc-muted); font-size: 0.75rem; }
+.ak-fails { margin-top: 0.6rem; font-size: var(--text-sm); }
+.ak-fails > summary { cursor: pointer; color: var(--st-bad); font-weight: 600; }
+.ak-fails table { margin-top: 0.4rem; }
+.ak-fails code { font-size: 0.75rem; overflow-wrap: anywhere; }

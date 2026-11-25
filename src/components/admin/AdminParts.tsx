@@ -40,7 +40,9 @@ export function Tile({ label, value, sub }: { label: string; value: ReactNode; s
 	);
 }
 
-export interface Bar { key: string; label: string; value: number; color: string }
+/** A share of a bar: ok keeps the bar's colour, fail is red, cancel orange, muted grey. */
+export interface BarPart { value: number; tone: 'ok' | 'fail' | 'cancel' | 'muted' }
+export interface Bar { key: string; label: string; value: number; color: string; parts?: BarPart[]; note?: string }
 
 /** One labelled horizontal bar per row, longest first, the value written at the end. */
 export function Bars({ rows, format, empty = 'rien' }: { rows: Bar[]; format: (n: number) => string; empty?: string }) {
@@ -50,12 +52,19 @@ export function Bars({ rows, format, empty = 'rien' }: { rows: Bar[]; format: (n
 	return (
 		<ul className="ak-bars">
 			{shown.map((r) => (
-				<li key={r.key} title={`${r.label} : ${format(r.value)}`}>
+				<li key={r.key} title={`${r.label} : ${format(r.value)}${r.note ? ` (${r.note})` : ''}`}>
 					<span className="ak-bar-label">{r.label}</span>
 					<span className="ak-bar-track">
-						<span className="ak-bar" style={{ width: `${Math.max(2, (r.value / max) * 100)}%`, background: r.color }} />
+						{r.parts ? (
+							<span className="ak-bar ak-bar--parts" style={{ width: `${Math.max(2, (r.value / max) * 100)}%` }}>
+								{r.parts.filter((x) => x.value > 0).map((x) => (
+									<span key={x.tone} className={`ak-part ak-part--${x.tone}`} style={{ flexGrow: x.value, background: x.tone === 'ok' ? r.color : undefined }} />
+								))}
+							</span>
+						) : <span className="ak-bar" style={{ width: `${Math.max(2, (r.value / max) * 100)}%`, background: r.color }} />}
 					</span>
 					<strong>{format(r.value)}</strong>
+					{r.note && <small className="ak-bar-note">{r.note}</small>}
 				</li>
 			))}
 		</ul>

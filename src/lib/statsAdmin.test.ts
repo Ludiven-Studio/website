@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-	CACHE_KEY, PURCHASES_KEY, REVENUE_KEY, num, osPlatform, purchaseKind, readPurchase, readBoard, readRevenueRow, revenueRange, revenueSummary, readCounts, readHosts, readRetention, readStats, statsHandler, tapRates,
+	CACHE_KEY, OUTCOME_PAGE, OUTCOME_PAGES, PURCHASES_KEY, REVENUE_KEY, buildOf, num, osPlatform, outcomeOf, readOutcomes, purchaseKind, readPurchase, readBoard, readRevenueRow, revenueRange, revenueSummary, readCounts, readHosts, readRetention, readStats, statsHandler, tapRates,
 	type Board, type BoardRow, type Overview, type Purchases, type Revenue,
 } from '../../supabase/functions/_shared/statsAdmin.mjs';
 
@@ -72,17 +72,17 @@ function fakeUmami(version: 2 | 3, opts: { fail?: RegExp; loginFails?: boolean; 
 		if (path.endsWith('/event-data')) {
 			// Umami 3 only: each event with its properties, newest first, one page of events at a time.
 			if (version === 2) return new Response('{}', { status: 404 });
-			const all = ((opts.iapEvents ?? IAP_EVENTS)[site] ?? []) as { session?: string; host?: string }[];
+			const all = ((q.get('event') === 'sign_in' ? SIGN_EVENTS : opts.iapEvents ?? IAP_EVENTS)[site] ?? []) as { session?: string; host?: string; os?: string }[];
 			const size = Number(q.get('pageSize') ?? 20), page = Number(q.get('page') ?? 1);
 			// This list carries no session: drop the fake's own field.
-			return ok({ data: all.slice((page - 1) * size, page * size).map(({ session: _session, host: _host, ...e }) => e), count: all.length, page, pageSize: size });
+			return ok({ data: all.slice((page - 1) * size, page * size).map(({ session: _session, host: _host, os: _os, ...e }) => e), count: all.length, page, pageSize: size });
 		}
 		if (path.endsWith('/events')) {
 			if (version === 2) return new Response('{}', { status: 404 });
-			const all = ((opts.iapEvents ?? IAP_EVENTS)[site] ?? []) as { eventId: string; eventName: string; session?: string; host?: string }[];
+			const all = ((q.get('event') === 'sign_in' ? SIGN_EVENTS : opts.iapEvents ?? IAP_EVENTS)[site] ?? []) as { eventId: string; eventName: string; session?: string; host?: string; os?: string }[];
 			const size = Number(q.get('pageSize') ?? 20), page = Number(q.get('page') ?? 1);
 			const data = all.slice((page - 1) * size, page * size)
-				.map((e) => ({ id: e.eventId, websiteId: site, sessionId: e.session, visitId: `v-${e.session}`, hostname: e.host ?? 'com.ludivenstudio.app', eventName: e.eventName, country: 'FR', device: 'mobile' }));
+				.map((e) => ({ id: e.eventId, websiteId: site, sessionId: e.session, visitId: `v-${e.session}`, hostname: e.host ?? 'com.ludivenstudio.app', eventName: e.eventName, country: 'FR', device: 'mobile', os: e.os }));
 			return ok({ data, count: all.length, page, pageSize: size });
 		}
 		if (path === '/reports/retention') {
@@ -106,6 +106,19 @@ const iap = (at: string, props: Record<string, string>, eventName = 'iap_result'
 	websiteId: 'w', eventId: `e-${at}`, eventName, session, host,
 	eventProperties: Object.entries(props).map(([dataKey, stringValue]) => ({ dataKey, stringValue, numberValue: null, dateValue: null, dataType: 1, createdAt: at })),
 });
+/** A sign_in event, with the OS and hostname the event list gives. */
+const sign = (at: string, props: Record<string, string>, os: string, host = 'com.ludivenstudio.petanquegame') => ({ ...iap(at, props, 'sign_in', 's-x', host), os });
+const SIGN_EVENTS: Record<string, unknown[]> = {
+	'w-pg': [
+		sign('2026-11-19T10:00:00Z', { provider: 'google', result: 'ok' }, 'Android OS'),
+		sign('2026-11-19T09:00:00Z', { provider: 'google', result: 'fail', reason: 'native:12500' }, 'Android OS'),
+		sign('2026-11-19T08:00:00Z', { provider: 'google', result: 'fail', reason: 'native:12500' }, 'Android OS'),
+		sign('2026-11-18T08:00:00Z', { provider: 'google', result: 'fail', reason: 'native:12500' }, 'Android OS', 'com.ludivenstudio.petanquegame.dev'),
+		sign('2026-11-17T08:00:00Z', { provider: 'apple', result: 'cancel' }, 'iOS'),
+		sign('2026-11-16T08:00:00Z', { provider: 'apple', result: 'fail', reason: 'no_session' }, 'iOS', 'com.ludivenstudio.petanquegame.beta'),
+		sign('2026-11-15T08:00:00Z', { provider: 'google', result: 'later' }, 'Android OS'),
+	],
+};
 const IAP_EVENTS: Record<string, unknown[]> = {
 	'w-pg': [
 		iap('2026-11-19T10:00:00Z', { item: 'coins_s', result: 'ok', store: 'play', asked: 'yes', test: 'no' }, 'iap_result', 's-a'),
@@ -197,7 +210,11 @@ describe('the stats-admin function', () => {
 		expect(body.cached).toBe(false);
 		expect(body.apps.map((a) => a.name)).toEqual(['Pétanque Game', 'Pétanque Meet']);
 		const pg = body.apps[0];
-		expect(pg.errors).toEqual([]);
+		// Umami 2 has no event list: the outcomes are named as unread, the rest stays.
+		expect(pg.errors).toEqual(version === 2 ? [
+			'iap_result outcomes: Umami GET /websites/w-pg/event-data: 404',
+			'sign_in outcomes: Umami GET /websites/w-pg/event-data: 404',
+		] : []);
 		expect(pg.periods).toEqual({ d1: { visitors: 10, visits: 15, pageviews: 40 }, d7: { visitors: 70, visits: 105, pageviews: 280 }, d28: { visitors: 280, visits: 420, pageviews: 1120 } });
 		expect(pg.hosts?.[0]).toEqual({ host: 'com.ludivenstudio.petanquegame', visitors: 70, test: false });
 		expect(pg.ads).toEqual([
@@ -261,6 +278,63 @@ describe('the stats-admin function', () => {
 		expect(pg.ads).toBeNull();
 		expect(pg.errors).toEqual(['house_ad_tap.ad: Umami GET /websites/w-pg/event-data/values: 500']);
 		expect(pg.periods.d28?.visitors).toBe(280);
+	});
+
+	it('splits each product and provider by outcome, and breaks the failures down by reason, platform and build', async () => {
+		const { fetchFn, calls } = fakeUmami(3);
+		const body = await (await statsHandler({ env: ENV, isAdmin, cache: fakeCache(), fetch: fetchFn, now: () => NOW })(post({ action: 'overview' }))).json() as Overview;
+		const pg = body.apps.find((a) => a.id === 'w-pg')!;
+		expect(pg.signIn.outcomes?.split).toEqual([
+			{ key: 'google', ok: 1, fail: 3, cancel: 0, later: 1, other: 0 },
+			{ key: 'apple', ok: 0, fail: 1, cancel: 1, later: 0, other: 0 },
+		]);
+		expect(pg.signIn.outcomes?.failures).toEqual([
+			{ key: 'google', reason: 'native:12500', platform: 'android', build: 'store', count: 2 },
+			{ key: 'apple', reason: 'no_session', platform: 'ios', build: 'beta', count: 1 },
+			{ key: 'google', reason: 'native:12500', platform: 'android', build: 'dev', count: 1 },
+		]);
+		expect(pg.signIn.outcomes).toMatchObject({ read: 7, total: 7, partial: false });
+		// iap_tap is not a purchase outcome.
+		expect(pg.purchases.outcomes?.split.find((s) => s.key === 'no_ads')).toEqual({ key: 'no_ads', ok: 1, fail: 0, cancel: 1, later: 0, other: 0 });
+		expect(pg.purchases.outcomes?.read).toBe(5);
+		// No hostname leaves the function, only the build's kind.
+		expect(JSON.stringify(pg.signIn.outcomes)).not.toMatch(/ludivenstudio|s-x|e-2026/);
+		// Meet's list is empty: nothing to split, and no failure to look up in the event list.
+		expect(body.apps.find((a) => a.id === 'w-meet')!.signIn.outcomes).toEqual({ split: [], failures: [], read: 0, total: 0, partial: false });
+		expect(calls.some((c) => c.includes('w-meet/events?'))).toBe(false);
+	});
+
+	it('names the outcomes of the apps in plain kinds, and the build from its hostname', () => {
+		expect(['ok', 'success', 'FAIL', 'failed', 'error', 'cancel', 'canceled', 'cancelled', 'later', 'pending', undefined].map(outcomeOf))
+			.toEqual(['ok', 'ok', 'fail', 'fail', 'fail', 'cancel', 'cancel', 'cancel', 'later', 'other', 'other']);
+		expect(buildOf('com.ludivenstudio.petanquegame')).toBe('store');
+		expect(buildOf('com.ludivenstudio.petanquegame.dev')).toBe('dev');
+		expect(buildOf('com.ludivenstudio.petanquegame.beta')).toBe('beta');
+		expect(buildOf('com.ludivenstudio.petanquegame', '1.0.15-beta3')).toBe('beta');
+		expect(buildOf(undefined)).toBe('?');
+	});
+
+	it('stops at its page limit and says the count is partial; a failure without its event row is of unknown platform', async () => {
+		const total = OUTCOME_PAGE * OUTCOME_PAGES + 50;
+		const at = (i: number) => new Date(NOW.getTime() - i * 60_000).toISOString();
+		const all = Array.from({ length: total }, (_, i) => iap(at(i), { provider: 'google', result: i % 2 ? 'ok' : 'fail' }, 'sign_in'));
+		const asked: string[] = [];
+		const u = {
+			get: async (path: string) => {
+				asked.push(path);
+				const q = new URLSearchParams(path.split('?')[1]);
+				const size = Number(q.get('pageSize')), page = Number(q.get('page'));
+				const slice = all.slice((page - 1) * size, page * size);
+				return path.includes('/event-data?') ? { data: slice, count: total } : { data: [], count: total };
+			},
+		};
+		const out = await readOutcomes(u, 'w', { startAt: 0, endAt: 1 }, 'sign_in', 'provider');
+		expect(out).toMatchObject({ read: OUTCOME_PAGE * OUTCOME_PAGES, total, partial: true });
+		expect(out.split).toEqual([{ key: 'google', ok: 1000, fail: 1000, cancel: 0, later: 0, other: 0 }]);
+		expect(out.failures).toEqual([{ key: 'google', reason: '', platform: '?', build: '?', count: 1000 }]);
+		expect(asked.filter((a) => a.includes('/event-data?'))).toHaveLength(OUTCOME_PAGES);
+		// An empty event list ends the lookup at its first page.
+		expect(asked.filter((a) => a.includes('/events?'))).toHaveLength(1);
 	});
 
 	it('reads the ad consent answers and launch states, per platform through the OS filter', async () => {

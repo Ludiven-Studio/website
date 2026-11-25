@@ -12,6 +12,11 @@ export interface ConsentSplit { platform: ConsentPlatform; visitors: number; ans
 /** answers: ad_consent's result (yes, no); opens: app_open's ads (yes, no, unasked); null when the call failed.
  *  platforms: null when the app sends neither event, or Umami could not split them by OS. */
 export interface Consent { answers: Count[] | null; opens: Count[] | null; platforms: ConsentSplit[] | null }
+export type Outcome = 'ok' | 'fail' | 'cancel' | 'later' | 'other';
+export type OutcomeSplit = { key: string } & Record<Outcome, number>;
+/** platform: android, ios, other or ? (unknown); build: store, dev, beta or ?. */
+export interface Failure { key: string; reason: string; platform: string; build: string; count: number }
+export interface Outcomes { split: OutcomeSplit[]; failures: Failure[]; read: number; total: number; partial: boolean }
 
 export interface AppStats {
 	id: string;
@@ -20,8 +25,9 @@ export interface AppStats {
 	periods: { d1: Stats | null; d7: Stats | null; d28: Stats | null };
 	events: Count[] | null;
 	hosts: Host[] | null;
-	purchases: { items: Count[] | null; results: Count[] | null };
-	signIn: { providers: Count[] | null; results: Count[] | null };
+	/** outcomes: missing from a cache written before them, null when unread or without any result. */
+	purchases: { items: Count[] | null; results: Count[] | null; outcomes?: Outcomes | null };
+	signIn: { providers: Count[] | null; results: Count[] | null; outcomes?: Outcomes | null };
 	ads: AdRate[] | null;
 	retention: Retention | null;
 	/** Null when both consent reads failed; missing from figures cached before it. */
@@ -106,6 +112,17 @@ export function readRetention(raw: unknown): Retention | null;
 export function tapRates(shows: Count[], taps: Count[]): AdRate[];
 export function readHosts(counts: Count[]): Host[];
 export function osPlatform(os: string): ConsentPlatform | null;
+export const OUTCOME_PAGE: number;
+export const OUTCOME_PAGES: number;
+export function outcomeOf(result: unknown): Outcome;
+export function buildOf(hostname: string | undefined, appVersion?: string): 'store' | 'dev' | 'beta' | '?';
+export function readOutcomes(
+	u: { get: (path: string) => Promise<unknown> },
+	id: string,
+	range: { startAt: number; endAt: number },
+	event: string,
+	keyProp: string,
+): Promise<Outcomes>;
 export function readConsent(
 	values: (event: string, property: string, filters?: { os?: string }) => Promise<Count[] | null>,
 	osVisitors: Count[] | null,

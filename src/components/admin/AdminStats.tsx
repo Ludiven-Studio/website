@@ -2,13 +2,13 @@
 // catalogue online next to its shows and taps, Google Play's orders (sales reports) and the purchases the apps saw.
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import GoogleSignIn from './GoogleSignIn';
-import { COUNTED_KINDS, KINDS, PRODUCTS, STATS_LOCAL, STORES, StatsError, overview, playOrders, purchases, statsMessage, type AppStats, type Count, type Overview, type PlayOrders, type Purchases } from '../../lib/statsAdmin';
+import { COUNTED_KINDS, KINDS, PRODUCTS, STATS_LOCAL, STORES, StatsError, overview, playOrders, purchases, statsMessage, type AppStats, type Count, type Outcomes, type Overview, type PlayOrders, type Purchases } from '../../lib/statsAdmin';
 import { appColor } from '../../lib/appColors';
 import { consentTable, type ConsentRow } from '../../lib/adConsent';
 import { baseAppId, shares } from '../../lib/promoShares';
 import type { Catalog } from '../../../supabase/functions/_shared/promoRules.mjs';
 import { useAdminSession } from './useAdminSession';
-import { AppName, Bars, DayStack, Help, Meter, Pill, Tile, type DaySeries, type Tone } from './AdminParts';
+import { AppName, Bars, DayStack, Help, Meter, Pill, Tile, type Bar, type DaySeries, type Tone } from './AdminParts';
 
 const int = new Intl.NumberFormat('fr-FR');
 const pct = (x: number | null | undefined): string => (x == null ? '–' : `${(x * 100).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} %`);
@@ -16,8 +16,9 @@ const when = (iso: string): string => new Date(iso).toLocaleString('fr-FR', { da
 const short = (iso: string): string => new Date(iso).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 const SHOWN_MAX = 50;
 const SHOWN_FIRST = 6;
-const RESULT_NAMES: Record<string, string> = { ok: 'réussis', success: 'réussis', fail: 'échoués', failed: 'échoués', error: 'échoués', cancel: 'annulés', cancelled: 'annulés', canceled: 'annulés' };
+const RESULT_NAMES: Record<string, string> = { ok: 'réussis', success: 'réussis', fail: 'échoués', failed: 'échoués', error: 'échoués', cancel: 'annulés', cancelled: 'annulés', canceled: 'annulés', later: 'remis à plus tard' };
 const RESULT_TONE: Record<string, Tone> = { réussis: 'ok', annulés: 'warn', échoués: 'bad' };
+const PROVIDERS: Record<string, string> = { google: 'Google', apple: 'Apple' };
 const ORDER_STATUS: Record<string, [string, Tone]> = {
 	charged: ['payée', 'ok'], refund: ['remboursée', 'warn'], refunded: ['remboursée', 'warn'], 'partial refund': ['remboursée en partie', 'warn'], cancelled: ['annulée', 'bad'], canceled: ['annulée', 'bad'],
 };
@@ -46,6 +47,60 @@ function Outcomes({ rows }: { rows: Count[] | null }) {
 	const merged = merge(rows, RESULT_NAMES);
 	if (!merged.length) return null;
 	return <p className="ak-pills">{merged.map(([name, n]) => <Pill key={name} tone={RESULT_TONE[name] ?? 'plain'}>{`${int.format(n)} ${name}`}</Pill>)}</p>;
+}
+
+const plural = (n: number, word: string): string => `${int.format(n)} ${word}${n > 1 ? 's' : ''}`;
+
+/** One bar per item or provider, split by outcome; null when the outcomes are missing or cut by the page limit. */
+function outcomeBars(o: Outcomes | null | undefined, color: string, label: (key: string) => string): Bar[] | null {
+	if (!o || o.partial || !o.split.length) return null;
+	return o.split.map((s) => {
+		const note = [
+			s.fail && plural(s.fail, 'échoué'),
+			s.cancel && plural(s.cancel, 'annulé'),
+			s.later && `${int.format(s.later)} à plus tard`,
+			s.other && plural(s.other, 'autre'),
+		].filter(Boolean).join(' · ');
+		return {
+			key: s.key, label: label(s.key), value: s.ok + s.fail + s.cancel + s.later + s.other, color, note: note || undefined,
+			parts: [{ value: s.ok, tone: 'ok' }, { value: s.fail, tone: 'fail' }, { value: s.cancel, tone: 'cancel' }, { value: s.later + s.other, tone: 'muted' }],
+		};
+	});
+}
+
+const PLATFORM_NAMES: Record<string, string> = { android: 'Android', ios: 'iOS', other: 'autre', '?': '?' };
+const BUILD_NAMES: Record<string, string> = { store: 'store', dev: 'dev', beta: 'bêta', '?': '?' };
+
+/** The failures by reason, platform and build, folded under the gauges. */
+function Failures({ what, o, label }: { what: string; o: Outcomes | null | undefined; label: (key: string) => string }) {
+	if (!o?.failures.length) return null;
+	const fails = o.split.reduce((s, x) => s + x.fail, 0);
+	return (
+		<details className="ak-fails">
+			<summary>{`Échecs ${what} : ${int.format(fails)}, par raison`}</summary>
+			<div className="as-scroll">
+				<table className="ak-table ak-list">
+					<thead><tr><th scope="col">Quoi</th><th scope="col">Raison</th><th scope="col">Système</th><th scope="col">Version</th><th scope="col">Nombre</th></tr></thead>
+					<tbody>
+						{o.failures.map((f) => (
+							<tr key={`${f.key}|${f.reason}|${f.platform}|${f.build}`}>
+								<th scope="row">{label(f.key)}</th>
+								<td><code>{f.reason || 'non dite'}</code></td>
+								<td>{PLATFORM_NAMES[f.platform] ?? f.platform}</td>
+								<td>{BUILD_NAMES[f.build] ?? f.build}</td>
+								<td>{int.format(f.count)}</td>
+							</tr>
+						))}
+					</tbody>
+				</table>
+			</div>
+			{o.partial && <p className="as-muted">{`Compté sur les ${int.format(o.read)} plus récents sur ${int.format(o.total)}.`}</p>}
+			<Help>
+				Version : store, installée depuis Google Play ou l'App Store ; dev et bêta, nos versions de test. Système et version viennent de
+				la liste des événements d'Umami ; « ? » quand elle ne les donne pas.
+			</Help>
+		</details>
+	);
 }
 
 /** A table showing its first rows, the rest one tap away. */
@@ -301,7 +356,10 @@ function AppCard({ app, catalog }: { app: AppStats; catalog: Catalog | null }) {
 	const p = app.periods;
 	const color = appColor(app.name, app.domain);
 	const items = merge(app.purchases.items);
-	const providers = merge(app.signIn.providers, { google: 'Google', apple: 'Apple' });
+	const providers = merge(app.signIn.providers, PROVIDERS);
+	const provider = (key: string): string => PROVIDERS[key] ?? key;
+	const buyBars = outcomeBars(app.purchases.outcomes, color, productName);
+	const signBars = outcomeBars(app.signIn.outcomes, color, provider);
 	const test = app.hosts?.filter((h) => h.test) ?? [];
 	return (
 		<article className="pa-card ak-appcard" style={{ '--app': color } as CSSProperties}>
@@ -330,18 +388,20 @@ function AppCard({ app, catalog }: { app: AppStats; catalog: Catalog | null }) {
 				<section>
 					<h3>Achats <small>28 j, toutes issues</small></h3>
 					{app.purchases.items === null ? <p className="as-muted">indisponible</p> : (
-						<Bars format={(n) => int.format(n)} empty="aucun" rows={items.map(([key, n]) => ({ key, label: productName(key), value: n, color }))} />
+						<Bars format={(n) => int.format(n)} empty="aucun" rows={buyBars ?? items.map(([key, n]) => ({ key, label: productName(key), value: n, color }))} />
 					)}
 					<Outcomes rows={app.purchases.results} />
 				</section>
 				<section>
 					<h3>Connexions <small>28 j</small></h3>
 					{app.signIn.providers === null ? <p className="as-muted">indisponible</p> : (
-						<Bars format={(n) => int.format(n)} empty="aucune" rows={providers.map(([key, n]) => ({ key, label: key, value: n, color }))} />
+						<Bars format={(n) => int.format(n)} empty="aucune" rows={signBars ?? providers.map(([key, n]) => ({ key, label: key, value: n, color }))} />
 					)}
 					<Outcomes rows={app.signIn.results} />
 				</section>
 			</div>
+			<Failures what="des achats" o={app.purchases.outcomes} label={productName} />
+			<Failures what="des connexions" o={app.signIn.outcomes} label={provider} />
 			{app.ads !== null && app.ads.length > 0 && (
 				<section>
 					<h3>Pubs maison montrées ici <small>28 j</small></h3>

@@ -28,8 +28,8 @@ function app(id, name, domain, [d1, d7, d28], extra) {
 		id, name, domain,
 		periods: { d1: stats(d1, Math.round(d1 * 1.6)), d7: stats(d7, Math.round(d7 * 2.1)), d28: stats(d28, Math.round(d28 * 2.6)) },
 		events: [], hosts: extra.hosts ?? null,
-		purchases: { items: counts(extra.items ?? {}), results: counts(extra.results ?? {}) },
-		signIn: { providers: counts(extra.providers ?? {}), results: counts(extra.signins ?? {}) },
+		purchases: { items: counts(extra.items ?? {}), results: counts(extra.results ?? {}), outcomes: extra.buyOut ?? null },
+		signIn: { providers: counts(extra.providers ?? {}), results: counts(extra.signins ?? {}), outcomes: extra.signOut ?? null },
 		ads: extra.ads ?? [],
 		retention: { d1: { rate: extra.r1, visitors: Math.round(d28 * 0.7), cohorts: 27 }, d7: { rate: extra.r7, visitors: Math.round(d28 * 0.6), cohorts: 21 } },
 		consent: extra.consent ?? { answers: [], opens: [], platforms: null },
@@ -37,6 +37,9 @@ function app(id, name, domain, [d1, d7, d28], extra) {
 	};
 }
 const ad = (id, show, tap) => ({ ad: id, show, tap, rate: show ? tap / show : null });
+const oc = (key, ok, fail = 0, cancel = 0, later = 0) => ({ key, ok, fail, cancel, later, other: 0 });
+const outcomes = (split, failures = []) => ({ split, failures, read: 0, total: 0, partial: false });
+const fail = (key, reason, platform, build, count) => ({ key, reason, platform, build, count });
 const split = (platform, visitors, answers, opens = {}) => ({ platform, visitors, answers: counts(answers), opens: counts(opens) });
 const consent = (platforms, all) => ({
 	answers: counts(all ?? platforms.reduce((o, p) => { for (const c of p.answers) o[c.key] = (o[c.key] ?? 0) + c.count; return o; }, {})),
@@ -50,7 +53,12 @@ const OVERVIEW = {
 		app('pg', 'Pétanque Game', 'com.ludivenstudio.petanquegame', [182, 640, 1204], {
 			hosts: [{ host: 'com.ludivenstudio.petanquegame', visitors: 1180, test: false }, { host: 'com.ludivenstudio.petanquegame.dev', visitors: 24, test: true }],
 			items: { coins2: 14, no_ads: 9, coins1: 6, coins3: 3 }, results: { ok: 21, cancel: 9, fail: 2 },
-			providers: { google: 96, apple: 11 }, signins: { ok: 98, cancel: 7, fail: 2 },
+			providers: { google: 1290, apple: 48 }, signins: { ok: 597, cancel: 7, fail: 729, later: 5 },
+			signOut: outcomes([oc('google', 571, 712, 2, 5), oc('apple', 26, 17, 5)], [
+				fail('google', 'native:12500', 'android', 'store', 640), fail('google', 'no_token', 'android', 'store', 51),
+				fail('apple', 'no_session', 'ios', 'store', 17), fail('google', 'native:12501', 'android', 'beta', 12), fail('google', 'native:12500', 'android', 'dev', 9),
+			]),
+			buyOut: outcomes([oc('coins2', 12, 0, 2), oc('no_ads', 5, 1, 3), oc('coins1', 3, 1, 2), oc('coins3', 1, 0, 2)], [fail('no_ads', 'store_unavailable', 'android', 'store', 1), fail('coins1', 'pending', 'ios', 'store', 1)]),
 			ads: [ad('dragon-gems', 4120, 61), ad('nino-rush', 3890, 44), ad('petanque-meet', 2210, 52)], r1: 0.152, r7: 0.099,
 			consent: consent([split('android', 905, { yes: 212, no: 61 }, { yes: 2480, no: 690, unasked: 410 }), split('ios', 299, { yes: 48, no: 37 }, { yes: 610, no: 420, unasked: 95 })]),
 		}),
@@ -208,6 +216,8 @@ try {
 			// A full-page shot would paint the fixed tab bar in the middle of the page.
 			await page.addStyleTag({ content: 'astro-dev-toolbar, nav.tb { display: none !important; }' });
 			await page.waitForTimeout(800);
+			// SNAP_OPEN=1: the folded failure tables open.
+			if (process.env.SNAP_OPEN) await page.$$eval('details.ak-fails', (ds) => ds.forEach((d) => { d.open = true; }));
 			// SNAP_EDIT=1: two weights changed, then the screen as it is, the save bar at its bottom over the weights table.
 			const edit = !!process.env.SNAP_EDIT && (await page.locator('.pw-root:not(.pm-root) .pw-table input[type="number"]').count()) > 0;
 			if (edit) {

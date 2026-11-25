@@ -165,6 +165,98 @@ export async function readConsent(values, osVisitors, errors) {
 	return consent;
 }
 
+// The outcome of each purchase and sign-in, read event by event (Umami 3's event-data list): the gauges split by
+// outcome, and the failures by reason, platform and build. The event list gives each failure's hostname and OS.
+export const OUTCOME_PAGE = 100;
+export const OUTCOME_PAGES = 20;
+const OUTCOMES = { ok: 'ok', success: 'ok', fail: 'fail', failed: 'fail', error: 'fail', cancel: 'cancel', cancelled: 'cancel', canceled: 'cancel', later: 'later' };
+
+/** ok, fail, cancel, later, or other: the apps word the same outcome differently. */
+export const outcomeOf = (result) => OUTCOMES[String(result ?? '').toLowerCase()] ?? 'other';
+
+/** store, dev or beta from the build's hostname (a test build's id ends in .dev or .beta); ? without one. */
+export function buildOf(hostname, appVersion = '') {
+	if (/beta/i.test(appVersion) || /\.beta$/i.test(hostname ?? '')) return 'beta';
+	if (/\.dev$/i.test(hostname ?? '')) return 'dev';
+	return hostname ? 'store' : '?';
+}
+
+/** One event's properties, lowercased. */
+function eventProps(entry) {
+	const props = new Map();
+	for (const p of Array.isArray(entry?.eventProperties) ? entry.eventProperties : []) {
+		if (!p || typeof p.dataKey !== 'string') continue;
+		const v = p.stringValue ?? p.numberValue ?? p.value;
+		if (v != null) props.set(p.dataKey, str(v).toLowerCase());
+	}
+	return props;
+}
+
+/** One event's outcomes over the range, per value of keyProp (item, provider), and its failures by reason × key ×
+ *  platform × build. partial: more events than OUTCOME_PAGES pages, the newest only are counted. */
+export async function readOutcomes(u, id, range, event, keyProp) {
+	const found = [];
+	let total = 0;
+	let partial = false;
+	for (let page = 1; page <= OUTCOME_PAGES; page++) {
+		const body = await u.get(`/websites/${id}/event-data?${query({ ...range, event, page, pageSize: OUTCOME_PAGE })}`);
+		const data = rows(body);
+		for (const e of data) {
+			const name = e?.eventName ?? e?.event;
+			if (name !== undefined && name !== event) continue;
+			const props = eventProps(e);
+			found.push({
+				event: typeof e?.eventId === 'string' ? e.eventId : '',
+				key: (props.get(keyProp) || '?').slice(0, 40),
+				outcome: outcomeOf(props.get('result')),
+				reason: (props.get('reason') || props.get('error') || '').slice(0, 60),
+				version: props.get('app_version') ?? '',
+			});
+		}
+		const count = Number(body?.count);
+		total = Number.isFinite(count) ? count : found.length;
+		if (data.length < OUTCOME_PAGE || !Number.isFinite(count) || page * OUTCOME_PAGE >= count) break;
+		if (page === OUTCOME_PAGES) partial = true;
+	}
+
+	// The hostname and OS of the failures only, from the event list (newest first, like the event-data list).
+	const meta = new Map();
+	const wanted = new Set(found.filter((f) => f.outcome === 'fail' && f.event).map((f) => f.event));
+	for (let page = 1; page <= OUTCOME_PAGES && wanted.size > 0; page++) {
+		const data = rows(await u.get(`/websites/${id}/events?${query({ ...range, event, page, pageSize: OUTCOME_PAGE })}`));
+		for (const e of data) {
+			if (!e || !wanted.has(e.id)) continue;
+			meta.set(e.id, { host: typeof e.hostname === 'string' ? e.hostname : '', os: typeof e.os === 'string' ? e.os : '' });
+			wanted.delete(e.id);
+		}
+		if (data.length < OUTCOME_PAGE) break;
+	}
+
+	const split = new Map();
+	const failures = new Map();
+	for (const f of found) {
+		const s = split.get(f.key) ?? { key: f.key, ok: 0, fail: 0, cancel: 0, later: 0, other: 0 };
+		s[f.outcome]++;
+		split.set(f.key, s);
+		if (f.outcome !== 'fail') continue;
+		const m = meta.get(f.event);
+		const platform = m ? (osPlatform(m.os) ?? (m.os ? 'other' : '?')) : '?';
+		const build = buildOf(m?.host, f.version);
+		const k = `${f.key}|${f.reason}|${platform}|${build}`;
+		const row = failures.get(k) ?? { key: f.key, reason: f.reason, platform, build, count: 0 };
+		row.count++;
+		failures.set(k, row);
+	}
+	const sum = (s) => s.ok + s.fail + s.cancel + s.later + s.other;
+	return {
+		split: [...split.values()].sort((a, b) => sum(b) - sum(a) || a.key.localeCompare(b.key)),
+		failures: [...failures.values()].sort((a, b) => b.count - a.count || a.key.localeCompare(b.key)).slice(0, 40),
+		read: found.length,
+		total,
+		partial,
+	};
+}
+
 /** Everything the page shows for one Umami website; each failed call is named in `errors`. */
 export async function appStats(u, site, now) {
 	const errors = [];
@@ -213,6 +305,11 @@ export async function appStats(u, site, now) {
 		safe('os', async () => readCounts(await u.get(`/websites/${id}/metrics?${query({ ...range(28), type: 'os' })}`))),
 	]);
 	const consent = await readConsent(values, os, errors);
+	const some = (r) => (r ?? []).some((c) => c.count > 0);
+	const [purchaseOutcomes, signInOutcomes] = await Promise.all([
+		some(iapResult) ? safe('iap_result outcomes', () => readOutcomes(u, id, range(28), 'iap_result', 'item')) : null,
+		some(signResult) ? safe('sign_in outcomes', () => readOutcomes(u, id, range(28), 'sign_in', 'provider')) : null,
+	]);
 	return {
 		id: String(site.id),
 		name: String(site.name ?? site.domain ?? site.id),
@@ -220,8 +317,8 @@ export async function appStats(u, site, now) {
 		periods: { d1, d7, d28 },
 		events,
 		hosts: hostname ? readHosts(hostname) : null,
-		purchases: { items: iapItem, results: iapResult },
-		signIn: { providers: signProvider, results: signResult },
+		purchases: { items: iapItem, results: iapResult, outcomes: purchaseOutcomes },
+		signIn: { providers: signProvider, results: signResult, outcomes: signInOutcomes },
 		ads: adShow && adTap ? tapRates(adShow, adTap) : null,
 		retention,
 		consent,

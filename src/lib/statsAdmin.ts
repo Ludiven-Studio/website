@@ -8,7 +8,7 @@ import type { AppStoreSales, Rates } from '../../supabase/functions/_shared/appS
 
 export type { PlayOrder, PlayOrders, PlayTotal } from '../../supabase/functions/_shared/playSales.mjs';
 export type { AppStoreSale, AppStoreSales, Rates } from '../../supabase/functions/_shared/appStoreSales.mjs';
-export type { AppStats, Board, BoardApp, Consent, ConsentPlatform, ConsentSplit, Count, Overview, Purchase, PurchaseKind, Purchases, Revenue, RevenueApp, RevenueDay, RevenueNetwork } from '../../supabase/functions/_shared/statsAdmin.mjs';
+export type { AppStats, Board, BoardApp, Consent, ConsentPlatform, ConsentSplit, Count, Failure, Outcome, OutcomeSplit, Outcomes, Overview, Purchase, PurchaseKind, Purchases, Revenue, RevenueApp, RevenueDay, RevenueNetwork } from '../../supabase/functions/_shared/statsAdmin.mjs';
 
 const LOCAL = import.meta.env.PUBLIC_STATS_ADMIN_URL as string | undefined;
 export const STATS_URL = LOCAL || `${SUPABASE_URL}/functions/v1/stats-admin`;
