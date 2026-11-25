@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated": "2026-11-24T13:52:00Z",
+  "updated": "2026-11-25T09:04:24Z",
   "rotationSeconds": 30,
   "defaultLanguage": "fr",
   "entries": [
@@ -42,7 +42,10 @@
         "com.ludivenstudio.petanquemeet",
         "com.ludivenstudio.dragonsgems",
         "com.ludivenstudio.ninorush"
-      ]
+      ],
+      "weights": {
+        "com.ludivenstudio.petanquemeet": 1
+      }
     },
     {
       "id": "petanque-game",
@@ -81,7 +84,10 @@
       ],
       "hideIn": [
         "com.ludivenstudio.petanquegame"
-      ]
+      ],
+      "weights": {
+        "com.ludivenstudio.petanquemeet": 1
+      }
     },
     {
       "id": "petanque-scan",
@@ -121,7 +127,10 @@
         "com.raphbenpro.petanquear",
         "com.ludivenstudio.dragonsgems",
         "com.ludivenstudio.ninorush"
-      ]
+      ],
+      "weights": {
+        "com.ludivenstudio.petanquemeet": 1
+      }
     },
     {
       "id": "dragon-gems",
@@ -161,7 +170,10 @@
         "com.ludivenstudio.dragonsgems",
         "com.ludivenstudio.petanquemeet",
         "com.raphbenpro.petanquear"
-      ]
+      ],
+      "weights": {
+        "com.ludivenstudio.petanquemeet": 1
+      }
     },
     {
       "id": "nino-rush",
@@ -201,7 +213,10 @@
         "com.ludivenstudio.ninorush",
         "com.ludivenstudio.petanquemeet",
         "com.raphbenpro.petanquear"
-      ]
+      ],
+      "weights": {
+        "com.ludivenstudio.petanquemeet": 1
+      }
     }
   ]
 }
