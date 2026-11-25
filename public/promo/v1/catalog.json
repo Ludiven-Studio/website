@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated": "2026-11-25T09:08:09Z",
+  "updated": "2026-11-25T09:08:24Z",
   "rotationSeconds": 30,
   "defaultLanguage": "fr",
   "entries": [
@@ -47,7 +47,10 @@
         "com.ludivenstudio.petanquemeet": 1,
         "com.ludivenstudio.ninorush": 1,
         "com.ludivenstudio.petanquegame": 1,
-        "com.ludivenstudio.dragonsgems": 1,
+        "com.ludivenstudio.dragonsgems": {
+          "android": 0,
+          "ios": 1
+        },
         "com.raphbenpro.petanquear": {
           "android": 2,
           "ios": 1
@@ -152,7 +155,10 @@
         },
         "com.ludivenstudio.ninorush": 1,
         "com.ludivenstudio.petanquegame": 1,
-        "com.ludivenstudio.dragonsgems": 1,
+        "com.ludivenstudio.dragonsgems": {
+          "android": 0,
+          "ios": 1
+        },
         "com.raphbenpro.petanquear": 1
       }
     },
