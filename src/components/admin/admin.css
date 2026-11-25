@@ -244,6 +244,9 @@ a.ah-tile:hover, a.ah-tile:focus-visible { box-shadow: 0 0 0 2px var(--sc-accent
 .ak-part { flex: 1 1 0; min-width: 3px; height: 100%; border-radius: 999px; }
 .ak-part--fail { background: var(--st-bad); }
 .ak-part--cancel { background: var(--st-warn); }
+/* Failed or cancelled, from versions that sent both as a failure: the red, greyed. */
+.ak-part--mixed, .ak-mixed { --tone: color-mix(in srgb, var(--st-bad) 50%, var(--sc-muted)); }
+.ak-part--mixed { background: var(--tone); }
 .ak-part--muted { background: color-mix(in srgb, var(--sc-muted) 45%, transparent); }
 .ak-bars .ak-bar-note { grid-column: 2 / -1; margin-top: -0.3rem; color: var(--sc-muted); font-size: 0.75rem; }
 .ak-fails { margin-top: 0.6rem; font-size: var(--text-sm); }

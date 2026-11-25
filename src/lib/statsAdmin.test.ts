@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-	CACHE_KEY, OUTCOME_PAGE, OUTCOME_PAGES, PURCHASES_KEY, REVENUE_KEY, buildOf, num, osPlatform, outcomeOf, readOutcomes, purchaseKind, readPurchase, readBoard, readRevenueRow, revenueRange, revenueSummary, readCounts, readHosts, readRetention, readStats, statsHandler, tapRates,
+	CACHE_KEY, NO_CANCEL, OUTCOME_PAGE, OUTCOME_PAGES, PURCHASES_KEY, REVENUE_KEY, baseVersion, buildOf, num, versionAtMost, osPlatform, outcomeOf, readOutcomes, purchaseKind, readPurchase, readBoard, readRevenueRow, revenueRange, revenueSummary, readCounts, readHosts, readRetention, readStats, statsHandler, tapRates,
 	type Board, type BoardRow, type Overview, type Purchases, type Revenue,
 } from '../../supabase/functions/_shared/statsAdmin.mjs';
 
@@ -110,13 +110,17 @@ const iap = (at: string, props: Record<string, string>, eventName = 'iap_result'
 const sign = (at: string, props: Record<string, string>, os: string, host = 'com.ludivenstudio.petanquegame') => ({ ...iap(at, props, 'sign_in', 's-x', host), os });
 const SIGN_EVENTS: Record<string, unknown[]> = {
 	'w-pg': [
-		sign('2026-11-19T10:00:00Z', { provider: 'google', result: 'ok' }, 'Android OS'),
-		sign('2026-11-19T09:00:00Z', { provider: 'google', result: 'fail', reason: 'native:12500' }, 'Android OS'),
-		sign('2026-11-19T08:00:00Z', { provider: 'google', result: 'fail', reason: 'native:12500' }, 'Android OS'),
+		sign('2026-11-19T10:00:00Z', { provider: 'google', result: 'ok', app_version: '1.0.16' }, 'Android OS'),
+		sign('2026-11-19T09:00:00Z', { provider: 'google', result: 'fail', reason: 'native:12500', app_version: '1.0.16', again: 'yes' }, 'Android OS'),
+		sign('2026-11-19T08:00:00Z', { provider: 'google', result: 'fail', reason: 'native:12500', app_version: '1.0.16' }, 'Android OS'),
 		sign('2026-11-18T08:00:00Z', { provider: 'google', result: 'fail', reason: 'native:12500' }, 'Android OS', 'com.ludivenstudio.petanquegame.dev'),
-		sign('2026-11-17T08:00:00Z', { provider: 'apple', result: 'cancel' }, 'iOS'),
-		sign('2026-11-16T08:00:00Z', { provider: 'apple', result: 'fail', reason: 'no_session' }, 'iOS', 'com.ludivenstudio.petanquegame.beta'),
-		sign('2026-11-15T08:00:00Z', { provider: 'google', result: 'later' }, 'Android OS'),
+		sign('2026-11-17T08:00:00Z', { provider: 'apple', result: 'cancel', app_version: '1.0.16' }, 'iOS'),
+		sign('2026-11-16T08:00:00Z', { provider: 'apple', result: 'fail', reason: 'no_session', app_version: '1.0.15-beta3' }, 'iOS', 'com.ludivenstudio.petanquegame.beta'),
+		sign('2026-11-15T08:00:00Z', { provider: 'google', result: 'later', app_version: '1.0.16' }, 'Android OS'),
+		// Store builds without a cancel value: a closed sheet was sent as a failure.
+		sign('2026-11-14T08:00:00Z', { provider: 'google', result: 'fail', app_version: '1.0.14' }, 'Android OS'),
+		sign('2026-11-13T08:00:00Z', { provider: 'google', result: 'fail', app_version: '1.0.14' }, 'Android OS'),
+		sign('2026-11-12T08:00:00Z', { provider: 'apple', result: 'failed', app_version: '1.0.8' }, 'iOS'),
 	],
 };
 const IAP_EVENTS: Record<string, unknown[]> = {
@@ -284,24 +288,37 @@ describe('the stats-admin function', () => {
 		const { fetchFn, calls } = fakeUmami(3);
 		const body = await (await statsHandler({ env: ENV, isAdmin, cache: fakeCache(), fetch: fetchFn, now: () => NOW })(post({ action: 'overview' }))).json() as Overview;
 		const pg = body.apps.find((a) => a.id === 'w-pg')!;
+		// Up to 1.0.14, Pétanque Game's fail also covers a closed sheet; from 1.0.15 (beta included) it is a failure;
+		// an event without a version stays a failure.
 		expect(pg.signIn.outcomes?.split).toEqual([
-			{ key: 'google', ok: 1, fail: 3, cancel: 0, later: 1, other: 0 },
-			{ key: 'apple', ok: 0, fail: 1, cancel: 1, later: 0, other: 0 },
+			{ key: 'google', ok: 1, fail: 3, mixed: 2, cancel: 0, later: 1, other: 0, again: 1 },
+			{ key: 'apple', ok: 0, fail: 1, mixed: 1, cancel: 1, later: 0, other: 0, again: 0 },
 		]);
 		expect(pg.signIn.outcomes?.failures).toEqual([
-			{ key: 'google', reason: 'native:12500', platform: 'android', build: 'store', count: 2 },
-			{ key: 'apple', reason: 'no_session', platform: 'ios', build: 'beta', count: 1 },
-			{ key: 'google', reason: 'native:12500', platform: 'android', build: 'dev', count: 1 },
+			{ key: 'google', outcome: 'fail', reason: 'native:12500', platform: 'android', build: 'store', version: '1.0.16', count: 2 },
+			{ key: 'google', outcome: 'mixed', reason: '', platform: 'android', build: 'store', version: '1.0.14', count: 2 },
+			{ key: 'apple', outcome: 'fail', reason: 'no_session', platform: 'ios', build: 'beta', version: '1.0.15', count: 1 },
+			{ key: 'apple', outcome: 'mixed', reason: '', platform: 'ios', build: 'store', version: '1.0.8', count: 1 },
+			{ key: 'google', outcome: 'fail', reason: 'native:12500', platform: 'android', build: 'dev', version: '?', count: 1 },
 		]);
-		expect(pg.signIn.outcomes).toMatchObject({ read: 7, total: 7, partial: false });
+		expect(pg.signIn.outcomes).toMatchObject({ read: 10, total: 10, partial: false });
 		// iap_tap is not a purchase outcome.
-		expect(pg.purchases.outcomes?.split.find((s) => s.key === 'no_ads')).toEqual({ key: 'no_ads', ok: 1, fail: 0, cancel: 1, later: 0, other: 0 });
+		expect(pg.purchases.outcomes?.split.find((s) => s.key === 'no_ads')).toEqual({ key: 'no_ads', ok: 1, fail: 0, mixed: 0, cancel: 1, later: 0, other: 0, again: 0 });
 		expect(pg.purchases.outcomes?.read).toBe(5);
 		// No hostname leaves the function, only the build's kind.
 		expect(JSON.stringify(pg.signIn.outcomes)).not.toMatch(/ludivenstudio|s-x|e-2026/);
 		// Meet's list is empty: nothing to split, and no failure to look up in the event list.
 		expect(body.apps.find((a) => a.id === 'w-meet')!.signIn.outcomes).toEqual({ split: [], failures: [], read: 0, total: 0, partial: false });
 		expect(calls.some((c) => c.includes('w-meet/events?'))).toBe(false);
+	});
+
+	it('reads a version from its first three numbers, and compares them as numbers', () => {
+		expect(['1.0.14', '1.0.15-beta3', '1.0.14 (114)', ' 2.10.0', 'v1.0', '', undefined].map(baseVersion)).toEqual(['1.0.14', '1.0.15', '1.0.14', '2.10.0', null, null, null]);
+		expect(versionAtMost('1.0.8', '1.0.14')).toBe(true);
+		expect(versionAtMost('1.0.14', '1.0.14')).toBe(true);
+		expect(versionAtMost('1.0.15', '1.0.14')).toBe(false);
+		expect(versionAtMost('1.1.0', '1.0.17')).toBe(false);
+		expect(NO_CANCEL['com.ludivenstudio.petanquegame']).toEqual({ sign_in: '1.0.14', iap_result: '1.0.17' });
 	});
 
 	it('names the outcomes of the apps in plain kinds, and the build from its hostname', () => {
@@ -330,8 +347,8 @@ describe('the stats-admin function', () => {
 		};
 		const out = await readOutcomes(u, 'w', { startAt: 0, endAt: 1 }, 'sign_in', 'provider');
 		expect(out).toMatchObject({ read: OUTCOME_PAGE * OUTCOME_PAGES, total, partial: true });
-		expect(out.split).toEqual([{ key: 'google', ok: 1000, fail: 1000, cancel: 0, later: 0, other: 0 }]);
-		expect(out.failures).toEqual([{ key: 'google', reason: '', platform: '?', build: '?', count: 1000 }]);
+		expect(out.split).toEqual([{ key: 'google', ok: 1000, fail: 1000, mixed: 0, cancel: 0, later: 0, other: 0, again: 0 }]);
+		expect(out.failures).toEqual([{ key: 'google', outcome: 'fail', reason: '', platform: '?', build: '?', version: '?', count: 1000 }]);
 		expect(asked.filter((a) => a.includes('/event-data?'))).toHaveLength(OUTCOME_PAGES);
 		// An empty event list ends the lookup at its first page.
 		expect(asked.filter((a) => a.includes('/events?'))).toHaveLength(1);

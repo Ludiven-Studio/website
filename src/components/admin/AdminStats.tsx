@@ -52,42 +52,70 @@ function Outcomes({ rows }: { rows: Count[] | null }) {
 const plural = (n: number, word: string): string => `${int.format(n)} ${word}${n > 1 ? 's' : ''}`;
 
 /** One bar per item or provider, split by outcome; null when the outcomes are missing or cut by the page limit. */
+/** The outcomes read event by event, when they cover every event: else the page keeps Umami's totals. */
+const usable = (o: Outcomes | null | undefined): o is Outcomes => !!o && !o.partial && o.split.length > 0;
+
 function outcomeBars(o: Outcomes | null | undefined, color: string, label: (key: string) => string): Bar[] | null {
-	if (!o || o.partial || !o.split.length) return null;
+	if (!usable(o)) return null;
 	return o.split.map((s) => {
+		const mixed = s.mixed ?? 0;
+		const failed = [s.fail && plural(s.fail, 'échoué'), mixed && `${int.format(mixed)} échoué${mixed > 1 ? 's' : ''} ou annulé${mixed > 1 ? 's' : ''}`]
+			.filter(Boolean).join(' · ');
 		const note = [
-			s.fail && plural(s.fail, 'échoué'),
+			failed && (s.again ? `${failed} (dont ${int.format(s.again)} après « Réessayer »)` : failed),
 			s.cancel && plural(s.cancel, 'annulé'),
 			s.later && `${int.format(s.later)} à plus tard`,
 			s.other && plural(s.other, 'autre'),
 		].filter(Boolean).join(' · ');
 		return {
-			key: s.key, label: label(s.key), value: s.ok + s.fail + s.cancel + s.later + s.other, color, note: note || undefined,
-			parts: [{ value: s.ok, tone: 'ok' }, { value: s.fail, tone: 'fail' }, { value: s.cancel, tone: 'cancel' }, { value: s.later + s.other, tone: 'muted' }],
+			key: s.key, label: label(s.key), value: s.ok + s.fail + mixed + s.cancel + s.later + s.other, color, note: note || undefined,
+			parts: [
+				{ value: s.ok, tone: 'ok' }, { value: s.fail, tone: 'fail' }, { value: mixed, tone: 'mixed' },
+				{ value: s.cancel, tone: 'cancel' }, { value: s.later + s.other, tone: 'muted' },
+			],
 		};
 	});
+}
+
+/** The chips under the gauges from the outcomes read event by event, else from Umami's totals. */
+function OutcomeChips({ o, rows }: { o: Outcomes | null | undefined; rows: Count[] | null }) {
+	if (!usable(o)) return <Outcomes rows={rows} />;
+	const total = (k: 'ok' | 'fail' | 'mixed' | 'cancel' | 'later' | 'other') => o.split.reduce((s, x) => s + (x[k] ?? 0), 0);
+	const chips: [string, string, number, Tone][] = [
+		['réussi', 'réussis', total('ok'), 'ok'], ['échoué', 'échoués', total('fail'), 'bad'],
+		['échoué ou annulé', 'échoués ou annulés', total('mixed'), 'mixed'], ['annulé', 'annulés', total('cancel'), 'warn'],
+		['remis à plus tard', 'remis à plus tard', total('later'), 'plain'], ['autre', 'autres', total('other'), 'plain'],
+	];
+	return (
+		<p className="ak-pills">
+			{chips.filter(([, , n]) => n > 0).sort((a, b) => b[2] - a[2]).map(([one, many, n, tone]) => (
+				<Pill key={many} tone={tone} title={tone === 'mixed' ? 'Versions qui envoyaient une fenêtre fermée comme un échec' : undefined}>{`${int.format(n)} ${n > 1 ? many : one}`}</Pill>
+			))}
+		</p>
+	);
 }
 
 const PLATFORM_NAMES: Record<string, string> = { android: 'Android', ios: 'iOS', other: 'autre', '?': '?' };
 const BUILD_NAMES: Record<string, string> = { store: 'store', dev: 'dev', beta: 'bêta', '?': '?' };
 
-/** The failures by reason, platform and build, folded under the gauges. */
+/** The failures by outcome, reason, platform and version, folded under the gauges. */
 function Failures({ what, o, label }: { what: string; o: Outcomes | null | undefined; label: (key: string) => string }) {
 	if (!o?.failures.length) return null;
-	const fails = o.split.reduce((s, x) => s + x.fail, 0);
+	const fails = o.split.reduce((s, x) => s + x.fail + (x.mixed ?? 0), 0);
 	return (
 		<details className="ak-fails">
-			<summary>{`Échecs ${what} : ${int.format(fails)}, par raison`}</summary>
+			<summary>{`Échecs ${what} : ${int.format(fails)}, par raison et version`}</summary>
 			<div className="as-scroll">
 				<table className="ak-table ak-list">
-					<thead><tr><th scope="col">Quoi</th><th scope="col">Raison</th><th scope="col">Système</th><th scope="col">Version</th><th scope="col">Nombre</th></tr></thead>
+					<thead><tr><th scope="col">Quoi</th><th scope="col">Issue</th><th scope="col">Raison</th><th scope="col">Système</th><th scope="col">Version</th><th scope="col">Nombre</th></tr></thead>
 					<tbody>
 						{o.failures.map((f) => (
-							<tr key={`${f.key}|${f.reason}|${f.platform}|${f.build}`}>
+							<tr key={`${f.key}|${f.outcome}|${f.reason}|${f.platform}|${f.build}|${f.version}`}>
 								<th scope="row">{label(f.key)}</th>
+								<td>{f.outcome === 'mixed' ? <Pill tone="mixed">échoué ou annulé</Pill> : <Pill tone="bad">échoué</Pill>}</td>
 								<td><code>{f.reason || 'non dite'}</code></td>
 								<td>{PLATFORM_NAMES[f.platform] ?? f.platform}</td>
-								<td>{BUILD_NAMES[f.build] ?? f.build}</td>
+								<td>{`${f.version ?? '?'} · ${BUILD_NAMES[f.build] ?? f.build}`}</td>
 								<td>{int.format(f.count)}</td>
 							</tr>
 						))}
@@ -96,8 +124,10 @@ function Failures({ what, o, label }: { what: string; o: Outcomes | null | undef
 			</div>
 			{o.partial && <p className="as-muted">{`Compté sur les ${int.format(o.read)} plus récents sur ${int.format(o.total)}.`}</p>}
 			<Help>
-				Version : store, installée depuis Google Play ou l'App Store ; dev et bêta, nos versions de test. Système et version viennent de
-				la liste des événements d'Umami ; « ? » quand elle ne les donne pas.
+				« Échoué ou annulé » : une version qui envoyait aussi une fenêtre Google ou Apple fermée, ou un achat annulé, comme un
+				échec (Pétanque Game : connexions jusqu'à la 1.0.14, achats jusqu'à la 1.0.17). Version : le numéro de l'appli, puis
+				store (installée depuis Google Play ou l'App Store), dev ou bêta (nos versions de test). Système et store viennent de la
+				liste des événements d'Umami ; « ? » quand elle ne les donne pas.
 			</Help>
 		</details>
 	);
@@ -390,14 +420,14 @@ function AppCard({ app, catalog }: { app: AppStats; catalog: Catalog | null }) {
 					{app.purchases.items === null ? <p className="as-muted">indisponible</p> : (
 						<Bars format={(n) => int.format(n)} empty="aucun" rows={buyBars ?? items.map(([key, n]) => ({ key, label: productName(key), value: n, color }))} />
 					)}
-					<Outcomes rows={app.purchases.results} />
+					<OutcomeChips o={app.purchases.outcomes} rows={app.purchases.results} />
 				</section>
 				<section>
 					<h3>Connexions <small>28 j</small></h3>
 					{app.signIn.providers === null ? <p className="as-muted">indisponible</p> : (
 						<Bars format={(n) => int.format(n)} empty="aucune" rows={signBars ?? providers.map(([key, n]) => ({ key, label: key, value: n, color }))} />
 					)}
-					<Outcomes rows={app.signIn.results} />
+					<OutcomeChips o={app.signIn.outcomes} rows={app.signIn.results} />
 				</section>
 			</div>
 			<Failures what="des achats" o={app.purchases.outcomes} label={productName} />

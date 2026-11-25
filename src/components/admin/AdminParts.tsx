@@ -18,8 +18,8 @@ export function Help({ children, label = 'Comment lire' }: { children: ReactNode
 	);
 }
 
-export type Tone = 'ok' | 'warn' | 'bad' | 'plain';
-const ICON: Record<Tone, string> = { ok: '✓', warn: '!', bad: '✕', plain: '·' };
+export type Tone = 'ok' | 'warn' | 'bad' | 'mixed' | 'plain';
+const ICON: Record<Tone, string> = { ok: '✓', warn: '!', bad: '✕', mixed: '?', plain: '·' };
 
 export function Pill({ tone, children, title }: { tone: Tone; children: ReactNode; title?: string }) {
 	return (
@@ -40,8 +40,8 @@ export function Tile({ label, value, sub }: { label: string; value: ReactNode; s
 	);
 }
 
-/** A share of a bar: ok keeps the bar's colour, fail is red, cancel orange, muted grey. */
-export interface BarPart { value: number; tone: 'ok' | 'fail' | 'cancel' | 'muted' }
+/** A share of a bar: ok keeps the bar's colour, fail is red, mixed (failed or cancelled) grey-red, cancel orange, muted grey. */
+export interface BarPart { value: number; tone: 'ok' | 'fail' | 'mixed' | 'cancel' | 'muted' }
 export interface Bar { key: string; label: string; value: number; color: string; parts?: BarPart[]; note?: string }
 
 /** One labelled horizontal bar per row, longest first, the value written at the end. */

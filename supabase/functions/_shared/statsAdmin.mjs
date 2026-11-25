@@ -174,6 +174,27 @@ const OUTCOMES = { ok: 'ok', success: 'ok', fail: 'fail', failed: 'fail', error:
 /** ok, fail, cancel, later, or other: the apps word the same outcome differently. */
 export const outcomeOf = (result) => OUTCOMES[String(result ?? '').toLowerCase()] ?? 'other';
 
+// Store builds that sent a closed Google or Apple sheet, or a cancelled purchase, as a failure: up to these versions
+// included, their fail reads « échoués ou annulés ». An event without a version stays a failure.
+export const NO_CANCEL = {
+	'com.ludivenstudio.petanquegame': { sign_in: '1.0.14', iap_result: '1.0.17' },
+};
+
+const baseAppKey = (domain) => String(domain ?? '').toLowerCase().replace(/\.(dev|beta)$/, '');
+
+/** "1.0.14" from "1.0.14", "1.0.15-beta3" or "1.0.14 (114)"; null without one. */
+export function baseVersion(v) {
+	const m = /^(\d+)\.(\d+)\.(\d+)/.exec(String(v ?? '').trim());
+	return m ? `${Number(m[1])}.${Number(m[2])}.${Number(m[3])}` : null;
+}
+
+/** a <= b, both "x.y.z". */
+export function versionAtMost(a, b) {
+	const x = a.split('.').map(Number), y = b.split('.').map(Number);
+	for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] < y[i];
+	return true;
+}
+
 /** store, dev or beta from the build's hostname (a test build's id ends in .dev or .beta); ? without one. */
 export function buildOf(hostname, appVersion = '') {
 	if (/beta/i.test(appVersion) || /\.beta$/i.test(hostname ?? '')) return 'beta';
@@ -193,8 +214,9 @@ function eventProps(entry) {
 }
 
 /** One event's outcomes over the range, per value of keyProp (item, provider), and its failures by reason × key ×
- *  platform × build. partial: more events than OUTCOME_PAGES pages, the newest only are counted. */
-export async function readOutcomes(u, id, range, event, keyProp) {
+ *  platform × build × version. partial: more events than OUTCOME_PAGES pages, the newest only are counted.
+ *  noCancelUpTo: the last version whose fail also covers a cancel (« mixed »). */
+export async function readOutcomes(u, id, range, event, keyProp, { noCancelUpTo } = {}) {
 	const found = [];
 	let total = 0;
 	let partial = false;
@@ -205,12 +227,18 @@ export async function readOutcomes(u, id, range, event, keyProp) {
 			const name = e?.eventName ?? e?.event;
 			if (name !== undefined && name !== event) continue;
 			const props = eventProps(e);
+			const version = props.get('app_version') ?? '';
+			const base = baseVersion(version);
+			let outcome = outcomeOf(props.get('result'));
+			if (outcome === 'fail' && noCancelUpTo && base && versionAtMost(base, noCancelUpTo)) outcome = 'mixed';
 			found.push({
 				event: typeof e?.eventId === 'string' ? e.eventId : '',
 				key: (props.get(keyProp) || '?').slice(0, 40),
-				outcome: outcomeOf(props.get('result')),
+				outcome,
 				reason: (props.get('reason') || props.get('error') || '').slice(0, 60),
-				version: props.get('app_version') ?? '',
+				version,
+				base: base ?? '?',
+				again: props.get('again') === 'yes',
 			});
 		}
 		const count = Number(body?.count);
@@ -221,7 +249,8 @@ export async function readOutcomes(u, id, range, event, keyProp) {
 
 	// The hostname and OS of the failures only, from the event list (newest first, like the event-data list).
 	const meta = new Map();
-	const wanted = new Set(found.filter((f) => f.outcome === 'fail' && f.event).map((f) => f.event));
+	const failed = (f) => f.outcome === 'fail' || f.outcome === 'mixed';
+	const wanted = new Set(found.filter((f) => failed(f) && f.event).map((f) => f.event));
 	for (let page = 1; page <= OUTCOME_PAGES && wanted.size > 0; page++) {
 		const data = rows(await u.get(`/websites/${id}/events?${query({ ...range, event, page, pageSize: OUTCOME_PAGE })}`));
 		for (const e of data) {
@@ -235,19 +264,21 @@ export async function readOutcomes(u, id, range, event, keyProp) {
 	const split = new Map();
 	const failures = new Map();
 	for (const f of found) {
-		const s = split.get(f.key) ?? { key: f.key, ok: 0, fail: 0, cancel: 0, later: 0, other: 0 };
+		const s = split.get(f.key) ?? { key: f.key, ok: 0, fail: 0, mixed: 0, cancel: 0, later: 0, other: 0, again: 0 };
 		s[f.outcome]++;
 		split.set(f.key, s);
-		if (f.outcome !== 'fail') continue;
+		if (!failed(f)) continue;
+		// « Réessayer » after a failure (again=yes, Pétanque Game from 1.0.18).
+		if (f.again) s.again++;
 		const m = meta.get(f.event);
 		const platform = m ? (osPlatform(m.os) ?? (m.os ? 'other' : '?')) : '?';
 		const build = buildOf(m?.host, f.version);
-		const k = `${f.key}|${f.reason}|${platform}|${build}`;
-		const row = failures.get(k) ?? { key: f.key, reason: f.reason, platform, build, count: 0 };
+		const k = `${f.key}|${f.outcome}|${f.reason}|${platform}|${build}|${f.base}`;
+		const row = failures.get(k) ?? { key: f.key, outcome: f.outcome, reason: f.reason, platform, build, version: f.base, count: 0 };
 		row.count++;
 		failures.set(k, row);
 	}
-	const sum = (s) => s.ok + s.fail + s.cancel + s.later + s.other;
+	const sum = (s) => s.ok + s.fail + s.mixed + s.cancel + s.later + s.other;
 	return {
 		split: [...split.values()].sort((a, b) => sum(b) - sum(a) || a.key.localeCompare(b.key)),
 		failures: [...failures.values()].sort((a, b) => b.count - a.count || a.key.localeCompare(b.key)).slice(0, 40),
@@ -306,9 +337,10 @@ export async function appStats(u, site, now) {
 	]);
 	const consent = await readConsent(values, os, errors);
 	const some = (r) => (r ?? []).some((c) => c.count > 0);
+	const noCancel = Object.hasOwn(NO_CANCEL, baseAppKey(site.domain)) ? NO_CANCEL[baseAppKey(site.domain)] : undefined;
 	const [purchaseOutcomes, signInOutcomes] = await Promise.all([
-		some(iapResult) ? safe('iap_result outcomes', () => readOutcomes(u, id, range(28), 'iap_result', 'item')) : null,
-		some(signResult) ? safe('sign_in outcomes', () => readOutcomes(u, id, range(28), 'sign_in', 'provider')) : null,
+		some(iapResult) ? safe('iap_result outcomes', () => readOutcomes(u, id, range(28), 'iap_result', 'item', { noCancelUpTo: noCancel?.iap_result })) : null,
+		some(signResult) ? safe('sign_in outcomes', () => readOutcomes(u, id, range(28), 'sign_in', 'provider', { noCancelUpTo: noCancel?.sign_in })) : null,
 	]);
 	return {
 		id: String(site.id),

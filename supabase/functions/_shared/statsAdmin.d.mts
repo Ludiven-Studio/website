@@ -12,10 +12,12 @@ export interface ConsentSplit { platform: ConsentPlatform; visitors: number; ans
 /** answers: ad_consent's result (yes, no); opens: app_open's ads (yes, no, unasked); null when the call failed.
  *  platforms: null when the app sends neither event, or Umami could not split them by OS. */
 export interface Consent { answers: Count[] | null; opens: Count[] | null; platforms: ConsentSplit[] | null }
-export type Outcome = 'ok' | 'fail' | 'cancel' | 'later' | 'other';
-export type OutcomeSplit = { key: string } & Record<Outcome, number>;
-/** platform: android, ios, other or ? (unknown); build: store, dev, beta or ?. */
-export interface Failure { key: string; reason: string; platform: string; build: string; count: number }
+/** mixed: a fail from a version that had no cancel value, so a failure or a closed sheet. */
+export type Outcome = 'ok' | 'fail' | 'mixed' | 'cancel' | 'later' | 'other';
+/** again: the failures followed by « Réessayer »; mixed and again are missing from a cache written before them. */
+export type OutcomeSplit = { key: string; mixed?: number; again?: number } & Record<Exclude<Outcome, 'mixed'>, number>;
+/** platform: android, ios, other or ? (unknown); build: store, dev, beta or ?; version: x.y.z or ?. */
+export interface Failure { key: string; outcome?: 'fail' | 'mixed'; reason: string; platform: string; build: string; version?: string; count: number }
 export interface Outcomes { split: OutcomeSplit[]; failures: Failure[]; read: number; total: number; partial: boolean }
 
 export interface AppStats {
@@ -114,7 +116,10 @@ export function readHosts(counts: Count[]): Host[];
 export function osPlatform(os: string): ConsentPlatform | null;
 export const OUTCOME_PAGE: number;
 export const OUTCOME_PAGES: number;
-export function outcomeOf(result: unknown): Outcome;
+export function outcomeOf(result: unknown): Exclude<Outcome, 'mixed'>;
+export const NO_CANCEL: Record<string, { sign_in?: string; iap_result?: string }>;
+export function baseVersion(v: unknown): string | null;
+export function versionAtMost(a: string, b: string): boolean;
 export function buildOf(hostname: string | undefined, appVersion?: string): 'store' | 'dev' | 'beta' | '?';
 export function readOutcomes(
 	u: { get: (path: string) => Promise<unknown> },
@@ -122,6 +127,7 @@ export function readOutcomes(
 	range: { startAt: number; endAt: number },
 	event: string,
 	keyProp: string,
+	opts?: { noCancelUpTo?: string },
 ): Promise<Outcomes>;
 export function readConsent(
 	values: (event: string, property: string, filters?: { os?: string }) => Promise<Count[] | null>,
