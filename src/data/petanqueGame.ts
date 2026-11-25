@@ -46,7 +46,7 @@ const perLang = (f: (l: LandingLang) => string) =>
 /** The Play feature graphic, its strapline painted in each language. */
 const HEROES = perLang((l) => `${A}/feature-${l}.webp`);
 const OG_IMAGES = perLang((l) => `/assets/work/og/petanque-game${l === 'fr' ? '' : `-${l}`}.jpg`);
-/** The Play store visuals, captioned in each language: aim, point, teams, online, settings, boules, leagues, rules. */
+/** The Play store visuals, captioned in each language: aim, online, cove, point, shooting challenge, leagues, boules, settings. */
 const SCREENS = Object.fromEntries(
 	langs.map((l) => [l, [1, 2, 3, 4, 5, 6, 7, 8].map((n) => `${A}/screen-0${n}-${l}.webp`)]),
 ) as Record<LandingLang, string[]>;
@@ -64,53 +64,53 @@ function typoFr<T>(v: T): T {
 const SHOTS: Record<LandingLang, string[]> = {
 	fr: [
 		'La vraie pétanque en 3D : roulette, demi-portée, portée, plombée',
-		'Le point au centimètre : des cercles autour du bouchon',
-		'Seul ou en équipe : tête-à-tête, doublette ou triplette',
-		'Joue en ligne : avec un ami, ou en partie classée',
-		'Quatre décors de Provence : choisis où tu joues',
+		'Joue en ligne : un toucher pour trouver un adversaire',
+		'La crique au couchant : un décor de prestige au bord de la mer',
+		'Le point au millimètre : des cercles autour du bouchon',
+		'Le défi de tir du jour : des pièces pour les meilleurs',
+		'Ligues et coupes : 28 coupes, de Bronze à Platine',
 		'Des boules de caractère : poids, diamètre, dureté, 14 modèles',
-		'Ligues et coupes : de Bronze à Diamant, gagne des trophées',
-		'Les règles en images : six pages pour bien débuter',
+		'Six décors au choix : du village à la crique',
 	],
 	en: [
 		'Real pétanque in 3D: roll, half lob, lob or high lob',
-		'Every centimetre counts: distance rings around the jack',
-		'Solo or in teams: singles, doubles or triples',
-		'Play online: with a friend, or in ranked matches',
-		'Four settings in Provence: choose where you play',
+		'Play online: one tap to find an opponent',
+		'The cove at sunset: a prestige place by the sea',
+		'Every millimetre counts: distance rings around the jack',
+		"Today's shooting challenge: coins for the best shooters",
+		'Leagues and cups: 28 cups, from Bronze to Platinum',
 		'Boules with character: weight, size, hardness, 14 models',
-		'Leagues and cups: from Bronze to Diamond, win trophies',
-		'The rules in pictures: six pages to get started',
+		'Six places to play: from the village to the cove',
 	],
 	es: [
 		'Petanca de verdad en 3D: rodada, medio lob, lob o lob alto',
-		'Cada centímetro cuenta: círculos de distancia al boliche',
-		'Solo o en equipo: individual, dupletas o tripletas',
-		'Juega en línea: con un amigo o en partidas clasificadas',
-		'Cuatro escenarios de Provenza: elige dónde juegas',
+		'Juega en línea: un toque para encontrar rival',
+		'La cala al atardecer: un escenario de prestigio junto al mar',
+		'Cada milímetro cuenta: círculos de distancia al boliche',
+		'El desafío de tiro del día: monedas para los mejores',
+		'Ligas y copas: 28 copas, de Bronce a Platino',
 		'Bolas con carácter: peso, diámetro, dureza, 14 modelos',
-		'Ligas y copas: de Bronce a Diamante, gana trofeos',
-		'Las reglas en imágenes: seis páginas para empezar',
+		'Seis escenarios a elegir: del pueblo a la cala',
 	],
 	de: [
 		'Echtes Boule in 3D: Rollen, halber Lob, Lob, hoher Lob',
-		'Jeder Zentimeter zählt: Abstandskreise um die Zielkugel',
-		'Allein oder im Team: Tête-à-tête, Doublette, Triplette',
-		'Spiel online: mit Freunden oder in gewerteten Partien',
-		'Vier Schauplätze der Provence: Wähle, wo du spielst',
+		'Spiel online: mit einem Tipp einen Gegner finden',
+		'Die Bucht bei Sonnenuntergang: ein Prestige-Schauplatz am Meer',
+		'Jeder Millimeter zählt: Abstandskreise um die Zielkugel',
+		'Die Schuss-Challenge des Tages: Münzen für die Besten',
+		'Ligen und Pokale: 28 Pokale, von Bronze bis Platin',
 		'Kugeln mit Charakter: Gewicht, Größe, Härte, 14 Modelle',
-		'Ligen und Pokale: von Bronze bis Diamant, hol Trophäen',
-		'Die Regeln in Bildern: sechs Seiten für den Einstieg',
+		'Sechs Schauplätze zur Wahl: vom Dorfplatz bis zur Bucht',
 	],
 	it: [
 		'La vera pétanque in 3D: rotolata, mezzo lob, lob o lob alto',
-		'Conta ogni centimetro: cerchi di distanza dal pallino',
-		'Da solo o a squadre: individuale, coppie o terne',
-		'Gioca online: con un amico o in partite classificate',
-		'Quattro scenari di Provenza: scegli dove giocare',
+		'Gioca online: un tocco per trovare un avversario',
+		'La caletta al tramonto: uno scenario di prestigio sul mare',
+		'Conta ogni millimetro: cerchi di distanza dal pallino',
+		'La sfida di bocciata del giorno: monete per i migliori',
+		'Leghe e coppe: 28 coppe, da Bronzo a Platino',
 		'Bocce con carattere: peso, diametro, durezza, 14 modelli',
-		'Leghe e coppe: da Bronzo a Diamante, vinci trofei',
-		'Le regole per immagini: sei pagine per iniziare',
+		'Sei scenari a scelta: dal paese alla caletta',
 	],
 };
 
@@ -118,7 +118,7 @@ const copy: Record<LandingLang, AppCopy> = {
 	fr: typoFr<AppCopy>({
 		title: 'Pétanque Game — le jeu de boules en 3D sur ton téléphone',
 		description:
-			"Pétanque en 3D sur Android et iPhone : contre l'ordinateur, à deux sur un téléphone ou en ligne, en tête-à-tête, doublette ou triplette. Défi de tir du jour, ligues, 14 boules, cinq décors. Sur l'App Store et Google Play.",
+			"Pétanque en 3D sur Android et iPhone : contre l'ordinateur, à deux sur un téléphone ou en ligne, en tête-à-tête, doublette ou triplette. Défi de tir du jour, ligues, 14 boules, six décors. Sur l'App Store et Google Play.",
 		tagline:
 			"Une partie sur la place du village, à l'ombre des platanes. Les boules roulent, rebondissent et se choquent comme pour de vrai, le terrain a ses pentes et ses cailloux, et la partie se joue en 13 points, selon les règles de la pétanque. Le jeu est fait pour ceux qui jouent pour de vrai : on pointe, on tire, on lit le terrain avant de lancer.",
 		heroAlt: "Deux boules et un bouchon sur le gravier d'une place de village au soleil couchant, sous le titre Pétanque Game",
@@ -126,7 +126,7 @@ const copy: Record<LandingLang, AppCopy> = {
 		soon: "Bientôt sur l'App Store",
 		soonShort: 'Bientôt',
 		news: {
-			title: 'Nouveau dans la version 1.0.14',
+			title: 'Les nouveautés',
 			items: [
 				{
 					title: 'Le défi de tir du jour',
@@ -134,7 +134,7 @@ const copy: Record<LandingLang, AppCopy> = {
 				},
 				{
 					title: 'Des pièces pour les meilleurs',
-					body: 'Un classement mondial du jour et un de la semaine. Chaque jour : 300 pièces au premier, 150 au deuxième et au troisième, 75 du 4e au 10e. Chaque semaine : 1 500 pièces au premier, 800 au deuxième et au troisième, 300 du 4e au 10e, 100 du 11e au 50e. Pour entrer au classement, il faut un compte.',
+					body: 'Un classement mondial du jour et un de la semaine. Chaque jour : 500 pièces au premier, 300 au deuxième, 200 au troisième, puis de 150 à 60 du 4e au 10e. Chaque semaine : 2 000 pièces au premier, 1 200 au deuxième, 800 au troisième, 400 du 4e au 10e, 200 du 11e au 20e, 100 du 21e au 50e. Pour entrer au classement, il faut un compte.',
 				},
 				{
 					title: 'Une leçon pour bien commencer',
@@ -211,8 +211,8 @@ const copy: Record<LandingLang, AppCopy> = {
 				body: 'Douze joueurs et joueuses, ton pseudo et la tenue de toute ton équipe. Dans le cercle, chacun a son petit rituel avant de lancer, comme les vrais joueurs.',
 			},
 			{
-				title: 'Cinq décors',
-				body: 'La place du village, la place au crépuscule et ses guirlandes, le boulodrome de campagne, le port et son phare, la cour du château. Une musique douce et les bruits du lieu : cigales, vagues, grillons le soir.',
+				title: 'Six décors',
+				body: 'La place du village, la place au crépuscule et ses guirlandes, le boulodrome de campagne, le port et son phare, la cour du château, la crique au couchant. Une musique douce et les bruits du lieu : cigales, vagues, grillons le soir.',
 			},
 		],
 		photoTitle: 'Apprendre sans peine',
@@ -286,7 +286,7 @@ const copy: Record<LandingLang, AppCopy> = {
 	en: {
 		title: 'Pétanque Game — French boules in 3D on your phone',
 		description:
-			'Pétanque in 3D for Android and iPhone: against the computer, two on one phone or online, in singles, doubles or triples. A daily shooting challenge, leagues, 14 boules, five settings. Out now on the App Store and Google Play.',
+			'Pétanque in 3D for Android and iPhone: against the computer, two on one phone or online, in singles, doubles or triples. A daily shooting challenge, leagues, 14 boules, six settings. Out now on the App Store and Google Play.',
 		tagline:
 			'A match on the village square, in the shade of the plane trees. The boules roll, bounce and knock each other away as they do for real, the ground has its slopes and its stones, and the match is played to 13 points, by the rules of pétanque. The game is made for people who play for real: you point, you shoot, you read the ground before you throw.',
 		heroAlt: 'Two boules and a jack on the gravel of a village square at sunset, under the title Pétanque Game',
@@ -294,7 +294,7 @@ const copy: Record<LandingLang, AppCopy> = {
 		soon: 'Coming soon to the App Store',
 		soonShort: 'Coming soon',
 		news: {
-			title: 'New in version 1.0.14',
+			title: "What's new",
 			items: [
 				{
 					title: "Today's shooting challenge",
@@ -302,7 +302,7 @@ const copy: Record<LandingLang, AppCopy> = {
 				},
 				{
 					title: 'Coins for the best',
-					body: 'A world ranking of the day and one of the week. Each day: 300 coins for 1st place, 150 for 2nd and 3rd, 75 from 4th to 10th. Each week: 1,500 coins for 1st, 800 for 2nd and 3rd, 300 from 4th to 10th, 100 from 11th to 50th. You need an account to enter the ranking.',
+					body: 'A world ranking of the day and one of the week. Each day: 500 coins for 1st place, 300 for 2nd, 200 for 3rd, then 150 down to 60 for 10th. Each week: 2,000 coins for 1st place, 1,200 for 2nd, 800 for 3rd, 400 from 4th to 10th, 200 from 11th to 20th, 100 from 21st to 50th. You need an account to enter the ranking.',
 				},
 				{
 					title: 'A lesson to start',
@@ -379,8 +379,8 @@ const copy: Record<LandingLang, AppCopy> = {
 				body: 'Twelve men and women, your name and the outfit your whole team wears. In the circle, each player has their own little ritual before throwing, as real players do.',
 			},
 			{
-				title: 'Five settings',
-				body: 'The village square, the square at dusk with its string lights, the country ground, the harbour with its lighthouse, the château courtyard. Gentle music and the sounds of the place: cicadas, waves, crickets in the evening.',
+				title: 'Six settings',
+				body: 'The village square, the square at dusk with its string lights, the country ground, the harbour with its lighthouse, the château courtyard, the cove at sunset. Gentle music and the sounds of the place: cicadas, waves, crickets in the evening.',
 			},
 		],
 		photoTitle: 'Easy to learn',
@@ -454,7 +454,7 @@ const copy: Record<LandingLang, AppCopy> = {
 	es: {
 		title: 'Pétanque Game — la petanca en 3D en tu móvil',
 		description:
-			'Petanca en 3D para Android y iPhone: contra la máquina, entre dos en un teléfono o en línea, individual, dupletas o tripletas. Desafío de tiro del día, ligas, 14 bolas, cinco escenarios. Ya en el App Store y Google Play.',
+			'Petanca en 3D para Android y iPhone: contra la máquina, entre dos en un teléfono o en línea, individual, dupletas o tripletas. Desafío de tiro del día, ligas, 14 bolas, seis escenarios. Ya en el App Store y Google Play.',
 		tagline:
 			'Una partida en la plaza del pueblo, a la sombra de los plátanos. Las bolas ruedan, rebotan y se golpean como de verdad, el terreno tiene sus pendientes y sus piedras, y la partida se juega a 13 puntos, con las reglas de la petanca. El juego está hecho para quienes juegan de verdad: se arrima, se tira, se lee el terreno antes de lanzar.',
 		heroAlt: 'Dos bolas y un boliche sobre la grava de una plaza de pueblo al atardecer, bajo el título Pétanque Game',
@@ -462,7 +462,7 @@ const copy: Record<LandingLang, AppCopy> = {
 		soon: 'Próximamente en el App Store',
 		soonShort: 'Próximamente',
 		news: {
-			title: 'Novedades de la versión 1.0.14',
+			title: 'Novedades',
 			items: [
 				{
 					title: 'Desafío de tiro del día',
@@ -470,7 +470,7 @@ const copy: Record<LandingLang, AppCopy> = {
 				},
 				{
 					title: 'Monedas para los mejores',
-					body: 'Una clasificación mundial del día y otra de la semana. Cada día: 300 monedas al primero, 150 al segundo y al tercero, 75 del 4.º al 10.º. Cada semana: 1500 monedas al primero, 800 al segundo y al tercero, 300 del 4.º al 10.º, 100 del 11.º al 50.º. Para entrar en la clasificación hace falta una cuenta.',
+					body: 'Una clasificación mundial del día y otra de la semana. Cada día: 500 monedas al primero, 300 al segundo, 200 al tercero, y de 150 a 60 hasta el 10.º. Cada semana: 2000 monedas al primero, 1200 al segundo, 800 al tercero, 400 del 4.º al 10.º, 200 del 11.º al 20.º, 100 del 21.º al 50.º. Para entrar en la clasificación hace falta una cuenta.',
 				},
 				{
 					title: 'Una lección para empezar',
@@ -547,8 +547,8 @@ const copy: Record<LandingLang, AppCopy> = {
 				body: 'Doce jugadores y jugadoras, tu apodo y la equipación de todo tu equipo. En el círculo, cada uno tiene su pequeño ritual antes de lanzar, como los jugadores de verdad.',
 			},
 			{
-				title: 'Cinco escenarios',
-				body: 'La plaza del pueblo, la plaza al atardecer con sus guirnaldas, la cancha de campo, el puerto con su faro, el patio del castillo. Música suave y los sonidos del lugar: cigarras, olas, grillos por la noche.',
+				title: 'Seis escenarios',
+				body: 'La plaza del pueblo, la plaza al atardecer con sus guirnaldas, la cancha de campo, el puerto con su faro, el patio del castillo, la cala al atardecer. Música suave y los sonidos del lugar: cigarras, olas, grillos por la noche.',
 			},
 		],
 		photoTitle: 'Fácil de aprender',
@@ -622,7 +622,7 @@ const copy: Record<LandingLang, AppCopy> = {
 	de: {
 		title: 'Pétanque Game — Boule in 3D auf deinem Handy',
 		description:
-			'Boule in 3D für Android und iPhone: gegen den Computer, zu zweit auf einem Handy oder online, im Tête-à-tête, in der Doublette oder Triplette. Schuss-Challenge des Tages, Ligen, 14 Kugeln, fünf Spielorte. Jetzt im App Store und bei Google Play.',
+			'Boule in 3D für Android und iPhone: gegen den Computer, zu zweit auf einem Handy oder online, im Tête-à-tête, in der Doublette oder Triplette. Schuss-Challenge des Tages, Ligen, 14 Kugeln, sechs Spielorte. Jetzt im App Store und bei Google Play.',
 		tagline:
 			'Eine Partie auf dem Dorfplatz, im Schatten der Platanen. Die Kugeln rollen, springen und treffen sich wie in echt, der Platz hat seine Neigungen und Steine, und gespielt wird bis 13 Punkte, nach den Regeln der Pétanque. Das Spiel ist für alle gemacht, die selbst spielen: Du legst, du schießt, du liest den Boden, bevor du wirfst.',
 		heroAlt: 'Zwei Kugeln und eine Zielkugel auf dem Kies eines Dorfplatzes bei Sonnenuntergang, unter dem Titel Pétanque Game',
@@ -630,7 +630,7 @@ const copy: Record<LandingLang, AppCopy> = {
 		soon: 'Demnächst im App Store',
 		soonShort: 'Demnächst',
 		news: {
-			title: 'Neu in Version 1.0.14',
+			title: 'Neuigkeiten',
 			items: [
 				{
 					title: 'Schuss-Challenge des Tages',
@@ -638,7 +638,7 @@ const copy: Record<LandingLang, AppCopy> = {
 				},
 				{
 					title: 'Münzen für die Besten',
-					body: 'Eine Weltrangliste des Tages und eine der Woche. Jeden Tag: 300 Münzen für Platz 1, 150 für Platz 2 und 3, 75 für Platz 4 bis 10. Jede Woche: 1.500 Münzen für Platz 1, 800 für Platz 2 und 3, 300 für Platz 4 bis 10, 100 für Platz 11 bis 50. Für die Rangliste brauchst du ein Konto.',
+					body: 'Eine Weltrangliste des Tages und eine der Woche. Jeden Tag: 500 Münzen für Platz 1, 300 für Platz 2, 200 für Platz 3, dann 150 bis 60 bis Platz 10. Jede Woche: 2.000 Münzen für Platz 1, 1.200 für Platz 2, 800 für Platz 3, 400 für Platz 4 bis 10, 200 für Platz 11 bis 20, 100 für Platz 21 bis 50. Für die Rangliste brauchst du ein Konto.',
 				},
 				{
 					title: 'Eine Lektion zum Start',
@@ -715,8 +715,8 @@ const copy: Record<LandingLang, AppCopy> = {
 				body: 'Zwölf Spielerinnen und Spieler, dein Name und das Trikot deines ganzen Teams. Im Kreis hat jeder vor dem Wurf sein kleines Ritual, wie echte Spieler.',
 			},
 			{
-				title: 'Fünf Spielorte',
-				body: 'Der Dorfplatz, der Platz in der Abenddämmerung mit seinen Lichterketten, der Platz auf dem Land, der Hafen mit seinem Leuchtturm, der Schlosshof. Ruhige Musik und die Geräusche des Ortes: Zikaden, Wellen, Grillen am Abend.',
+				title: 'Sechs Spielorte',
+				body: 'Der Dorfplatz, der Platz in der Abenddämmerung mit seinen Lichterketten, der Platz auf dem Land, der Hafen mit seinem Leuchtturm, der Schlosshof, die Bucht bei Sonnenuntergang. Ruhige Musik und die Geräusche des Ortes: Zikaden, Wellen, Grillen am Abend.',
 			},
 		],
 		photoTitle: 'Leicht zu lernen',
@@ -790,7 +790,7 @@ const copy: Record<LandingLang, AppCopy> = {
 	it: {
 		title: 'Pétanque Game — le bocce in 3D sul tuo telefono',
 		description:
-			"Pétanque in 3D per Android e iPhone: contro il computer, in due su un telefono o online, individuale, coppie o terne. Sfida di bocciata del giorno, leghe, 14 bocce, cinque ambientazioni. Ora su App Store e Google Play.",
+			"Pétanque in 3D per Android e iPhone: contro il computer, in due su un telefono o online, individuale, coppie o terne. Sfida di bocciata del giorno, leghe, 14 bocce, sei ambientazioni. Ora su App Store e Google Play.",
 		tagline:
 			"Una partita nella piazza del paese, all'ombra dei platani. Le bocce rotolano, rimbalzano e si colpiscono come dal vero, il campo ha le sue pendenze e i suoi sassi, e la partita si gioca a 13 punti, con le regole della pétanque. Il gioco è fatto per chi gioca davvero: si accosta, si boccia, si legge il terreno prima di lanciare.",
 		heroAlt: 'Due bocce e un pallino sulla ghiaia di una piazza di paese al tramonto, sotto il titolo Pétanque Game',
@@ -798,7 +798,7 @@ const copy: Record<LandingLang, AppCopy> = {
 		soon: "Presto sull'App Store",
 		soonShort: 'Presto',
 		news: {
-			title: 'Novità della versione 1.0.14',
+			title: 'Novità',
 			items: [
 				{
 					title: 'Sfida di bocciata del giorno',
@@ -806,7 +806,7 @@ const copy: Record<LandingLang, AppCopy> = {
 				},
 				{
 					title: 'Monete per i migliori',
-					body: "Una classifica mondiale del giorno e una della settimana. Ogni giorno: 300 monete al primo, 150 al secondo e al terzo, 75 dal 4° al 10°. Ogni settimana: 1500 monete al primo, 800 al secondo e al terzo, 300 dal 4° al 10°, 100 dall'11° al 50°. Per entrare in classifica serve un account.",
+					body: "Una classifica mondiale del giorno e una della settimana. Ogni giorno: 500 monete al primo, 300 al secondo, 200 al terzo, poi da 150 a 60 fino al 10°. Ogni settimana: 2000 monete al primo, 1200 al secondo, 800 al terzo, 400 dal 4° al 10°, 200 dall'11° al 20°, 100 dal 21° al 50°. Per entrare in classifica serve un account.",
 				},
 				{
 					title: 'Una lezione per iniziare',
@@ -883,8 +883,8 @@ const copy: Record<LandingLang, AppCopy> = {
 				body: 'Dodici giocatori e giocatrici, il tuo nome e la divisa di tutta la tua squadra. Nel cerchio, ognuno ha il suo piccolo rituale prima di lanciare, come i veri giocatori.',
 			},
 			{
-				title: 'Cinque ambientazioni',
-				body: 'La piazza del paese, la piazza al tramonto con le sue luci, il campo di campagna, il porto con il suo faro, il cortile del castello. Musica tranquilla e i suoni del luogo: cicale, onde, grilli la sera.',
+				title: 'Sei ambientazioni',
+				body: 'La piazza del paese, la piazza al tramonto con le sue luci, il campo di campagna, il porto con il suo faro, il cortile del castello, la caletta al tramonto. Musica tranquilla e i suoni del luogo: cicale, onde, grilli la sera.',
 			},
 		],
 		photoTitle: 'Facile da imparare',
