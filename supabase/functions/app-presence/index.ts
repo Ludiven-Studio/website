@@ -1,5 +1,6 @@
-// app-presence — how many play an app right now. Each phone in the app beats once a minute with a
-// random id made at each launch; the answer is how many were heard in the last two minutes.
+// app-presence — how many play an app right now. Each phone in the app beats with a random id made at
+// each launch (Pétanque Game: every 5 min, 15 s while searching, 5 s on an online screen; the other apps every
+// minute); the answer is how many were heard in the last six minutes (migration 20261125130000).
 // Nothing about the player is kept: no player id, no IP, rows gone minutes after the app closes.
 // The app's key is public, so a count can be forged: a session counts from its second beat (the table),
 // and each IP brings so many sessions and beats, held in this instance's memory only (_shared/presence.ts).
