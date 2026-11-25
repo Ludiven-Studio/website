@@ -5,6 +5,8 @@ img: /assets/ami-es/vignette.png
 img_alt: AMI·ES — Application Mobile pour l'Inclusion des étudiant·es dans l'Enseignement Supérieur
 role: Développeur
 org: Université Claude Bernard Lyon 1
+appPage: https://ami-es.fr/
+appPageLabel: Découvrir l'appli
 description: |
   Développement d'une application destinée aux personnes autistes ou présentant des troubles neuro-développementaux, en collaboration avec l'Université Claude Bernard Lyon 1.
 tags:

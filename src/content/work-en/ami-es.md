@@ -5,6 +5,8 @@ img: /assets/ami-es/vignette.png
 img_alt: AMI·ES — mobile app for the inclusion of students in higher education
 role: Developer
 org: Claude Bernard Lyon 1 University
+appPage: https://ami-es.fr/
+appPageLabel: Discover the app
 description: |
   A mobile app for autistic people and people with neurodevelopmental conditions, built with Claude Bernard Lyon 1 University.
 tags:

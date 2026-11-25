@@ -51,7 +51,7 @@ const altLang = en ? `/en/work/${entry.slug}/` : undefined;
 									<div class="cta">
 										<StoreBadges appStore={entry.data.appStore} playStore={entry.data.playStore} lang="fr" />
 										{entry.data.appPage && (
-											<a class="app-page" href={entry.data.appPage}>
+											<a class="app-page" href={entry.data.appPage} {...(/^https?:/.test(entry.data.appPage) && { target: "_blank", rel: "noopener" })}>
 												{entry.data.appPageLabel || "Voir la page de l'application"} <Icon icon="arrow-right" />
 											</a>
 										)}

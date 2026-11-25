@@ -51,7 +51,7 @@ const { Content } = await entry.render();
 									<div class="cta">
 										<StoreBadges appStore={entry.data.appStore} playStore={entry.data.playStore} lang="en" />
 										{entry.data.appPage && (
-											<a class="app-page" href={entry.data.appPage}>
+											<a class="app-page" href={entry.data.appPage} {...(/^https?:/.test(entry.data.appPage) && { target: "_blank", rel: "noopener" })}>
 												{entry.data.appPageLabel || 'See the app page'} <Icon icon="arrow-right" />
 											</a>
 										)}
