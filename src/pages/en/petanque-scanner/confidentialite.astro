@@ -18,7 +18,7 @@ import Hero from '../../../components/Hero.astro';
 		<p class="updated">
 			This policy covers <strong>the Pétanque Scan mobile app</strong>
 			(formerly Pétanque Scanner, <code>com.raphbenpro.petanquear</code>), not the ludiven-studio.fr website, which has its
-			<a href="/confidentialite/">own policy</a>. Last updated: 20 November 2026 (version 1.2.15: each screen opened and your choice about ads are counted in the statistics, events take the names shared by our apps and scans say their mode, 3D or photo; our house videos have a "Report this video" link; version 1.2.14: our house ads, read from our website, replace the Pétanque Meet strip and video; after a refusal, "Turn ads on?" is offered once per session when you ask for a video; advertising moves from Google AdMob to Unity LevelPlay, with our own consent window; on iPhone, without Apple's tracking permission, ads are not personalised; withdrawing your consent is passed on to the ad networks; Google Firebase is removed; 10 free scans a day instead of 3).
+			<a href="/confidentialite/">own policy</a>. Last updated: 25 November 2026 (when you made your ad choice and, on an iPhone, your answer to Apple's tracking question, counted in the statistics; version 1.2.15: each screen opened and your choice about ads are counted in the statistics, events take the names shared by our apps and scans say their mode, 3D or photo; our house videos have a "Report this video" link; version 1.2.14: our house ads, read from our website, replace the Pétanque Meet strip and video; after a refusal, "Turn ads on?" is offered once per session when you ask for a video; advertising moves from Google AdMob to Unity LevelPlay, with our own consent window; on iPhone, without Apple's tracking permission, ads are not personalised; withdrawing your consent is passed on to the ad networks; Google Firebase is removed; 10 free scans a day instead of 3).
 		</p>
 		<p class="updated">
 			This is a courtesy translation. In case of discrepancy, the
@@ -243,7 +243,7 @@ import Hero from '../../../components/Hero.astro';
 				<li><code>update_prompt</code> / <code>update_tapped</code> — an update is offered to you (recommended or required), or you tap the update button — old name, sent until 4 weeks after 1.2.15 is out</li>
 				<li><code>consent_accepted</code> / <code>consent_declined</code> — your consent choice, sent at each launch — old name, sent until 4 weeks after 1.2.15 is out</li>
 				<li><code>app_open</code> — the app starts, with whether it is the first launch and your choice about ads (yes, no, or not asked yet) (since 1.2.15)</li>
-				<li><code>ad_consent</code> — your answer in the "Ads" window: yes or no (since 1.2.15)</li>
+				<li><code>ad_consent</code> — your answer in the "Ads" window: yes or no (since 1.2.15), with when you gave it (first launch, settings or when asking for a reward) and, on an iPhone, your answer to Apple's tracking question</li>
 				<li><code>update_shown</code> / <code>update_tap</code> — an update is offered (advised or required), or you tap the update button (since 1.2.15)</li>
 				<li><code>shop_open</code> — the Premium screen opens, with where you came from (since 1.2.15)</li>
 				<li><code>iap_tap</code> / <code>iap_result</code> / <code>iap_restore</code> — you tap the Premium purchase; its result (done, cancelled or failed, with a short failure code and the store); a restore, with the number of purchases found. Never a price. (since 1.2.15)</li>
