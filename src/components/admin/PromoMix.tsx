@@ -58,7 +58,7 @@ export default function PromoMix({ catalog, published, readOnly, change }: Props
 				</p>
 			</Help>
 			<p className="pa-note pw-warn">
-				Lu par Pétanque Game 1.0.17, Pétanque Meet 1.1.5, Pétanque Scan 1.2.19, Dragon's Gems 1.2.2 et les versions
+				Lu par Pétanque Game 1.0.18, Pétanque Meet 1.1.5, Pétanque Scan 1.2.19, Dragon's Gems 1.2.2 et les versions
 				suivantes. Les versions déjà publiées gardent leur réglage.
 			</p>
 			<div className="pw-scroll">
