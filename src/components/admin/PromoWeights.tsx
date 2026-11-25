@@ -21,15 +21,13 @@ const percent = (x: number): string => `${Math.round(x * 100)} %`;
 
 interface Props {
 	catalog: Catalog;
-	/** The catalogue online, which « Valider » changes one row of; null while an old version is shown. */
+	/** The catalogue online, to mark the rows changed; null while an old version is shown. */
 	published: Catalog | null;
 	readOnly: boolean;
-	busy: boolean;
 	change: (fn: (c: Catalog) => void) => void;
-	validate: (app: string, platform: Platform) => void;
 }
 
-export default function PromoWeights({ catalog, published, readOnly, busy, change, validate }: Props) {
+export default function PromoWeights({ catalog, published, readOnly, change }: Props) {
 	const [spot, setSpot] = useState<Spot>('banner');
 	const [installed, setInstalled] = useState<Set<string>>(new Set());
 	const apps = useMemo(() => showingApps(catalog, SHOWING_OTHERS), [catalog]);
@@ -70,7 +68,6 @@ export default function PromoWeights({ catalog, published, readOnly, busy, chang
 								<th scope="col">Appli qui affiche</th>
 								<th scope="col">Pondéré</th>
 								{catalog.entries.map((e) => <th scope="col" key={e.id}><AppName name={e.title.fr ?? e.id} of={e.id} /></th>)}
-								<th scope="col">Enregistrer</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -80,7 +77,10 @@ export default function PromoWeights({ catalog, published, readOnly, busy, chang
 								const flips = !!published && isWeighted(published, app) !== weighted;
 								return (
 									<tr key={app} className={changed ? 'pw-changed' : undefined}>
-										<th scope="row"><AppName name={name(app)} of={app} /><small>{app}</small></th>
+										<th scope="row">
+											<AppName name={name(app)} of={app} /><small>{app}</small>
+											{changed && flips && <small className="pw-flip">{weighted ? `passe aussi ${other} en pondéré` : `rend aussi ${other} aux groupes`}</small>}
+										</th>
 										<td>
 											<label className="pw-switch">
 												<input type="checkbox" checked={weighted} disabled={readOnly} onChange={(ev) => setWeighted(app, ev.target.checked)} />
@@ -102,12 +102,6 @@ export default function PromoWeights({ catalog, published, readOnly, busy, chang
 												)}
 											</td>
 										))}
-										<td className="pw-save">
-											<button type="button" className="pa-btn pa-primary" disabled={readOnly || busy || !changed}
-												aria-label={`Valider ${name(app)} sur ${PLATFORM_NAMES[platform]}`}
-												onClick={() => validate(app, platform)}>Valider</button>
-											{changed && flips && <small>{weighted ? `passe aussi ${other} en pondéré` : `rend aussi ${other} aux groupes`}</small>}
-										</td>
 									</tr>
 								);
 							})}
@@ -128,8 +122,8 @@ export default function PromoWeights({ catalog, published, readOnly, busy, chang
 					seulement. Sinon elle garde la règle actuelle : ses groupes d'abord, puis le poids général de la pub.
 				</p>
 				<p>
-					« Valider » publie tout de suite cette ligne seule (cette appli, cette plateforme), sans le reste de tes changements.
-					L'interrupteur « Pondéré » vaut pour Android et iOS à la fois.
+					Une ligne changée reste surlignée jusqu'à « Tout enregistrer », dans la barre en bas de l'écran, qui envoie tous
+					tes changements de la page d'un coup. L'interrupteur « Pondéré » vaut pour Android et iOS à la fois.
 				</p>
 				<p>
 					Parts sans compter la règle qui ne remontre jamais la même pub deux fois de suite. « À défaut » : la pub ne sort que

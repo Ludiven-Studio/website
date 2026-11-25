@@ -221,3 +221,20 @@ a.ah-tile:hover, a.ah-tile:focus-visible { box-shadow: 0 0 0 2px var(--sc-accent
 	.ak-consent :is(thead th, tbody th) { white-space: normal; }
 	.ak-consent-plat { display: block; color: var(--sc-muted); font-size: 0.75rem; }
 }
+
+/* /admin/pubs/: the save bar, held at the bottom of the screen while the draft differs from the catalogue online. */
+.pa-root:has(> .pa-savebar) { padding-bottom: 6rem; }
+.pa-root .pa-savebar {
+	position: fixed; z-index: 50; left: 50%; transform: translateX(-50%);
+	bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+	width: min(56rem, calc(100% - 2rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+	display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center; justify-content: space-between;
+	padding: 0.7rem 0.9rem 0.7rem 1.2rem; border-radius: 1rem; background: var(--sc-surface); color: var(--sc-ink);
+	box-shadow: inset 4px 0 0 var(--sc-accent), 0 8px 28px rgb(26 21 51 / 0.18), 0 1px 3px rgb(26 21 51 / 0.12);
+}
+.pa-root .pa-savebar p { margin: 0; display: flex; flex-wrap: wrap; gap: 0.1rem 0.6rem; align-items: baseline; }
+.pa-root .pa-savebar-note { color: var(--sc-muted); font-size: var(--text-sm); }
+.pa-root .pa-savebar--blocked { box-shadow: inset 4px 0 0 var(--st-bad), 0 8px 28px rgb(26 21 51 / 0.18), 0 1px 3px rgb(26 21 51 / 0.12); }
+.pa-root .pa-savebar--blocked .pa-savebar-note { color: var(--st-bad); }
+.pa-root .pa-savebar .pa-actions { margin-left: auto; }
+.pa-root .pw-table tbody th small.pw-flip { display: block; margin-left: 0; color: var(--st-warn); }

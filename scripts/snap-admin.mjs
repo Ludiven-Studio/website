@@ -208,8 +208,17 @@ try {
 			// A full-page shot would paint the fixed tab bar in the middle of the page.
 			await page.addStyleTag({ content: 'astro-dev-toolbar, nav.tb { display: none !important; }' });
 			await page.waitForTimeout(800);
-			const name = `${path.replace(/^\/|\/$/g, '').replace(/\//g, '_')}-${view}.png`;
-			await page.screenshot({ path: `${out}/${name}`, fullPage: true });
+			// SNAP_EDIT=1: two weights changed, then the screen as it is, the save bar at its bottom over the weights table.
+			const edit = !!process.env.SNAP_EDIT && (await page.locator('.pw-root:not(.pm-root) .pw-table input[type="number"]').count()) > 0;
+			if (edit) {
+				const inputs = page.locator('.pw-root:not(.pm-root) .pw-table input[type="number"]');
+				await inputs.first().fill('3');
+				await inputs.last().fill('4');
+				await page.locator('.pw-root:not(.pm-root) .pw-changed').last().evaluate((el) => el.scrollIntoView({ block: 'center' }));
+				await page.waitForTimeout(300);
+			}
+			const name = `${path.replace(/^\/|\/$/g, '').replace(/\//g, '_')}-${view}${edit ? '-edit' : ''}.png`;
+			await page.screenshot({ path: `${out}/${name}`, fullPage: !edit });
 			console.log(`${out}/${name}`);
 			await ctx.close();
 		}

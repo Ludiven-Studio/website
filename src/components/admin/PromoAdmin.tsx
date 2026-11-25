@@ -8,10 +8,10 @@ import {
 	AdminError, LOCAL_RUN, fileBase64, load, publish, revert, upload, versionAt, versions,
 	type Catalog, type CatalogEntry, type Loaded, type Published, type Upload, type Version,
 } from '../../lib/promoAdmin';
-import PromoWeights from './PromoWeights';
+import PromoWeights, { SHOWING_OTHERS } from './PromoWeights';
 import PromoMix from './PromoMix';
 import { Help, Pill, appStyle } from './AdminParts';
-import { applyRow, type Platform } from '../../lib/promoShares';
+import { pendingChanges, pendingLabel } from '../../lib/promoPending';
 import { BANNER_TEXT_MAX, CATALOG_URL, LANGUAGES, PROMO_DIR, catalogUrl, checkCatalog, sitePath } from '../../../supabase/functions/_shared/promoRules.mjs';
 
 const LANG_NAMES: Record<string, string> = { fr: 'Français', en: 'English', es: 'Español', de: 'Deutsch', it: 'Italiano' };
@@ -72,6 +72,8 @@ export default function PromoAdmin() {
 	const [history, setHistory] = useState<Version[] | null>(null);
 	const [peek, setPeek] = useState<{ version: Version; catalog: Catalog } | null>(null);
 	const [lastWeight, setLastWeight] = useState<Record<string, number>>({});
+	// The save bar's answer, shown a few seconds after « Tout enregistrer » went through.
+	const [saved, setSaved] = useState('');
 
 	useEffect(() => {
 		if (LOCAL_RUN) return;
@@ -120,6 +122,23 @@ export default function PromoAdmin() {
 	}
 
 	const dirty = !!loaded && !!draft && JSON.stringify(draft) !== JSON.stringify(loaded.catalog);
+	const pending = useMemo(() => (dirty ? pendingChanges(loaded!.catalog, draft!, SHOWING_OTHERS) : null), [dirty, loaded, draft]);
+
+	useEffect(() => {
+		if (!dirty) return;
+		const warn = (ev: BeforeUnloadEvent) => {
+			ev.preventDefault();
+			ev.returnValue = '';
+		};
+		window.addEventListener('beforeunload', warn);
+		return () => window.removeEventListener('beforeunload', warn);
+	}, [dirty]);
+
+	useEffect(() => {
+		if (!saved) return;
+		const t = window.setTimeout(() => setSaved(''), 8000);
+		return () => window.clearTimeout(t);
+	}, [saved]);
 	const problems = useMemo(() => {
 		if (!draft || !loaded) return [];
 		const { problems: rules, files } = checkCatalog(draft, { strict: true });
@@ -171,31 +190,12 @@ export default function PromoAdmin() {
 		if (!loaded || !draft) return;
 		const used = new Set(checkCatalog(draft).files.map((f) => f.path));
 		const sent = [...uploads.values()].filter((u) => used.has(u.path)).map(({ path, sha }) => ({ path, sha }));
+		setMessage(null);
 		const done: Published | undefined = await run('Publication…', () => publish(draft, loaded.blob, sent, summary(loaded.catalog, draft)));
 		if (!done) return;
 		await reload();
+		setSaved(`Enregistré (${done.commit.slice(0, 7)}), en ligne dans 5 min environ.`);
 		setMessage({ kind: 'ok', text: `Publié (${done.commit.slice(0, 7)}). Le site se déploie en 5 min environ ; les applis le liront à leur lancement suivant.${done.removed.length ? ` Fichiers effacés après 30 jours : ${done.removed.length}.` : ''}${done.warnings.length ? ` À noter : ${done.warnings.join(' ; ')}` : ''}` });
-	}
-
-	/** Publishes one app's weights on one platform, over the catalogue online; the rest of the draft stays pending. */
-	async function doValidate(app: string, platform: Platform) {
-		if (!loaded || !draft) return;
-		const next = applyRow(loaded.catalog, draft, app, platform);
-		const { problems: rules } = checkCatalog(next, { strict: true });
-		if (rules.length) {
-			setMessage({ kind: 'error', text: 'Cette ligne ne peut pas partir :', problems: rules });
-			return;
-		}
-		const where = platform === 'ios' ? 'iOS' : 'Android';
-		const done = await run(`Validation ${where}…`, () => publish(next, loaded.blob, [], `[CHANGED] House ads weights: ${app} on ${where} (admin page)`));
-		if (!done) return;
-		const data = await run('Chargement…', load);
-		if (!data) return;
-		setLoaded(data);
-		// Keeps the other pending changes: this row now matches the catalogue online.
-		setDraft((d) => (d ? { ...d, updated: data.catalog.updated } : d));
-		setHistory(await run('Historique…', versions) ?? null);
-		setMessage({ kind: 'ok', text: `Poids de ${app} sur ${where} publiés (${done.commit.slice(0, 7)}). Le site se déploie en 5 min environ.` });
 	}
 
 	async function doRevert(v: Version) {
@@ -307,8 +307,7 @@ export default function PromoAdmin() {
 			)}
 
 			{shown && (
-				<PromoWeights catalog={shown} published={peek ? null : loaded?.catalog ?? null} readOnly={!!peek} busy={!!busy}
-					validate={(app, platform) => void doValidate(app, platform)}
+				<PromoWeights catalog={shown} published={peek ? null : loaded?.catalog ?? null} readOnly={!!peek}
 					change={(fn) => setDraft((d) => {
 						if (!d) return d;
 						const next = clone(d);
@@ -340,6 +339,27 @@ export default function PromoAdmin() {
 					</ul>
 				) : <p className="pa-note">Aucune version chargée.</p>}
 			</details>
+
+			{((dirty && !peek) || saved) && (
+				<div className={`pa-savebar ${problems.length && dirty ? 'pa-savebar--blocked' : ''}`.trim()} role="region" aria-label="Enregistrement">
+					{dirty && !peek ? (
+						<>
+							<p>
+								<strong>{pendingLabel(pending!)}</strong>
+								{problems.length > 0 ? (
+									<span className="pa-savebar-note">{problems.length} problème{problems.length > 1 ? 's' : ''} à corriger, listé{problems.length > 1 ? 's' : ''} en haut</span>
+								) : message?.kind === 'error' ? (
+									<span className="pa-savebar-note">{message.text}</span>
+								) : <span className="pa-savebar-note">pas encore en ligne</span>}
+							</p>
+							<span className="pa-actions">
+								<button type="button" className="pa-btn" disabled={!!busy} onClick={() => { setDraft(clone(loaded!.catalog)); setUploads(new Map()); setMessage(null); }}>Annuler</button>
+								<button type="button" className="pa-btn pa-primary" disabled={problems.length > 0 || !!busy} onClick={() => void doPublish()}>{busy || 'Tout enregistrer'}</button>
+							</span>
+						</>
+					) : <p><strong>{saved}</strong></p>}
+				</div>
+			)}
 		</div>
 	);
 }
