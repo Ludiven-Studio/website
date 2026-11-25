@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated": "2026-11-25T09:05:59Z",
+  "updated": "2026-11-25T09:06:51Z",
   "rotationSeconds": 30,
   "defaultLanguage": "fr",
   "entries": [
@@ -90,7 +90,10 @@
         "com.ludivenstudio.petanquegame"
       ],
       "weights": {
-        "com.ludivenstudio.petanquemeet": 1,
+        "com.ludivenstudio.petanquemeet": {
+          "android": 2,
+          "ios": 1
+        },
         "com.ludivenstudio.ninorush": 1,
         "com.ludivenstudio.petanquegame": 1,
         "com.ludivenstudio.dragonsgems": 1,
@@ -137,7 +140,10 @@
         "com.ludivenstudio.ninorush"
       ],
       "weights": {
-        "com.ludivenstudio.petanquemeet": 1,
+        "com.ludivenstudio.petanquemeet": {
+          "android": 2,
+          "ios": 1
+        },
         "com.ludivenstudio.ninorush": 1,
         "com.ludivenstudio.petanquegame": 1,
         "com.ludivenstudio.dragonsgems": 1,
