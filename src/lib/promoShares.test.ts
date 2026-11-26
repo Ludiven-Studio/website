@@ -41,6 +41,14 @@ describe('group mode, as the apps draw today', () => {
 		expect(pct(cat(base()), PG, { ...android, platform: 'ios', installed })).toEqual({ meet: 100, game: 0, dragon: 0 });
 	});
 
+	// Raphaël, 2026-11-26: an entry with `app` ignored its hideIn, as the apps did; both now hide it.
+	it('hides an entry its hideIn names, with or without app, and takes the groups from app only', () => {
+		const e = base().map((x) => (x.id === 'meet' ? { ...x, hideIn: [MEET, DG] } : x));
+		expect(state(cat(e), DG).meet).toBe('self');
+		expect(groupsOf(cat(e), DG)).toEqual(['games']);
+		expect(state(cat(e), PG).meet).toBe('shown');
+	});
+
 	it('takes every group for an app with no entry, or one in both groups', () => {
 		expect(groupsOf(cat(base()), DOMINO)).toEqual([]);
 		expect(pct(cat(base()), DOMINO)).toEqual({ meet: 33.3, game: 33.3, dragon: 33.3 });

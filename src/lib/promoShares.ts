@@ -82,15 +82,15 @@ export function setWeightIn(entry: CatalogEntry, appId: string, platform: Platfo
 /** True when a weights value differs between platforms: the app versions that read numbers only drop that entry. */
 export const perPlatform = (entry: CatalogEntry): boolean => isObject(entry.weights) && Object.values(entry.weights).some(isObject);
 
-/** True when the entry advertises the app itself: its `app` ids, or `hideIn` in an entry without `app`. */
+/** True when the app never shows the entry: its `app` ids (its own ad) and its `hideIn` ids, with or without `app`
+ * (Raphaël, 2026-11-26), as the apps' HousePicker.IsHiddenIn. */
 export function hiddenIn(entry: CatalogEntry, appId: string): boolean {
-	const own = strings(entry.app);
-	return (own.length ? own : strings(entry.hideIn)).some((id) => matches(appId, id));
+	return [...strings(entry.app), ...strings(entry.hideIn)].some((id) => matches(appId, id));
 }
 
-/** The groups of the entry that advertises the app; none when it has no entry. */
+/** The groups of the entry that advertises the app, by `app` only; none when it has no entry. */
 export function groupsOf(catalog: Catalog, appId: string): string[] {
-	const own = (catalog.entries ?? []).find((e) => strings(e.app).length > 0 && hiddenIn(e, appId));
+	const own = (catalog.entries ?? []).find((e) => strings(e.app).some((id) => matches(appId, id)));
 	return own ? strings(own.groups) : [];
 }
 
