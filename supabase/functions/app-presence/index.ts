@@ -9,14 +9,18 @@
 // searches): the others are told the newest search, so a player waiting finds an opponent. The name is shown
 // only while its owner searches, and goes with the row.
 //
-// POST { app, session, seek? } -> { online, seeker: { nick, players, game, since } | null }
+// From 1.0.20 the beats carry the game's online protocol: the count and the search told are those of the phones of
+// the same protocol, and the phones beating without one (before 1.0.20) are a group of their own
+// (migration 20261127120000). Still one call a beat.
 //
-// Deploy:  supabase functions deploy app-presence
+// POST { app, session, proto?, seek? } -> { online, seeker: { nick, players, game, proto, since } | null }
+//
+// Deploy:  supabase functions deploy app-presence, after the migrations: before 20261127120000 every beat fails
 // Table:   migrations/20261114120000_app_presence.sql, 20261117120000_app_presence_confirmed.sql,
-//          20261118130000_app_presence_seek.sql (presence_beat_seek)
+//          20261118130000_app_presence_seek.sql, 20261127120000_app_presence_proto.sql (presence_beat_seek)
 
 import { createClient } from 'jsr:@supabase/supabase-js@2.117.0';
-import { BeatLimiter, clientIp, isSession, parseSeek } from '../_shared/presence.ts';
+import { BeatLimiter, clientIp, isSession, parseProto, parseSeek } from '../_shared/presence.ts';
 
 const CORS = {
 	'Access-Control-Allow-Origin': '*',
@@ -59,6 +63,7 @@ Deno.serve(async (req) => {
 		p_nick: seek?.nick ?? null,
 		p_players: seek?.players ?? null,
 		p_game: seek?.game ?? null,
+		p_proto: parseProto(body.proto),
 	});
 	if (error) {
 		console.error('presence_beat_seek', error.message);

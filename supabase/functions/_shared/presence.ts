@@ -89,3 +89,10 @@ export function parseSeek(raw: unknown): Seek | null {
 	if (!nick || !Number.isInteger(players) || players < 1 || players > 3 || !GAME_RE.test(game)) return null;
 	return { nick, players, game };
 }
+
+/** OnlineService.Protocol of the beating phone (« 14 » in 1.0.20), or null: the phones before 1.0.20 send none. */
+export function parseProto(raw: unknown): string | null {
+	if (typeof raw !== 'string' && typeof raw !== 'number') return null;
+	const proto = String(raw);
+	return /^[0-9]{1,8}$/.test(proto) ? proto : null;
+}

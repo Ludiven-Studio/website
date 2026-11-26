@@ -4055,3 +4055,17 @@
 - 23:40 : poussé sur la ligne de Raphaël (« pousse le correctif hideIn du site ») : promoShares.ts, son test, le
   commentaire de promoRules.mjs, et cette section ; catalogue déjà nettoyé par l'admin (0103893), simulation : les 5
   applis montrent la même chose. Statut : terminé. Réservations libérées.
+## 2026-11-26 — Pétanque Game : présence par version (proto) (session website)
+- Statut : en cours (2026-11-26T23:39+01:00). Demande de l'utilisateur : Relais du Producer (Raphaël : « tout comme
+  recommandé ») : en 1.0.20, la liste des joueurs en ligne ne montre que ceux d'une version compatible ; préparer
+  migration + fonction, tests, commit et push, sans appliquer ni déployer
+- Réservations actives : `supabase/functions/app-presence/index.ts`, `supabase/functions/_shared/presence.ts`,
+  `supabase/functions/_shared/presence_test.ts`, `supabase/migrations/20261127120000_app_presence_proto.sql`,
+  `supabase/tests/app_presence_proto_test.sql`.
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 23:41 : migration 20261127120000 (colonne proto, presence_beat_seek à 6 arguments, celle à 5 gardée pour la fonction
+  en ligne), app-presence passe proto ; test SQL sur une base jetable (initdb, port 55437) OK, et en échec sur l'ancien
+  comportement (2 contrôles) ; deno test 7/7, deno check et eslint OK ; aucun appel de plus. Pas appliqué, pas déployé.
+- 23:41 : commité et poussé sur le relais du Producer (Raphaël : « tout comme recommandé ») : mes 5 fichiers et cette
+  section seulement ; migration non appliquée, fonction non déployée (attend la phrase de Raphaël tapée ici). Statut :
+  terminé. Réservations libérées.

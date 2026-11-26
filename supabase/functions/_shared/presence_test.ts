@@ -1,6 +1,6 @@
 // deno test supabase/functions/_shared/presence_test.ts
 import { assert, assertEquals } from 'jsr:@std/assert@1';
-import { BeatLimiter, clientIp, isSession, parseSeek } from './presence.ts';
+import { BeatLimiter, clientIp, isSession, parseProto, parseSeek } from './presence.ts';
 
 const LIMITS = { sessionsPerIp: 3, sessionWindowMs: 10 * 60_000, beatsPerMinute: 5 };
 const id = (n: number): string => `0000000${n}-1111-4222-8333-444444444444`.slice(-36);
@@ -60,4 +60,17 @@ Deno.test('a search carries a clean name, a format and a session to join', () =>
 	assertEquals(parseSeek({ nick: 'Bébert', players: 1, game: 'a b' }), null, 'a session id');
 	assertEquals(parseSeek(undefined), null);
 	assertEquals(parseSeek('Bébert'), null);
+});
+
+Deno.test("a beat's protocol is the game's number, or none before 1.0.20", () => {
+	assertEquals(parseProto('14'), '14');
+	assertEquals(parseProto(14), '14', 'sent as a number');
+	assertEquals(parseProto(undefined), null, 'a phone before 1.0.20');
+	assertEquals(parseProto(null), null);
+	assertEquals(parseProto(''), null);
+	assertEquals(parseProto(' 14'), null, 'nothing around it');
+	assertEquals(parseProto('14a'), null);
+	assertEquals(parseProto('1'.repeat(9)), null, 'eight digits at most');
+	assertEquals(parseProto(1.5), null);
+	assertEquals(parseProto({ proto: '14' }), null);
 });
