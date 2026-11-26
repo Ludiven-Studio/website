@@ -4044,3 +4044,14 @@
 - 22:51 : commité sur la branche drone-test-duel du worktree website-worktrees/drone-test-duel, pas poussé : le
   Producer pousse sur le mot de Raphaël. Mon fichier et cette section seulement.. Statut : terminé. Réservations
   libérées.
+
+## 2026-11-26 — LudivenTools : hideIn l'emporte toujours (pubs maison) (session LudivenTools)
+- Statut : en cours (2026-11-26T23:31+01:00). Demande de l'utilisateur : Raphaël via le Producer : « tout comme
+  recommandé », hideIn gagne aussi avec app
+- Réservations actives : `src/lib/promoShares.ts`, `src/lib/promoShares.test.ts` (worktree D:/tmp/site-hidein).
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 23:33 : promoShares.ts : hideIn masque aussi avec app, groupes par app seul ; vitest promo 161 OK, eslint OK ;
+  commité dans le worktree D:/tmp/site-hidein (branche ludiventools-hidein), pas poussé : attend la ligne de Raphaël
+- 23:40 : poussé sur la ligne de Raphaël (« pousse le correctif hideIn du site ») : promoShares.ts, son test, le
+  commentaire de promoRules.mjs, et cette section ; catalogue déjà nettoyé par l'admin (0103893), simulation : les 5
+  applis montrent la même chose. Statut : terminé. Réservations libérées.
