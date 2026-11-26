@@ -71,6 +71,7 @@ export default defineConfig({
                 !page.includes('/jeux/eclats/nuit') &&
                 !page.includes('/beta-') &&
                 !page.includes('/prefab-fusion') &&
+                !page.includes('/work/dominoland') &&
                 !page.includes('/admin/'),
         }),
         AstroPWA({

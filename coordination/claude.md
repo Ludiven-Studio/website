@@ -4093,3 +4093,25 @@
   du mot de Raphaël pour pousser.
 - 07:46 : commité et poussé à la demande de Raphaël tapée ici (« Pousse la correction du menu des pages de test ») :
   mes 2 fichiers et cette section seulement. Statut : terminé. Réservations libérées.
+## 2026-11-26 — Dominoland : pages produit, téléchargement, confidentialité, CGU (×5), version.json (session DominoWorld)
+- Statut : en cours (2026-11-26T23:34+01:00). Demande de l'utilisateur : Producer (décision de Raphaël, 2026-11-26 :
+  1.0 sans pub, sans achat, sans compte ; exception au gel pour les liens légaux et les pages du site) : faire les
+  pages de Dominoland ; commit sans push sur une branche
+- Réservations actives : `src/pages/dominoland.astro`, `src/pages/dominoland/{telecharger,confidentialite,cgu}.astro`,
+  `src/pages/{en,es,de,it}/dominoland*`, `src/components/DominolandLanding.astro`,
+  `src/components/DominolandDownload.astro`, `src/data/dominoland.ts`, `public/dominoland/`,
+  `public/assets/home/stage-dominoland.webp`, `src/data/homeGames.ts`, `src/data/siteNav.ts`,
+  `src/data/testerLinks.ts`, `src/layouts/BaseLayout.astro`, `src/pages/confidentialite.astro`,
+  `src/pages/contact.astro`, `src/pages/en/contact.astro`, `src/pages/mentions-legales.astro`,
+  `src/content/work/dominoland.md`, `src/content/work-en/dominoland.md` (worktree website-worktrees/dominoland-pages).
+- Ressources : serveur de dev sur le port 4411 ; eslint, `astro check`. Build annoncé ici avant.
+- 23:51 : Pages produit et téléchargement (×5), confidentialité et CGU (×5), version.json 1.0.0, listes (accueil,
+  contact, confidentialité du site, mentions légales, fiche projet masquée) ; eslint et astro check propres (0 erreur),
+  test versionJson 29/29, captures clair, sombre, téléphone vues. Lancement du build complet (écrit dist/, .astro/,
+  public/vendor/ de mon worktree website-worktrees/dominoland-pages)…
+- 23:54 : Build complet OK (268 pages, précache 441 entrées, liens OK). Réserve aussi astro.config.mjs : la fiche
+  projet masquée /work/dominoland/ hors du sitemap, comme Prefab Fusion.
+- 00:08 : Retiré du carrousel de l'accueil (homeGames.ts non touché) : un 6e jeu y passait seul sur une 2e ligne ;
+  image de tête dans public/assets/dominoland/stage.webp. Build complet OK (268 pages, précache 441, liens OK).
+- 00:08 : commité sur la branche dominoland-pages du worktree website-worktrees/dominoland-pages, pas poussé : le push
+  attend le mot de Raphaël. Mes fichiers et cette section seulement. Statut : terminé. Réservations libérées.
