@@ -3990,3 +3990,15 @@
 - Ressources : serveur de dev sur le port 4391 ; eslint, `astro check`. Build annoncé ici avant.
 - 14:20 : stats-admin redéployé sur la phrase de Raphaël (403 sans compte : il tourne) ; commité, push du site en
   attente de sa phrase ; tests 49/49, eslint, astro check, captures. Statut : terminé. Réservations libérées.
+
+## 2026-11-26 — Nino Rush : « panda roux aventurier », sans « petit » (session NinoRush)
+- Statut : en cours (2026-11-26T15:49+01:00). Demande de l'utilisateur : Producer (Raphaël : « c est plus un "petit"
+  panda roux ») : retirer « petit » partout où il décrit Nino, en 5 langues
+- Réservations actives : `src/data/ninoRush.ts`.
+- Ressources : serveur de dev sur le port 4397 ; eslint, `astro check`. Build annoncé ici avant.
+- 15:57 : src/data/ninoRush.ts : « petit » retiré des 5 langues (titre, description, texte de l'image, histoire) ;
+  eslint et astro check propres. Lancement du build complet (écrit dist/, .astro/, public/vendor/)…
+- 15:59 : Build complet propre (246 pages, precache et liens OK) ; la page /nino-rush/ du dist dit « panda roux
+  aventurier ».
+- 15:59 : commité et poussé sur le relais du Producer (Raphaël : « c est plus un "petit" panda roux ») : mon fichier et
+  cette section seulement. Statut : terminé. Réservations libérées.
