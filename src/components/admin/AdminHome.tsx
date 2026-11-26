@@ -14,7 +14,7 @@ const int = new Intl.NumberFormat('fr-FR');
 // The studio's apps in the order of their colours.
 const APPS = ['Pétanque Game', "Dragon's Gems", 'Pétanque Meet', 'Nino Rush', 'Pétanque Scan'];
 
-interface Tile { href: string; title: string; text: string; figure?: ReactNode; sub?: string; extra?: string }
+interface Tile { href: string; title: string; text: string; figure?: ReactNode; lines?: (string | undefined)[] }
 /** Why the purchases did not come: the stats not set up, the function not redeployed, or no answer. */
 export function whyMissing(e: unknown): string {
 	if (e instanceof StatsError && e.status === 503) return 'statistiques non branchées';
@@ -48,25 +48,25 @@ export default function AdminHome() {
 	}, [signedIn]);
 
 	const counted = money ? homeIncome(money) : null;
-	const month = counted ? revenueTile(counted) : {};
+	const month = counted ? revenueTile(counted) : { lines: [] };
 	const tiles: Tile[] = [
 		{
 			href: '/admin/stats/', title: 'Statistiques', text: 'Visiteurs, achats, connexions et pubs maison, appli par appli.',
-			figure: stats ? int.format(stats.visitors7) : undefined, sub: stats ? `visiteurs sur 7 jours · ${stats.apps} applis` : statsError ?? undefined,
-			extra: counted && money ? weekLine(counted, money.why) : undefined,
+			figure: stats ? int.format(stats.visitors7) : undefined,
+			lines: [stats ? `visiteurs des 7 derniers jours · ${stats.apps} applis` : statsError ?? undefined, counted && money ? weekLine(counted, money.why) : undefined],
 		},
 		{
 			href: '/admin/revenus/', title: 'Revenus', text: 'La publicité et les achats intégrés, en euros.',
-			figure: month.figure, sub: month.sub,
+			figure: month.figure, lines: month.lines,
 		},
 		{
 			href: '/admin/versions/', title: 'Versions', text: 'Chaque appli sur les stores, chez les testeurs et sur main.',
 			figure: waits === null ? undefined : <span className={waits ? 'ak-warn-text' : undefined}>{waits}</span>,
-			sub: waits === null ? undefined : waits ? `chose${waits > 1 ? 's' : ''} t'attend${waits > 1 ? 'ent' : ''}` : "rien ne t'attend",
+			lines: [waits === null ? undefined : waits ? `chose${waits > 1 ? 's' : ''} t'attend${waits > 1 ? 'ent' : ''}` : "rien ne t'attend"],
 		},
 		{
 			href: '/admin/pubs/', title: 'Pubs maison', text: 'Le catalogue des applis et leurs poids.',
-			figure: ads === null ? undefined : ads, sub: ads === null ? undefined : `pub${ads > 1 ? 's' : ''} active${ads > 1 ? 's' : ''}`,
+			figure: ads === null ? undefined : ads, lines: [ads === null ? undefined : `pub${ads > 1 ? 's' : ''} active${ads > 1 ? 's' : ''}`],
 		},
 		{ href: '/tests/', title: 'Versions de test', text: 'Les APK de test des applis et les prototypes, au même endroit.' },
 	];
@@ -93,8 +93,7 @@ export default function AdminHome() {
 						<a className="ak-tile ah-tile" href={t.href}>
 							<span>{t.title}</span>
 							{t.figure !== undefined ? <strong>{t.figure}</strong> : <em>{t.text}</em>}
-							{t.sub && <small>{t.sub}</small>}
-							{t.extra && <small>{t.extra}</small>}
+							{t.lines?.filter(Boolean).map((l) => <small key={l}>{l}</small>)}
 						</a>
 					</li>
 				))}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { homeIncome, revenueTile, weekLine, type HomeMoney } from './homeRevenue';
-import { income, periodLine } from './income';
+import { income, periodLine, since } from './income';
+import { NET_SHARE } from './inAppWeek';
 import type { PlayOrders, Purchase, Purchases, Rates, Revenue } from './statsAdmin';
 
 // Raphaël's November, 24 Nov 2026: 2,06 $ of ads (1,88 € on /admin/revenus/ at the ECB's 1,0957 $ for 1 €) and
@@ -39,9 +40,22 @@ describe('one count for the admin home and /admin/revenus/', () => {
 		const page = periodLine(income({ revenue: MONEY, orders: null, apple: null, seen: SEEN, rates: RATES, now: NOW }), 'month');
 		expect(page.total).toBe(14.25);
 		expect(nbsp(home.figure)).toBe('14,25 €');
-		expect(nbsp(page.parts)).toBe('Pubs 1,88 € net (2,06 $US) · Achats 12,37 € net (17,47 € payés, vus par les applis)');
-		expect(nbsp(home.sub)).toBe(`net ce mois · ${nbsp(page.parts)}`);
-		expect(nbsp(weekLine(homeIncome(NOVEMBER), ''))).toBe('Achats intégrés · 7 j : 12,37 € net (17,47 € payés)');
+		expect(nbsp(page.sum)).toBe('Pubs 1,88 € + Achats 12,37 € = 14,25 € net');
+		expect(page.paid.map(nbsp)).toEqual(['Pubs : 2,06 $US versés par LevelPlay', "Achats : 17,47 € payés, d'après les achats vus par les applis, pas les relevés Google/Apple"]);
+		expect(nbsp(page.net)).toBe('net = payé − TVA (20 %) − commission du store (15 %) ; les pubs sont nettes telles quelles (ni TVA ni commission)');
+		expect(home.lines.map(nbsp)).toEqual(['net depuis le 1er novembre', nbsp(page.sum), ...page.paid.map(nbsp), nbsp(page.net)]);
+		expect(nbsp(weekLine(homeIncome(NOVEMBER), ''))).toBe('Achats intégrés des 7 derniers jours : 12,37 € net (17,47 € payés)');
+	});
+
+	it('counts net from the apps as paid less 20 % VAT then the store’s 15 %', () => {
+		// The 7 days Raphaël saw on 26 Nov: 14,98 € paid, 10,61 € net.
+		expect(Math.round(14.98 * NET_SHARE * 100) / 100).toBe(10.61);
+		expect(Math.round(17.47 * NET_SHARE * 100) / 100).toBe(12.37);
+	});
+
+	it('writes the month it counts from', () => {
+		expect(since('2026-11-01')).toBe('depuis le 1er novembre');
+		expect(since('2027-02-01')).toBe('depuis le 1er février');
 	});
 
 	it('takes a store’s own report once it answers, and says so', () => {
@@ -53,13 +67,17 @@ describe('one count for the admin home and /admin/revenus/', () => {
 		expect(r.inAppFrom).toEqual({ play: 'report', appstore: 'apps' });
 		// Play from its report only (4,16 € less 15 %), the App Store from the apps (none seen).
 		expect(r.month.play).toEqual({ net: 3.54, gross: 4.99 });
-		expect(nbsp(periodLine(r, 'month').parts)).toContain('Google Play relevé du store, App Store vus par les applis');
+		expect(nbsp(periodLine(r, 'month').paid.join(' '))).toContain("Google Play d'après son relevé, App Store d'après les achats vus par l'appli");
+		const both = periodLine(homeIncome({ ...NOVEMBER, orders, apple: { generatedAt: '', from: '', errors: [], sales: [] } as never }), 'month');
+		expect(nbsp(both.paid.join(' '))).toContain("d'après les relevés Google/Apple");
+		expect(nbsp(both.net)).toContain("net = payé − TVA du pays de l'acheteur − commission du store");
 	});
 
 	it('names what did not come', () => {
 		const none = homeIncome({ ...NOVEMBER, seen: null });
-		expect(revenueTile(none).sub).toContain('Achats non relevés');
+		expect(nbsp(periodLine(none, 'month').sum)).toBe('Pubs 1,88 € = 1,88 € net · achats non relevés');
+		expect(revenueTile(none).lines).toContain('net = ce que LevelPlay verse (ni TVA ni commission)');
 		expect(weekLine(none, 'statistiques non branchées')).toBe('Achats intégrés : statistiques non branchées');
-		expect(revenueTile(homeIncome({ money: null, orders: null, apple: null, seen: null, rates: null, now: NOW }))).toEqual({});
+		expect(revenueTile(homeIncome({ money: null, orders: null, apple: null, seen: null, rates: null, now: NOW }))).toEqual({ lines: [] });
 	});
 });

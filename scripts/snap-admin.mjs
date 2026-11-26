@@ -166,6 +166,8 @@ const APPSTORE = {
 const RATES = { generatedAt: ago(2), date: '2026-11-20', perEur: { EUR: 1, USD: 1.0512, CHF: 0.9381, CAD: 1.4702 }, cached: true };
 
 const ANSWERS = { overview: OVERVIEW, orders: ORDERS, purchases: PURCHASES, revenue: REVENUE, board: BOARD, appstore: APPSTORE, rates: RATES, ...PROMO };
+// SNAP_APPS=1: no store report answers, so the purchases come from what the apps saw, as live in November 2026.
+if (process.env.SNAP_APPS) for (const k of ['orders', 'appstore']) delete ANSWERS[k];
 
 const mock = createServer((req, res) => {
 	res.setHeader('Access-Control-Allow-Origin', '*');

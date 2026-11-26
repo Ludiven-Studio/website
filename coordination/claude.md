@@ -3961,3 +3961,14 @@
   l'APK sera en ligne (choix de Raphaël). Réservations maintenues.
 - 01:11 : commité et poussé à la demande de l'utilisateur (APK dev 0.1.1 en ligne) : mes 2 fichiers et cette section
   seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-26 — Admin : revenus lisibles (session website)
+- Statut : en cours (2026-11-26T13:37+01:00). Demande de l'utilisateur : Producer (Raphaël « ok ») : périodes en
+  entier, total en somme, ligne net, « vus par les applis » reformulé
+- Réservations actives : `src/lib/income.ts`, `src/lib/homeRevenue.ts`, `src/lib/homeRevenue.test.ts`,
+  `src/components/admin/AdminHome.tsx`, `src/components/admin/AdminRevenue.tsx`.
+- Ressources : serveur de dev sur le port 4391 ; eslint, `astro check`. Build annoncé ici avant.
+- 13:42 : Réserve aussi scripts/snap-admin.mjs (SNAP_APPS : sans relevé des stores). Tests 10/10, eslint et astro check
+  propres. Captures sur le serveur de dev, port 4391.
+- 13:44 : commité et poussé sur le relais du Producer (Raphaël « ok ») : mes 6 fichiers et cette section seulement.
+  Statut : terminé. Réservations libérées.

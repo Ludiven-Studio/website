@@ -1,7 +1,7 @@
 // /admin/revenus/: the studio's income in euros first (ads, Google Play and App Store in-app sales, net and paid),
 // then the ad revenue per app from the LevelPlay Reporting API (every mediated network), through stats-admin: this
 // month, the last 30 days and each of those days, with Unity Ads' own share.
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { Fragment, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import GoogleSignIn from './GoogleSignIn';
 import { appColor } from '../../lib/appColors';
 import { networkLabel, unityShare } from '../../lib/adNetworks';
@@ -9,7 +9,7 @@ import {
 	STATS_LOCAL, StatsError, appStore, playOrders, purchases, rates, revenue, statsMessage,
 	type AppStoreSales, type PlayOrders, type Purchases, type Rates, type Revenue, type RevenueApp, type RevenueDay, type RevenueNetwork,
 } from '../../lib/statsAdmin';
-import { PLAY_CUT, SOURCES, income, periodLine, type Source } from '../../lib/income';
+import { PLAY_CUT, SOURCES, income, periodLine, since, type Source } from '../../lib/income';
 import { useAdminSession } from './useAdminSession';
 import { AppName, Bars, DayStack, Help, Pill, Tile, appStyle } from './AdminParts';
 
@@ -19,6 +19,8 @@ const at = (d: string) => new Date(`${d}T12:00:00Z`);
 const dayLabel = (d: string): string => at(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'UTC' });
 const firstLabel = (d: string): string => (d.endsWith('-01') ? `1er ${at(d).toLocaleDateString('fr-FR', { month: 'short', timeZone: 'UTC' })}` : dayLabel(d));
 const when = (iso: string): string => new Date(iso).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
+/** « Depuis le 1er novembre ». */
+const Since = (monthStart: string): string => since(monthStart).replace(/^d/, 'D');
 
 /** « 1–23 nov. », or « 25 oct.–23 nov. » across two months. */
 function range(from: string, to: string): string {
@@ -69,7 +71,7 @@ function Income({ ads, orders, apple, seen, fx }: { ads: Revenue | null; orders:
 	const status = (s: Source): ReactNode => {
 		if (s === 'ads') return ads ? null : <Pill tone="warn">pas lu</Pill>;
 		const from = r.inAppFrom[s], problem = s === 'play' ? orders.problem : apple.problem;
-		if (from === 'apps') return <Pill tone="plain" title={problem ? `Relevé du store : ${problem}` : undefined}>vus par les applis</Pill>;
+		if (from === 'apps') return <Pill tone="plain" title={problem ? `Relevé du store : ${problem}` : undefined}>achats vus par les applis, pas le relevé</Pill>;
 		return from ? null : <Pill tone="warn">{problem ?? 'pas lu'}</Pill>;
 	};
 	const paid30 = (s: Source): string => (s === 'ads' ? (r.adsPaid ? money(r.adsPaid.currency)(r.adsPaid.last30) : '–') : eur(r.last30[s].gross));
@@ -79,15 +81,16 @@ function Income({ ads, orders, apple, seen, fx }: { ads: Revenue | null; orders:
 		<section className="ak-income">
 			<header className="ak-section"><h2>Tout compris <small>en euros, net</small></h2></header>
 			<div className="ak-tiles">
-				<Tile label={`Ce mois · ${range(r.monthStart, last)}`} value={eur(month.total)} sub={month.parts} />
-				<Tile label={`30 derniers jours · ${range(first, last)}`} value={eur(last30.total)} sub={last30.parts} />
-				<Tile label="Publicité · ce mois" value={eur(r.month.ads.net)} sub="LevelPlay, toutes régies" />
-				<Tile label="Achats intégrés · ce mois" value={eur(r.month.play.net + r.month.appstore.net)} sub={`Google Play ${eur(r.month.play.net)} · App Store ${eur(r.month.appstore.net)}`} />
+				<Tile label={`${Since(r.monthStart)} · ${range(r.monthStart, last)}`} value={eur(month.total)} sub={<>{month.sum}{month.paid.map((l) => <Fragment key={l}><br />{l}</Fragment>)}</>} />
+				<Tile label={`30 derniers jours · ${range(first, last)}`} value={eur(last30.total)} sub={<>{last30.sum}{last30.paid.map((l) => <Fragment key={l}><br />{l}</Fragment>)}</>} />
+				<Tile label={`Publicité · ${since(r.monthStart)}`} value={eur(r.month.ads.net)} sub="LevelPlay, toutes régies" />
+				<Tile label={`Achats intégrés · ${since(r.monthStart)}`} value={eur(r.month.play.net + r.month.appstore.net)} sub={`Google Play ${eur(r.month.play.net)} · App Store ${eur(r.month.appstore.net)}`} />
 			</div>
+			{month.net && <p className="ak-note">{month.net.replace(/^n/, 'N')}.</p>}
 			<div className="pa-card ak-card">
 				<div className="as-scroll">
 					<table className="ak-table ak-num ak-sources">
-						<thead><tr><th scope="col">Source</th><th scope="col">Ce mois</th><th scope="col">30 jours</th><th scope="col" className="ak-wide">30 jours payé</th></tr></thead>
+						<thead><tr><th scope="col">Source</th><th scope="col">{Since(r.monthStart)}</th><th scope="col">30 derniers jours</th><th scope="col" className="ak-wide">Payé, 30 derniers jours</th></tr></thead>
 						<tbody>
 							{SOURCES.map((s) => (
 								<tr key={s}>
@@ -107,7 +110,7 @@ function Income({ ads, orders, apple, seen, fx }: { ads: Revenue | null; orders:
 				{r.apps.length > 0 && (
 					<div className="as-scroll">
 						<table className="ak-table ak-num">
-							<thead><tr><th scope="col">Par appli · 30 jours</th><th scope="col" className="ak-wide">Publicité</th><th scope="col" className="ak-wide">Google Play</th><th scope="col" className="ak-wide">App Store</th><th scope="col">Total</th></tr></thead>
+							<thead><tr><th scope="col">Par appli · 30 derniers jours</th><th scope="col" className="ak-wide">Publicité</th><th scope="col" className="ak-wide">Google Play</th><th scope="col" className="ak-wide">App Store</th><th scope="col">Total</th></tr></thead>
 							<tbody>
 								{r.apps.map((a) => (
 									<tr key={a.key}>
@@ -127,8 +130,9 @@ function Income({ ads, orders, apple, seen, fx }: { ads: Revenue | null; orders:
 						Net : ce qui revient au studio. Publicité : ce que LevelPlay nous verse, entre entreprises, sans TVA ; « payé » la
 						donne en dollars, avant conversion. App Store : les « Developer Proceeds » d'Apple, après sa part et la TVA. Google Play :
 						une estimation, le prix hors taxes moins les {Math.round(PLAY_CUT * 100)} % de Google. Payé : ce que les acheteurs ont
-						payé. Sans le relevé d'un store, ses achats sont ceux que les applis ont vus (réels seulement, au prix du catalogue
-						en France, net estimé : TVA de 20 % puis 15 % du store) ; c'est le même compte que l'accueil de l'admin.
+						payé. Sans le relevé d'un store, ses achats sont ceux que les applis ont vus, pas ceux du relevé de Google ou
+						d'Apple (réels seulement, au prix du catalogue en France ; net = payé − TVA (20 %) − commission du store (15 %),
+						une estimation : la TVA dépend du pays de l'acheteur) ; c'est le même compte que l'accueil de l'admin.
 					</p>
 					<p>
 						{fx.data
@@ -143,19 +147,19 @@ function Income({ ads, orders, apple, seen, fx }: { ads: Revenue | null; orders:
 	);
 }
 
-function AppCard({ app, fmt }: { app: RevenueApp; fmt: (n: number) => string }) {
+function AppCard({ app, fmt, monthStart }: { app: RevenueApp; fmt: (n: number) => string; monthStart: string }) {
 	return (
 		<article className="pa-card ak-appcard" style={appStyle(app.name)}>
 			<header>
 				<h2><i aria-hidden="true" />{app.name}</h2>
 				{app.platforms.length > 1 && (
-					<small>{app.platforms.map((p) => `${PLATFORMS[p.platform] ?? p.platform} ${fmt(p.month)}`).join(' · ')} ce mois</small>
+					<small>{app.platforms.map((p) => `${PLATFORMS[p.platform] ?? p.platform} ${fmt(p.month)}`).join(' · ')} {since(monthStart)}</small>
 				)}
 			</header>
 			<div className="ak-nums">
-				<div><span>Ce mois</span><strong>{fmt(app.month)}</strong><small>{unityPart(app.networks, 'month', fmt)}</small></div>
-				<div><span>30 jours</span><strong>{fmt(app.last30)}</strong><small>{unityPart(app.networks, 'last30', fmt)}</small></div>
-				<div><span>Affichages</span><strong>{int.format(app.impressions30)}</strong><small>sur 30 jours</small></div>
+				<div><span>{Since(monthStart)}</span><strong>{fmt(app.month)}</strong><small>{unityPart(app.networks, 'month', fmt)}</small></div>
+				<div><span>30 derniers jours</span><strong>{fmt(app.last30)}</strong><small>{unityPart(app.networks, 'last30', fmt)}</small></div>
+				<div><span>Affichages</span><strong>{int.format(app.impressions30)}</strong><small>sur les 30 derniers jours</small></div>
 			</div>
 			<DayStack days={app.days.map((d) => d.date)} series={[{ key: app.name, label: app.name, color: appColor(app.name), byDay: byDay(app.days) }]} unit={fmt} partial />
 		</article>
@@ -174,14 +178,14 @@ function Studio({ data, fmt }: { data: Revenue; fmt: (n: number) => string }) {
 	return (
 		<>
 			<div className="ak-tiles">
-				<Tile label={`Ce mois · ${range(data.monthStart, data.to)}`} value={fmt(total.month)} sub={unityPart(total.networks, 'month', fmt)} />
+				<Tile label={`${Since(data.monthStart)} · ${range(data.monthStart, data.to)}`} value={fmt(total.month)} sub={unityPart(total.networks, 'month', fmt)} />
 				<Tile label={`30 derniers jours · ${range(data.from, data.to)}`} value={fmt(total.last30)} sub={unityPart(total.networks, 'last30', fmt)} />
 				{yesterday && <Tile label={`Hier · ${dayLabel(yesterday.date)}`} value={fmt(yesterday.revenue)} sub={`${fmt(week.reduce((s, d) => s + d.revenue, 0) / Math.max(1, week.length))} par jour sur 7 jours`} />}
-				<Tile label="Affichages · 30 jours" value={int.format(shows)} sub={`${apps.length} ${apps.length > 1 ? 'applis' : 'appli'}`} />
+				<Tile label="Affichages · 30 derniers jours" value={int.format(shows)} sub={`${apps.length} ${apps.length > 1 ? 'applis' : 'appli'}`} />
 			</div>
 			{nothingBefore && (
 				<p className="ak-note">
-					LevelPlay ne compte aucun revenu avant le {firstLabel(data.monthStart)} : ce mois et les 30 jours sont donc égaux, et ce
+					LevelPlay ne compte aucun revenu avant le {firstLabel(data.monthStart)} : les chiffres {since(data.monthStart)} et des 30 derniers jours sont donc égaux, et ce
 					que Unity compte en octobre a été gagné hors LevelPlay.
 				</p>
 			)}
@@ -210,11 +214,11 @@ function Studio({ data, fmt }: { data: Revenue; fmt: (n: number) => string }) {
 			</section>
 			<div className="pa-card ak-pair">
 				<section>
-					<h2>Par appli <small>30 jours</small></h2>
+					<h2>Par appli <small>30 derniers jours</small></h2>
 					<Bars format={fmt} empty="aucun revenu" rows={apps.map((a) => ({ key: a.name, label: a.name, value: a.last30, color: appColor(a.name) }))} />
 				</section>
 				<section className="ak-netbars">
-					<h2>Par régie <small>30 jours, noms de LevelPlay</small></h2>
+					<h2>Par régie <small>30 derniers jours, noms de LevelPlay</small></h2>
 					{total.networks ? (
 						<Bars format={fmt} empty="aucun revenu" rows={total.networks.map((n) => ({ key: n.network, label: networkLabel(n), value: n.last30, color: 'var(--sc-muted)' }))} />
 					) : <p className="as-muted">Relevé d'avant le détail par régie : « Actualiser » le relit.</p>}
@@ -289,7 +293,7 @@ export default function AdminRevenue() {
 			{data && !data.apps.length && <p className="pa-card as-muted">LevelPlay ne donne aucun revenu sur ces 30 jours.</p>}
 			{data && data.apps.length > 0 && (
 				<div className="ak-apps">
-					{data.apps.map((a) => <AppCard key={a.name} app={a} fmt={fmt} />)}
+					{data.apps.map((a) => <AppCard key={a.name} app={a} fmt={fmt} monthStart={data.monthStart} />)}
 				</div>
 			)}
 		</div>

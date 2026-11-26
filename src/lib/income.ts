@@ -2,7 +2,8 @@
 // US dollars), Google Play's and the App Store's in-app sales, each converted at the ECB's rate of the day.
 // Net is what reaches the studio: LevelPlay's figure as it is (paid business to business, no VAT), Apple's proceeds,
 // and for Google Play an estimate, the price before tax less Google's 15 %. Each store's own report is used when it
-// answers; without it, the purchases its apps saw, at the catalogue price (`inAppFrom` says which).
+// answers; without it, the purchases its apps saw, at the French catalogue price less 20 % VAT then the store's 15 %
+// (`inAppFrom` says which).
 import { APP_NAMES, appKey } from './appColors';
 import { COUNTED_KINDS, type AppStoreSales, type PlayOrders, type Purchases, type Rates, type Revenue } from './statsAdmin';
 import { NET_SHARE, cataloguePrice } from './inAppWeek';
@@ -35,6 +36,7 @@ export interface Income {
 const DAY = 86_400_000;
 const isoDay = (t: number) => new Date(t).toISOString().slice(0, 10);
 const round = (n: number) => Math.round(n * 100) / 100;
+const NBSP = String.fromCharCode(0xa0);
 const plain = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '');
 
 function appOf(...names: (string | undefined)[]): { key: string; name: string } {
@@ -138,19 +140,50 @@ export function income({ revenue, orders, apple, seen = null, rates, now }: {
 	return out;
 }
 
-/** A period's total, net, and what it is made of, in the words each part needs: « Pubs 1,88 € net (2,06 $US) ·
- *  Achats 12,37 € net (17,47 € payés, vus par les applis) ». The home and /admin/revenus/ both show it. */
-export function periodLine(r: Income, period: 'month' | 'last30' | 'last7'): { total: number; parts: string } {
+/** « depuis le 1er novembre », the month a `monthStart` opens. */
+export function since(monthStart: string): string {
+	return `depuis le 1er ${new Date(`${monthStart}T12:00:00Z`).toLocaleDateString('fr-FR', { month: 'long', timeZone: 'UTC' })}`;
+}
+
+export interface PeriodLine {
+	total: number;
+	/** « Pubs 2,15 € + Achats 12,37 € = 14,52 € net ». */
+	sum: string;
+	/** What was paid, and where each figure comes from: one line for the ads, one for the purchases. */
+	paid: string[];
+	/** How net is counted. */
+	net: string;
+}
+
+/** A period's net total as the sum of its parts, what was paid, and how net is counted. The home and
+ *  /admin/revenus/ both show it. */
+export function periodLine(r: Income, period: 'month' | 'last30' | 'last7'): PeriodLine {
 	const eur = (n: number) => n.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
 	const p = r[period];
 	const buyNet = round(p.play.net + p.appstore.net), buyPaid = round(p.play.gross + p.appstore.gross);
-	const paid = r.adsPaid;
-	const ads = paid
-		? `Pubs ${eur(p.ads.net)} net (${paid[period].toLocaleString('fr-FR', { style: 'currency', currency: paid.currency })})`
-		: 'Pubs non relevées';
+	const total = round(p.ads.net + buyNet);
+	const ads = r.adsPaid;
 	const { play, appstore } = r.inAppFrom;
-	const word = (f: InAppFrom) => (f === 'report' ? 'relevé du store' : f === 'apps' ? 'vus par les applis' : 'non relevé');
-	const how = play === appstore ? (play === 'report' ? 'relevés des stores' : word(play)) : `Google Play ${word(play)}, App Store ${word(appstore)}`;
-	const buys = !play && !appstore ? 'Achats non relevés' : `Achats ${eur(buyNet)} net (${eur(buyPaid)} payés, ${how})`;
-	return { total: round(p.ads.net + buyNet), parts: `${ads} · ${buys}` };
+	const buys = !!(play || appstore);
+
+	const terms = [ads && `Pubs ${eur(p.ads.net)}`, buys && `Achats ${eur(buyNet)}`].filter(Boolean);
+	const missing = [!ads && 'pubs non relevées', !buys && 'achats non relevés'].filter(Boolean);
+	const sum = [terms.length ? `${terms.join(' + ')} = ${eur(total)} net` : '', ...missing].filter(Boolean).join(' · ');
+
+	const word = (f: InAppFrom) => (f === 'report' ? "d'après son relevé" : f === 'apps' ? "d'après les achats vus par l'appli" : 'non relevé');
+	const how = play === appstore
+		? (play === 'report' ? "d'après les relevés Google/Apple" : "d'après les achats vus par les applis, pas les relevés Google/Apple")
+		: `Google Play ${word(play)}, App Store ${word(appstore)}`;
+	const paid = [
+		ads && `Pubs : ${ads[period].toLocaleString('fr-FR', { style: 'currency', currency: ads.currency })} versés par LevelPlay`,
+		buys && `Achats : ${eur(buyPaid)} payés, ${how}`,
+	].filter((l): l is string => !!l);
+
+	const fromApps = play === 'apps' || appstore === 'apps';
+	const pct = (n: number) => `(${n}${NBSP}%)`;
+	const net = [
+		buys && (fromApps ? `net = payé − TVA ${pct(20)} − commission du store ${pct(15)}` : "net = payé − TVA du pays de l'acheteur − commission du store"),
+		ads && (buys ? 'les pubs sont nettes telles quelles (ni TVA ni commission)' : 'net = ce que LevelPlay verse (ni TVA ni commission)'),
+	].filter(Boolean).join(' ; ');
+	return { total, sum, paid, net };
 }
