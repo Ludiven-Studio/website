@@ -4069,3 +4069,13 @@
 - 23:41 : commité et poussé sur le relais du Producer (Raphaël : « tout comme recommandé ») : mes 5 fichiers et cette
   section seulement ; migration non appliquée, fonction non déployée (attend la phrase de Raphaël tapée ici). Statut :
   terminé. Réservations libérées.
+
+## 2026-11-27 — Pétanque Scan : version.json 1.2.19 poussé (session website) (session website)
+- Statut : en cours (2026-11-27T00:07+01:00). Demande de l'utilisateur : Passe le version.json de Pétanque Scan à
+  1.2.19 sur les deux stores et pousse le site
+- Réservations actives : `public/petanque-scanner/version.json` (même contenu que le worktree scan-version-1219 de la
+  session PetanqueScan, non commité là-bas).
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 00:07 : latest_android et latest_ios 1.2.18 → 1.2.19, min inchangé, JSON valide, identique à celui de la session
+  PetanqueScan ; pas de build (fichier statique hors précache). Commité et poussé à la demande de l'utilisateur, tapée
+  dans cette session : mon fichier et cette section seulement. Statut : terminé. Réservations libérées.
