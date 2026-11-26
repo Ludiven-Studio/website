@@ -1,4 +1,4 @@
--- Presence by protocol (Pétanque Game 1.0.20), on a scratch database (never production):
+-- Presence by protocol (Pétanque Game 1.0.20, the phones before it with protocol 14), on a scratch database (never production):
 --   psql -v ON_ERROR_STOP=1 -d <scratch db> -f supabase/tests/app_presence_proto_test.sql
 -- Stands in for Supabase's roles, applies the app_presence migrations, checks, then rolls everything back.
 
@@ -35,35 +35,43 @@ begin
 	end loop;
 	perform presence_beat_seek('petanquegame', new_idle, null, null, null, '14');
 
-	-- A 1.0.20 phone counts and is told only the 1.0.20 phones.
+	-- A 1.0.20 phone counts the phones without a protocol with its own (1.0.16-1.0.19 play 14 too), and is told
+	-- the search of its own protocol first.
 	r := presence_beat_seek('petanquegame', new_idle, null, null, null, '14');
-	if (r->>'online')::int <> 2 then raise exception '1.0.20 phone: % online, 2 expected (%)', r->>'online', r; end if;
+	if (r->>'online')::int <> 4 then raise exception '1.0.20 phone: % online, 4 expected (%)', r->>'online', r; end if;
 	if r->'seeker'->>'game' is distinct from 'g14' then raise exception '1.0.20 phone told %', r->'seeker'; end if;
 	if r->'seeker'->>'proto' is distinct from '14' then raise exception 'the search told without its protocol: %', r; end if;
 
 	-- A phone before 1.0.20, through the function deployed today (five arguments) or the new one with no
-	-- protocol: only its own group, never the 1.0.20 search.
+	-- protocol: it counts the 1.0.20 phones, and is told the search without a protocol first.
 	r := presence_beat_seek('petanquegame', old_idle, null, null, null);
-	if (r->>'online')::int <> 2 then raise exception 'old phone: % online, 2 expected (%)', r->>'online', r; end if;
+	if (r->>'online')::int <> 4 then raise exception 'old phone: % online, 4 expected (%)', r->>'online', r; end if;
 	if r->'seeker'->>'game' is distinct from 'g13' then raise exception 'old phone told %', r->'seeker'; end if;
-	if r->'seeker' ? 'proto' and r->'seeker'->'proto' <> 'null'::jsonb then raise exception 'old search with a protocol: %', r; end if;
 	r := presence_beat_seek('petanquegame', old_idle, null, null, null, null);
-	if r->'seeker'->>'game' is distinct from 'g13' or (r->>'online')::int <> 2 then raise exception 'old phone, new path: %', r; end if;
+	if r->'seeker'->>'game' is distinct from 'g13' or (r->>'online')::int <> 4 then raise exception 'old phone, new path: %', r; end if;
 
-	-- The 1.0.20 search stops: a 1.0.20 phone is told none, though an old phone still searches.
+	-- The 1.0.20 search stops: a 1.0.20 phone is told the old search without a protocol, so the game offers it only
+	-- once Unity lists it among protocol 14's open games (a 1.0.14 one never is).
 	perform presence_beat_seek('petanquegame', new_seeker, null, null, null, '14');
 	r := presence_beat_seek('petanquegame', new_idle, null, null, null, '14');
-	if r->'seeker' <> 'null'::jsonb then raise exception '1.0.20 phone told an old search: %', r; end if;
+	if r->'seeker'->>'game' is distinct from 'g13' then raise exception '1.0.20 phone not told the old search: %', r; end if;
+	if r->'seeker'->'proto' <> 'null'::jsonb then raise exception 'an old search told with a protocol: %', r; end if;
 
-	-- The old search stops: an old phone is told none, though a 1.0.20 phone searches again.
+	-- The old search stops and a 1.0.20 phone searches again: an old phone is told it (1.0.16-1.0.19 can join it).
 	perform presence_beat_seek('petanquegame', new_seeker, 'Bébert', 2::smallint, 'g14b', '14');
 	perform presence_beat_seek('petanquegame', old_seeker, null, null, null);
 	r := presence_beat_seek('petanquegame', old_idle, null, null, null);
-	if r->'seeker' <> 'null'::jsonb then raise exception 'old phone told a 1.0.20 search: %', r; end if;
+	if r->'seeker'->>'game' is distinct from 'g14b' then raise exception 'old phone not told the 1.0.20 search: %', r; end if;
 
-	-- Another protocol is alone: it counts itself only.
+	-- Another protocol is alone: it counts itself only, and its search reaches neither a 1.0.20 phone nor an old one.
 	r := presence_beat_seek('petanquegame', later, null, null, null, '15');
 	if (r->>'online')::int <> 1 or r->'seeker' <> 'null'::jsonb then raise exception 'protocol 15: %', r; end if;
+	perform presence_beat_seek('petanquegame', new_seeker, null, null, null, '14');
+	perform presence_beat_seek('petanquegame', later, 'Lulu', 1::smallint, 'g15', '15');
+	r := presence_beat_seek('petanquegame', old_idle, null, null, null);
+	if r->'seeker' <> 'null'::jsonb then raise exception 'old phone told a protocol 15 search: %', r; end if;
+	r := presence_beat_seek('petanquegame', new_idle, null, null, null, '14');
+	if r->'seeker' <> 'null'::jsonb or (r->>'online')::int <> 4 then raise exception '1.0.20 phone and protocol 15: %', r; end if;
 
 	-- Rows keep their protocol; the silent ones still go after 7 minutes, whatever their group.
 	if (select proto from app_presence where session = new_seeker) is distinct from '14' then raise exception 'protocol not kept'; end if;

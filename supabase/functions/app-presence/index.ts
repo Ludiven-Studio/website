@@ -10,8 +10,8 @@
 // only while its owner searches, and goes with the row.
 //
 // From 1.0.20 the beats carry the game's online protocol: the count and the search told are those of the phones of
-// the same protocol, and the phones beating without one (before 1.0.20) are a group of their own
-// (migration 20261127120000). Still one call a beat.
+// the same protocol, the phones beating without one (before 1.0.20) going with 14, their searches told without a
+// protocol for the game to check against Unity's list (migration 20261127120000). Still one call a beat.
 //
 // POST { app, session, proto?, seek? } -> { online, seeker: { nick, players, game, proto, since } | null }
 //
