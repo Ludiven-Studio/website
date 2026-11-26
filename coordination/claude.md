@@ -4017,3 +4017,16 @@
 - 18:32 : Build complet OK (0 erreur, 246 pages, précache 419 entrées, liens OK).
 - 18:32 : commité sur décision de Raphaël relayée par le Producer : mes 7 fichiers et cette section seulement ; le push
   du site attend sa phrase tapée dans cette session. Statut : terminé. Réservations libérées.
+
+## 2026-11-26 — Nino Rush : APK de test 1.0.25 (session release-publisher)
+- Statut : en cours (2026-11-26T20:46+01:00). Demande de l'utilisateur : Producer (Raphaël : « publie ») : publier
+  l'APK de test Nino Rush 1.0.25, version et taille de /nino-rush/telecharger/
+- Réservations actives : `src/data/ninoRush.ts`.
+- Ressources : serveur de dev sur le port 4399 ; eslint, `astro check`. Build annoncé ici avant.
+- 20:50 : src/data/ninoRush.ts : version 1.0.25, 80,3 Mo (apk_publish.py page) ; eslint et astro check propres.
+  Lancement du build complet dans mon worktree D:/tmp/site-publish-nino-1.0.25 (écrit dist/, .astro/, public/vendor/
+  là-bas)…
+- 20:52 : Build complet OK (246 pages, précache 419 entrées, liens OK) ; /nino-rush/telecharger/ du dist dit « Version
+  1.0.25 · 80,3 Mo ».
+- 20:52 : commité et poussé sur le relais du Producer (Raphaël : « publie ») : mon fichier et cette section seulement.
+  Statut : terminé. Réservations libérées.. Statut : terminé. Réservations libérées.
