@@ -131,7 +131,8 @@ function checkEntry(e, base, defaultLanguage, strict, files) {
 		if (link.android === undefined && link.ios === undefined && link.web === undefined) errors.push('no link');
 	}
 	strings(e.hideIn, 'hideIn', errors);
-	// The apps built since 2026-11-05 hide an entry only in its own app; the older ones still read hideIn.
+	// hideIn hides the entry in those apps (LudivenTools 40bc256d, 2026-11-26). The apps built 2026-11-05 to then
+	// read it only in an entry without app, the older ones only hideIn: so app stays in hideIn.
 	strings(e.app, 'app', errors, (s) => PACKAGE.test(s));
 	if (Array.isArray(e.app))
 		for (const id of e.app) if (!e.hideIn?.includes?.(id)) errors.push(`app "${id}" is not in hideIn: the apps built before "app" would show it in itself`);
