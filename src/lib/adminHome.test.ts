@@ -15,7 +15,17 @@ const OVERVIEW = {
 } as unknown as Overview;
 
 describe('admin home lines', () => {
-	it('names the app most visited and compares the week with the 28 days’ average', () => {
+	it('compares the visitors of the last 7 days with the 7 days before', () => {
+		const prev = (o: Overview, visitors: number[]) =>
+			({ ...o, apps: o.apps.map((a, i) => ({ ...a, periods: { ...a.periods, prev7: { visitors: visitors[i], visits: 0, pageviews: 0 } } })) }) as Overview;
+		// 1061 visitors now against 1100 before: −4 %.
+		expect(statsLines(prev(OVERVIEW, [200, 700, 200])).map(nbsp)).toEqual([
+			'Pétanque Game en tête : 640 visiteurs',
+			"Visiteurs : −4 % par rapport aux 7 jours d'avant (1 100)",
+		]);
+	});
+
+	it('falls back on the 28 days’ average for an answer cached without the week before', () => {
 		// 2228 visits in 7 days against 5517 / 4 = 1379.25 a week: +62 %.
 		expect(statsLines(OVERVIEW).map(nbsp)).toEqual([
 			'Pétanque Game en tête : 640 visiteurs',

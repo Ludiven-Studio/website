@@ -26,7 +26,7 @@ const counts = (o) => Object.entries(o).map(([key, count]) => ({ key, count }));
 function app(id, name, domain, [d1, d7, d28], extra) {
 	return {
 		id, name, domain,
-		periods: { d1: stats(d1, Math.round(d1 * 1.6)), d7: stats(d7, Math.round(d7 * 2.1)), d28: stats(d28, Math.round(d28 * 2.6)) },
+		periods: { d1: stats(d1, Math.round(d1 * 1.6)), d7: stats(d7, Math.round(d7 * 2.1)), d28: stats(d28, Math.round(d28 * 2.6)), prev7: stats(Math.round(d7 * 0.88), Math.round(d7 * 1.9)) },
 		events: [], hosts: extra.hosts ?? null,
 		purchases: { items: counts(extra.items ?? {}), results: counts(extra.results ?? {}), outcomes: extra.buyOut ?? null },
 		signIn: { providers: counts(extra.providers ?? {}), results: counts(extra.signins ?? {}), outcomes: extra.signOut ?? null },

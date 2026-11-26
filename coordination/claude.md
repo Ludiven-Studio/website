@@ -3981,3 +3981,12 @@
 - Ressources : serveur de dev sur le port 4391 ; eslint, `astro check`. Build annoncé ici avant.
 - 14:12 : commité ; push en attente de la phrase de Raphaël dans cette session (refusé sur le relais) ; tests 4/4,
   eslint, astro check, captures clair/sombre/téléphone. Statut : terminé. Réservations libérées.
+
+## 2026-11-26 — Admin : tendance vs la semaine d'avant (session website)
+- Statut : en cours (2026-11-26T14:15+01:00). Demande de l'utilisateur : Ajoute la tendance vs la semaine d'avant dans
+  stats-admin et redéploie-le
+- Réservations actives : `supabase/functions/_shared/statsAdmin.mjs`, `supabase/functions/_shared/statsAdmin.d.mts`,
+  `src/lib/statsAdmin.test.ts`, `src/lib/adminHome.ts`, `src/lib/adminHome.test.ts`, `scripts/snap-admin.mjs`.
+- Ressources : serveur de dev sur le port 4391 ; eslint, `astro check`. Build annoncé ici avant.
+- 14:20 : stats-admin redéployé sur la phrase de Raphaël (403 sans compte : il tourne) ; commité, push du site en
+  attente de sa phrase ; tests 49/49, eslint, astro check, captures. Statut : terminé. Réservations libérées.

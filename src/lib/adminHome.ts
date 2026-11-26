@@ -10,19 +10,26 @@ const nameOf = (id: string) => {
 	return key ? APP_NAMES[key] : id;
 };
 
-/** The Statistiques card: the app most visited, and the visits of the last 7 days against the 28 days' weekly
- *  average. Umami counts visitors once per period, so only visits (sessions) add up across weeks. */
+const signed = (change: number) => `${change > 0 ? '+' : change < 0 ? '−' : ''}${pct(Math.abs(change))}`;
+
+/** The Statistiques card: the app most visited, then the visitors of the last 7 days against the 7 days before.
+ *  An answer cached before stats-admin read those (no `prev7`) compares the visits with the 28 days' weekly
+ *  average instead: Umami counts visitors once per period, so only visits add up across weeks. */
 export function statsLines(o: Overview): string[] {
 	const lines: string[] = [];
 	const top = [...o.apps].sort((a, b) => (b.periods.d7?.visitors ?? 0) - (a.periods.d7?.visitors ?? 0))[0];
 	const topVisitors = top?.periods.d7?.visitors ?? 0;
 	if (top && topVisitors) lines.push(`${top.name} en tête : ${int.format(topVisitors)} visiteurs`);
+	const withPrev = o.apps.filter((a) => a.periods.prev7 && a.periods.d7);
+	const before = withPrev.reduce((n, a) => n + (a.periods.prev7?.visitors ?? 0), 0);
+	if (before > 0) {
+		const now = withPrev.reduce((n, a) => n + (a.periods.d7?.visitors ?? 0), 0);
+		lines.push(`Visiteurs : ${signed(Math.round((now / before - 1) * 100))} par rapport aux 7 jours d'avant (${int.format(before)})`);
+		return lines;
+	}
 	const v7 = o.apps.reduce((n, a) => n + (a.periods.d7?.visits ?? 0), 0);
 	const v28 = o.apps.reduce((n, a) => n + (a.periods.d28?.visits ?? 0), 0);
-	if (v28 > 0) {
-		const change = Math.round((v7 / (v28 / 4) - 1) * 100);
-		lines.push(`Visites : ${change > 0 ? '+' : change < 0 ? '−' : ''}${pct(Math.abs(change))} par rapport à la moyenne des 28 derniers jours`);
-	}
+	if (v28 > 0) lines.push(`Visites : ${signed(Math.round((v7 / (v28 / 4) - 1) * 100))} par rapport à la moyenne des 28 derniers jours`);
 	return lines;
 }
 

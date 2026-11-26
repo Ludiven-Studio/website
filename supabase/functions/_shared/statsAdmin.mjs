@@ -304,7 +304,7 @@ export async function appStats(u, site, now) {
 	const errors = [];
 	const id = encodeURIComponent(site.id);
 	const end = now.getTime();
-	const range = (days) => ({ startAt: end - days * DAY, endAt: end });
+	const range = (days, back = 0) => ({ startAt: end - (days + back) * DAY, endAt: end - back * DAY });
 	const safe = async (what, fn) => {
 		try {
 			return await fn();
@@ -315,14 +315,17 @@ export async function appStats(u, site, now) {
 	};
 	const values = (event, property, filters = {}) => safe(`${event}.${property}${filters.os ? ` (${filters.os})` : ''}`, async () =>
 		readCounts(await u.get(`/websites/${id}/event-data/values?${query({ ...range(28), event, eventName: event, propertyName: property, ...filters })}`)));
-	const [d1, d7, d28, events, hostname, iapItem, iapResult, signProvider, signResult, adShow, adTap, retention, os] = await Promise.all([
-		...Object.values(PERIODS).map((days) => safe(`stats ${days} j`, async () => {
-			// /stats counts pageviews only; the apps send events only, so their visitors come from the session
-			// stats, which count every event (Umami 2.14 and later). The larger of the two wins.
-			const page = readStats(await u.get(`/websites/${id}/stats?${query(range(days))}`));
-			const all = await u.get(`/websites/${id}/sessions/stats?${query(range(days))}`).then(readStats).catch(() => null);
-			return all ? { visitors: Math.max(page.visitors, all.visitors), visits: Math.max(page.visits, all.visits), pageviews: page.pageviews } : page;
-		})),
+	const periodStats = (what, r) => safe(what, async () => {
+		// /stats counts pageviews only; the apps send events only, so their visitors come from the session
+		// stats, which count every event (Umami 2.14 and later). The larger of the two wins.
+		const page = readStats(await u.get(`/websites/${id}/stats?${query(r)}`));
+		const all = await u.get(`/websites/${id}/sessions/stats?${query(r)}`).then(readStats).catch(() => null);
+		return all ? { visitors: Math.max(page.visitors, all.visitors), visits: Math.max(page.visits, all.visits), pageviews: page.pageviews } : page;
+	});
+	const [d1, d7, d28, prev7, events, hostname, iapItem, iapResult, signProvider, signResult, adShow, adTap, retention, os] = await Promise.all([
+		...Object.values(PERIODS).map((days) => periodStats(`stats ${days} j`, range(days))),
+		// The 7 days before the last 7, for the week's trend.
+		periodStats('stats 7 j précédents', range(7, 7)),
 		safe('events', async () => readCounts(await u.get(`/websites/${id}/metrics?${query({ ...range(28), type: 'event' })}`))),
 		safe('hosts', async () => {
 			// Newer Umami names it hostname, older host; an empty answer to hostname is an answer.
@@ -357,7 +360,7 @@ export async function appStats(u, site, now) {
 		id: String(site.id),
 		name: String(site.name ?? site.domain ?? site.id),
 		domain: typeof site.domain === 'string' ? site.domain : '',
-		periods: { d1, d7, d28 },
+		periods: { d1, d7, d28, prev7 },
 		events,
 		hosts: hostname ? readHosts(hostname) : null,
 		purchases: { items: iapItem, results: iapResult, outcomes: purchaseOutcomes },

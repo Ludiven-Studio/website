@@ -224,7 +224,10 @@ describe('the stats-admin function', () => {
 			'iap_result outcomes: Umami GET /websites/w-pg/event-data: 404',
 			'sign_in outcomes: Umami GET /websites/w-pg/event-data: 404',
 		] : []);
-		expect(pg.periods).toEqual({ d1: { visitors: 10, visits: 15, pageviews: 40 }, d7: { visitors: 70, visits: 105, pageviews: 280 }, d28: { visitors: 280, visits: 420, pageviews: 1120 } });
+		expect(pg.periods).toEqual({
+			d1: { visitors: 10, visits: 15, pageviews: 40 }, d7: { visitors: 70, visits: 105, pageviews: 280 }, d28: { visitors: 280, visits: 420, pageviews: 1120 },
+			prev7: { visitors: 70, visits: 105, pageviews: 280 },
+		});
 		expect(pg.hosts?.[0]).toEqual({ host: 'com.ludivenstudio.petanquegame', visitors: 70, test: false });
 		expect(pg.ads).toEqual([
 			{ ad: 'dragon-gems', show: 30, tap: 3, rate: 0.1 },
@@ -260,6 +263,13 @@ describe('the stats-admin function', () => {
 		const body = await res.json() as Overview;
 		expect(body.apps.map((a) => a.name)).toEqual(['Pétanque Game', 'Pétanque Meet']);
 		expect(calls.filter((c) => c.startsWith('GET /teams/t-ludiven/websites'))).toHaveLength(1);
+	});
+
+	it('reads the 7 days before the last 7, for the week’s trend', async () => {
+		const { fetchFn, calls } = fakeUmami(3);
+		await statsHandler({ env: ENV, isAdmin, cache: fakeCache(), fetch: fetchFn, now: () => NOW })(post({ action: 'overview' }));
+		const DAY = 86_400_000, t = NOW.getTime();
+		expect(calls).toContain(`GET /websites/w-pg/stats?startAt=${t - 14 * DAY}&endAt=${t - 7 * DAY}`);
 	});
 
 	it('counts the visitors of an app that sends events only from the session stats', async () => {

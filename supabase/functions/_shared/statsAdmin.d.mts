@@ -25,7 +25,8 @@ export interface AppStats {
 	id: string;
 	name: string;
 	domain: string;
-	periods: { d1: Stats | null; d7: Stats | null; d28: Stats | null };
+	/** `prev7`: the 7 days before `d7`; missing from an answer cached before it existed. */
+	periods: { d1: Stats | null; d7: Stats | null; d28: Stats | null; prev7?: Stats | null };
 	events: Count[] | null;
 	hosts: Host[] | null;
 	/** outcomes: missing from a cache written before them, null when unread or without any result. */
