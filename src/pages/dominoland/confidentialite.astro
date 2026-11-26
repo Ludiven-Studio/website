@@ -1,0 +1,172 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Hero from '../../components/Hero.astro';
+import LangSwitch from '../../components/LangSwitch.astro';
+---
+
+<BaseLayout
+	title="Confidentialité de l'application Dominoland | Ludiven Studio"
+	description="Politique de confidentialité du jeu mobile Dominoland : jeu sans compte, sans publicité et sans achat, progression gardée sur le téléphone, statistiques d'usage sans identifiant, droits RGPD."
+	alternates={{ fr: '/dominoland/confidentialite/', en: '/en/dominoland/confidentialite/', es: '/es/dominoland/confidentialite/', de: '/de/dominoland/confidentialite/', it: '/it/dominoland/confidentialite/' }}
+>
+	<div class="wrapper stack gap-12 legal">
+		<div class="stack gap-8">
+			<LangSwitch
+				lang="fr"
+				links={[
+					{ lang: 'en', href: '/en/dominoland/confidentialite/' },
+					{ lang: 'es', href: '/es/dominoland/confidentialite/' },
+					{ lang: 'de', href: '/de/dominoland/confidentialite/' },
+					{ lang: 'it', href: '/it/dominoland/confidentialite/' },
+				]}
+			/>
+			<Hero
+				title="Confidentialité — Dominoland"
+				tagline="Ni compte, ni publicité, ni achat : ta progression reste sur ton téléphone."
+			/>
+		</div>
+
+		<p class="updated">
+			Cette politique concerne <strong>le jeu mobile Dominoland</strong> (<code>com.ludivenstudio.dominoland</code>). Le reste du site a sa <a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 26 novembre 2026.
+		</p>
+
+		<div class="summary">
+			<p><strong>L'essentiel&nbsp;:</strong></p>
+			<p>Le jeu se joue sans compte et sans réseau&nbsp;: ta progression reste sur ton téléphone. Il n'a ni publicité, ni achat intégré. Quand ton téléphone est connecté, le jeu lit sur notre site le numéro de sa dernière version, et envoie des statistiques d'usage sans identifiant à notre propre serveur, en Allemagne. Le moteur du jeu, Unity, envoie aussi des statistiques techniques sur l'appareil. Le jeu ne fait pas de rapports de plantage, et nous ne vendons pas tes données. Le jeu s'adresse à tout le monde, à partir de 13 ans.</p>
+		</div>
+
+		<section class="stack gap-2">
+			<h2>1. Qui est responsable du traitement</h2>
+			<p>Éditeur de l'application et responsable du traitement&nbsp;:</p>
+			<ul>
+				<li>Dénomination sociale&nbsp;: <strong>Ludiven Studio</strong></li>
+				<li>Forme juridique&nbsp;: EURL au capital de 1&nbsp;000&nbsp;€</li>
+				<li>Immatriculation&nbsp;: 999&nbsp;253&nbsp;586 R.C.S. Vienne — SIRET 999&nbsp;253&nbsp;586&nbsp;00013</li>
+				<li>Siège social&nbsp;: 1166 route de la Ranche, 38440 Châtonnay, France</li>
+				<li>Contact&nbsp;: <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a></li>
+			</ul>
+			<p>Voir aussi les <a href="/mentions-legales/">mentions légales</a>.</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>2. Sur ton téléphone</h2>
+			<p>Ta progression (niveaux, étoiles, records) est enregistrée sur ton téléphone, dans le dossier de l'application, avec une copie de secours, et tes réglages (langue, thème, musique) à côté. Le jeu ne l'envoie à personne&nbsp;: il n'y a pas de compte et pas de copie en ligne.</p>
+			<p>Elle peut être copiée dans la sauvegarde de ton téléphone si elle est activée (la sauvegarde Android, ou celle de ton iPhone). Elle disparaît si tu désinstalles le jeu, sauf si cette sauvegarde la restaure.</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>3. La mise à jour</h2>
+			<p>À chaque lancement, si ton téléphone est connecté, le jeu lit sur notre site, ludiven-studio.fr, hébergé par GitHub Pages, un petit fichier qui donne sa dernière version, pour te proposer la mise à jour quand il en existe une plus récente. «&nbsp;Mettre à jour&nbsp;» ouvre la page du jeu sur son store ou sur notre site.</p>
+			<p>Cette demande ne porte ni identifiant, ni cookie, ni rien sur toi&nbsp;: comme pour toute page web, l'hébergeur voit seulement l'adresse IP de ton téléphone et le logiciel qui fait la demande. Base légale&nbsp;: notre intérêt légitime à te proposer les corrections du jeu.</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>4. Statistiques d'usage</h2>
+			<p>Quand ton téléphone est connecté, le jeu envoie à <strong>Umami</strong>, un outil de statistiques sans cookie installé sur notre propre serveur, le nom de chaque écran ouvert et le nom de certaines actions&nbsp;:</p>
+			<ul>
+				<li>le jeu s'ouvre (premier lancement ou non, et l'état d'un choix sur la publicité, toujours «&nbsp;non demandé&nbsp;» puisque le jeu n'en a pas)&nbsp;;</li>
+				<li>un niveau commence (le mode&nbsp;: Tracé, Rythme ou Chemin infini, et le numéro du niveau), puis finit (gagné, perdu ou quitté, les étoiles, et la durée par tranche&nbsp;: moins de 30 secondes, jusqu'à 1 minute, 3 minutes, 10 minutes, ou plus)&nbsp;;</li>
+				<li>la proposition de mise à jour s'affiche, et si tu la touches.</li>
+			</ul>
+			<p>Chaque envoi porte aussi la plateforme, le type de version (test ou publique), la version du jeu et du système, le modèle de téléphone, la langue du téléphone et la taille de l'écran. <strong>Aucun</strong> identifiant de joueur ou d'installation, ni identifiant publicitaire, ni nom, ni adresse mail n'y figure&nbsp;: ces statistiques ne sont pas reliées à ton identité.</p>
+			<p>Comme tout service web, notre serveur voit l'adresse IP de ton téléphone. Il ne la conserve pas, mais en déduit le pays, la région et la ville. Pour compter les joueurs, il regroupe les actions faites depuis une même connexion et un même modèle de téléphone, pendant un mois calendaire au plus. Ce serveur est loué à <strong>Hetzner Online GmbH</strong>, qui l'héberge en Allemagne&nbsp;; personne d'autre ne reçoit ces statistiques. Elles nous disent jusqu'où les joueurs vont, où ils bloquent et ce qui leur plaît. Base légale&nbsp;: notre intérêt légitime à améliorer le jeu.</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>5. Le moteur du jeu</h2>
+			<p>Le jeu est construit avec Unity. Son moteur envoie à <strong>Unity Technologies</strong> des statistiques techniques sur l'appareil (modèle, système, processeur, carte graphique), selon la <a href="https://unity.com/legal/game-player-and-app-user-privacy-policy" target="_blank" rel="noopener">politique de confidentialité de Unity</a>. Les autres outils de mesure de Unity, dont les rapports de plantage, sont coupés dans le jeu.</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>6. Ce que le jeu ne fait pas</h2>
+			<ul>
+				<li>Ni compte, ni connexion avec Google ou Apple.</li>
+				<li>Ni publicité, ni régie publicitaire&nbsp;: le jeu n'utilise pas l'identifiant publicitaire de ton téléphone et ne te suit pas d'une appli à l'autre.</li>
+				<li>Ni achat intégré.</li>
+				<li>Ni rapport de plantage, ni Firebase.</li>
+				<li>Ni position, ni contacts, ni photos, ni fichiers, ni micro, ni caméra&nbsp;: le jeu ne demande aucune de ces autorisations.</li>
+			</ul>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>7. Qui reçoit tes données, et combien de temps</h2>
+			<p>Nous ne vendons pas tes données. Elles ne sont traitées que par&nbsp;:</p>
+			<ul>
+				<li><strong>Hetzner Online GmbH</strong>&nbsp;: hébergement de notre serveur de statistiques d'usage, en Allemagne&nbsp;;</li>
+				<li><strong>GitHub</strong>&nbsp;: hébergement de notre site et du fichier de version&nbsp;;</li>
+				<li><strong>Unity Technologies</strong>&nbsp;: les statistiques techniques du moteur&nbsp;;</li>
+				<li><strong>Google</strong> et <strong>Apple</strong>&nbsp;: la distribution du jeu.</li>
+			</ul>
+			<p>GitHub et Unity sont des sociétés américaines&nbsp;: ces transferts sont encadrés par le chapitre V du RGPD (clauses contractuelles types, ou cadre de protection des données UE–États-Unis).</p>
+			<p>Les statistiques d'usage sont gardées 24 mois sur notre serveur, puis effacées&nbsp;; ses sauvegardes, 14 jours. L'adresse IP reste dans les journaux techniques de GitHub le temps que GitHub fixe. Unity garde ses statistiques selon sa propre politique.</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>8. Tes droits</h2>
+			<p>Tu as un droit d'accès, de rectification, d'effacement, de limitation, d'opposition et de portabilité. Comme les statistiques ne portent aucun identifiant, nous ne pouvons pas retrouver celles qui viennent de ton téléphone. Pour toute demande, écris à <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>&nbsp;: nous répondons sous un mois. Tu peux aussi te plaindre auprès de la CNIL (www.cnil.fr).</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>9. Âge</h2>
+			<p>Le jeu s'adresse à tout le monde, à partir de 13 ans. Il ne demande ni compte ni paiement, et ne recueille rien qui permette de savoir qui joue.</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>10. Changements</h2>
+			<p>Nous mettons cette page à jour à chaque changement du jeu qui touche à tes données, avec sa date en haut.</p>
+			<p>Le lien «&nbsp;Politique de confidentialité&nbsp;» des Options du jeu ouvre cette page dans ton navigateur&nbsp;: ce n'est plus le jeu qui est alors en cause, mais ton navigateur et le site, qui a sa propre politique.</p>
+			<p>Une question&nbsp;: <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a></p>
+			<p>Voir aussi les <a href="/dominoland/cgu/">conditions d'utilisation du jeu</a>.</p>
+		</section>
+	</div>
+</BaseLayout>
+
+<style>
+	.legal {
+		max-width: 68ch;
+		margin-inline: auto;
+		color: var(--sc-ink-2);
+		font-size: var(--text-md);
+		line-height: 1.6;
+	}
+	.legal h2 {
+		font-size: var(--text-xl);
+		color: var(--sc-ink);
+	}
+	.legal ul {
+		padding-left: 1.2rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+	.legal a {
+		color: var(--sc-link);
+		text-decoration: 1px solid underline transparent;
+		text-underline-offset: 0.25em;
+		transition: text-decoration-color var(--theme-transition);
+	}
+	.legal a:hover,
+	.legal a:focus {
+		text-decoration-color: currentColor;
+	}
+	.updated {
+		font-size: var(--text-sm);
+		color: var(--sc-muted);
+	}
+	.summary {
+		border: 1px solid var(--sc-line);
+		border-left: 3px solid var(--sc-accent);
+		border-radius: 0.5rem;
+		padding: 1rem 1.25rem;
+		background: var(--sc-surface);
+	}
+	.summary p {
+		margin-bottom: 0.5rem;
+	}
+	code {
+		font-size: 0.9em;
+		background: var(--sc-surface);
+		padding: 0.1em 0.35em;
+		border-radius: 0.25em;
+	}
+</style>

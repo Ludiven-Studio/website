@@ -1,0 +1,225 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Hero from '../../components/Hero.astro';
+import LangSwitch from '../../components/LangSwitch.astro';
+---
+
+<BaseLayout
+	title="Conditions d'utilisation de l'application Dominoland | Ludiven Studio"
+	description="Conditions générales d'utilisation du jeu mobile Dominoland : jeu gratuit, sans publicité, sans achat et sans compte, progression sur le téléphone, propriété intellectuelle, responsabilité, droit applicable."
+	alternates={{ fr: '/dominoland/cgu/', en: '/en/dominoland/cgu/', es: '/es/dominoland/cgu/', de: '/de/dominoland/cgu/', it: '/it/dominoland/cgu/' }}
+>
+	<div class="wrapper stack gap-12 legal">
+		<div class="stack gap-8">
+			<LangSwitch
+				lang="fr"
+				links={[
+					{ lang: 'en', href: '/en/dominoland/cgu/' },
+					{ lang: 'es', href: '/es/dominoland/cgu/' },
+					{ lang: 'de', href: '/de/dominoland/cgu/' },
+					{ lang: 'it', href: '/it/dominoland/cgu/' },
+				]}
+			/>
+			<Hero
+				title="Conditions d'utilisation — Dominoland"
+				tagline="Un jeu gratuit, sans publicité ni achat."
+			/>
+		</div>
+
+		<p class="updated">
+			Application <strong>Dominoland</strong> (<code>com.ludivenstudio.dominoland</code>) — dernière mise à
+			jour&nbsp;: 26 novembre 2026.
+		</p>
+
+		<div class="summary">
+			<p><strong>À retenir avant de jouer&nbsp;:</strong></p>
+			<ul>
+				<li>Le jeu se télécharge <strong>gratuitement</strong>. Il n'a <strong>ni publicité, ni achat intégré, ni abonnement</strong>.</li>
+				<li>Il se joue <strong>sans compte et sans réseau</strong>&nbsp;: ta progression reste sur ton téléphone.</li>
+				<li>Les étoiles et les records <strong>n'ont aucune valeur en argent</strong>.</li>
+				<li>Le jeu s'adresse à tout le monde, à partir de <strong>13 ans</strong>. Il n'a <strong>ni jeu en ligne, ni chat</strong>.</li>
+			</ul>
+		</div>
+
+		<section class="stack gap-2">
+			<h2>1. Objet et acceptation</h2>
+			<p>
+				Ces conditions régissent l'utilisation du jeu mobile Dominoland (ci-après «&nbsp;le Jeu&nbsp;»). En
+				installant ou en utilisant le Jeu, tu les acceptes. Si tu les refuses, n'utilise pas le Jeu et
+				désinstalle-le.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>2. Éditeur</h2>
+			<ul>
+				<li>Dénomination sociale&nbsp;: <strong>Ludiven Studio</strong></li>
+				<li>Forme juridique&nbsp;: EURL au capital de 1&nbsp;000&nbsp;€</li>
+				<li>Immatriculation&nbsp;: 999&nbsp;253&nbsp;586 R.C.S. Vienne — SIRET 999&nbsp;253&nbsp;586&nbsp;00013</li>
+				<li>Numéro de TVA intracommunautaire&nbsp;: FR20&nbsp;999253586</li>
+				<li>Siège social&nbsp;: 1166 route de la Ranche, 38440 Châtonnay, France</li>
+				<li>Directeur de la publication&nbsp;: Ludiven Studio</li>
+				<li>Contact&nbsp;: <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a></li>
+			</ul>
+			<p>Voir aussi les <a href="/mentions-legales/">mentions légales</a>.</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>3. Le Jeu</h2>
+			<p>
+				Dominoland est un jeu de réflexion et de rythme&nbsp;: tu traces des lignes de dominos, tu lances la vague,
+				et les pièces tombées forment un dessin. Il propose trois modes&nbsp;: le Tracé, le Rythme et le Chemin
+				infini.
+			</p>
+			<p>
+				Le Jeu est gratuit. Il n'affiche aucune publicité et ne vend rien&nbsp;: aucun contenu n'est payant.
+			</p>
+			<p>
+				Jouer ne demande ni compte ni réseau. Quand ton téléphone est connecté, le Jeu regarde au lancement s'il
+				existe une version plus récente et envoie des statistiques d'usage sans identifiant (voir la
+				<a href="/dominoland/confidentialite/">politique de confidentialité</a>). Les coûts de connexion et
+				d'équipement restent à ta charge.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>4. Ta progression</h2>
+			<p>
+				Ta progression (niveaux, étoiles, records) est gardée <strong>sur ton téléphone seulement</strong>. Tu
+				peux la perdre en désinstallant le Jeu ou en changeant de téléphone, sauf si la sauvegarde de ton
+				téléphone la restaure. Comme le Jeu n'a pas de compte, l'éditeur n'en a aucune copie et ne peut pas la
+				rendre.
+			</p>
+			<p>
+				Les étoiles et les records sont une <strong>licence d'utilisation personnelle</strong> dans le Jeu. Ils
+				<strong>n'ont aucune valeur en argent</strong>&nbsp;: ils ne se convertissent pas en argent, ne
+				s'échangent pas et ne se revendent pas.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>5. Propriété intellectuelle</h2>
+			<p>
+				Le Jeu, son code, ses niveaux, ses images, ses animations, ses sons, ses musiques et ses textes
+				appartiennent à Ludiven Studio ou à ses concédants et sont protégés par le droit de la propriété
+				intellectuelle. Tu reçois un droit d'usage personnel et non exclusif. Les composants d'autres auteurs
+				restent à leurs auteurs, sous leurs licences, citées dans le Jeu (Options › «&nbsp;Crédits et
+				licences&nbsp;») et dans les <a href="/mentions-legales/#licences-dominoland">mentions légales</a>.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>6. Évolution, interruption et arrêt du service</h2>
+			<p>
+				L'éditeur peut faire évoluer le Jeu, ajouter ou retirer des fonctions et des niveaux. Si une version
+				future ajoutait de la publicité ou des achats, ces conditions et la politique de confidentialité seraient
+				mises à jour avant, et la date en haut de page changerait.
+			</p>
+			<p>
+				L'éditeur peut arrêter tout ou partie du service, notamment si un store en impose le retrait. Les niveaux
+				resteront jouables tant que la version installée fonctionne sur ton téléphone.
+			</p>
+			<p>
+				Ces conditions peuvent changer. La date de mise à jour figure en haut de page. En cas de changement
+				important, nous te le signalerons&nbsp;; continuer à jouer vaut acceptation.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>7. Responsabilité</h2>
+			<p>
+				Le Jeu est fourni en l'état. L'éditeur ne garantit pas qu'il fonctionne sans interruption ni erreur sur
+				tous les téléphones.
+			</p>
+			<p>
+				La responsabilité de l'éditeur ne peut être engagée qu'en cas de faute prouvée, et se limite aux
+				dommages directs et prévisibles. Elle ne couvre pas la perte d'une progression gardée sur le téléphone.
+				Rien ici n'exclut sa responsabilité en cas de faute lourde ou d'atteinte à l'intégrité physique, ni ne
+				limite tes droits impératifs de consommateur.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>8. Données personnelles</h2>
+			<p>
+				Le traitement de tes données est décrit dans la
+				<a href="/dominoland/confidentialite/">politique de confidentialité de Dominoland</a>, qui fait partie
+				de ces conditions.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>9. Droit applicable et litiges</h2>
+			<p>
+				Ces conditions sont soumises au <strong>droit français</strong>. Si tu es consommateur et résides dans
+				un autre État de l'Union européenne, tu gardes les protections impératives de ton pays.
+			</p>
+			{/* TODO legal: replace with the mediator's name, address and website once adhesion is signed (art. L612-1). */}
+			<p>
+				En cas de difficulté, écris-nous d'abord&nbsp;: nous cherchons une solution amiable. Sans solution sous
+				un mois, tu peux recourir gratuitement à un médiateur de la consommation (article L612-1 du Code de la
+				consommation). Ses coordonnées sont communiquées sur simple demande à
+				<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>. À défaut d'accord, le litige
+				sera porté devant les tribunaux compétents.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>10. Contact</h2>
+			<p>
+				Pour toute question ou pour signaler un problème&nbsp;:
+				<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>.
+			</p>
+		</section>
+	</div>
+</BaseLayout>
+
+<style>
+	.legal {
+		max-width: 68ch;
+		margin-inline: auto;
+		color: var(--sc-ink-2);
+		font-size: var(--text-md);
+		line-height: 1.6;
+	}
+	.legal h2 {
+		font-size: var(--text-xl);
+		color: var(--sc-ink);
+	}
+	.legal ul {
+		padding-left: 1.2rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+	.legal a {
+		color: var(--sc-link);
+		text-decoration: 1px solid underline transparent;
+		text-underline-offset: 0.25em;
+		transition: text-decoration-color var(--theme-transition);
+	}
+	.legal a:hover,
+	.legal a:focus {
+		text-decoration-color: currentColor;
+	}
+	.updated {
+		font-size: var(--text-sm);
+		color: var(--sc-muted);
+	}
+	.summary {
+		border: 1px solid var(--sc-line);
+		border-left: 3px solid var(--sc-accent);
+		border-radius: 0.5rem;
+		padding: 1rem 1.25rem;
+		background: var(--sc-surface);
+	}
+	.summary p {
+		margin-bottom: 0.5rem;
+	}
+	code {
+		font-size: 0.9em;
+		background: var(--sc-surface);
+		padding: 0.1em 0.35em;
+		border-radius: 0.25em;
+	}
+</style>

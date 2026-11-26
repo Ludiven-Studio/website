@@ -1,0 +1,80 @@
+---
+// The Dominoland download page, in five languages: both store badges faded under « bientôt » until the game is out.
+// Testers reach the dev build by tapping the icon (TesterLinks).
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Icon from './Icon.astro';
+import AppStage from './AppStage.astro';
+import MoreApps from './MoreApps.astro';
+import ShareButton from './ShareButton.astro';
+import StoreBadges from './StoreBadges.astro';
+import TesterLinks from './TesterLinks.astro';
+import { APP_NAME, DOWNLOAD_PATHS, ICON, LANDING_PATHS, SHARE_IMAGE, STAGE, STORES, copy, screens, typo, type Lang } from '../data/dominoland';
+
+interface Props {
+	lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = copy[lang];
+const ty = (s: string) => typo(lang, s);
+const shots = screens(lang);
+const play = STORES.play ? `${STORES.play}&hl=${lang}` : undefined;
+---
+
+<BaseLayout title={t.dl.title} description={t.description} image={SHARE_IMAGE} lang={lang} alternates={DOWNLOAD_PATHS}>
+	<div>
+		<AppStage lang={lang} name={APP_NAME} icon={ICON} kicker={ty(t.soon)} lead={ty(t.dl.lead)} art={STAGE}>
+			<StoreBadges playStore={play} appStore={STORES.apple} lang={lang} soon={t.soonShort} />
+			<div class="as-actions">
+				<a class="sc-link" href={LANDING_PATHS[lang]}>{t.dl.back} <Icon icon="arrow-right" size="1em" /></a>
+				<ShareButton id="dominoland" title={APP_NAME} lang={lang} />
+			</div>
+			<TesterLinks app="dominoland" lang={lang} icon=".as-icon" />
+		</AppStage>
+	</div>
+
+	<main class="wrapper">
+		<div class="dl-body stack gap-12">
+			<section class="stack gap-6">
+				<h2>{t.dl.screensTitle}</h2>
+				<div class="shots">
+					{shots.map((src, i) => <img src={src} alt={ty(t.shotsAlt[i] ?? '')} width="540" height="1170" loading="lazy" decoding="async" />)}
+				</div>
+			</section>
+
+			<MoreApps lang={lang} current="dominoland" />
+		</div>
+	</main>
+</BaseLayout>
+
+<style>
+	.dl-body {
+		padding-block: 1rem 4rem;
+	}
+
+	h2 {
+		font-size: var(--text-xl);
+		color: var(--sc-ink);
+		text-align: center;
+	}
+
+	.shots {
+		display: grid;
+		gap: 1.25rem;
+		grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+	}
+
+	.shots img {
+		width: 100%;
+		height: auto;
+		border-radius: 1.25rem;
+		border: 1px solid var(--sc-line);
+		box-shadow: var(--sc-shadow);
+	}
+
+	@media (min-width: 50em) {
+		.shots {
+			grid-template-columns: repeat(5, 1fr);
+		}
+	}
+</style>

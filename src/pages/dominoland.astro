@@ -1,0 +1,11 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import DominolandLanding from '../components/DominolandLanding.astro';
+import { copy, LANDING_PATHS, SHARE_IMAGE } from '../data/dominoland';
+
+const t = copy.fr;
+---
+
+<BaseLayout title={t.title} description={t.description} image={SHARE_IMAGE} lang="fr" alternates={LANDING_PATHS}>
+	<DominolandLanding lang="fr" />
+</BaseLayout>

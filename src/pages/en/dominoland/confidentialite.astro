@@ -1,0 +1,176 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import Hero from '../../../components/Hero.astro';
+import LangSwitch from '../../../components/LangSwitch.astro';
+---
+
+<BaseLayout
+	title="Privacy policy of the Dominoland app | Ludiven Studio"
+	description="Privacy policy of the Dominoland mobile game: no account, no ads and no purchases, progress kept on the phone, usage statistics with no ID, GDPR rights."
+	lang="en"
+	alternates={{ fr: '/dominoland/confidentialite/', en: '/en/dominoland/confidentialite/', es: '/es/dominoland/confidentialite/', de: '/de/dominoland/confidentialite/', it: '/it/dominoland/confidentialite/' }}
+>
+	<div class="wrapper stack gap-12 legal">
+		<div class="stack gap-8">
+			<LangSwitch
+				lang="en"
+				links={[
+					{ lang: 'fr', href: '/dominoland/confidentialite/' },
+					{ lang: 'es', href: '/es/dominoland/confidentialite/' },
+					{ lang: 'de', href: '/de/dominoland/confidentialite/' },
+					{ lang: 'it', href: '/it/dominoland/confidentialite/' },
+				]}
+			/>
+			<Hero
+				title="Privacy — Dominoland"
+				tagline="No account, no ads, no purchases: your progress stays on your phone."
+			/>
+		</div>
+
+		<p class="updated">
+			This policy covers <strong>the Dominoland mobile game</strong> (<code>com.ludivenstudio.dominoland</code>). The rest of the website has its <a href="/confidentialite/">own policy</a> (in French). Last updated: November 26, 2026.
+		</p>
+		<p class="updated">
+			This is a courtesy translation. In case of discrepancy, the <a href="/dominoland/confidentialite/" hreflang="fr">original French version</a> prevails.
+		</p>
+
+		<div class="summary">
+			<p><strong>In short:</strong></p>
+			<p>The game plays with no account and no network: your progress stays on your phone. It has no ads and no in-app purchases. When your phone is online, the game reads its latest version number on our website, and sends usage statistics with no ID to our own server, in Germany. The game engine, Unity, also sends technical statistics about the device. The game sends no crash reports, and we do not sell your data. The game is for everyone, aged 13 and up.</p>
+		</div>
+
+		<section class="stack gap-2">
+			<h2>1. Who is responsible</h2>
+			<p>Publisher of the app and data controller:</p>
+			<ul>
+				<li>Company: <strong>Ludiven Studio</strong></li>
+				<li>Legal form: EURL (French single-member limited company) with a capital of €1,000</li>
+				<li>Registration: 999&nbsp;253&nbsp;586 R.C.S. Vienne — SIRET 999&nbsp;253&nbsp;586&nbsp;00013</li>
+				<li>Registered office: 1166 route de la Ranche, 38440 Châtonnay, France</li>
+				<li>Contact: <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a></li>
+			</ul>
+			<p>See also the <a href="/mentions-legales/">legal notice</a> (in French).</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>2. On your phone</h2>
+			<p>Your progress (levels, stars, best scores) is saved on your phone, in the app's folder, with a backup copy, and your settings (language, theme, music) next to it. The game sends it to no one: there is no account and no online copy.</p>
+			<p>It can be copied into your phone's backup if that is on (the Android backup, or your iPhone's). It is gone if you uninstall the game, unless that backup restores it.</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>3. The update check</h2>
+			<p>At each launch, if your phone is online, the game reads a small file on our website, ludiven-studio.fr, hosted by GitHub Pages, that gives its latest version, so it can offer you the update when a newer one exists. "Update" opens the game's page on its store or on our website.</p>
+			<p>This request carries no ID, no cookie and nothing about you: as for any web page, the host only sees your phone's IP address and the software making the request. Legal basis: our legitimate interest in offering you the game's fixes.</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>4. Usage statistics</h2>
+			<p>When your phone is online, the game sends to <strong>Umami</strong>, a cookie-free statistics tool installed on our own server, the name of each screen opened and the name of some actions:</p>
+			<ul>
+				<li>the game opens (first launch or not, and the state of an ad choice, always "not asked" since the game has no ads);</li>
+				<li>a level starts (the mode: The Trace, Rhythm or Endless path, and the level number), then ends (won, lost or quit, the stars, and the time in bands: under 30 seconds, up to 1 minute, 3 minutes, 10 minutes, or more);</li>
+				<li>the update offer shows, and whether you tap it.</li>
+			</ul>
+			<p>Each send also carries the platform, the build type (test or public), the game and system versions, the phone model, the phone's language and the screen size. <strong>No</strong> player or install ID, advertising ID, name or email address is in it: these statistics are not linked to who you are.</p>
+			<p>Like any web service, our server sees your phone's IP address. It does not keep it, but derives the country, region and city from it. To count players, it groups the actions made from the same connection and the same phone model, for one calendar month at most. This server is rented from <strong>Hetzner Online GmbH</strong>, which hosts it in Germany; no one else receives these statistics. They tell us how far players go, where they get stuck and what they enjoy. Legal basis: our legitimate interest in improving the game.</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>5. The game engine</h2>
+			<p>The game is built with Unity. Its engine sends <strong>Unity Technologies</strong> technical statistics about the device (model, system, processor, graphics card), under <a href="https://unity.com/legal/game-player-and-app-user-privacy-policy" target="_blank" rel="noopener">Unity's privacy policy</a>. Unity's other measuring tools, crash reports included, are turned off in the game.</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>6. What the game does not do</h2>
+			<ul>
+				<li>No account, no sign-in with Google or Apple.</li>
+				<li>No ads, no ad network: the game does not use your phone's advertising ID and does not track you across apps.</li>
+				<li>No in-app purchases.</li>
+				<li>No crash reports, no Firebase.</li>
+				<li>No location, contacts, photos, files, microphone or camera: the game asks for none of these permissions.</li>
+			</ul>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>7. Who receives your data, and for how long</h2>
+			<p>We do not sell your data. Only these companies process it:</p>
+			<ul>
+				<li><strong>Hetzner Online GmbH</strong>: hosting of our usage statistics server, in Germany;</li>
+				<li><strong>GitHub</strong>: hosting of our website and the version file;</li>
+				<li><strong>Unity Technologies</strong>: the engine's technical statistics;</li>
+				<li><strong>Google</strong> and <strong>Apple</strong>: distribution of the game.</li>
+			</ul>
+			<p>GitHub and Unity are US companies: these transfers follow chapter V of the GDPR (standard contractual clauses, or the EU–US Data Privacy Framework).</p>
+			<p>Usage statistics are kept 24 months on our server, then erased; its backups, 14 days. The IP address stays in GitHub's technical logs as long as GitHub sets. Unity keeps its statistics under its own policy.</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>8. Your rights</h2>
+			<p>You have the right to access, correct, erase, restrict, object and port your data. As the statistics carry no ID, we cannot find those that come from your phone. For any request, write to <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>: we answer within a month. You can also complain to the CNIL (www.cnil.fr), the French data protection authority.</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>9. Age</h2>
+			<p>The game is for everyone, aged 13 and up. It asks for no account and no payment, and collects nothing that tells who is playing.</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>10. Changes</h2>
+			<p>We update this page whenever a change in the game touches your data, with its date at the top.</p>
+			<p>The "Privacy policy" link in the game's Options opens this page in your browser. From there your browser and the website apply, under their own policy.</p>
+			<p>Questions: <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a></p>
+			<p>See also the <a href="/en/dominoland/cgu/">game's terms of use</a>.</p>
+		</section>
+	</div>
+</BaseLayout>
+
+<style>
+	.legal {
+		max-width: 68ch;
+		margin-inline: auto;
+		color: var(--sc-ink-2);
+		font-size: var(--text-md);
+		line-height: 1.6;
+	}
+	.legal h2 {
+		font-size: var(--text-xl);
+		color: var(--sc-ink);
+	}
+	.legal ul {
+		padding-left: 1.2rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+	.legal a {
+		color: var(--sc-link);
+		text-decoration: 1px solid underline transparent;
+		text-underline-offset: 0.25em;
+		transition: text-decoration-color var(--theme-transition);
+	}
+	.legal a:hover,
+	.legal a:focus {
+		text-decoration-color: currentColor;
+	}
+	.updated {
+		font-size: var(--text-sm);
+		color: var(--sc-muted);
+	}
+	.summary {
+		border: 1px solid var(--sc-line);
+		border-left: 3px solid var(--sc-accent);
+		border-radius: 0.5rem;
+		padding: 1rem 1.25rem;
+		background: var(--sc-surface);
+	}
+	.summary p {
+		margin-bottom: 0.5rem;
+	}
+	code {
+		font-size: 0.9em;
+		background: var(--sc-surface);
+		padding: 0.1em 0.35em;
+		border-radius: 0.25em;
+	}
+</style>

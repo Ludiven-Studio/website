@@ -1,0 +1,270 @@
+---
+// The Dominoland product page, in five languages. Not on the stores yet: both badges faded under « bientôt ».
+import Icon from './Icon.astro';
+import AppStage from './AppStage.astro';
+import MoreApps from './MoreApps.astro';
+import ContactCTA from './ContactCTA.astro';
+import ShareButton from './ShareButton.astro';
+import StoreBadges from './StoreBadges.astro';
+import { APP_NAME, CONTACT, ICON, PRIVACY, STAGE, STORES, TERMS, copy, screens, typo, type Lang } from '../data/dominoland';
+
+interface Props {
+	lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = copy[lang];
+const ty = (s: string) => typo(lang, s);
+const shots = screens(lang);
+const play = STORES.play ? `${STORES.play}&hl=${lang}` : undefined;
+
+const jsonLd = [
+	{
+		'@context': 'https://schema.org',
+		'@type': ['VideoGame', 'MobileApplication'],
+		name: APP_NAME,
+		description: t.description,
+		url: new URL(Astro.url.pathname, Astro.site).href,
+		image: new URL(ICON, Astro.site).href,
+		applicationCategory: 'GameApplication',
+		genre: 'Puzzle',
+		operatingSystem: 'Android, iOS',
+		inLanguage: ['fr', 'en', 'es', 'de', 'it'],
+		offers: { '@type': 'Offer', price: '0', priceCurrency: 'EUR' },
+		author: { '@type': 'Organization', name: 'Ludiven Studio' },
+	},
+	{
+		'@context': 'https://schema.org',
+		'@type': 'FAQPage',
+		mainEntity: t.faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })),
+	},
+];
+---
+
+<div class="stack gap-20">
+	<div>
+		<AppStage lang={lang} name={APP_NAME} icon={ICON} kicker={t.kicker} tagline={ty(t.tagline)} lead={ty(t.intro)} art={STAGE}>
+			<StoreBadges playStore={play} appStore={STORES.apple} lang={lang} soon={t.soonShort} />
+			<div class="as-actions">
+				<ShareButton id="dominoland" title={APP_NAME} lang={lang} />
+			</div>
+		</AppStage>
+	</div>
+
+	<main class="wrapper stack gap-15">
+
+		<section class="stack gap-4">
+			<p class="story">{ty(t.story)}</p>
+		</section>
+
+		<section class="stack gap-4">
+			<h2 class="section-title">{t.traceTitle}</h2>
+			<div class="box grid-2">
+				{t.trace.map((f) => (
+					<div>
+						<h3>{ty(f.title)}</h3>
+						<p>{ty(f.body)}</p>
+					</div>
+				))}
+			</div>
+		</section>
+
+		<section class="screens stack gap-6">
+			<h2 class="section-title">{t.galleryTitle}</h2>
+			<div class="screens-grid">
+				{shots.map((src, i) => <img src={src} alt={ty(t.shotsAlt[i] ?? '')} width="540" height="1170" loading="lazy" decoding="async" />)}
+			</div>
+		</section>
+
+		<section class="stack gap-4">
+			<h2 class="section-title">{t.rhythmTitle}</h2>
+			<div class="box grid-3">
+				{t.rhythm.map((r) => (
+					<div>
+						<h3>{ty(r.title)}</h3>
+						<p>{ty(r.body)}</p>
+					</div>
+				))}
+			</div>
+		</section>
+
+		<section class="stack gap-4">
+			<h2 class="section-title">{t.moreTitle}</h2>
+			<div class="box grid-3">
+				{t.more.map((m) => (
+					<div>
+						<h3>{ty(m.title)}</h3>
+						<p>{ty(m.body)}</p>
+					</div>
+				))}
+			</div>
+		</section>
+
+		<section class="stack gap-4">
+			<h2 class="section-title">{ty(t.priceTitle)}</h2>
+			<div class="box">
+				<p>{ty(t.price)}</p>
+			</div>
+		</section>
+
+		<section class="stack gap-4">
+			<h2 class="section-title">{t.faqTitle}</h2>
+			<div class="box faq">
+				{t.faq.map((f) => (
+					<details>
+						<summary>{ty(f.q)}</summary>
+						<p>{ty(f.a)}</p>
+						{f.link && <p class="faq-link"><a href={f.link.href}>{f.link.label} <Icon icon="arrow-right" size="1em" /></a></p>}
+					</details>
+				))}
+			</div>
+		</section>
+
+		<section class="stack gap-4 closing">
+			<h2 class="section-title">{ty(t.soon)}</h2>
+			<StoreBadges playStore={play} appStore={STORES.apple} lang={lang} soon={t.soonShort} />
+			<p class="legal" id="support">{ty(t.support)} <a href={CONTACT[lang]}>{t.supportLink}</a> · <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a></p>
+			<p class="legal"><a href={PRIVACY[lang]}>{t.privacy}</a> · <a href={TERMS[lang]}>{t.terms}</a></p>
+		</section>
+
+		<MoreApps lang={lang} current="dominoland" />
+	</main>
+
+	<ContactCTA lang={lang} />
+</div>
+
+<script type="application/ld+json" is:inline set:html={JSON.stringify(jsonLd)} />
+
+<style>
+	.story {
+		max-width: 60ch;
+		font-size: var(--text-lg);
+		color: var(--sc-ink-2);
+	}
+
+	.box {
+		border: 1px solid var(--sc-line);
+		border-radius: 0.75rem;
+		padding: 1.5rem;
+		background-color: var(--sc-surface);
+		box-shadow: var(--sc-shadow);
+	}
+
+	.box p {
+		color: var(--sc-muted);
+	}
+
+	.section-title {
+		font-size: var(--text-xl);
+		color: var(--sc-ink);
+	}
+
+	.grid-2,
+	.grid-3 {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 2.5rem;
+	}
+
+	.grid-2 h3,
+	.grid-3 h3 {
+		font-size: var(--text-lg);
+		color: var(--sc-ink);
+	}
+
+	.screens {
+		text-align: center;
+	}
+
+	.screens-grid {
+		display: grid;
+		gap: 1.25rem;
+		align-items: start;
+		grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+	}
+
+	.screens-grid img {
+		width: 100%;
+		height: auto;
+		border-radius: 1.25rem;
+		border: 1px solid var(--sc-line);
+		box-shadow: var(--sc-shadow);
+		background: var(--sc-surface-2);
+	}
+
+	.faq {
+		display: grid;
+		gap: 0.25rem;
+	}
+
+	.faq details {
+		border-bottom: 1px solid var(--sc-line);
+		padding: 0.75rem 0;
+	}
+
+	.faq details:last-child {
+		border-bottom: 0;
+	}
+
+	.faq summary {
+		cursor: pointer;
+		color: var(--sc-ink);
+		font-family: var(--font-brand);
+		font-size: var(--text-md);
+	}
+
+	.faq details p {
+		margin-top: 0.75rem;
+		max-width: 65ch;
+	}
+
+	.faq-link a {
+		color: var(--sc-link);
+		font-weight: 600;
+		text-decoration: 1px solid underline transparent;
+		text-underline-offset: 0.25em;
+	}
+
+	.faq-link a:hover,
+	.faq-link a:focus {
+		text-decoration-color: currentColor;
+	}
+
+	.closing {
+		align-items: center;
+		text-align: center;
+	}
+
+	.legal {
+		color: var(--sc-muted);
+		font-size: var(--text-sm);
+	}
+
+	@media (min-width: 50em) {
+		.box {
+			border-radius: 1.5rem;
+			padding: 2.5rem;
+		}
+
+		.grid-2 {
+			grid-template-columns: repeat(2, 1fr);
+			gap: 2.5rem 5rem;
+		}
+
+		/* An odd last card takes the whole row. */
+		.grid-2 > :last-child:nth-child(odd) {
+			grid-column: 1 / -1;
+		}
+
+		.screens-grid {
+			grid-template-columns: repeat(5, 1fr);
+		}
+	}
+
+	@media (min-width: 60em) {
+		.grid-3 {
+			grid-template-columns: repeat(3, 1fr);
+			gap: 2.5rem 3rem;
+		}
+	}
+</style>
