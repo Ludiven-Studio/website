@@ -22,6 +22,10 @@
 .ak-tile.ah-tile > span { font-weight: 700; font-size: var(--text-base); color: var(--sc-ink); }
 .ah-tile em { font-style: normal; font-size: var(--text-sm); color: var(--sc-muted); }
 a.ah-tile:hover, a.ah-tile:focus-visible { box-shadow: 0 0 0 2px var(--sc-accent); outline: none; }
+.ah-figure { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.4rem; }
+/* The change since the reading before: up in a calm accent tint, down neutral; the ink stays a text colour. */
+.ah-delta { font-size: 0.8rem; font-weight: 600; font-variant-numeric: tabular-nums; padding: 0.05rem 0.45rem; border-radius: 999px; color: var(--sc-muted); background: color-mix(in srgb, var(--sc-muted) 14%, transparent); }
+.ah-delta--up { color: var(--sc-ink); background: color-mix(in srgb, var(--sc-accent) 18%, transparent); }
 .ak-legend.ah-apps { justify-content: flex-start; font-size: var(--text-sm); color: var(--sc-muted); }
 
 /* Colours: one per app (same everywhere, checked for colour-blind separation in this order), then states only. */

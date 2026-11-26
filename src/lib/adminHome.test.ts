@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { houseAdLines, statsLines, testLines, waitLines } from './adminHome';
+import { NO_TRACK, deltaLabel, dueReload, houseAdLines, statsLines, testLines, track, waitLines } from './adminHome';
 import type { Board, BoardApp, Overview } from './statsAdmin';
 
 const nbsp = (s: string) => s.replace(/\s/g, ' ');
@@ -52,5 +52,36 @@ describe('admin home lines', () => {
 			"La plus cliquée : Dragon's Gems (70 clics)",
 		]);
 		expect(houseAdLines({ generatedAt: '', apps: [] } as unknown as Overview)).toEqual([]);
+	});
+});
+
+describe('admin home reloads', () => {
+	const min = 60_000;
+	it('reloads only in a visible tab, once the last reading is 10 minutes old', () => {
+		expect(dueReload('visible', 0, Date.UTC(2026, 10, 26))).toBe(true); // never read yet
+		expect(dueReload('visible', 10 * min, 19 * min)).toBe(false);
+		expect(dueReload('visible', 10 * min, 20 * min)).toBe(true);
+		expect(dueReload('hidden', 10 * min, 60 * min)).toBe(false);
+		expect(dueReload('visible', 10 * min, 60 * min)).toBe(true); // back on the tab after a long while
+	});
+
+	it('badges a figure that moved, and clears it at the next reading that brings no change', () => {
+		let t = track(NO_TRACK, 'visitors', 1061);
+		expect(t.delta).toEqual({}); // the first reading has nothing to compare with
+		t = track(t, 'visitors', 1076);
+		t = track(t, 'waits', 4);
+		expect(t.delta).toEqual({ visitors: 15 });
+		t = track(t, 'waits', 3);
+		expect(t.delta).toEqual({ visitors: 15, waits: -1 }); // a figure not read again keeps its badge
+		t = track(t, 'visitors', 1076);
+		expect(t.delta).toEqual({ waits: -1 });
+		expect(track(track(NO_TRACK, 'revenue', 12.37), 'revenue', 12.79).delta).toEqual({ revenue: 0.42 });
+	});
+
+	it('writes the change with its sign', () => {
+		expect(deltaLabel(15)).toBe('+15');
+		expect(deltaLabel(-1)).toBe('−1');
+		expect(nbsp(deltaLabel(0.42, '€'))).toBe('+0,42 €');
+		expect(nbsp(deltaLabel(-1200))).toBe('−1 200');
 	});
 });

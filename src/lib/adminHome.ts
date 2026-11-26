@@ -66,3 +66,30 @@ export function houseAdLines(o: Overview): string[] {
 	if (t.tap) lines.push(`La plus cliquée : ${nameOf(best)} (${int.format(t.tap)} clics)`);
 	return lines;
 }
+
+/** The home reloads its cards this often, and only in a visible tab. */
+export const RELOAD_MS = 10 * 60_000;
+
+/** Whether the cards are due a reload: the tab is visible and the last reading is `every` old. */
+export function dueReload(visibility: DocumentVisibilityState, lastAt: number, now: number, every = RELOAD_MS): boolean {
+	return visibility === 'visible' && now - lastAt >= every;
+}
+
+/** Each figure's last value, and its change against the reading before when it moved. */
+export interface Track { last: Record<string, number>; delta: Record<string, number> }
+export const NO_TRACK: Track = { last: {}, delta: {} };
+
+/** A figure read again: its badge is the change from the last reading, gone when that reading brings no change.
+ *  A figure that failed to load is not read again, so it keeps its value and its badge. */
+export function track(t: Track, key: string, value: number): Track {
+	const before = t.last[key];
+	const { [key]: _, ...delta } = t.delta;
+	const change = before === undefined ? 0 : Math.round((value - before) * 100) / 100;
+	return { last: { ...t.last, [key]: value }, delta: change ? { ...delta, [key]: change } : delta };
+}
+
+/** « +15 », « −1 », « +0,42 € ». */
+export function deltaLabel(change: number, unit = ''): string {
+	const n = Math.abs(change).toLocaleString('fr-FR', { maximumFractionDigits: 2, minimumFractionDigits: Number.isInteger(change) ? 0 : 2 });
+	return `${change > 0 ? '+' : '−'}${n}${unit ? `${String.fromCharCode(0xa0)}${unit}` : ''}`;
+}

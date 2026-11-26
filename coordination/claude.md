@@ -4002,3 +4002,18 @@
   aventurier ».
 - 15:59 : commité et poussé sur le relais du Producer (Raphaël : « c est plus un "petit" panda roux ») : mon fichier et
   cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-26 — Admin : accueil rafraîchi toutes les 10 min, badge d'écart (session website)
+- Statut : en cours (2026-11-26T18:25+01:00). Demande de l'utilisateur : (transmis par le Producer, décision de
+  Raphaël) « ok sinon toutes les 10 min » : recharger les cartes de /admin/ toutes les 10 min onglet visible, badge +N
+  / −N sur les chiffres qui ont bougé
+- Réservations actives : `src/components/admin/AdminHome.tsx`, `src/components/admin/AdminHome.test.ts`,
+  `src/lib/adminHome.ts`, `src/lib/adminHome.test.ts`, `src/lib/homeRevenue.ts`, `src/components/admin/admin.css`.
+- Ressources : serveur de dev sur le port 4391 ; eslint, `astro check`. Build annoncé ici avant.
+- 18:29 : Réserve aussi scripts/snap-admin.mjs (SNAP_RELOAD : une 2e lecture 10 min plus tard, pour voir les badges).
+  Tests 14/14, eslint et astro check OK.
+- 18:30 : Captures clair, sombre, téléphone OK (+15, +0,96 €, −1). Lancement du build complet (écrit dist/, .astro/,
+  public/vendor/)…
+- 18:32 : Build complet OK (0 erreur, 246 pages, précache 419 entrées, liens OK).
+- 18:32 : commité sur décision de Raphaël relayée par le Producer : mes 7 fichiers et cette section seulement ; le push
+  du site attend sa phrase tapée dans cette session. Statut : terminé. Réservations libérées.

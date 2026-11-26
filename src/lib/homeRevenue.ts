@@ -12,10 +12,10 @@ export const homeIncome = (h: HomeMoney): Income =>
 
 /** The Revenus tile: the month's net total, then one line each for the sum, what was paid and how net is counted.
  *  Nothing read at all gives no figure. */
-export function revenueTile(r: Income): { figure?: string; lines: string[] } {
+export function revenueTile(r: Income): { figure?: string; total?: number; lines: string[] } {
 	if (!r.adsPaid && !r.inAppFrom.play && !r.inAppFrom.appstore) return { lines: [] };
 	const m = periodLine(r, 'month');
-	return { figure: eur(m.total), lines: [`net ${since(r.monthStart)}`, m.sum, ...m.paid, m.net] };
+	return { figure: eur(m.total), total: m.total, lines: [`net ${since(r.monthStart)}`, m.sum, ...m.paid, m.net] };
 }
 
 /** The Statistiques tile's in-app line, the last 7 days; `why` when no source answered. */

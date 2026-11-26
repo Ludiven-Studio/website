@@ -168,6 +168,15 @@ const RATES = { generatedAt: ago(2), date: '2026-11-20', perEur: { EUR: 1, USD: 
 const ANSWERS = { overview: OVERVIEW, orders: ORDERS, purchases: PURCHASES, revenue: REVENUE, board: BOARD, appstore: APPSTORE, rates: RATES, ...PROMO };
 // SNAP_APPS=1: no store report answers, so the purchases come from what the apps saw, as live in November 2026.
 if (process.env.SNAP_APPS) for (const k of ['orders', 'appstore']) delete ANSWERS[k];
+// SNAP_RELOAD=1: the home read once, then again 10 minutes later with 15 more visitors, one wait done and $1 more
+// ads this month, to see the badges.
+let bumped = false;
+const BUMPED = {
+	overview: { ...OVERVIEW, apps: OVERVIEW.apps.map((a, i) => (i ? a : { ...a, periods: { ...a.periods, d7: { ...a.periods.d7, visitors: a.periods.d7.visitors + 15 } } })) },
+	board: { ...BOARD, apps: BOARD.apps.map((a, i) => (i ? a : { ...a, waits: a.waits.slice(1) })) },
+	revenue: { ...REVENUE, total: { ...REVENUE.total, month: REVENUE.total.month + 1 } },
+};
+const answerOf = (action) => (bumped && BUMPED[action]) || ANSWERS[action];
 
 const mock = createServer((req, res) => {
 	res.setHeader('Access-Control-Allow-Origin', '*');
@@ -177,7 +186,7 @@ const mock = createServer((req, res) => {
 	req.on('data', (c) => (body += c));
 	req.on('end', () => {
 		const { action } = JSON.parse(body || '{}');
-		const answer = ANSWERS[action];
+		const answer = answerOf(action);
 		res.writeHead(answer ? 200 : 400, { 'Content-Type': 'application/json' });
 		res.end(JSON.stringify(answer ?? { error: 'unknown action' }));
 	});
@@ -204,7 +213,7 @@ async function answerFunctions(page) {
 	await page.route(/\/functions\/v1\/(stats-admin|promo-admin)/, (route) => {
 		if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*' } });
 		const { action } = JSON.parse(route.request().postData() || '{}');
-		const answer = ANSWERS[action];
+		const answer = answerOf(action);
 		return route.fulfill({ status: answer ? 200 : 400, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(answer ?? { error: 'unknown action' }) });
 	});
 }
@@ -219,7 +228,17 @@ try {
 			if (live) await answerFunctions(page);
 			page.on('pageerror', (e) => errors.push(`${path} ${view}: ${e.message}`));
 			page.on('console', (m) => m.type() === 'error' && !m.text().includes('fetching the script') && errors.push(`${path} ${view}: ${m.text()}`));
+			const reload = !!process.env.SNAP_RELOAD && path === '/admin/';
+			bumped = false;
+			if (reload) await page.clock.install();
 			await page.goto(server.base + path, { waitUntil: 'networkidle' });
+			if (reload) {
+				await page.waitForSelector('.ah-tile strong');
+				bumped = true;
+				await page.clock.runFor('10:01');
+				await page.waitForSelector('.ah-delta');
+				await page.waitForLoadState('networkidle');
+			}
 			// A full-page shot would paint the fixed tab bar in the middle of the page.
 			await page.addStyleTag({ content: 'astro-dev-toolbar, nav.tb { display: none !important; }' });
 			await page.waitForTimeout(800);
