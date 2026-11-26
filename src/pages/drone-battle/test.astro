@@ -15,7 +15,7 @@ const LATEST = `${SUPABASE_URL}/storage/v1/object/public/builds/dronebattle/late
 	<div class="wrapper test-page stack gap-6">
 		<header class="stack gap-2">
 			<h1>Drone Battle — version de test</h1>
-			<p class="lead">Le jeu Android en cours de développement : des drones s'affrontent dans une forêt. Joue seul contre deux drones ennemis, ou en duel à deux téléphones sur le même Wi-Fi ; le premier à 5 destructions gagne. Il s'installe sous le nom « Drone Battle Dev ».</p>
+			<p class="lead">Le jeu Android en cours de développement : des drones s'affrontent dans une forêt. Joue seul contre deux drones ennemis, ou en duel à deux téléphones sur le même Wi-Fi ; le premier à 5 destructions gagne. Il s'installe sous le nom « Drone Battle Dev ».</p>
 		</header>
 
 		<section class="card stack gap-4" id="build" data-latest={LATEST}>
@@ -34,18 +34,29 @@ const LATEST = `${SUPABASE_URL}/storage/v1/object/public/builds/dronebattle/late
 		<section class="stack gap-2">
 			<h2>Installer sur Android</h2>
 			<ol>
-				<li>Ouvre cette page sur le téléphone et touche « Télécharger ».</li>
+				<li>Ouvre cette page sur le téléphone et touche « Télécharger ».</li>
 				<li>Ouvre le fichier téléchargé. Si Android bloque, autorise ton navigateur à installer des applis inconnues, puis réessaie.</li>
 				<li>Pour une nouvelle version, refais la même chose : elle s'installe par-dessus l'ancienne.</li>
 			</ol>
 		</section>
 
 		<section class="stack gap-2">
+			<h2>Commandes</h2>
+			<ul>
+				<li>Sur téléphone, le pouce gauche pilote avec le stick. Le pouce droit règle l'altitude avec le curseur vertical, de 1 m entre les troncs jusqu'au-dessus des arbres.</li>
+				<li>Sur téléphone, ton drone tire tout seul quand le tir toucherait, et le canon s'incline vers un drone devant toi : il suffit de tourner vers l'ennemi.</li>
+				<li>À la manette, stick gauche pour piloter, stick droit pour l'altitude, gâchette ou A pour tirer.</li>
+				<li>Au clavier, ZQSD ou les flèches pour piloter, E et A pour monter et descendre, Espace pour tirer.</li>
+			</ul>
+		</section>
+
+		<section class="stack gap-2">
 			<h2>Jouer en duel</h2>
 			<ol>
-				<li>Les deux téléphones sont sur le même Wi-Fi.</li>
-				<li>Sur le premier, touche « Duel » puis « Héberger » : l'adresse à donner s'affiche en haut.</li>
-				<li>Sur le second, touche « Duel », tape cette adresse, puis « Rejoindre ».</li>
+				<li>Les deux téléphones sont sur le même Wi-Fi, pas en 4G/5G. Un Wi-Fi public ou « invités » peut bloquer la connexion entre appareils : prends celui de la maison.</li>
+				<li>Sur le premier, touche « Duel » puis « Héberger » : l'adresse à donner s'affiche en haut.</li>
+				<li>Sur le second, touche « Duel », tape cette adresse, puis « Rejoindre ».</li>
+				<li>Le premier à 5 destructions gagne. « Rejouer » relance la partie pour les deux, « Quitter » revient au salon.</li>
 			</ol>
 		</section>
 	</div>

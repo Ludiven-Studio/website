@@ -4030,3 +4030,17 @@
   1.0.25 · 80,3 Mo ».
 - 20:52 : commité et poussé sur le relais du Producer (Raphaël : « publie ») : mon fichier et cette section seulement.
   Statut : terminé. Réservations libérées.. Statut : terminé. Réservations libérées.
+
+## 2026-11-26 — DroneBattle : page testeurs, section duel et commandes (session DroneBattle)
+- Statut : en cours (2026-11-26T22:48+01:00). Demande de l'utilisateur : Raphaël (via le Producer, « oui aux 4
+  questions ») : conseils Wi-Fi et règle du duel, section Commandes ; commit sans push, le Producer pousse
+- Réservations actives : `src/pages/drone-battle/test.astro`.
+- Ressources : serveur de dev sur le port 4397 ; eslint, `astro check`. Build annoncé ici avant.
+- 22:49 : Lancement du build complet (écrit dist/, .astro/, public/vendor/ de mon worktree
+  website-worktrees/drone-test-duel)…
+- 22:51 : Section Commandes (curseur d'altitude, tir auto, manette, clavier) et duel (conseil Wi-Fi, premier à 5,
+  Rejouer, Quitter), espaces insécables dans les guillemets. eslint OK, astro check 0 erreur, build complet OK (246
+  pages, precache et liens OK), captures clair, sombre, téléphone vues.
+- 22:51 : commité sur la branche drone-test-duel du worktree website-worktrees/drone-test-duel, pas poussé : le
+  Producer pousse sur le mot de Raphaël. Mon fichier et cette section seulement.. Statut : terminé. Réservations
+  libérées.
