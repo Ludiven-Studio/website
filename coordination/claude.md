@@ -3972,3 +3972,12 @@
   propres. Captures sur le serveur de dev, port 4391.
 - 13:44 : commité et poussé sur le relais du Producer (Raphaël « ok ») : mes 6 fichiers et cette section seulement.
   Statut : terminé. Réservations libérées.
+
+## 2026-11-26 — Admin : accueil, priorités par carte (session website)
+- Statut : en cours (2026-11-26T14:05+01:00). Demande de l'utilisateur : Producer (Raphaël) : remplir le vide des
+  cartes de l'accueil admin avec les priorités de chacune
+- Réservations actives : `src/lib/adminHome.ts`, `src/lib/adminHome.test.ts`, `src/components/admin/AdminHome.tsx`,
+  `scripts/snap-admin.mjs`.
+- Ressources : serveur de dev sur le port 4391 ; eslint, `astro check`. Build annoncé ici avant.
+- 14:12 : commité ; push en attente de la phrase de Raphaël dans cette session (refusé sur le relais) ; tests 4/4,
+  eslint, astro check, captures clair/sombre/téléphone. Statut : terminé. Réservations libérées.

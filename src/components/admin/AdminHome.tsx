@@ -6,6 +6,10 @@ import { accountLabel, signOut } from '../../lib/meetupAuth';
 import GoogleSignIn from './GoogleSignIn';
 import { STATS_LOCAL, StatsError, appStore, board, overview, playOrders, purchases, rates, revenue, statsMessage, totals } from '../../lib/statsAdmin';
 import { homeIncome, revenueTile, weekLine, type HomeMoney } from '../../lib/homeRevenue';
+import { houseAdLines, statsLines, testLines, waitLines } from '../../lib/adminHome';
+import { readBetaBuild } from '../../lib/betaBuild';
+import { TEST_APPS } from '../../data/testBuilds';
+import type { Overview } from '../../lib/statsAdmin';
 import type { Catalog } from '../../../supabase/functions/_shared/promoRules.mjs';
 import { useAdminSession } from './useAdminSession';
 import { AppName } from './AdminParts';
@@ -24,7 +28,9 @@ export function whyMissing(e: unknown): string {
 
 export default function AdminHome() {
 	const { session, ready, error } = useAdminSession(STATS_LOCAL);
-	const [stats, setStats] = useState<ReturnType<typeof totals> | null>(null);
+	const [ov, setOv] = useState<Overview | null>(null);
+	const [waitList, setWaitList] = useState<string[]>([]);
+	const [tests, setTests] = useState<string[]>([]);
 	const [statsError, setStatsError] = useState<string | null>(null);
 	const [ads, setAds] = useState<number | null>(null);
 	const [waits, setWaits] = useState<number | null>(null);
@@ -35,12 +41,24 @@ export default function AdminHome() {
 
 	useEffect(() => {
 		if (!signedIn) return;
-		overview().then((o) => setStats(totals(o))).catch((e) => setStatsError(statsMessage(e)));
+		overview().then(setOv).catch((e) => setStatsError(statsMessage(e)));
 		void Promise.allSettled([revenue(), playOrders(), appStore(), purchases(), rates()]).then(([ad, o, a, p, r]) => {
 			const ok = <T,>(x: PromiseSettledResult<T>): T | null => (x.status === 'fulfilled' ? x.value : null);
 			setMoney({ money: ok(ad), orders: ok(o), apple: ok(a), seen: ok(p), rates: ok(r), now: new Date(), why: p.status === 'rejected' ? whyMissing(p.reason) : '' });
 		});
-		board().then((b) => setWaits(b.apps.reduce((n, a) => n + a.waits.length, 0))).catch(() => setWaits(null));
+		board().then((b) => {
+			setWaits(b.apps.reduce((n, a) => n + a.waits.length, 0));
+			setWaitList(waitLines(b));
+		}).catch(() => setWaits(null));
+		// The testers' manifests the /tests/ page reads: public, one small file per app.
+		void Promise.all(TEST_APPS.filter((a) => a.latest).map((a) => fetch(`${a.latest}?t=${Date.now()}`, { cache: 'no-store' })
+			.then((r) => (r.ok ? r.json() : null))
+			.then((j) => {
+				const b = j ? readBetaBuild(j) : null;
+				return b ? { name: a.name, version: b.version, date: b.date } : null;
+			})
+			.catch(() => null)))
+			.then((all) => setTests(testLines(all.filter((b) => b !== null))));
 		fetch('/promo/v1/catalog.json', { cache: 'no-cache' })
 			.then((r) => (r.ok ? r.json() : null))
 			.then((c: Catalog | null) => setAds(c ? c.entries.filter((e) => (e.weight ?? 1) > 0).length : null))
@@ -49,11 +67,16 @@ export default function AdminHome() {
 
 	const counted = money ? homeIncome(money) : null;
 	const month = counted ? revenueTile(counted) : { lines: [] };
+	const stats = ov ? totals(ov) : null;
 	const tiles: Tile[] = [
 		{
 			href: '/admin/stats/', title: 'Statistiques', text: 'Visiteurs, achats, connexions et pubs maison, appli par appli.',
 			figure: stats ? int.format(stats.visitors7) : undefined,
-			lines: [stats ? `visiteurs des 7 derniers jours · ${stats.apps} applis` : statsError ?? undefined, counted && money ? weekLine(counted, money.why) : undefined],
+			lines: [
+				stats ? `visiteurs des 7 derniers jours · ${stats.apps} applis` : statsError ?? undefined,
+				...(ov ? statsLines(ov) : []),
+				counted && money ? weekLine(counted, money.why) : undefined,
+			],
 		},
 		{
 			href: '/admin/revenus/', title: 'Revenus', text: 'La publicité et les achats intégrés, en euros.',
@@ -62,13 +85,14 @@ export default function AdminHome() {
 		{
 			href: '/admin/versions/', title: 'Versions', text: 'Chaque appli sur les stores, chez les testeurs et sur main.',
 			figure: waits === null ? undefined : <span className={waits ? 'ak-warn-text' : undefined}>{waits}</span>,
-			lines: [waits === null ? undefined : waits ? `chose${waits > 1 ? 's' : ''} t'attend${waits > 1 ? 'ent' : ''}` : "rien ne t'attend"],
+			lines: [waits === null ? undefined : waits ? `chose${waits > 1 ? 's' : ''} t'attend${waits > 1 ? 'ent' : ''}` : "rien ne t'attend", ...waitList],
 		},
 		{
 			href: '/admin/pubs/', title: 'Pubs maison', text: 'Le catalogue des applis et leurs poids.',
-			figure: ads === null ? undefined : ads, lines: [ads === null ? undefined : `pub${ads > 1 ? 's' : ''} active${ads > 1 ? 's' : ''}`],
+			figure: ads === null ? undefined : ads,
+			lines: [ads === null ? undefined : `pub${ads > 1 ? 's' : ''} active${ads > 1 ? 's' : ''}`, ...(ov ? houseAdLines(ov) : [])],
 		},
-		{ href: '/tests/', title: 'Versions de test', text: 'Les APK de test des applis et les prototypes, au même endroit.' },
+		{ href: '/tests/', title: 'Versions de test', text: 'Les APK de test des applis et les prototypes, au même endroit.', lines: tests.length ? ['Les plus récentes :', ...tests] : [] },
 	];
 
 	return (
