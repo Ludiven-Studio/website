@@ -4125,3 +4125,18 @@
   précache 441, liens OK).
 - 07:52 : commité sur la branche dominoland-pages (worktree website-worktrees/dominoland-pages), pas poussé : le
   Producer pousse. Mes fichiers et cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-27 — Pétanque Scan : Google AdMob sur la page des sociétés (1.2.20) (session PetanqueScan)
+- Statut : en cours (2026-11-27T09:40+01:00). Demande de l'utilisateur : Relais du Producer (Raphaël : « oui il vaut
+  mieux ») : préparer /publicite/societes/ en 5 langues avec Google AdMob pour Pétanque Scan 1.2.20, commit sur une
+  branche de worktree, sans pousser ; en ligne le jour de la sortie de la 1.2.20, sur son mot
+- Réservations actives : `src/pages{,/en,/es,/de,/it}/publicite/societes.astro` (worktree
+  website-worktrees/scan-admob-societes, branche scan-admob-societes).
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 09:43 : 5 pages modifiées (Google AdMob pour Pétanque Scan dès 1.2.20, formulaire de Google sur Android, date du
+  27/11) ; astro check 0 erreur. Lancement du build complet (écrit dist/, .astro/, public/vendor/ de mon worktree
+  website-worktrees/scan-admob-societes)…
+- 09:45 : Build complet OK (268 pages, précache 441, liens OK) ; Google AdMob dans les 5 pages construites.
+- 09:45 : commité dans le worktree website-worktrees/scan-admob-societes (branche locale scan-admob-societes), pas
+  poussé : en ligne le jour de la sortie de la 1.2.20, sur le mot de Raphaël ; mes 5 fichiers et cette section
+  seulement. Statut : terminé. Réservations libérées.
