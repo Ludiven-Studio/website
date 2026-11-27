@@ -26,6 +26,7 @@ export interface TestApp {
 const manifest = (folder: string) => `${SUPABASE_URL}/storage/v1/object/public/builds/${folder}/latest.json`;
 
 export const TEST_APPS: TestApp[] = [
+	{ id: 'table-tennis', name: 'Table Tennis Tactics', tag: 'Le tennis de table en consignes tracées', icon: null, initials: 'TT', color: '#0c8599', latest: manifest('tabletennis'), page: '/table-tennis-tactics/test/' },
 	{ id: 'drone-battle', name: 'Drone Battle', tag: 'Combats de drones dans une forêt, seul ou en duel', icon: null, initials: 'DB', color: '#2f9e44', latest: manifest('dronebattle'), page: '/drone-battle/test/' },
 	{ id: 'dominoland', name: 'Dominoland', tag: 'Le jeu de dominos', icon: '/assets/tests/dominoland.webp', initials: 'DL', color: '#e8b04a', latest: manifest('dominoland'), page: '/dominoland/test/' },
 	{ id: 'petanque-game', name: 'Pétanque Game', tag: 'La pétanque en 3D, version de développement', icon: PG_ICON, initials: 'PG', color: '#2f7fd1', latest: manifest('petanquegame'), page: '/jeux/petanque/test/' },

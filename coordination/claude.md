@@ -4176,3 +4176,19 @@
 - 00:25 : commité et poussé à la demande de l'utilisateur (« Pousse les pages légales de Pétanque Game 1.0.20 sur le
   site ») : d51c88f, 2d6fda3, 8558f7b, ba4328f, a2fadab ; mes fichiers et cette section seulement. Statut : terminé.
   Réservations libérées.
+
+## 2026-11-28 — Table Tennis Tactics : page de test (session TableTennis)
+- Statut : en cours (2026-11-28T00:31+01:00). Demande de l'utilisateur : Producer : page de test de Table Tennis
+  Tactics et entrée dans /tests, commit sans pousser
+- Réservations actives : `src/pages/table-tennis-tactics/test.astro`, `src/data/testBuilds.ts`, `src/data/siteNav.ts`,
+  `astro.config.mjs` (worktree website-worktrees/tt-test-page).
+- Ressources : serveur de dev sur le port 4396 ; eslint, `astro check`. Build annoncé ici avant.
+- 00:32 : Page /table-tennis-tactics/test/ écrite sur le modèle de Drone Battle ; carte en tête de /tests/, filtre du
+  sitemap, globIgnores du précache, APP_PAGES de siteNav (et `src/data/siteNav.test.ts`, réservé aussi). npm ci dans le
+  worktree…
+- 00:38 : eslint OK, astro check 0 erreur, vitest testHub et siteNav 6/6, captures clair, sombre, téléphone sans erreur
+  console (carte TT dans /tests/, 0.1.4 lue en direct). Lancement du build complet (écrit dist/, .astro/,
+  public/vendor/ du worktree tt-test-page)…
+- 00:42 : Build complet OK (270 pages, précache 444, liens OK) ; la page n'est ni dans le sitemap ni dans le précache.
+  Commité sur la branche tt-test-page, pas poussé : la mise en ligne attend le mot de Raphaël. Réservations gardées
+  jusque-là.

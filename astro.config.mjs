@@ -66,6 +66,7 @@ export default defineConfig({
                 !page.includes('/jeux/eclats/test') &&
                 !page.includes('/dominoland/test') &&
                 !page.includes('/drone-battle/test') &&
+                !page.includes('/table-tennis-tactics/test') &&
                 !page.includes('/suivi-familial/') &&
                 !page.includes('/cap-etoile/test-') &&
                 !page.includes('/jeux/eclats/nuit') &&
@@ -108,6 +109,7 @@ export default defineConfig({
                     'jeux/eclats/test/**',
                     'dominoland/test/**',
                     'drone-battle/test/**',
+                    'table-tennis-tactics/test/**',
                     'rencontres/test/**',
                     'suivi-familial/**',
                     'cap-etoile/test-*/**',

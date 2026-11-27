@@ -14,7 +14,7 @@ describe('site menu', () => {
 	});
 
 	it("lights « Jeux » on every app's pages and on the testers' hub", () => {
-		for (const path of ['/dominoland/', '/dominoland/test/', '/drone-battle/test/', '/nino-rush/telecharger/', '/petanque-game/', '/petanque-scanner/test/', '/petanque/', '/tests/']) {
+		for (const path of ['/dominoland/', '/dominoland/test/', '/drone-battle/test/', '/nino-rush/telecharger/', '/petanque-game/', '/petanque-scanner/test/', '/petanque/', '/table-tennis-tactics/test/', '/tests/']) {
 			expect(menu(path), path).toEqual(['Jeux']);
 			expect(tab(path), path).toEqual(['games']);
 		}

@@ -26,7 +26,7 @@ export interface NavText {
 }
 
 // The apps' own pages count as the « games » part of the site, their testers' pages too, even those under /jeux/.
-const APP_PAGES = String.raw`(?:dragons-gems|dominoland|drone-battle|nino-rush|petanque-game|petanque-meet|petanque-scanner|petanque|tests|jeux\/[^/]+\/test)(?:\/|$)`;
+const APP_PAGES = String.raw`(?:dragons-gems|dominoland|drone-battle|nino-rush|petanque-game|petanque-meet|petanque-scanner|petanque|table-tennis-tactics|tests|jeux\/[^/]+\/test)(?:\/|$)`;
 const APPS = new RegExp(String.raw`^\/(?:(?:en|es|de|it)\/)?` + APP_PAGES);
 /** The mini-games: everything under /jeux/ but the apps' testers' pages. */
 const MINI = /^\/jeux\/(?![^/]+\/test\/)/;
