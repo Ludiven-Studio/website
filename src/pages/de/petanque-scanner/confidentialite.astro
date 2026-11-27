@@ -18,7 +18,7 @@ import Hero from '../../../components/Hero.astro';
 		<p class="updated">
 			Diese Erklärung betrifft <strong>die mobile App Pétanque Scan</strong>
 			(früher Pétanque Scanner, <code>com.raphbenpro.petanquear</code>) und nicht die Website ludiven-studio.fr, die über eine
-			<a href="/confidentialite/">eigene Datenschutzerklärung</a> verfügt. Letzte Aktualisierung: 25. November 2026 (der Zeitpunkt deiner Wahl zur Werbung und auf dem iPhone deine Antwort auf Apples Frage zum Tracking, in der Statistik gezählt; Version 1.2.15: Jeder geöffnete Bildschirm und deine Wahl zur Werbung werden in den Statistiken gezählt, die Ereignisse tragen die gemeinsamen Namen unserer Apps und Scans geben ihren Modus an, 3D oder Foto; unsere eigenen Videos haben einen Link „Dieses Video melden“; Version 1.2.14: Unsere eigenen Anzeigen, von unserer Website geladen, ersetzen das Banner und das Video von Pétanque Meet; nach einer Ablehnung wird „Werbung aktivieren?“ einmal pro Sitzung angeboten, wenn du ein Video anforderst; die Werbung wechselt von Google AdMob zu Unity LevelPlay, mit unserem eigenen Einwilligungsfenster; auf dem iPhone ist die Werbung ohne Apples Tracking-Erlaubnis nicht personalisiert; ein Widerruf deiner Einwilligung wird an die Werbenetzwerke weitergegeben; Google Firebase entfällt; 10 kostenlose Scans pro Tag statt 3).
+			<a href="/confidentialite/">eigene Datenschutzerklärung</a> verfügt. Letzte Aktualisierung: 27. November 2026 (Version 1.2.20: auf dem iPhone ist Apples Frage zum Tracking die einzige Frage zur Werbung; der Zeitpunkt deiner Wahl zur Werbung und auf dem iPhone deine Antwort auf Apples Frage zum Tracking, in der Statistik gezählt; Version 1.2.15: Jeder geöffnete Bildschirm und deine Wahl zur Werbung werden in den Statistiken gezählt, die Ereignisse tragen die gemeinsamen Namen unserer Apps und Scans geben ihren Modus an, 3D oder Foto; unsere eigenen Videos haben einen Link „Dieses Video melden“; Version 1.2.14: Unsere eigenen Anzeigen, von unserer Website geladen, ersetzen das Banner und das Video von Pétanque Meet; nach einer Ablehnung wird „Werbung aktivieren?“ einmal pro Sitzung angeboten, wenn du ein Video anforderst; die Werbung wechselt von Google AdMob zu Unity LevelPlay, mit unserem eigenen Einwilligungsfenster; auf dem iPhone ist die Werbung ohne Apples Tracking-Erlaubnis nicht personalisiert; ein Widerruf deiner Einwilligung wird an die Werbenetzwerke weitergegeben; Google Firebase entfällt; 10 kostenlose Scans pro Tag statt 3).
 		</p>
 		<p class="updated">
 			Dies ist eine Höflichkeitsübersetzung. Bei Abweichungen gilt die
@@ -30,7 +30,7 @@ import Hero from '../../../components/Hero.astro';
 			<ul>
 				<li><strong>Die Bilder deiner Kamera verlassen nie dein Gerät.</strong> Die Erkennung der Kugeln wird lokal auf dem Handy berechnet. Kein Foto, kein Video und kein Bild wird an einen Server gesendet oder dauerhaft gespeichert — auch nicht im Fotomodus, in dem das beim Auslösen aufgenommene Bild im Arbeitsspeicher bleibt.</li>
 				<li>Es gibt <strong>kein Benutzerkonto</strong>. Wir kennen weder deinen Namen noch deine E-Mail-Adresse noch deinen Standort. Unser einziger Server ist der für die Nutzungsstatistik (siehe §5).</li>
-				<li>Werbung startet <strong>nur mit deiner Einwilligung</strong>, die beim ersten Start abgefragt wird. Ohne sie funktioniert die App genauso, ohne die Werbung unserer Partner. Du kannst deine Wahl jederzeit ändern. Auf dem iPhone ist die Werbung ohne Apples Tracking-Erlaubnis nicht personalisiert. Die Nutzungsstatistik, ohne Cookie und ohne Kennung, hängt nicht von dieser Wahl ab (siehe §5).</li>
+				<li>Werbung startet <strong>nur mit deiner Einwilligung</strong>: beim ersten Start in unserem Fenster; auf dem iPhone seit Version 1.2.20, indem du das Tracking erlaubst, wenn Apple dich fragt. Ohne sie funktioniert die App genauso, ohne die Werbung unserer Partner. Du kannst deine Wahl jederzeit ändern. Die Nutzungsstatistik, ohne Cookie und ohne Kennung, hängt nicht von dieser Wahl ab (siehe §5).</li>
 				<li>Der <strong>Premium-Kauf entfernt die Werbung</strong>, und in diesem Fall wird das Werbe-SDK gar nicht erst gestartet.</li>
 			</ul>
 		</div>
@@ -99,8 +99,8 @@ import Hero from '../../../components/Hero.astro';
 					<tbody>
 						<tr>
 							<td>Werbe-ID des Geräts (GAID unter Android, IDFA unter iOS, wenn du Tracking erlaubst), weitere Gerätekennungen, IP-Adresse, Interaktionen mit Anzeigen, technische Informationen (siehe §4)</td>
-							<td>Werbung anzeigen, nach deinen Interessen ausgewählt, außer auf dem iPhone ohne Tracking-Erlaubnis (siehe §4), sie messen, Betrug bekämpfen</td>
-							<td>Einwilligung (Art. 6 Abs. 1 lit. a DSGVO): ohne sie startet nichts</td>
+							<td>Werbung anzeigen, nach deinen Interessen ausgewählt, sie messen, Betrug bekämpfen (siehe §4)</td>
+							<td>Einwilligung (Art. 6 Abs. 1 lit. a DSGVO): ohne sie startet nichts; auf dem iPhone seit Version 1.2.20 die Tracking-Erlaubnis von Apple</td>
 							<td>Unity Technologies und seine Tochtergesellschaft ironSource (Unity LevelPlay, ironSource Ads, Unity Ads); über deren Auktionen weitere Werbekäufer (siehe §4)</td>
 						</tr>
 						<tr>
@@ -167,25 +167,28 @@ import Hero from '../../../components/Hero.astro';
 				Einwilligungsfenster (Google UMP).
 			</p>
 			<p>
-				<strong>Deine Einwilligung.</strong> Beim ersten Start fragt dich, egal in welchem Land, ein Fenster
+				<strong>Deine Einwilligung.</strong> Beim ersten Start fragt dich ein Fenster
 				„Werbung“, ob du zustimmst, dass unsere Werbepartner (Unity Ads und ironSource) eine Kennung deines
 				Handys nutzen, um die Werbung auszuwählen und ihre Wirkung zu messen. „Akzeptieren“ und „Ablehnen“
-				haben das gleiche Gewicht.
+				haben das gleiche Gewicht. Auf dem iPhone erscheint dieses Fenster seit Version 1.2.20 nur noch unter iOS 13 oder älter (siehe unten).
+			</p>
+			<p>
+				<strong>Deine Einwilligung auf dem iPhone</strong> (iOS 14 oder neuer, seit Version 1.2.20). Die einzige Frage ist die von Apple, ob du der App erlaubst, deine Aktivitäten zu verfolgen; ihr Text nennt Unity Ads, ironSource und ihre Partner. Erlaubst du es, sagt dir ein Hinweis „Werbung“ mit einer einzigen Schaltfläche OK, was diese Unternehmen mit der Werbe-ID deines iPhones tun, mit einem Link zur Liste der Unternehmen und zu dieser Datenschutzerklärung, und wo du deine Wahl ändern kannst; die Werbung startet nach OK. Lehnst du ab oder ist das Tracking auf deinem iPhone eingeschränkt, zeigt die App kein Fenster zur Werbung, es startet kein Werbemodul und ihnen wird nichts übermittelt: Sie zeigt nur unsere eigenen Anzeigen. Solange du Apple nicht geantwortet hast, startet keine Werbung unserer Partner, und die Frage kommt beim nächsten Start wieder.
 			</p>
 			<ul>
 				<li><strong>Wenn du akzeptierst</strong>: Unity LevelPlay startet und zeigt das Banner und die Videos. Wenn es keine Anzeige zu zeigen hat, treten unsere eigenen Anzeigen an seine Stelle, beim Banner wie beim Video.</li>
 				<li><strong>Wenn du ablehnst</strong>: Es startet kein Werbemodul. Die App funktioniert genauso, ohne die Werbung unserer Partner: An ihrer Stelle zeigt ein Banner abwechselnd unsere eigenen Anzeigen für unsere anderen Apps (derzeit Pétanque Meet und, unter Android, Pétanque Game), und ein kurzes Video einer dieser Apps lädt deine Scans ebenfalls auf. Unsere eigenen Anzeigen laufen über kein Werbenetzwerk und verfolgen dich nicht (siehe §5 und §8).</li>
-				<li><strong>Nach einer Ablehnung</strong> bietet dir die App einmal pro Sitzung an, die Werbung zu aktivieren, wenn du ein Video anforderst, um deine Scans aufzuladen: „Werbung aktivieren“ gilt als „Akzeptieren“ (auf dem iPhone wird dann die Tracking-Erlaubnis von Apple abgefragt, falls das noch nicht geschehen ist), „Video unserer Apps ansehen“ behält deine Ablehnung bei und zeigt eines unserer Videos.</li>
-				<li><strong>Deine Antwort</strong>, ihr Datum und die Version des Textes bleiben auf deinem Handy. Die App fragt dich nach 6 Monaten erneut, egal ob du akzeptiert oder abgelehnt hast, oder früher, wenn sich unsere Werbepartner ändern. Deine Wahl (ja oder nein) wird außerdem ohne Kennung in unserer Nutzungsstatistik gezählt, bei jedem Start (siehe §5).</li>
+				<li><strong>Nach einer Ablehnung</strong> bietet dir die App einmal pro Sitzung an, die Werbung zu aktivieren, wenn du ein Video anforderst, um deine Scans aufzuladen: „Werbung aktivieren“ gilt als „Akzeptieren“, „Video unserer Apps ansehen“ behält deine Ablehnung bei und zeigt eines unserer Videos. Auf dem iPhone (iOS 14 oder neuer) gibt es diese Frage seit Version 1.2.20 nicht mehr: Nach einer Ablehnung des Trackings ist das Video eines unserer eigenen.</li>
+				<li><strong>Deine Antwort</strong>, ihr Datum und die Version des Textes bleiben auf deinem Handy. Die App fragt dich nach 6 Monaten erneut, egal ob du akzeptiert oder abgelehnt hast, oder früher, wenn sich unsere Werbepartner ändern. Auf dem iPhone (iOS 14 oder neuer) speichert Apple deine Antwort auf seine Frage. Deine Wahl (ja oder nein) wird außerdem ohne Kennung in unserer Nutzungsstatistik gezählt, bei jedem Start (siehe §5).</li>
 				<li><strong>Wenn du deine Einwilligung widerrufst</strong> (in den Einstellungen der App, siehe §12): Die Werbung unserer Partner endet sofort, und die App meldet den Widerruf an Unity LevelPlay, das ihn an die Werbenetzwerke weitergibt.</li>
-				<li><strong>Unter iOS</strong> wird die Tracking-Erlaubnis von Apple (<em>App Tracking Transparency</em>) erst nach einem „Akzeptieren“ abgefragt und dient nur der Werbung. Wenn du sie ablehnst oder später in den Einstellungen des iPhones ausschaltest (die App berücksichtigt das beim nächsten Start), wird weiterhin Werbung angezeigt, aber sie ist <strong>nicht personalisiert</strong>: Die App teilt Unity LevelPlay mit, dass du personalisierte Werbung ablehnst, LevelPlay gibt das an die Werbenetzwerke weiter, und die Werbe-ID des iPhones wird ihnen nicht übermittelt.</li>
+				<li><strong>Auf dem iPhone</strong>: Schaltest du das Tracking später unter Einstellungen › Datenschutz &amp; Sicherheit › Tracking aus, berücksichtigt die App das beim nächsten Start: Die Werbung unserer Partner startet nicht mehr, es bleiben nur unsere eigenen Anzeigen. Versionen vor 1.2.20 fragten die Tracking-Erlaubnis nach einem „Akzeptieren“ ab und zeigten ohne sie nicht personalisierte Werbung.</li>
 				<li><strong>Die Nutzungsstatistik</strong> (siehe §5) wird gesendet, ob du zustimmst oder nicht: Sie enthält weder Werbe-ID noch Cookie noch Gerätekennung.</li>
 				<li><strong>Wenn du Premium kaufst</strong>: Die Werbung verschwindet, und das Werbemodul wird nicht mehr gestartet.</li>
 			</ul>
 			<p>
 				<strong>Wenn du zugestimmt hast</strong>, erhalten die Module von ironSource und Unity Ads, um
 				Anzeigen auszuliefern, auszuwählen, zu messen und Betrug zu bekämpfen, die <strong>Werbe-ID</strong>
-				deines Handys (auf dem iPhone nur, wenn du Tracking erlaubst) und weitere Gerätekennungen, deine
+				deines Handys und weitere Gerätekennungen, deine
 				<strong>IP-Adresse</strong> (die einen ungefähren
 				Standort auf Stadtebene ergibt), deine Interaktionen mit den Anzeigen, deine Nutzungsdauer,
 				technische Informationen (Leistung, Abstürze) und, laut Unity Ads, die in der App getätigten Käufe.
@@ -247,7 +250,7 @@ import Hero from '../../../components/Hero.astro';
 				<li><code>update_prompt</code> / <code>update_tapped</code> — dir wird ein Update angeboten (empfohlen oder erforderlich), oder du tippst auf die Update-Schaltfläche — alter Name, gesendet bis 4 Wochen nach dem Erscheinen von 1.2.15</li>
 				<li><code>consent_accepted</code> / <code>consent_declined</code> — deine Einwilligungsentscheidung, bei jedem Start gesendet — alter Name, gesendet bis 4 Wochen nach dem Erscheinen von 1.2.15</li>
 				<li><code>app_open</code> — die App startet, mit der Angabe, ob es der erste Start ist, und deiner Wahl zur Werbung (ja, nein oder noch nicht gefragt) (seit 1.2.15)</li>
-				<li><code>ad_consent</code> — deine Antwort im Fenster „Werbung“: ja oder nein (seit 1.2.15), mit dem Zeitpunkt deiner Antwort (erster Start, Einstellungen oder beim Anfordern einer Belohnung) und auf dem iPhone deine Antwort auf Apples Frage zum Tracking</li>
+				<li><code>ad_consent</code> — deine Antwort im Fenster „Werbung“: ja oder nein (seit 1.2.15), mit dem Zeitpunkt deiner Antwort (erster Start, Einstellungen oder beim Anfordern einer Belohnung) und auf dem iPhone deine Antwort auf Apples Frage zum Tracking; auf dem iPhone (iOS 14 oder neuer) seit Version 1.2.20 ein Ja, wenn du das Tracking erlaubt und im Hinweis auf OK getippt hast, und nichts nach einer Ablehnung</li>
 				<li><code>update_shown</code> / <code>update_tap</code> — dir wird ein Update angeboten (empfohlen oder erforderlich), oder du tippst auf die Update-Schaltfläche (seit 1.2.15)</li>
 				<li><code>shop_open</code> — der Premium-Angebotsbildschirm öffnet sich, mit der Stelle, von der du kommst (seit 1.2.15)</li>
 				<li><code>iap_tap</code> / <code>iap_result</code> / <code>iap_restore</code> — du tippst auf den Kauf von Premium; sein Ergebnis (erfolgreich, abgebrochen oder gescheitert, mit einem kurzen Fehlercode und dem Store); eine Wiederherstellung, mit der Zahl der gefundenen Käufe. Nie ein Preis. (seit 1.2.15)</li>
@@ -383,7 +386,7 @@ import Hero from '../../../components/Hero.astro';
 				<li><strong>Daten der Reichweitenmessung — Umami</strong>: in Form von Ereignisstatistiken <strong>24 Monate</strong> auf unserem Server gespeichert, dann gelöscht; seine Sicherungen werden 14 Tage aufbewahrt. Was Umami Cloud noch von nicht aktualisierten Versionen erhält, wird dort nach 6 Monaten gelöscht. Diese Daten sind mit keiner Gerätekennung verknüpft und erlauben es nicht, den Weg einer Person nachzuvollziehen.</li>
 				<li><strong>Scan-Zähler</strong>: wird jeden Tag zurückgesetzt.</li>
 				<li><strong>Werbedaten</strong>: nach den Regeln von Unity und ironSource.</li>
-				<li><strong>Deine Antwort zur Werbung</strong>: 6 Monate auf dem Handy, danach fragt dich die App erneut.</li>
+				<li><strong>Deine Antwort zur Werbung</strong>: 6 Monate auf dem Handy, danach fragt dich die App erneut; auf dem iPhone (iOS 14 oder neuer) speichert iOS deine Antwort an Apple.</li>
 				<li><strong>Premium-Kennzeichnung</strong>: auf dem Gerät gespeichert bis zur Deinstallation (unter iOS kann der Schlüsselbund sie behalten, siehe §9).</li>
 				<li>E-Mails, die über „Dieses Video melden“ gesendet werden, werden so lange aufbewahrt, wie die Bearbeitung der Meldung dauert, und dann gelöscht, spätestens nach 12 Monaten.</li>
 			</ul>
@@ -397,7 +400,7 @@ import Hero from '../../../components/Hero.astro';
 			</p>
 			<p><strong>In der Praxis:</strong></p>
 			<ul>
-				<li><strong>Einwilligung widerrufen oder ändern</strong>: Tippe in den Einstellungen der App auf „Werbe-Einwilligung verwalten“: Das Fenster „Werbung“ erscheint wieder. Wenn du ablehnst, endet die Werbung unserer Partner sofort, und die App meldet den Widerruf an Unity LevelPlay, das ihn an die Werbenetzwerke weitergibt. Wenn du unter iOS das Tracking unter Einstellungen › Datenschutz &amp; Sicherheit › Tracking ausschaltest, ist die Werbung ab dem nächsten Start der App nicht mehr personalisiert (siehe §4).</li>
+				<li><strong>Einwilligung widerrufen oder ändern</strong>: Unter Android und auf einem iPhone mit iOS 13 oder älter tippe in den Einstellungen der App auf „Werbe-Einwilligung verwalten“: Das Fenster „Werbung“ erscheint wieder. Wenn du ablehnst, endet die Werbung unserer Partner sofort, und die App meldet den Widerruf an Unity LevelPlay, das ihn an die Werbenetzwerke weitergibt. Auf einem iPhone mit iOS 14 oder neuer seit Version 1.2.20: Einstellungen › Datenschutz &amp; Sicherheit › Tracking, indem du Pétanque Scan ein- oder ausschaltest; die Zeile in den Einstellungen der App erscheint nur, solange das Tracking erlaubt ist, und zeigt den Hinweis erneut (siehe §4).</li>
 				<li><strong>Lokale Daten löschen</strong>: Deinstalliere die App oder lösche ihre Daten in den Einstellungen des Handys.</li>
 				<li><strong>Werbe-ID zurücksetzen</strong>: Android → Einstellungen › Google › Werbung; iOS → Einstellungen › Datenschutz &amp; Sicherheit › Tracking.</li>
 				<li><strong>Werbedaten löschen lassen</strong>: Diese liegen bei Unity (ironSource, Unity Ads); bitte Unity über die in deren Datenschutzerklärung genannten Wege um ihre Löschung (Link in §4).</li>

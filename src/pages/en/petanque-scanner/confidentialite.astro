@@ -18,7 +18,7 @@ import Hero from '../../../components/Hero.astro';
 		<p class="updated">
 			This policy covers <strong>the Pétanque Scan mobile app</strong>
 			(formerly Pétanque Scanner, <code>com.raphbenpro.petanquear</code>), not the ludiven-studio.fr website, which has its
-			<a href="/confidentialite/">own policy</a>. Last updated: 25 November 2026 (when you made your ad choice and, on an iPhone, your answer to Apple's tracking question, counted in the statistics; version 1.2.15: each screen opened and your choice about ads are counted in the statistics, events take the names shared by our apps and scans say their mode, 3D or photo; our house videos have a "Report this video" link; version 1.2.14: our house ads, read from our website, replace the Pétanque Meet strip and video; after a refusal, "Turn ads on?" is offered once per session when you ask for a video; advertising moves from Google AdMob to Unity LevelPlay, with our own consent window; on iPhone, without Apple's tracking permission, ads are not personalised; withdrawing your consent is passed on to the ad networks; Google Firebase is removed; 10 free scans a day instead of 3).
+			<a href="/confidentialite/">own policy</a>. Last updated: 27 November 2026 (version 1.2.20: on iPhone, Apple's tracking question as the only question about ads; when you made your ad choice and, on an iPhone, your answer to Apple's tracking question, counted in the statistics; version 1.2.15: each screen opened and your choice about ads are counted in the statistics, events take the names shared by our apps and scans say their mode, 3D or photo; our house videos have a "Report this video" link; version 1.2.14: our house ads, read from our website, replace the Pétanque Meet strip and video; after a refusal, "Turn ads on?" is offered once per session when you ask for a video; advertising moves from Google AdMob to Unity LevelPlay, with our own consent window; on iPhone, without Apple's tracking permission, ads are not personalised; withdrawing your consent is passed on to the ad networks; Google Firebase is removed; 10 free scans a day instead of 3).
 		</p>
 		<p class="updated">
 			This is a courtesy translation. In case of discrepancy, the
@@ -30,7 +30,7 @@ import Hero from '../../../components/Hero.astro';
 			<ul>
 				<li><strong>Your camera images never leave your device.</strong> Boule detection is computed locally on the phone. No photo, no video and no image is sent to a server or stored permanently — including in photo mode, where the image taken when you press the shutter stays in RAM.</li>
 				<li>There is <strong>no user account</strong>. We do not know your name, your email address or your location. Our only server is the one for usage statistics (see §5).</li>
-				<li>Advertising starts <strong>only with your consent</strong>, requested at first launch. Without it, the app works just the same, without our partners' ads. You can change your mind at any time. On iPhone, without Apple's tracking permission, ads are not personalised. Usage statistics, with no cookie and no identifier, do not depend on this choice (see §5).</li>
+				<li>Advertising starts <strong>only with your consent</strong>: at first launch, in our window; on iPhone, since version 1.2.20, by allowing tracking when Apple asks you. Without it, the app works just the same, without our partners' ads. You can change your mind at any time. Usage statistics, with no cookie and no identifier, do not depend on this choice (see §5).</li>
 				<li>Buying <strong>Premium removes advertising</strong> and, in that case, the advertising SDK is not even started.</li>
 			</ul>
 		</div>
@@ -97,8 +97,8 @@ import Hero from '../../../components/Hero.astro';
 					<tbody>
 						<tr>
 							<td>Device advertising identifier (GAID on Android, IDFA on iOS if you allow tracking), other device identifiers, IP address, interactions with ads, technical information (see §4)</td>
-							<td>Showing ads, chosen according to your interests except on iPhone without the tracking permission (see §4), measuring them, fighting fraud</td>
-							<td>Consent (Art. 6(1)(a) GDPR): without it, nothing starts</td>
+							<td>Showing ads, chosen according to your interests, measuring them, fighting fraud (see §4)</td>
+							<td>Consent (Art. 6(1)(a) GDPR): without it, nothing starts; on iPhone, since version 1.2.20, Apple's tracking permission</td>
 							<td>Unity Technologies and its subsidiary ironSource (Unity LevelPlay, ironSource Ads, Unity Ads); through their auctions, other ad buyers (see §4)</td>
 						</tr>
 						<tr>
@@ -164,24 +164,26 @@ import Hero from '../../../components/Hero.astro';
 				its consent window (Google UMP).
 			</p>
 			<p>
-				<strong>Your consent.</strong> At first launch, whatever your country, an "Ads" window asks whether
+				<strong>Your consent.</strong> At first launch, an "Ads" window asks whether
 				you accept that our ad partners (Unity Ads and ironSource) use an identifier of your phone to choose
-				the ads and measure how they perform. "Accept" and "Refuse" carry the same weight.
+				the ads and measure how they perform. "Accept" and "Refuse" carry the same weight. On iPhone, since version 1.2.20, this window only shows on iOS 13 or older (see below).
+			</p>
+			<p>
+				<strong>Your consent on iPhone</strong> (iOS 14 or later, since version 1.2.20). The only question is Apple's, which asks whether you allow the app to track your activity; its text names Unity Ads, ironSource and their partners. If you allow it, an "Ads" note tells you, with a single OK button, what these companies do with your iPhone's advertising identifier, with a link to the list of companies and to this policy, and where to change your mind; ads start after OK. If you refuse, or if tracking is restricted on your iPhone, the app shows no window about ads, no advertising module starts and nothing is sent to them: it only shows our house ads. Until you have answered Apple, none of our partners' ads start, and the question comes back at the next launch.
 			</p>
 			<ul>
 				<li><strong>If you accept</strong>: Unity LevelPlay starts and shows the banner and the videos. When it has no ad to show, our house ads take its place, for the banner as for the video.</li>
 				<li><strong>If you refuse</strong>: no advertising module starts. The app works just the same, without our partners' ads: in their place, a strip shows our house ads in turn, for our other apps (today Pétanque Meet and, on Android, Pétanque Game), and a short video of one of them also recharges your scans. Our house ads go through no ad network and do not track you (see §5 and §8).</li>
-				<li><strong>After a refusal</strong>, when you ask for a video to recharge your scans, the app offers once per session to turn advertising on: "Turn ads on" counts as an "Accept" (on iPhone, Apple's tracking permission is then requested if it has not been yet), "Watch a video of our apps" keeps your refusal and shows one of our videos.</li>
-				<li><strong>Your answer</strong>, its date and the version of the text stay on your phone. The app asks you again after 6 months, whether you accepted or refused, or sooner if our ad partners change. Your choice (yes or no) is also counted, with no identifier, in our usage statistics, at each launch (see §5).</li>
+				<li><strong>After a refusal</strong>, when you ask for a video to recharge your scans, the app offers once per session to turn advertising on: "Turn ads on" counts as an "Accept", "Watch a video of our apps" keeps your refusal and shows one of our videos. On iPhone (iOS 14 or later), since version 1.2.20, this question no longer exists: once tracking is refused, the video is one of ours.</li>
+				<li><strong>Your answer</strong>, its date and the version of the text stay on your phone. The app asks you again after 6 months, whether you accepted or refused, or sooner if our ad partners change. On iPhone (iOS 14 or later), Apple keeps your answer to its question. Your choice (yes or no) is also counted, with no identifier, in our usage statistics, at each launch (see §5).</li>
 				<li><strong>If you withdraw your consent</strong> in the app's settings (see §12): our partners' advertising stops at once, and the app reports the withdrawal to Unity LevelPlay, which passes it on to the ad networks.</li>
-				<li><strong>On iOS</strong>, Apple's tracking permission (<em>App Tracking Transparency</em>) is only requested after an "Accept", and only serves advertising. If you refuse it, or turn it off later in the iPhone's settings (the app takes this into account the next time it starts), ads still show, but they are <strong>not personalised</strong>: the app tells Unity LevelPlay that you refuse personalised advertising, LevelPlay passes this on to the ad networks, and the iPhone's advertising identifier is not shared with them.</li>
+				<li><strong>On iPhone</strong>, if you later turn tracking off in Settings › Privacy &amp; Security › Tracking, the app takes it into account the next time it starts: our partners' advertising no longer starts and only our house ads remain. Versions before 1.2.20 requested the tracking permission after an "Accept" and, without it, showed non-personalised ads.</li>
 				<li><strong>Usage statistics</strong> (see §5) are sent whether you accept or not: they hold no advertising identifier, no cookie and no device identifier.</li>
 				<li><strong>If you buy Premium</strong>: advertising disappears and the advertising module is no longer started.</li>
 			</ul>
 			<p>
 				<strong>If you have accepted</strong>, to show ads, choose them, measure them and fight fraud, the
-				ironSource and Unity Ads modules receive your phone's <strong>advertising identifier</strong> (on iPhone,
-				only if you allow tracking) and
+				ironSource and Unity Ads modules receive your phone's <strong>advertising identifier</strong> and
 				other device identifiers, your <strong>IP address</strong> (which gives an approximate location, at
 				city level), your interactions with the ads, how long you use the app, technical information
 				(performance, crashes) and, according to Unity Ads, the purchases made in the app. Their auctions
@@ -243,7 +245,7 @@ import Hero from '../../../components/Hero.astro';
 				<li><code>update_prompt</code> / <code>update_tapped</code> — an update is offered to you (recommended or required), or you tap the update button — old name, sent until 4 weeks after 1.2.15 is out</li>
 				<li><code>consent_accepted</code> / <code>consent_declined</code> — your consent choice, sent at each launch — old name, sent until 4 weeks after 1.2.15 is out</li>
 				<li><code>app_open</code> — the app starts, with whether it is the first launch and your choice about ads (yes, no, or not asked yet) (since 1.2.15)</li>
-				<li><code>ad_consent</code> — your answer in the "Ads" window: yes or no (since 1.2.15), with when you gave it (first launch, settings or when asking for a reward) and, on an iPhone, your answer to Apple's tracking question</li>
+				<li><code>ad_consent</code> — your answer in the "Ads" window: yes or no (since 1.2.15), with when you gave it (first launch, settings or when asking for a reward) and, on an iPhone, your answer to Apple's tracking question; on an iPhone (iOS 14 or later), since version 1.2.20, a yes when you have allowed tracking and tapped OK on the note, and nothing after a refusal</li>
 				<li><code>update_shown</code> / <code>update_tap</code> — an update is offered (advised or required), or you tap the update button (since 1.2.15)</li>
 				<li><code>shop_open</code> — the Premium screen opens, with where you came from (since 1.2.15)</li>
 				<li><code>iap_tap</code> / <code>iap_result</code> / <code>iap_restore</code> — you tap the Premium purchase; its result (done, cancelled or failed, with a short failure code and the store); a restore, with the number of purchases found. Never a price. (since 1.2.15)</li>
@@ -374,7 +376,7 @@ import Hero from '../../../components/Hero.astro';
 				<li><strong>Analytics data — Umami</strong>: kept as event statistics for <strong>24 months</strong> on our server, then erased; its backups are kept 14 days. Those Umami Cloud still receives from versions not yet updated are erased there after 6 months. This data is not linked to any device identifier and does not allow anyone's journey to be reconstructed.</li>
 				<li><strong>Scan counter</strong>: reset every day.</li>
 				<li><strong>Advertising data</strong>: according to the rules of Unity and ironSource.</li>
-				<li><strong>Your answer about advertising</strong>: 6 months on the phone, then the app asks you again.</li>
+				<li><strong>Your answer about advertising</strong>: 6 months on the phone, then the app asks you again; on iPhone (iOS 14 or later), your answer to Apple is kept by iOS.</li>
 				<li><strong>Premium flag</strong>: kept on the device until uninstallation (on iOS, the Keychain may keep it, see §9).</li>
 				<li>E-mails sent with "Report this video" are kept as long as it takes to handle the report, then deleted, at the latest after 12 months.</li>
 			</ul>
@@ -388,7 +390,7 @@ import Hero from '../../../components/Hero.astro';
 			</p>
 			<p><strong>In practice:</strong></p>
 			<ul>
-				<li><strong>Withdraw or change your consent</strong>: tap "Manage ad consent" in the app's settings: the "Ads" window comes back. If you refuse, our partners' advertising stops at once, and the app reports the withdrawal to Unity LevelPlay, which passes it on to the ad networks. On iOS, turning tracking off in Settings › Privacy &amp; Security › Tracking makes the ads non-personalised from the app's next start (see §4).</li>
+				<li><strong>Withdraw or change your consent</strong>: on Android, and on an iPhone with iOS 13 or older, tap "Manage ad consent" in the app's settings: the "Ads" window comes back. If you refuse, our partners' advertising stops at once, and the app reports the withdrawal to Unity LevelPlay, which passes it on to the ad networks. On an iPhone with iOS 14 or later, since version 1.2.20: Settings › Privacy &amp; Security › Tracking, by turning Pétanque Scan on or off; the line in the app's settings only appears while tracking is allowed, and shows the note again (see §4).</li>
 				<li><strong>Erase local data</strong>: uninstall the app, or clear its data from the phone's settings.</li>
 				<li><strong>Reset your advertising identifier</strong>: Android → Settings › Google › Ads; iOS → Settings › Privacy &amp; Security › Tracking.</li>
 				<li><strong>Erase advertising data</strong>: it is held by Unity (ironSource, Unity Ads); ask Unity to erase it by the means given in its privacy policy (link in §4).</li>
