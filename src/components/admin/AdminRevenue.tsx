@@ -1,15 +1,16 @@
 // /admin/revenus/: the studio's income in euros first (ads, Google Play and App Store in-app sales, net and paid),
 // then the ad revenue per app from the LevelPlay Reporting API (every mediated network), through stats-admin: this
-// month, the last 30 days and each of those days, with Unity Ads' own share.
+// month, the last 30 days and each of those days, with Unity Ads' own share; then a card for each app that sells
+// without ads (Nino Rush): its in-app sales and the house videos it showed, which earn nothing.
 import { Fragment, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import GoogleSignIn from './GoogleSignIn';
-import { appColor } from '../../lib/appColors';
+import { APP_NAMES, appColor, appKey, type AppKey } from '../../lib/appColors';
 import { networkLabel, unityShare } from '../../lib/adNetworks';
 import {
-	STATS_LOCAL, StatsError, appStore, playOrders, purchases, rates, revenue, statsMessage,
-	type AppStoreSales, type PlayOrders, type Purchases, type Rates, type Revenue, type RevenueApp, type RevenueDay, type RevenueNetwork,
+	STATS_LOCAL, StatsError, appStore, overview, playOrders, purchases, rates, revenue, statsMessage,
+	type AppStoreSales, type Overview, type PlayOrders, type Purchases, type Rates, type Revenue, type RevenueApp, type RevenueDay, type RevenueNetwork,
 } from '../../lib/statsAdmin';
-import { PLAY_CUT, SOURCES, income, periodLine, since, type Source } from '../../lib/income';
+import { PLAY_CUT, SOURCES, income, periodLine, since, type IncomeApp, type Source } from '../../lib/income';
 import { useAdminSession } from './useAdminSession';
 import { AppName, Bars, DayStack, Help, Pill, Tile, appStyle } from './AdminParts';
 
@@ -166,6 +167,34 @@ function AppCard({ app, fmt, monthStart }: { app: RevenueApp; fmt: (n: number) =
 	);
 }
 
+/** The apps with no ad network: they always get a card, sales or not. */
+const NO_ADS: readonly AppKey[] = ['nino-rush'];
+
+/** The house videos an app showed over Umami's 28 days (house_ad_show), null when unread. */
+function houseShows(o: Overview | null, key: string): number | null {
+	const site = o?.apps.find((a) => appKey(a.name, a.domain) === key);
+	return site?.ads ? site.ads.reduce((n, r) => n + r.show, 0) : null;
+}
+
+/** An app that sells without ads: its in-app sales in euros, net, and the house videos it showed. */
+function InAppCard({ name, app, days, monthStart, shows }: { name: string; app: IncomeApp | undefined; days: string[]; monthStart: string; shows: number | null }) {
+	const a = app?.inApp;
+	return (
+		<article className="pa-card ak-appcard" style={appStyle(name)}>
+			<header>
+				<h2><i aria-hidden="true" />{name}</h2>
+				<small>sans publicité · achats en euros, net</small>
+			</header>
+			<div className="ak-nums">
+				<div><span>{Since(monthStart)}</span><strong>{eur(a?.month ?? 0)}</strong><small>achats intégrés</small></div>
+				<div><span>30 derniers jours</span><strong>{eur(a?.last30 ?? 0)}</strong><small>{eur(a?.paid30 ?? 0)} payés</small></div>
+				<div><span>Vidéos maison</span><strong>{shows === null ? '–' : int.format(shows)}</strong><small>{shows === null ? 'pas lues' : 'sur 28 jours, sans revenu'}</small></div>
+			</div>
+			<DayStack days={days} series={[{ key: name, label: name, color: appColor(name), byDay: a?.days ?? new Map() }]} unit={eur} partial />
+		</article>
+	);
+}
+
 function Studio({ data, fmt }: { data: Revenue; fmt: (n: number) => string }) {
 	const { total, apps } = data;
 	const days = total.days.map((d) => d.date);
@@ -244,6 +273,7 @@ export default function AdminRevenue() {
 	const [apple, setApple] = useState<Loaded<AppStoreSales>>({ data: null, problem: null });
 	const [fx, setFx] = useState<Loaded<Rates>>({ data: null, problem: null });
 	const [seen, setSeen] = useState<Purchases | null>(null);
+	const [stats, setStats] = useState<Overview | null>(null);
 	const [busy, setBusy] = useState(false);
 	const [message, setMessage] = useState<string | null>(null);
 	const signedIn = STATS_LOCAL || !!session;
@@ -259,6 +289,7 @@ export default function AdminRevenue() {
 			settle(appStore(refresh), setApple, 'clé App Store non posée'),
 			settle(rates(), setFx, 'pas lu'),
 			purchases(refresh).then(setSeen).catch(() => setSeen(null)),
+			overview(refresh).then(setStats).catch(() => setStats(null)),
 		]);
 		setBusy(false);
 	}
@@ -278,6 +309,10 @@ export default function AdminRevenue() {
 		);
 
 	const fmt = money(data?.currency ?? 'USD');
+	const r = income({ revenue: data, orders: orders.data, apple: apple.data, seen, rates: fx.data, now: new Date() });
+	// An app with ads but no LevelPlay revenue yet is not « sans publicité »: only the apps with no ad network get a card.
+	const withAds = new Set((data?.apps ?? []).map((a) => appKey(a.name) ?? a.name));
+	const noAds = NO_ADS.filter((k) => !withAds.has(k));
 	return (
 		<div className="as-root">
 			<div className="pa-bar">
@@ -291,9 +326,13 @@ export default function AdminRevenue() {
 			{data && <header className="ak-section"><h2>Publicité <small>LevelPlay, en dollars US</small></h2></header>}
 			{data && <Studio data={data} fmt={fmt} />}
 			{data && !data.apps.length && <p className="pa-card as-muted">LevelPlay ne donne aucun revenu sur ces 30 jours.</p>}
-			{data && data.apps.length > 0 && (
+			{!busy && ((data && data.apps.length > 0) || noAds.length > 0) && (
 				<div className="ak-apps">
-					{data.apps.map((a) => <AppCard key={a.name} app={a} fmt={fmt} monthStart={data.monthStart} />)}
+					{data?.apps.map((a) => <AppCard key={a.name} app={a} fmt={fmt} monthStart={data.monthStart} />)}
+					{noAds.map((k) => {
+						const app = r.apps.find((a) => a.key === k);
+						return <InAppCard key={k} name={app?.name ?? APP_NAMES[k as AppKey] ?? k} app={app} days={r.days} monthStart={r.monthStart} shows={houseShows(stats, k)} />;
+					})}
 				</div>
 			)}
 		</div>

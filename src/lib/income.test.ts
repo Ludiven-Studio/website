@@ -89,6 +89,16 @@ describe('the studio income in euros', () => {
 		]);
 	});
 
+	it('gives each app its in-app sales alone, this month, over 30 days and per day', () => {
+		const r = income({ revenue: revenue(), orders: ORDERS, apple: APPLE, rates: RATES, now: NOW });
+		const nino = r.apps.find((a) => a.key === 'nino-rush')!;
+		// 4 CHF before tax less 15 % = 3.4 CHF = 6.8 €; 5 CHF paid = 10 €.
+		expect([nino.inApp.month, nino.inApp.last30, nino.inApp.paid30, nino.inApp.days.get('2026-11-19')]).toEqual([6.8, 6.8, 10, 6.8]);
+		const game = r.apps.find((a) => a.key === 'petanque-game')!;
+		// Play in November (8.5 €), the App Store in October (2 €): the ads stay out.
+		expect([game.inApp.month, game.inApp.last30]).toEqual([8.5, 10.5]);
+	});
+
 	it('works with only some sources, and on its own 30 days when the ads are missing', () => {
 		const r = income({ revenue: null, orders: ORDERS, apple: null, rates: null, now: NOW });
 		expect([r.days[0], r.days.length]).toEqual(['2026-10-25', 30]);

@@ -14,7 +14,12 @@ export type Source = (typeof SOURCES)[number];
 /** `gross`: what was paid, in euros. For the ads, what LevelPlay pays, so the same as net. */
 export interface Amount { net: number; gross: number }
 export type InAppFrom = 'report' | 'apps' | null;
-export interface IncomeApp { key: string; name: string; ads: number; play: number; appstore: number; total: number }
+/** Per source and `total`: net over the 30 days. `inApp`: the in-app sales alone (both stores), net this month and
+ *  over 30 days, paid over 30 days, and net per day, for the card of an app that sells without ads. */
+export interface IncomeApp {
+	key: string; name: string; ads: number; play: number; appstore: number; total: number;
+	inApp: { month: number; last30: number; paid30: number; days: Map<string, number> };
+}
 export interface Income {
 	days: string[];
 	monthStart: string;
@@ -84,9 +89,13 @@ export function income({ revenue, orders, apple, seen = null, rates, now }: {
 		if (n === null) missing.add(netCurrency);
 		if (g === null) missing.add(grossCurrency);
 		if (n === null || g === null) return;
+		const a = apps.get(app.key) ?? { ...app, ads: 0, play: 0, appstore: 0, total: 0, inApp: { month: 0, last30: 0, paid30: 0, days: new Map<string, number>() } };
+		apps.set(app.key, a);
+		const store = source !== 'ads';
 		if (date >= monthStart && date <= to) {
 			out.month[source].net += n;
 			out.month[source].gross += g;
+			if (store) a.inApp.month += n;
 		}
 		if (!in30.has(date)) return;
 		out.last30[source].net += n;
@@ -96,10 +105,13 @@ export function income({ revenue, orders, apple, seen = null, rates, now }: {
 			out.last7[source].gross += g;
 		}
 		out.byDay[source].set(date, (out.byDay[source].get(date) ?? 0) + n);
-		const a = apps.get(app.key) ?? { ...app, ads: 0, play: 0, appstore: 0, total: 0 };
 		a[source] += n;
 		a.total += n;
-		apps.set(app.key, a);
+		if (store) {
+			a.inApp.last30 += n;
+			a.inApp.paid30 += g;
+			a.inApp.days.set(date, (a.inApp.days.get(date) ?? 0) + n);
+		}
 	}
 
 	for (const a of revenue?.apps ?? []) {
@@ -123,8 +135,11 @@ export function income({ revenue, orders, apple, seen = null, rates, now }: {
 		for (const period of [out.month, out.last30, out.last7]) period[src] = { net: round(period[src].net), gross: round(period[src].gross) };
 		for (const [d, v] of out.byDay[src]) out.byDay[src].set(d, round(v));
 	}
-	out.apps = [...apps.values()]
-		.map((a) => ({ ...a, ads: round(a.ads), play: round(a.play), appstore: round(a.appstore), total: round(a.total) }))
+	out.apps = [...apps.values()].filter((a) => a.total || a.inApp.month)
+		.map((a) => ({
+			...a, ads: round(a.ads), play: round(a.play), appstore: round(a.appstore), total: round(a.total),
+			inApp: { month: round(a.inApp.month), last30: round(a.inApp.last30), paid30: round(a.inApp.paid30), days: new Map([...a.inApp.days].map(([d, v]) => [d, round(v)])) },
+		}))
 		.sort((x, y) => y.total - x.total || x.name.localeCompare(y.name));
 	out.unconverted = [...missing].sort();
 	/* The periods' ads from LevelPlay's own totals, as the Publicité block shows them: each app's days are rounded
