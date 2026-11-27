@@ -5,9 +5,11 @@ import { accessToken } from './meetupAuth';
 import type { Board, Overview, PurchaseKind, Purchases, Revenue } from '../../supabase/functions/_shared/statsAdmin.mjs';
 import type { PlayOrders } from '../../supabase/functions/_shared/playSales.mjs';
 import type { AppStoreSales, Rates } from '../../supabase/functions/_shared/appStoreSales.mjs';
+import type { Reviews } from '../../supabase/functions/_shared/storeReviews.mjs';
 
 export type { PlayOrder, PlayOrders, PlayTotal } from '../../supabase/functions/_shared/playSales.mjs';
 export type { AppStoreSale, AppStoreSales, Rates } from '../../supabase/functions/_shared/appStoreSales.mjs';
+export type { CountryRating, Review, ReviewApp, ReviewStore, Reviews, StoreRating } from '../../supabase/functions/_shared/storeReviews.mjs';
 export type { AppStats, Board, BoardApp, Consent, ConsentPlatform, ConsentSplit, Count, Failure, Outcome, OutcomeSplit, Outcomes, Overview, Purchase, PurchaseKind, Purchases, Revenue, RevenueApp, RevenueDay, RevenueNetwork } from '../../supabase/functions/_shared/statsAdmin.mjs';
 
 const LOCAL = import.meta.env.PUBLIC_STATS_ADMIN_URL as string | undefined;
@@ -71,6 +73,11 @@ export function revenue(refresh = false): Promise<Revenue> {
 /** The App Store's in-app sales of the last 30 days and this month (App Store Connect's Sales reports). */
 export function appStore(refresh = false): Promise<AppStoreSales> {
 	return call<AppStoreSales>({ action: 'appstore', refresh });
+}
+
+/** The stores' ratings and reviews of the studio's apps (iTunes lookup and the Play Console's exports), cached 6 hours. */
+export function reviews(refresh = false): Promise<Reviews> {
+	return call<Reviews>({ action: 'reviews', refresh });
 }
 
 /** The ECB's euro reference rates of the day. */

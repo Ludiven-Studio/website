@@ -7,6 +7,7 @@
 // in `errors`, instead of failing the page.
 
 import { ORDERS_CACHE_MINUTES, ORDERS_KEY, playOrders } from './playSales.mjs';
+import { REVIEWS_CACHE_MINUTES, REVIEWS_KEY, storeReviews } from './storeReviews.mjs';
 import { APPSTORE_CACHE_MINUTES, APPSTORE_KEY, RATES_CACHE_MINUTES, RATES_KEY, appStoreSales, ecbRates } from './appStoreSales.mjs';
 
 export const CACHE_MINUTES = 10;
@@ -736,6 +737,20 @@ export function statsHandler({ env, isAdmin, cache, board, fetch: fetchFn = fetc
 				return json({ error: apple ? 'App Store Connect did not answer' : 'ECB did not answer', detail: String(e?.message ?? e).slice(0, 200) }, 502);
 			}
 			await Promise.resolve().then(() => cache.put(key, data)).catch(() => undefined);
+			return json({ ...data, cached: false });
+		}
+		if (body?.action === 'reviews') {
+			// The App Store's part needs no key, so the action always answers; Google Play's says why it is missing.
+			const at = now();
+			const hit = body.refresh === true ? null : await Promise.resolve().then(() => cache.get(REVIEWS_KEY)).catch(() => null);
+			if (hit && at.getTime() - new Date(hit.fetchedAt).getTime() < REVIEWS_CACHE_MINUTES * 60_000) return json({ ...hit.body, cached: true });
+			let data;
+			try {
+				data = await storeReviews(env, fetchFn, at);
+			} catch (e) {
+				return json({ error: 'the stores did not answer', detail: String(e?.message ?? e).slice(0, 200) }, 502);
+			}
+			await Promise.resolve().then(() => cache.put(REVIEWS_KEY, data)).catch(() => undefined);
 			return json({ ...data, cached: false });
 		}
 		if (body?.action === 'orders') {

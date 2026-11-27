@@ -259,3 +259,19 @@ a.ah-tile:hover, a.ah-tile:focus-visible { box-shadow: 0 0 0 2px var(--sc-accent
 .ak-cancels td code { display: block; }
 .ak-fails table { margin-top: 0.4rem; }
 .ak-fails code { font-size: 0.75rem; overflow-wrap: anywhere; }
+
+/* /admin/avis/: the reviews, a low one marked on its left; our reply set back; the rating beside a store version. */
+.av-filters { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center; font-size: var(--text-sm); margin: 0.5rem 0 0.75rem; }
+.av-filters select { font: inherit; padding: 0.2rem 0.4rem; border: 1px solid var(--sc-line); border-radius: 0.5rem; background: var(--sc-surface); color: var(--sc-ink); }
+.av-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.75rem; }
+.av-review { display: grid; gap: 0.3rem; padding: 0.6rem 0 0.6rem 0.85rem; border-left: 3px solid var(--sc-line); font-size: var(--text-sm); }
+.av-review.av-low { border-left-color: var(--st-warn); }
+.av-review header { display: flex; flex-wrap: wrap; gap: 0.25rem 0.75rem; align-items: center; }
+.av-review p { margin: 0; color: var(--sc-ink); overflow-wrap: anywhere; }
+.av-stars { color: var(--st-warn); letter-spacing: 0.05em; }
+.av-stars span { color: color-mix(in srgb, var(--sc-muted) 45%, transparent); }
+.av-reply { margin: 0.2rem 0 0; padding: 0.45rem 0.75rem; border-radius: 0.6rem; background: var(--sc-surface-2); color: var(--sc-ink-2); }
+.av-reply span { font-weight: 600; }
+.av-answer { justify-self: start; font-size: 0.8rem; }
+.av-star { margin-left: 0.5rem; font-size: 0.8rem; color: var(--sc-ink-2); text-decoration: none; white-space: nowrap; }
+.av-star:hover { text-decoration: underline; }

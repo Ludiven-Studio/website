@@ -165,7 +165,29 @@ const APPSTORE = {
 };
 const RATES = { generatedAt: ago(2), date: '2026-11-20', perEur: { EUR: 1, USD: 1.0512, CHF: 0.9381, CAD: 1.4702 }, cached: true };
 
-const ANSWERS = { overview: OVERVIEW, orders: ORDERS, purchases: PURCHASES, revenue: REVENUE, board: BOARD, appstore: APPSTORE, rates: RATES, ...PROMO };
+const rating = (app, store, average, count, countries = []) => ({ app, store, live: count >= 0, average: count ? average : null, count: Math.max(0, count), countries, version: '', url: store === 'play' ? `https://play.google.com/store/apps/details?id=x.${app}` : `https://apps.apple.com/app/${app}/id1` });
+const review = (app, h, stars, text, reply = null) => ({ app, store: 'play', stars, at: ago(h), title: '', text, lang: 'fr', version: '1.0.24', reply, replyAt: reply ? ago(h - 2) : null, link: 'https://play.google.com/apps/publish?account=1&reviewid=x' });
+const REVIEW_LIST = [
+	review('nino-rush', 5, 5, "Ma fille de 7 ans adore, les mondes sont superbes et Nino est trop mignon. On attend la suite !"),
+	review('petanque-game', 20, 2, "Le jeu se fige après la 3e mène sur mon Galaxy A14, dommage car le reste est bien fait.", 'Merci, la 1.0.20 corrige ce blocage : dites-nous si ça va mieux.'),
+	review('dragon-gems', 50, 4, 'Joli et reposant, un peu trop de vidéos à mon goût.'),
+	review('petanque-scan', 70, 5, ''),
+	review('petanque-meet', 120, 1, "Impossible de créer une partie dans mon club, l'appli tourne dans le vide."),
+	review('nino-rush', 200, 3, 'Bien mais la caméra part dans les loopings.'),
+];
+const REVIEWS = {
+	generatedAt: ago(1), play: process.env.SNAP_PLAY_CLOSED ? 'closed' : 'ok', cached: true, errors: [],
+	reviews: process.env.SNAP_PLAY_CLOSED ? [] : REVIEW_LIST,
+	apps: [
+		{ app: 'petanque-game', name: 'Pétanque Game', stores: [rating('petanque-game', 'appstore', 1, 1, [{ country: 'fr', average: 1, count: 1 }]), rating('petanque-game', 'play', 4.21, 38)], last30: { average: 2, count: 1 } },
+		{ app: 'petanque-scan', name: 'Pétanque Scan', stores: [rating('petanque-scan', 'appstore', 5, 1, [{ country: 'fr', average: 5, count: 1 }]), rating('petanque-scan', 'play', 4.6, 12)], last30: { average: 5, count: 1 } },
+		{ app: 'petanque-meet', name: 'Pétanque Meet', stores: [rating('petanque-meet', 'appstore', 0, 0), rating('petanque-meet', 'play', 3.9, 9)], last30: { average: 1, count: 1 } },
+		{ app: 'dragon-gems', name: "Dragon's Gems", stores: [rating('dragon-gems', 'appstore', 5, 1, [{ country: 'fr', average: 5, count: 1 }]), rating('dragon-gems', 'play', 4.4, 7)], last30: { average: 4, count: 1 } },
+		{ app: 'nino-rush', name: 'Nino Rush', stores: [rating('nino-rush', 'appstore', 4.5, 6, [{ country: 'fr', average: 4.5, count: 4 }, { country: 'be', average: 4.5, count: 2 }]), rating('nino-rush', 'play', 4.25, 4)], last30: { average: 4, count: 2 } },
+	].map((a) => (process.env.SNAP_PLAY_CLOSED ? { ...a, stores: a.stores.filter((s) => s.store === 'appstore'), last30: { average: null, count: 0 } } : a)),
+};
+
+const ANSWERS = { overview: OVERVIEW, orders: ORDERS, purchases: PURCHASES, revenue: REVENUE, board: BOARD, appstore: APPSTORE, rates: RATES, reviews: REVIEWS, ...PROMO };
 // SNAP_APPS=1: no store report answers, so the purchases come from what the apps saw, as live in November 2026.
 if (process.env.SNAP_APPS) for (const k of ['orders', 'appstore']) delete ANSWERS[k];
 // SNAP_RELOAD=1: the home read once, then again 10 minutes later with 15 more visitors, one wait done and $1 more

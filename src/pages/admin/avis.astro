@@ -1,0 +1,14 @@
+---
+// The stores' ratings and reviews of the studio's apps (Raphaël's account only).
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdminReviews from '../../components/admin/AdminReviews';
+import '../../components/admin/admin.css';
+---
+
+<BaseLayout title="Avis — admin | Ludiven Studio" description="Notes et avis des applis du studio sur les stores." noindex>
+	<div class="wrapper stack gap-6">
+		<p class="pa-note"><a href="/admin/">← Admin du studio</a></p>
+		<h1 class="pa-h1">Avis</h1>
+		<AdminReviews client:only="react" />
+	</div>
+</BaseLayout>

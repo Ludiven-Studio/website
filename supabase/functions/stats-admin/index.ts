@@ -3,7 +3,9 @@
 // view-only user, cached 10 minutes in admin_stats_cache; and the studio board of /admin/versions/ (studio_board,
 // written by the studio's board.py); and the ad revenue of /admin/revenus/, read from the LevelPlay Reporting API
 // and cached an hour in admin_stats_cache; and the Google Play orders of /admin/stats/, read from the Play Console's
-// sales reports in Cloud Storage and cached an hour. The logic is in _shared/statsAdmin.mjs and _shared/playSales.mjs.
+// sales reports in Cloud Storage and cached an hour; and the stores' ratings and reviews of /admin/avis/ (the
+// public iTunes lookup, and the Play Console's exports in the same bucket), cached 6 hours. The logic is in
+// _shared/statsAdmin.mjs, _shared/playSales.mjs and _shared/storeReviews.mjs.
 //
 // Secrets: UMAMI_URL (https://stats.ludiven-studio.fr), UMAMI_USER and UMAMI_PASSWORD (the view-only
 // « dashboard » user), PROMO_ADMIN_USER_ID (Raphaël's Supabase user id, the same as promo-admin),

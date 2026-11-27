@@ -1,11 +1,13 @@
 // /admin/: one tile per admin page. Once signed in, the tiles show each page's key figure: the visitors from
 // stats-admin with the in-app sales of the last 7 days, the month's revenue in euros (ads and in-app purchases, the
-// same count as /admin/revenus/), what waits on the studio board, and the house ads from the catalogue online.
+// same count as /admin/revenus/), what waits on the studio board, the stores' ratings, and the house ads from the
+// catalogue online.
 // The cards reload every 10 minutes in a visible tab, keep their figures while they do, and badge what moved.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { accountLabel, signOut } from '../../lib/meetupAuth';
 import GoogleSignIn from './GoogleSignIn';
-import { STATS_LOCAL, StatsError, appStore, board, overview, playOrders, purchases, rates, revenue, statsMessage, totals } from '../../lib/statsAdmin';
+import { STATS_LOCAL, StatsError, appStore, board, overview, playOrders, purchases, rates, revenue, reviews, statsMessage, totals, type Reviews } from '../../lib/statsAdmin';
+import { reviewTile } from '../../lib/reviews';
 import { homeIncome, revenueTile, weekLine, type HomeMoney } from '../../lib/homeRevenue';
 import { NO_TRACK, deltaLabel, dueReload, houseAdLines, statsLines, testLines, track, waitLines, type Track } from '../../lib/adminHome';
 import { readBetaBuild } from '../../lib/betaBuild';
@@ -41,6 +43,7 @@ export default function AdminHome() {
 	const [statsError, setStatsError] = useState<string | null>(null);
 	const [ads, setAds] = useState<number | null>(null);
 	const [waits, setWaits] = useState<number | null>(null);
+	const [rated, setRated] = useState<Reviews | null>(null);
 	const [signInError, setSignInError] = useState<string | null>(null);
 	// Every money source at once, so a figure never switches source as the answers come in.
 	const [money, setMoney] = useState<Money | null>(null);
@@ -72,6 +75,10 @@ export default function AdminHome() {
 				// Keyed by the month: a new month's first reading starts afresh instead of showing a big minus.
 				if (total !== undefined) note(`revenue:${counted.monthStart}`, total);
 			});
+			reviews().then((r) => {
+				setRated(r);
+				note('reviews', r.reviews.length);
+			}).catch(() => undefined);
 			board().then((b) => {
 				const n = b.apps.reduce((k, a) => k + a.waits.length, 0);
 				setWaits(n);
@@ -118,6 +125,7 @@ export default function AdminHome() {
 	const month = counted ? revenueTile(counted) : { lines: [] };
 	const stats = ov ? totals(ov) : null;
 	const tests = testLines(builds);
+	const stars = rated ? reviewTile(rated, new Date()) : null;
 	const badge = (key: string, unit?: string): Pick<Tile, 'delta' | 'up'> => {
 		const d = moved.delta[key];
 		return d ? { delta: deltaLabel(d, unit), up: d > 0 } : {};
@@ -140,6 +148,10 @@ export default function AdminHome() {
 			href: '/admin/versions/', title: 'Versions', text: 'Chaque appli sur les stores, chez les testeurs et sur main.',
 			figure: waits === null ? undefined : <span className={waits ? 'ak-warn-text' : undefined}>{waits}</span>, ...badge('waits'),
 			lines: [waits === null ? undefined : waits ? `chose${waits > 1 ? 's' : ''} t'attend${waits > 1 ? 'ent' : ''}` : "rien ne t'attend", ...waitList],
+		},
+		{
+			href: '/admin/avis/', title: 'Avis', text: 'Les notes et les avis des stores, appli par appli.',
+			figure: stars?.figure, ...badge('reviews'), lines: stars?.lines ?? [],
 		},
 		{
 			href: '/admin/pubs/', title: 'Pubs maison', text: 'Le catalogue des applis et leurs poids.',

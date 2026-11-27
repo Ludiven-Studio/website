@@ -1,14 +1,19 @@
 // /admin/versions/: each app's store, testers' and main versions and what waits for Raphaël, from the studio
-// board (studio_board, written by the studio's board.py after each send) through stats-admin.
+// board (studio_board, written by the studio's board.py after each send) through stats-admin, with each store's
+// rating beside its live version (/admin/avis/).
 import { useEffect, useState } from 'react';
 import GoogleSignIn from './GoogleSignIn';
-import { STATS_LOCAL, StatsError, board, statsMessage, type Board, type BoardApp } from '../../lib/statsAdmin';
+import { STATS_LOCAL, StatsError, board, reviews, statsMessage, type Board, type BoardApp, type Reviews, type ReviewStore } from '../../lib/statsAdmin';
+import { ratingOf, starLabel } from '../../lib/reviews';
 import { useAdminSession } from './useAdminSession';
 import { AppName, Pill, Tile, appStyle, type Tone } from './AdminParts';
 
 const HOUR = 3600_000;
 // A board line older than this has likely missed a send.
 const STALE_HOURS = 48;
+
+/** The rows that show a store's rating. */
+const RATED: Partial<Record<keyof BoardApp, ReviewStore>> = { play_prod: 'play', ios: 'appstore' };
 
 const ROWS: [keyof BoardApp, string][] = [
 	['play_prod', 'Google Play'],
@@ -39,7 +44,7 @@ function boardMessage(e: unknown): string {
 	return statsMessage(e);
 }
 
-function AppCard({ app, now }: { app: BoardApp; now: number }) {
+function AppCard({ app, now, rated }: { app: BoardApp; now: number; rated: Reviews | null }) {
 	const stale = !!app.updatedAt && now - Date.parse(app.updatedAt) > STALE_HOURS * HOUR;
 	return (
 		<article className="pa-card ak-appcard" id={`app-${app.app}`} style={appStyle(app.name, app.app)}>
@@ -51,10 +56,15 @@ function AppCard({ app, now }: { app: BoardApp; now: number }) {
 				{ROWS.map(([key, label]) => {
 					const text = (app[key] as string) || '';
 					const t = key === 'main' ? 'plain' : tone(text);
+					const store = RATED[key];
+					const r = store ? ratingOf(rated, store, app.app, app.name) : undefined;
 					return (
 						<div key={key}>
 							<dt>{label}</dt>
-							<dd>{!text ? <span className="as-muted">–</span> : t === 'plain' ? text : <Pill tone={t}>{text}</Pill>}</dd>
+							<dd>
+								{!text ? <span className="as-muted">–</span> : t === 'plain' ? text : <Pill tone={t}>{text}</Pill>}
+								{text && r?.live && <a className="av-star" href="/admin/avis/" title={`Note ${store === 'play' ? 'Google Play' : 'App Store'}`}>{starLabel(r)}</a>}
+							</dd>
 						</div>
 					);
 				})}
@@ -69,6 +79,7 @@ function AppCard({ app, now }: { app: BoardApp; now: number }) {
 export default function AdminVersions() {
 	const { session, ready, error } = useAdminSession(STATS_LOCAL);
 	const [data, setData] = useState<Board | null>(null);
+	const [rated, setRated] = useState<Reviews | null>(null);
 	const [busy, setBusy] = useState(false);
 	const [message, setMessage] = useState<string | null>(null);
 	const signedIn = STATS_LOCAL || !!session;
@@ -76,6 +87,8 @@ export default function AdminVersions() {
 	async function load() {
 		setBusy(true);
 		setMessage(null);
+		// The ratings come on their own: the board never waits for the stores.
+		reviews().then(setRated).catch(() => undefined);
 		try {
 			setData(await board());
 		} catch (e) {
@@ -131,7 +144,7 @@ export default function AdminVersions() {
 					</ul>
 				</section>
 			)}
-			{apps.length > 0 && <div className="ak-apps ak-apps--narrow">{apps.map((a) => <AppCard key={a.app} app={a} now={now} />)}</div>}
+			{apps.length > 0 && <div className="ak-apps ak-apps--narrow">{apps.map((a) => <AppCard key={a.app} app={a} now={now} rated={rated} />)}</div>}
 		</div>
 	);
 }
