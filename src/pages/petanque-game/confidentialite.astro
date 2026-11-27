@@ -30,16 +30,16 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			Cette politique concerne <strong>l'application mobile Pétanque Game</strong>
 			(<code>com.ludivenstudio.petanquegame</code>). Le jeu de pétanque du site
 			(<a href="/jeux/petanque/">ludiven-studio.fr/jeux/petanque</a>) et le reste du site ont leur
-			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 25 novembre 2026 (le moment de ton choix sur la publicité et, sur iPhone, ta réponse à la question de suivi d'Apple, comptés dans les statistiques&nbsp;; version 1.0.15&nbsp;: la présence pendant le jeu en ligne, une publicité avant la finale d'une coupe, la partie classée en cours, l'heure du jeu, les annulations et les échecs de connexion dans les statistiques&nbsp;; les écrans ouverts et ton choix sur la publicité, comptés dans les statistiques&nbsp;; version 1.0.14&nbsp;: la recherche d'un adversaire annoncée aux autres joueurs, les pièces à gagner aux classements du défi de tir, le nombre de joueurs en ligne en ce moment, le défi de tir et ses classements, les pièces et les achats sans compte&nbsp;; version 1.0.8&nbsp;: nos propres publicités, nouvelle fenêtre «&nbsp;Publicité personnalisée&nbsp;», plus de sauvegarde Google sur Android).
+			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 27 novembre 2026 (version 1.0.20&nbsp;: Google AdMob parmi les régies&nbsp;; sur Android, le formulaire de consentement de Google&nbsp;; sur iPhone, la question de suivi d'Apple comme seule question sur la publicité&nbsp;; le défi de tir payant après la première série du jour&nbsp;; le moment de ton choix sur la publicité et, sur iPhone, ta réponse à la question de suivi d'Apple, comptés dans les statistiques&nbsp;; version 1.0.15&nbsp;: la présence pendant le jeu en ligne, une publicité avant la finale d'une coupe, la partie classée en cours, l'heure du jeu, les annulations et les échecs de connexion dans les statistiques&nbsp;; les écrans ouverts et ton choix sur la publicité, comptés dans les statistiques&nbsp;; version 1.0.14&nbsp;: la recherche d'un adversaire annoncée aux autres joueurs, les pièces à gagner aux classements du défi de tir, le nombre de joueurs en ligne en ce moment, le défi de tir et ses classements, les pièces et les achats sans compte&nbsp;; version 1.0.8&nbsp;: nos propres publicités, nouvelle fenêtre «&nbsp;Publicité personnalisée&nbsp;», plus de sauvegarde Google sur Android).
 		</p>
 
 		<div class="summary">
 			<p><strong>L'essentiel&nbsp;:</strong></p>
 			<ul>
-				<li>Contre l'ordinateur ou à deux sur un téléphone, tu joues <strong>sans compte</strong>, même hors ligne. Quand le téléphone a internet, seules partent la publicité si tu l'as acceptée, des statistiques d'usage anonymes, quelques demandes à notre site (la dernière version du jeu, nos propres publicités) et, une fois par minute pendant que tu joues, un signal sans identifiant qui sert à compter les joueurs en ce moment (voir §2).</li>
+				<li>Contre l'ordinateur ou à deux sur un téléphone, tu joues <strong>sans compte</strong>, même hors ligne. Quand le téléphone a internet, seules partent la publicité si tu l'as acceptée, des statistiques d'usage anonymes, quelques demandes à notre site (la dernière version du jeu, nos propres publicités) et, toutes les 5 minutes pendant que tu joues, un signal sans identifiant qui sert à compter les joueurs en ce moment (voir §2).</li>
 				<li>Le jeu en ligne et les classements demandent un <strong>compte Google</strong> (Android ou iPhone) <strong>ou Apple</strong> (iPhone). Les pièces, le magasin et les ligues marchent aussi sans compte&nbsp;: ta progression reste alors sur ton téléphone. Avec un compte, elle est sauvegardée chez <strong>Unity</strong>, notre prestataire, pour la retrouver sur tous tes téléphones.</li>
 				<li><strong>Ton pseudo est public</strong>&nbsp;: dans la liste des parties publiques, chez ton adversaire et au classement, avec ta note, et, le temps que tu cherches un adversaire, dans un bandeau chez les joueurs qui ont le jeu ouvert. Il n'y a pas de chat.</li>
-				<li>La publicité des régies ne s'affiche <strong>qu'avec ton accord</strong>, demandé au premier lancement. Sans lui, tu joues normalement, sans publicité entre les parties&nbsp;; seules des vidéos de nos autres jeux et applis peuvent passer, quand tu demandes une récompense. Aucune revente de données.</li>
+				<li>La publicité des régies ne s'affiche <strong>qu'avec ton accord</strong>&nbsp;: sur Android, dans le formulaire de Google ou notre fenêtre, au premier lancement&nbsp;; sur iPhone, en autorisant le suivi quand Apple te le demande. Sans lui, tu joues normalement, sans publicité entre les parties&nbsp;; seules des vidéos de nos autres jeux et applis peuvent passer, quand tu demandes une récompense. Aucune revente de données.</li>
 				<li>Tu peux <strong>supprimer ton compte</strong> à tout moment&nbsp;: Options › «&nbsp;Supprimer mon compte&nbsp;» (<a href="#suppression">voir §11</a>).</li>
 			</ul>
 		</div>
@@ -66,9 +66,10 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			</p>
 			<ul>
 				<li>la <strong>publicité</strong>, si tu l'as acceptée (voir §6)&nbsp;;</li>
+				<li>sur Android, à chaque lancement, une demande au <strong>service de consentement de Google</strong>, pour savoir s'il faut te poser la question sur la publicité (voir §6)&nbsp;;</li>
 				<li>des <strong>statistiques d'usage</strong> sans identifiant (voir §7)&nbsp;;</li>
 				<li>la lecture du <strong>numéro de la dernière version</strong> du jeu sur notre site (voir §9)&nbsp;;</li>
-				<li>un <strong>signal de présence</strong>, une fois par minute tant que le jeu est ouvert, toutes les 5 secondes tant qu'un écran du jeu en ligne est affiché&nbsp;: un numéro tiré au hasard à chaque lancement, sans compte ni identifiant de joueur, pour afficher combien de joueurs jouent en ce moment (voir §5 et §12)&nbsp;;</li>
+				<li>un <strong>signal de présence</strong>, toutes les 5 minutes tant que le jeu est ouvert, toutes les 5 secondes tant qu'un écran du jeu en ligne est affiché&nbsp;: un numéro tiré au hasard à chaque lancement, sans compte ni identifiant de joueur, avec, depuis la version 1.0.20, le numéro de version du jeu en ligne, pour afficher combien de joueurs jouent en ce moment (voir §5 et §12)&nbsp;;</li>
 				<li>la lecture de la liste de <strong>nos propres publicités</strong> sur notre site, à chaque lancement, puis de l'image et de la vidéo de celle qui passe (voir §6).</li>
 			</ul>
 			<p>
@@ -120,7 +121,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li><strong>Recherche d'un adversaire</strong>&nbsp;: tant que tu attends un adversaire dans une partie publique, ton téléphone envoie toutes les 15 secondes ton pseudo, le format et l'identifiant de la partie chez Unity à notre fonction (voir §12)&nbsp;; les joueurs qui ont le jeu ouvert voient «&nbsp;Bébert cherche un adversaire&nbsp;» et peuvent te rejoindre. Une partie privée, avec un ami par son code, n'est jamais annoncée.</li>
 				<li><strong>Pendant la partie</strong>, ton adversaire reçoit ton pseudo, ta note, ton joueur, ta tenue et ta boule, puis tes lancers (leur vitesse et l'endroit où ta main lâche la boule). Après chaque lancer, le téléphone qui a ouvert la partie envoie l'arbitrage (position des boules, score). Ces messages passent par <strong>Unity Relay</strong>, qui les achemine sans les garder.</li>
 				<li><strong>Classement</strong>&nbsp;: chaque partie publique en tête-à-tête jouée jusqu'au bout fait bouger ta note (une note Elo). Ta note et ton pseudo sont alors envoyés au classement <strong>Unity Leaderboards</strong>, que tous les joueurs du jeu peuvent consulter&nbsp;: les 50 premiers, et chacun sa propre ligne. Les parties avec un ami par code et les parties en équipe ne comptent pas.</li>
-				<li><strong>Défi de tir</strong>&nbsp;: si tu as un compte, le score de chaque série (sur 50) et ton pseudo vont aux classements du jour et de la semaine (<strong>Unity Leaderboards</strong>), que tous les joueurs du jeu peuvent consulter. Sans compte, tes séries restent sur ton téléphone.</li>
+				<li><strong>Défi de tir</strong>&nbsp;: la première série de chaque jour (UTC) est gratuite&nbsp;; une autre coûte 200 pièces ou une vidéo récompensée (qui suit les règles de la publicité, §6). Si tu as un compte, le score de chaque série (sur 50) et ton pseudo vont aux classements du jour et de la semaine (<strong>Unity Leaderboards</strong>), que tous les joueurs du jeu peuvent consulter. Sans compte, tes séries restent sur ton téléphone.</li>
 				<li><strong>Pièces du défi de tir</strong>&nbsp;: les 10 premiers du classement du jour et les 50 premiers de celui de la semaine gagnent des pièces. Une minute avant chaque remise à zéro, notre serveur relève ces places chez Unity, avec l'identifiant Unity de chaque joueur mais sans son pseudo, et ton téléphone vient y chercher les tiennes avec ton jeton de connexion Unity (voir §13).</li>
 			</ul>
 			<p>
@@ -189,13 +190,13 @@ import LangSwitch from '../../components/LangSwitch.astro';
 							<td>Identifiant publicitaire, autres identifiants de l'appareil, adresse IP, interactions avec les annonces, durée d'utilisation, achats faits dans le jeu (déclarés par Unity Ads), informations techniques (voir §6)</td>
 							<td>Choisir les publicités selon ton profil, limiter leur répétition, mesurer leur efficacité, lutter contre la fraude</td>
 							<td>Ton consentement (art. 6.1.a)&nbsp;: sans lui, rien ne démarre</td>
-							<td>Unity Technologies et sa filiale ironSource (Unity LevelPlay, ironSource Ads, Unity Ads)&nbsp;; par leurs enchères, d'autres acheteurs de publicité (voir §6)</td>
+							<td>Unity Technologies et sa filiale ironSource (Unity LevelPlay, ironSource Ads, Unity Ads), Google (Google AdMob, depuis la version 1.0.20&nbsp;; sur iPhone, hors Espace économique européen, Royaume-Uni et Suisse)&nbsp;; par leurs enchères, d'autres acheteurs de publicité (voir §6)</td>
 						</tr>
 						<tr>
-							<td>Ta réponse à la fenêtre «&nbsp;Publicité personnalisée&nbsp;» (accepter ou refuser, ou un oui donné avant une vidéo), le jour où tu l'as donnée et la version du texte</td>
+							<td>Ta réponse sur la publicité&nbsp;: sur Android, au formulaire de Google ou à notre fenêtre «&nbsp;Publicité personnalisée&nbsp;» (accepter ou refuser, ou un oui donné avant une vidéo, avec le jour et la version du texte)&nbsp;; sur iPhone, à la question de suivi d'Apple</td>
 							<td>T'en souvenir et pouvoir prouver ton choix</td>
 							<td>Obligation légale</td>
-							<td>Gardée sur ton téléphone seulement&nbsp;; Umami compte les oui et les non, sans identifiant (voir §7)</td>
+							<td>Gardée sur ton téléphone (sur iPhone, par iOS)&nbsp;; Umami compte les oui et les non de notre fenêtre et, sur iPhone, les oui, sans identifiant (voir §7)&nbsp;; Google reçoit et compte les réponses à son formulaire</td>
 						</tr>
 						<tr>
 							<td>Adresse IP du téléphone, quand il lit sur notre site la liste de nos propres publicités, leurs images et leurs vidéos</td>
@@ -204,7 +205,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 							<td>GitHub, hébergeur de notre site</td>
 						</tr>
 						<tr>
-							<td>Un numéro tiré au hasard à chaque lancement du jeu, envoyé une fois par minute tant que le jeu est ouvert, toutes les 5 secondes tant qu'un écran du jeu en ligne est affiché, sans compte ni identifiant de joueur</td>
+							<td>Un numéro tiré au hasard à chaque lancement du jeu, envoyé toutes les 5 minutes tant que le jeu est ouvert, toutes les 5 secondes tant qu'un écran du jeu en ligne est affiché, sans compte ni identifiant de joueur, avec le numéro de version du jeu en ligne (depuis la version 1.0.20)</td>
 							<td>Afficher combien de joueurs jouent en ce moment</td>
 							<td>Intérêt légitime</td>
 							<td>Notre fonction chez Supabase (voir §12)</td>
@@ -240,25 +241,27 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			<h2>6. Publicité</h2>
 			<p>
 				Le jeu est gratuit et financé par la publicité, servie par <strong>Unity LevelPlay</strong> avec les
-				régies <strong>ironSource Ads</strong> et <strong>Unity Ads</strong> (Unity Technologies et sa filiale
-				ironSource)&nbsp;: des vidéos facultatives que tu choisis de regarder (pour doubler tes pièces d'une
+				régies <strong>ironSource Ads</strong>, <strong>Unity Ads</strong> (Unity Technologies et sa filiale
+				ironSource) et, depuis la version 1.0.20, <strong>Google AdMob</strong> (Google)&nbsp;: des vidéos facultatives que tu choisis de regarder (pour doubler tes pièces d'une
 				partie ou ton bonus du jour, ou pour des pièces gratuites), et une publicité entre deux parties libres
-				contre l'ordinateur, une fois toutes les deux parties au plus, et une avant la finale d'une coupe, quand tu viens d'en gagner la demi-finale. Google n'intervient ni dans la
-				publicité de ce jeu ni dans ton accord.
+				contre l'ordinateur, une fois toutes les deux parties au plus, et une avant la finale d'une coupe, quand tu viens d'en gagner la demi-finale. Sur iPhone, Google AdMob ne sert pas de publicité dans l'Espace économique européen, au
+				Royaume-Uni et en Suisse.
 			</p>
 			<p>
-				<strong>Ton accord.</strong> Au premier lancement, quel que soit ton pays, une fenêtre «&nbsp;Publicité personnalisée&nbsp;» («&nbsp;Publicité et vie privée&nbsp;» avant la version 1.0.8) te demande si tu acceptes que Unity Ads, ironSource (groupe Unity) et leurs partenaires choisissent les publicités selon ton profil, en limitent la répétition, mesurent leur efficacité et luttent contre la fraude. Pour cela, leurs modules enregistrent et lisent des informations sur ton téléphone, dont son identifiant publicitaire. Le lien «&nbsp;Voir les sociétés&nbsp;» de la fenêtre mène à la liste des sociétés concernées (<a href="/publicite/societes/">Les sociétés de la publicité dans nos applis</a>), un autre à cette politique. «&nbsp;Accepter&nbsp;» et «&nbsp;Refuser&nbsp;» ont le même poids.
+				<strong>Ton accord sur Android.</strong> À chaque lancement, avant toute publicité, le jeu demande au service de consentement de Google (Google User Messaging Platform) s'il doit te poser la question. Pour cela, Google reçoit l'adresse IP de ton téléphone (qui lui donne ton pays ou ta région), l'identifiant de l'application et des informations techniques sur le téléphone, mais pas son identifiant publicitaire. S'il le faut, le formulaire de Google s'affiche&nbsp;: il présente les sociétés publicitaires, dont Google, ironSource et Unity Ads, et leurs finalités, et te laisse consentir, refuser ou régler chaque choix. Ta réponse est gardée sur ton téléphone, dans le format standard du secteur (IAB TCF), où les modules publicitaires la lisent&nbsp;; Google compte aussi les réponses à son formulaire. Les régies ne démarrent que si tu acceptes au moins le stockage d'informations sur ton téléphone. Là où Google ne pose pas de question, une fenêtre «&nbsp;Publicité personnalisée&nbsp;» («&nbsp;Publicité et vie privée&nbsp;» avant la version 1.0.8) te demande si tu acceptes que Unity Ads, ironSource (groupe Unity), Google AdMob et leurs partenaires choisissent les publicités selon ton profil, en limitent la répétition, mesurent leur efficacité et luttent contre la fraude. Pour cela, leurs modules enregistrent et lisent des informations sur ton téléphone, dont son identifiant publicitaire. Le lien «&nbsp;Voir les sociétés&nbsp;» de la fenêtre mène à la liste des sociétés concernées (<a href="/publicite/societes/">Les sociétés de la publicité dans nos applis</a>), un autre à cette politique. «&nbsp;Accepter&nbsp;» et «&nbsp;Refuser&nbsp;» ont le même poids.
+			</p>
+			<p>
+				<strong>Ton accord sur iPhone.</strong> La seule question est celle d'Apple, qui te demande si tu autorises le jeu à suivre tes activités&nbsp;; son texte nomme Unity Ads, ironSource, Google AdMob et leurs partenaires. Si tu l'autorises, une note te dit une fois, avec un seul bouton OK, ce que ces sociétés font de l'identifiant publicitaire de ton iPhone, avec un lien vers la liste des sociétés et vers cette politique, et où changer d'avis&nbsp;; la publicité démarre après OK. Si tu refuses, ou si le suivi est restreint sur ton iPhone, le jeu n'affiche aucune fenêtre sur la publicité, aucun module publicitaire ne démarre et rien ne leur est transmis&nbsp;: tu joues normalement, sans publicité entre les parties, et les récompenses passent par des vidéos de nos autres jeux et applis.
 			</p>
 			<ul>
-				<li><strong>Si tu refuses</strong>, aucun module publicitaire ne démarre et rien ne leur est transmis, pas même ton refus&nbsp;: tu joues normalement, sans publicité entre les parties. Les offres de vidéo restent&nbsp;: la première fois que tu en touches une dans une session, le jeu te demande si tu veux activer la publicité. Un oui vaut un «&nbsp;Accepter&nbsp;»&nbsp;; sinon, et ensuite jusqu'à la fin de la session, il te montre une vidéo de l'un de nos autres jeux ou applis, qui donne la même récompense (voir plus bas).</li>
-				<li><strong>Ta réponse</strong>, le jour où tu l'as donnée et la version du texte restent sur ton téléphone. Le jeu te la redemande au bout de 182 jours (6 mois), que tu aies accepté ou refusé, ou plus tôt si nos partenaires publicitaires changent. Ton choix (oui ou non) est aussi compté, sans identifiant, dans nos statistiques d'usage (voir §7).</li>
-				<li><strong>Tu peux changer d'avis à tout moment</strong>&nbsp;: Options › «&nbsp;Choix publicitaires&nbsp;». Si tu retires ton accord en cours de partie, le jeu arrête aussitôt de charger des publicités&nbsp;; le module publicitaire reste chargé jusqu'à ce que tu fermes le jeu, puis ne démarre plus.</li>
-				<li><strong>Sur iPhone</strong>, l'autorisation de suivi d'Apple ne t'est demandée qu'après un oui. Si tu la refuses, ou tant que tu n'y as pas répondu, les publicités ne sont pas personnalisées&nbsp;: le module publicitaire est informé que tu n'as pas accepté la personnalisation, et l'identifiant publicitaire de l'iPhone n'est pas utilisé.</li>
+				<li><strong>Si tu refuses</strong> (sur Android), aucun module publicitaire ne démarre et rien ne leur est transmis, pas même ton refus&nbsp;: tu joues normalement, sans publicité entre les parties. Les offres de vidéo restent&nbsp;: la première fois que tu en touches une dans une session, le jeu te demande si tu veux activer la publicité. Un oui vaut un «&nbsp;Accepter&nbsp;»&nbsp;; sinon, et ensuite jusqu'à la fin de la session, il te montre une vidéo de l'un de nos autres jeux ou applis, qui donne la même récompense (voir plus bas).</li>
+				<li><strong>Ta réponse</strong> à notre fenêtre, le jour où tu l'as donnée et la version du texte restent sur ton téléphone. Le jeu te la redemande au bout de 182 jours (6 mois), que tu aies accepté ou refusé, ou plus tôt si nos partenaires publicitaires changent (c'est le cas de la version 1.0.20, qui ajoute Google AdMob). Ta réponse au formulaire de Google reste sur ton téléphone jusqu'à ce que Google la redemande. Ton choix dans notre fenêtre (oui ou non) et, sur iPhone, ton autorisation sont aussi comptés, sans identifiant, dans nos statistiques d'usage (voir §7).</li>
+				<li><strong>Tu peux changer d'avis à tout moment</strong>&nbsp;: sur Android, Options › «&nbsp;Choix publicitaires&nbsp;» (le formulaire de Google, ou notre fenêtre là où Google ne demande rien)&nbsp;; sur iPhone, Réglages › Confidentialité et sécurité › Suivi, et Options › «&nbsp;Choix publicitaires&nbsp;» remontre la note tant que le suivi est autorisé. Si tu retires ton accord en cours de partie, le jeu arrête aussitôt de charger des publicités&nbsp;; le module publicitaire reste chargé jusqu'à ce que tu fermes le jeu, puis ne démarre plus.</li>
 			</ul>
 			<p>
 				<strong>Si tu as accepté</strong>, pour afficher les annonces, les choisir, les mesurer et lutter
-				contre la fraude, les modules d'ironSource et de Unity Ads reçoivent l'<strong>identifiant
-				publicitaire</strong> de ton téléphone et d'autres identifiants de l'appareil, ton <strong>adresse
+				contre la fraude, les modules d'ironSource, de Unity Ads et de Google reçoivent l'<strong>identifiant
+				publicitaire</strong> de ton téléphone et d'autres identifiants de l'appareil (sur Android, aussi l'identifiant d'ensemble d'applis et, le cas échéant, des identifiants liés aux comptes connectés du téléphone), ton <strong>adresse
 				IP</strong> (qui donne une position approximative, à l'échelle de la ville), tes interactions avec
 				les annonces, ta durée d'utilisation, des informations techniques (performances, plantages) et,
 				selon Unity Ads, les achats faits dans le jeu. Leurs enchères peuvent transmettre la demande
@@ -276,7 +279,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				Tu peux aussi réinitialiser ou supprimer l'identifiant publicitaire dans les réglages de ton téléphone.
 				Pour en savoir plus, et pour les partenaires d'ironSource et de Unity Ads&nbsp;: la
 				<a href="https://unity.com/legal/game-player-and-app-user-privacy-policy" target="_blank" rel="noopener">politique
-				de confidentialité de Unity</a>, qui couvre Unity Ads, LevelPlay et ironSource.
+				de confidentialité de Unity</a>, qui couvre Unity Ads, LevelPlay et ironSource. Pour Google&nbsp;: <a href="https://policies.google.com/technologies/partner-sites" target="_blank" rel="noopener">comment Google utilise les données des applis partenaires</a> et sa <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">règle de confidentialité</a>.
 			</p>
 		</section>
 
@@ -294,7 +297,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li><code>daily_bonus</code>, <code>challenge_claim</code> — un bonus du jour (série) ou un défi (pièces) est reçu&nbsp;;</li>
 				<li><code>shop_buy</code> — un objet est acheté avec des pièces (objet, prix)&nbsp;;</li>
 				<li><code>iap_tap</code>, <code>iap_result</code>, <code>iap_gate</code> — tu touches un produit payant, le résultat de l'achat (produit, réussi ou raison de l'échec, achat de test ou non), la réponse à la question posée à un adulte (juste, fausse ou annulée)&nbsp;; jamais de montant&nbsp;;</li>
-				<li><code>ad_consent</code> — ta réponse à la fenêtre «&nbsp;Publicité personnalisée&nbsp;» (oui ou non), avec le moment où tu l'as donnée (premier lancement, réglages ou en demandant une récompense) et, sur iPhone, ta réponse à la question de suivi d'Apple&nbsp;;</li>
+				<li><code>ad_consent</code> — ta réponse à la fenêtre «&nbsp;Publicité personnalisée&nbsp;» (oui ou non), avec le moment où tu l'as donnée (premier lancement, réglages ou en demandant une récompense) et, sur iPhone, un oui quand tu as autorisé le suivi et lu la note, avec la réponse d'Apple&nbsp;; ta réponse au formulaire de Google n'y est pas envoyée&nbsp;;</li>
 				<li><code>ad_offer</code>, <code>ad_start</code>, <code>ad_rewarded</code>, <code>ad_interstitial</code> — une vidéo est proposée ou regardée, une publicité s'affiche (emplacement, format, résultat, vidéo d'une régie ou des nôtres)&nbsp;;</li>
 				<li><code>house_ads_ask</code> — ta réponse quand une offre de vidéo te propose d'activer la publicité (oui ou non)&nbsp;;</li>
 				<li><code>house_ad_show</code>, <code>house_ad_tap</code> — une vidéo de nos autres jeux et applis passe, ou tu ouvres sa fiche avec «&nbsp;Découvrir&nbsp;» (laquelle, emplacement)&nbsp;; avant la version 1.0.15, sous les noms <code>house_ad</code>, <code>house_ad_open</code>&nbsp;;</li>
@@ -304,6 +307,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li><code>shots_start</code>, <code>shots_end</code> — une série du défi de tir commence ou finit (score, carreaux, record du jour ou non, compte ou non, nombre de séries, en tranches)&nbsp;;</li>
 				<li><code>shots_prize</code> — tu reçois des pièces gagnées à un classement du défi de tir (jour ou semaine, place en tranches, pièces)&nbsp;;</li>
 				<li><code>result_leave</code> — comment tu quittes l'écran de résultat (rejouer, menu, jeu quitté)&nbsp;;</li>
+				<li><code>coins_spend</code>, <code>shop_buy</code> — comptent aussi une série du défi de tir payée en pièces (objet <code>shots_retry</code>, prix)&nbsp;; <code>ad_offer</code>, <code>ad_rewarded</code>, la vidéo qui en paie une&nbsp;; aucune donnée nouvelle&nbsp;;</li>
 				<li><code>coins_short</code> — il te manque des pièces (où, combien, ton solde, en tranches)&nbsp;;</li>
 				<li><code>resume</code> — tu reprends ou non une partie coupée&nbsp;;</li>
 				<li><code>save_offer</code>, <code>reconnect_offer</code> — le jeu te propose un compte pour sauvegarder ta progression, ou de te reconnecter (nombre de parties en tranches, en ligne ou non)&nbsp;;</li>
@@ -375,7 +379,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li>la copie de ta progression (une par compte, et celle du jeu sans compte)&nbsp;;</li>
 				<li>les réglages qui restent avec le téléphone&nbsp;: main qui lance, côté de la planche, lancer simple ou expert, vue de jeu, langue, thème, son, rappels&nbsp;;</li>
 				<li>ta session Unity, si tu es connecté&nbsp;;</li>
-				<li>ta réponse à la fenêtre «&nbsp;Publicité personnalisée&nbsp;», le jour où tu l'as donnée et la version du texte, et, si tu as accepté, les données des modules publicitaires (voir §6)&nbsp;;</li>
+				<li>ta réponse sur la publicité (à notre fenêtre, le jour où tu l'as donnée et la version du texte&nbsp;; au formulaire de Google, au format IAB TCF ou GPP&nbsp;; sur iPhone, la version du texte de la note déjà vue) et, si tu as accepté, les données des modules publicitaires (voir §6)&nbsp;;</li>
 				<li>tes paiements en argent réel des dernières 24 heures (heure, montant, devise), pour la question posée à un adulte avant un nouvel achat&nbsp;; ils ne quittent pas ton téléphone&nbsp;;</li>
 				<li>une partie contre l'ordinateur coupée (un appel, le jeu fermé), pour la reprendre où elle en était&nbsp;;</li>
 				<li>l'heure du jeu, pour qu'un changement de l'heure du téléphone ne donne pas le bonus du jour ni les défis en avance&nbsp;; le jeu la règle sur l'heure que donnent les réponses de notre serveur de statistiques, sans rien envoyer de plus&nbsp;;</li>
@@ -437,8 +441,8 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			<ul>
 				<li><strong>Unity Technologies</strong> — comptes (Authentication), sauvegarde (Cloud Save), parties en ligne (Multiplayer et Relay), classement (Leaderboards), module d'achat (In-App Purchasing) et, si tu l'as acceptée, publicité (Unity LevelPlay, Unity Ads).</li>
 				<li><strong>ironSource</strong>, filiale de Unity Technologies — publicité (ironSource Ads), si tu l'as acceptée. Les enchères d'ironSource et de Unity Ads peuvent transmettre la demande d'annonce à d'autres acheteurs de publicité (voir §6).</li>
-				<li><strong>Google</strong> (Google Ireland Limited, Google LLC) — connexion sur Android et sur iPhone, Google Play (distribution, paiement, fiche de notation).</li>
-				<li><strong>Apple Inc.</strong> — «&nbsp;Se connecter avec Apple&nbsp;», autorisation de suivi, App Store (distribution, paiement, fiche de notation).</li>
+				<li><strong>Google</strong> (Google Ireland Limited, Google LLC) — connexion sur Android et sur iPhone, Google Play (distribution, paiement, fiche de notation), et depuis la version 1.0.20&nbsp;: sur Android, le formulaire de consentement à la publicité (Google User Messaging Platform), à chaque lancement&nbsp;; si tu l'as acceptée, la publicité (Google AdMob, par les enchères de Unity LevelPlay&nbsp;; sur iPhone, hors Espace économique européen, Royaume-Uni et Suisse).</li>
+				<li><strong>Apple Inc.</strong> — «&nbsp;Se connecter avec Apple&nbsp;», la question de suivi (seule question sur la publicité sur iPhone), App Store (distribution, paiement, fiche de notation).</li>
 				<li><strong>Hetzner Online GmbH</strong> (Allemagne) — hébergement de notre serveur de statistiques d'usage (voir §7).</li>
 				<li><strong>Supabase, Inc.</strong> — hébergement de notre fonction qui retire l'accès «&nbsp;Se connecter avec Apple&nbsp;» (voir §11)&nbsp;: elle reçoit le code d'Apple, l'identifiant de l'application et l'adresse IP du téléphone, et ne garde rien&nbsp;; et de celle qui compte les joueurs en ligne&nbsp;: elle reçoit le numéro tiré au hasard au lancement et l'adresse IP du téléphone, et, pendant que tu cherches un adversaire, ton pseudo, le format et l'identifiant de la partie, gardés le temps de ta recherche. Elle n'enregistre pas cette adresse, qu'elle peut garder en mémoire quelques minutes pour bloquer les abus&nbsp;; les journaux techniques de Supabase la gardent un temps limité, selon ses conditions. Celle des pièces du défi de tir reçoit de Unity l'identifiant des joueurs aux places gagnantes et de ton téléphone ton jeton de connexion Unity et son adresse IP, qu'elle n'enregistre pas (les journaux techniques de Supabase la gardent un temps limité)&nbsp;; elle ne garde pas le jeton&nbsp;; elle garde 30 jours l'identifiant, la place, le score et les pièces, sans pseudo (voir §13).</li>
 				<li><strong>GitHub, Inc.</strong> — hébergement de notre site, lu pour la vérification de mise à jour (voir §9) et pour nos propres publicités (voir §6)&nbsp;; GitHub enregistre l'adresse IP de chaque visite pour la sécurité de son service.</li>
@@ -461,8 +465,8 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li><strong>Joueurs en ligne en ce moment</strong>&nbsp;: le numéro tiré au hasard est effacé dans les minutes qui suivent l'arrêt du jeu.</li>
 				<li><strong>Recherche d'un adversaire</strong>&nbsp;: ton pseudo, le format et l'identifiant de la partie sont effacés dès que tu ne cherches plus, au plus tard quelques minutes après.</li>
 				<li><strong>Statistiques d'usage</strong>&nbsp;: gardées <strong>24 mois</strong> sur notre serveur, puis effacées&nbsp;; ses sauvegardes, 14 jours.</li>
-				<li><strong>Données publicitaires</strong>&nbsp;: selon les règles de Unity et d'ironSource.</li>
-				<li><strong>Ta réponse sur la publicité</strong>&nbsp;: 182 jours (6 mois) sur ton téléphone, puis le jeu te la redemande.</li>
+				<li><strong>Données publicitaires</strong>&nbsp;: selon les règles de Unity, d'ironSource et de Google.</li>
+				<li><strong>Ta réponse sur la publicité</strong>&nbsp;: dans notre fenêtre, 182 jours (6 mois) sur ton téléphone, puis le jeu te la redemande&nbsp;; dans le formulaire de Google (Android), sur ton téléphone jusqu'à ce que Google la redemande ou que tu désinstalles le jeu&nbsp;; sur iPhone, ta réponse à Apple est gardée par iOS.</li>
 				<li><strong>Nos propres publicités</strong>&nbsp;: leur liste et leurs images restent sur ton téléphone jusqu'à ce que notre site les remplace ou que tu désinstalles le jeu.</li>
 				<li><strong>Achats</strong>&nbsp;: les numéros de transaction restent dans ta progression, jusqu'à la suppression du compte&nbsp;; Google et Apple gardent leurs propres justificatifs.</li>
 				<li><strong>Tes paiements des dernières 24 heures</strong>&nbsp;: sur ton téléphone, effacés au bout de 24 heures.</li>
@@ -479,7 +483,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			</p>
 			<ul>
 				<li><strong>Corriger ton pseudo</strong>&nbsp;: «&nbsp;Mon personnage&nbsp;», depuis Options.</li>
-				<li><strong>Retirer ton accord pour la publicité</strong>&nbsp;: Options › «&nbsp;Choix publicitaires&nbsp;»&nbsp;; sur iPhone, Réglages › Confidentialité et sécurité › Suivi.</li>
+				<li><strong>Retirer ton accord pour la publicité</strong>&nbsp;: sur Android, Options › «&nbsp;Choix publicitaires&nbsp;»&nbsp;; sur iPhone, Réglages › Confidentialité et sécurité › Suivi.</li>
 				<li><strong>Effacer tes données</strong>&nbsp;: voir <a href="#suppression">§11</a>.</li>
 				<li><strong>Le reste</strong> (copie de tes données, opposition, question)&nbsp;: écris à <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>, avec ton pseudo et ton type de compte. Nous répondons sous un mois.</li>
 			</ul>
