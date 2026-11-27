@@ -22,7 +22,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			Cette politique concerne <strong>l'application mobile Dragon Gems Swipe</strong>
 			(<code>com.ludivenstudio.dragonsgems</code>) et ses classements, partagés avec le jeu du site
 			(<a href="/jeux/eclats/">ludiven-studio.fr/jeux/eclats</a>). Le reste du site a sa
-			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 25 novembre 2026 (le moment de ton choix sur la publicité et, sur iPhone, ta réponse à la question de suivi d'Apple, comptés dans les statistiques).
+			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 27 novembre 2026 (version 1.3.0&nbsp;: sur iPhone, la question de suivi d'Apple est la seule question sur la publicité&nbsp;; le moment de ton choix sur la publicité et, sur iPhone, ta réponse à la question de suivi d'Apple, comptés dans les statistiques).
 		</p>
 
 		<div class="summary">
@@ -31,7 +31,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li>Le jeu se joue <strong>sans compte</strong>. Ta progression est gardée sur ton téléphone.</li>
 				<li>Un <strong>compte Google ou Apple</strong>, facultatif, sauvegarde ta progression en ligne pour la retrouver sur tous tes appareils.</li>
 				<li>Les classements du défi du jour, du mode infini et du défi du sommet montrent <strong>ton pseudo et ton score</strong>, à tout le monde. Rien d'autre.</li>
-				<li>Des <strong>vidéos facultatives</strong> offrent des cœurs et des pièces&nbsp;: celles de Unity si tu les acceptes, sinon des vidéos de nos autres jeux et applis. L'application ne demande ni ta position, ni tes contacts, ni tes photos.</li>
+				<li>Des <strong>vidéos facultatives</strong> offrent des cœurs et des pièces&nbsp;: celles de Unity si tu les acceptes (sur iPhone, en autorisant le suivi quand Apple te le demande), sinon des vidéos de nos autres jeux et applis. L'application ne demande ni ta position, ni tes contacts, ni tes photos.</li>
 				<li>Des <strong>statistiques d'usage</strong> sans identifiant (niveaux joués, vidéos, achats…) partent sur notre propre serveur, en Allemagne.</li>
 				<li>Des <strong>achats intégrés</strong> facultatifs (pièces, cœurs illimités), payés par Google Play ou l'App Store.</li>
 				<li>Tu peux <strong>supprimer ton compte</strong> à tout moment depuis les Réglages de l'application.</li>
@@ -151,10 +151,10 @@ import LangSwitch from '../../components/LangSwitch.astro';
 							<td>Unity (LevelPlay, Unity Ads, ironSource Ads), qui les partage avec des annonceurs</td>
 						</tr>
 						<tr>
-							<td>Ton choix sur la publicité et sa date</td>
-							<td>T'en souvenir six mois, puis te le redemander&nbsp;; le transmettre à Unity</td>
+							<td>Ton choix sur la publicité et sa date&nbsp;; sur iPhone, ta réponse à la question de suivi d'Apple</td>
+							<td>T'en souvenir six mois, puis te le redemander (sur iPhone, iOS garde la réponse à Apple)&nbsp;; le transmettre à Unity</td>
 							<td>Obligation légale</td>
-							<td>Ton téléphone&nbsp;; Unity&nbsp;; Umami compte les oui et les non, sans identifiant (voir §8)</td>
+							<td>Ton téléphone&nbsp;; Unity&nbsp;; Umami compte les oui et les non, sans identifiant (sur iPhone, seulement les oui&nbsp;; voir §8)</td>
 						</tr>
 						<tr>
 							<td>Produit acheté, reçu du store, numéro de transaction</td>
@@ -204,19 +204,31 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				ne lui transmettons ni ton compte, ni ton pseudo, ni ta progression.
 			</p>
 			<p>
-				<strong>Ton accord.</strong> Avant la première vidéo, le jeu te demande si tu acceptes les vidéos
+				<strong>Ton accord sur Android</strong> (et sur un iPhone d'avant iOS 14). Avant la première vidéo, le jeu te demande si tu acceptes les vidéos
 				publicitaires de Unity («&nbsp;Accepter&nbsp;» ou «&nbsp;Refuser&nbsp;»)&nbsp;; elle renvoie aussi à la
 				<a href="/publicite/societes/">liste des sociétés concernées</a>. Le module de Unity ne démarre
 				qu'après «&nbsp;Accepter&nbsp;». Après «&nbsp;Refuser&nbsp;», Unity ne reçoit rien&nbsp;: les récompenses
 				passent par des vidéos de nos autres jeux et applis, téléchargées depuis notre site, et le jeu te
 				propose une fois par session d'activer les vidéos de Unity&nbsp;; «&nbsp;Activer les pubs&nbsp;» vaut
 				alors «&nbsp;Accepter&nbsp;». Ton choix vaut six mois, puis le jeu te le redemande. Tu peux changer d'avis
-				à tout moment&nbsp;: Réglages › «&nbsp;Choix publicitaires&nbsp;». Sur iPhone, après «&nbsp;Accepter&nbsp;»
-				ou «&nbsp;Activer les pubs&nbsp;», Apple te demande l'autorisation de suivi&nbsp;; sans elle,
-				l'identifiant publicitaire de l'iPhone n'est pas utilisé et les vidéos ne sont pas adaptées à tes centres
-				d'intérêt, ce qui vaut aussi, pour Unity, refus de la vente de tes données au sens des lois des États
-				américains. Tu peux aussi
-				réinitialiser ou supprimer l'identifiant publicitaire dans les réglages de ton téléphone. Pour en
+				à tout moment&nbsp;: Réglages › «&nbsp;Choix publicitaires&nbsp;».
+			</p>
+			<p>
+				<strong>Ton accord sur iPhone</strong> (iOS 14 ou plus récent, depuis la version 1.3.0). La seule question
+				est celle d'Apple, qui te demande si tu autorises le jeu à suivre tes activités&nbsp;; son texte nomme
+				Unity Ads, ironSource et leurs partenaires. Si tu l'autorises, une note «&nbsp;Publicités&nbsp;» te dit
+				une fois, avec un seul bouton OK, ce que ces sociétés font, avec un lien vers la
+				<a href="/publicite/societes/">liste des sociétés concernées</a> et vers cette politique, et où changer
+				d'avis&nbsp;; les vidéos de Unity démarrent après OK. Si tu refuses, ou si le suivi est restreint sur ton
+				iPhone, le jeu n'affiche aucune fenêtre sur la publicité, le module de Unity ne démarre pas et ne reçoit
+				rien&nbsp;: les récompenses passent par des vidéos de nos autres jeux et applis, et la ligne
+				«&nbsp;Choix publicitaires&nbsp;» n'apparaît pas dans les Réglages du jeu. Sans réponse à la question
+				d'Apple, aucune vidéo de Unity, et la question revient au lancement suivant. Tu changes d'avis dans
+				les Réglages de l'iPhone › Confidentialité et sécurité › Suivi, en activant ou en coupant Dragon Gems
+				Swipe&nbsp;; tant que le suivi est autorisé, «&nbsp;Choix publicitaires&nbsp;» remontre la note.
+			</p>
+			<p>
+				Tu peux aussi réinitialiser ou supprimer l'identifiant publicitaire dans les réglages de ton téléphone. Pour en
 				savoir plus&nbsp;: la
 				<a href="https://unity.com/legal/game-player-and-app-user-privacy-policy" target="_blank" rel="noopener">politique de confidentialité de Unity</a>.
 			</p>
@@ -261,7 +273,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li><code>continue_buy</code>, <code>breath_buy</code>, <code>coins_spend</code>, <code>coins_short</code> — des pièces sont dépensées (pour quoi, combien, mode, niveau) ou manquent (dans quelle tranche, et si une vidéo est proposée)&nbsp;;</li>
 				<li><code>shop_open</code>, <code>iap_tap</code>, <code>iap_buy</code>, <code>iap_result</code>, <code>iap_restore</code> — la boutique s'ouvre (depuis quel écran), un achat avec de l'argent est demandé, réussi, annulé, en attente ou échoué (produit, Google Play ou App Store, code court de l'erreur), une restauration des achats (résultat, nombre d'achats rendus)&nbsp;;</li>
 				<li><code>daily_gift</code> (et <code>daily_claim</code>) — le cadeau du jour est reçu (jour de la série)&nbsp;;</li>
-				<li><code>reminders</code> (et <code>reminders_answer</code>), <code>ad_consent</code> — ta réponse sur les rappels et sur la publicité (oui ou non), avec, pour la publicité, le moment où tu l'as donnée (premier lancement, réglages ou en demandant une récompense) et, sur iPhone, ta réponse à la question de suivi d'Apple&nbsp;;</li>
+				<li><code>reminders</code> (et <code>reminders_answer</code>), <code>ad_consent</code> — ta réponse sur les rappels et sur la publicité (oui ou non), avec, pour la publicité, le moment où tu l'as donnée (premier lancement, réglages ou en demandant une récompense) et, sur iPhone, ta réponse à la question de suivi d'Apple (depuis la version 1.3.0, sur iPhone, seulement un oui, quand tu as autorisé le suivi et lu la note&nbsp;; rien après un refus)&nbsp;;</li>
 				<li><code>update_prompt</code>, <code>update_tapped</code> (et <code>update_shown</code>, <code>update_tap</code>) — la proposition de mise à jour est montrée ou touchée (facultative ou obligatoire)&nbsp;;</li>
 				<li><code>theme</code> — tu changes de thème ou de mode sombre (lequel)&nbsp;;</li>
 				<li><code>sign_in_offer</code>, <code>sign_in</code>, <code>sign_out</code>, <code>account_delete</code> — le jeu te propose de te connecter (à quel moment), une connexion (Google ou Apple&nbsp;; réussie, annulée, échouée ou remise à plus tard), une déconnexion, une suppression de compte (réussie ou non).</li>
@@ -384,7 +396,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			<h2>14. Mineurs</h2>
 			<p>
 				Le jeu ne s'adresse pas aux enfants de moins de 13 ans et se joue sans compte. Si tu as moins de
-				15 ans, demande à tes parents avant de répondre «&nbsp;Accepter&nbsp;» sur les vidéos, avant un
+				15 ans, demande à tes parents avant d'accepter les vidéos publicitaires (sur iPhone, d'autoriser le suivi), avant un
 				achat et avant de te connecter avec un compte. Choisis un pseudo qui n'est pas ton vrai nom. Si tu es
 				parent et souhaites faire supprimer un compte ou un pseudo, écris-nous&nbsp;: nous le supprimerons.
 			</p>

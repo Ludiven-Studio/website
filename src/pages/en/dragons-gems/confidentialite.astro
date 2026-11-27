@@ -23,7 +23,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			This policy covers <strong>the Dragon Gems Swipe mobile app</strong>
 			(<code>com.ludivenstudio.dragonsgems</code>) and its leaderboards, shared with the game on the website
 			(<a href="/jeux/eclats/">ludiven-studio.fr/jeux/eclats</a>). The rest of the website has its
-			<a href="/confidentialite/">own policy</a> (in French). Last updated: November 25, 2026 (when you made your ad choice and, on an iPhone, your answer to Apple's tracking question, counted in the statistics).
+			<a href="/confidentialite/">own policy</a> (in French). Last updated: November 27, 2026 (version 1.3.0: on iPhone, Apple's tracking question is the only question about ads; when you made your ad choice and, on an iPhone, your answer to Apple's tracking question, counted in the statistics).
 		</p>
 		<p class="updated">
 			This is a courtesy translation. In case of discrepancy, the
@@ -36,7 +36,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li>The game is played <strong>without an account</strong>. Your progress is kept on your phone.</li>
 				<li>An optional <strong>Google or Apple account</strong> saves your progress online, to find it on all your devices.</li>
 				<li>The daily challenge, endless mode and summit challenge leaderboards show <strong>your name and your score</strong> to everyone. Nothing else.</li>
-				<li><strong>Optional videos</strong> give hearts and coins: Unity's if you accept them, otherwise videos of our other games and apps. The app asks for neither your location, nor your contacts, nor your photos.</li>
+				<li><strong>Optional videos</strong> give hearts and coins: Unity's if you accept them (on iPhone, by allowing tracking when Apple asks), otherwise videos of our other games and apps. The app asks for neither your location, nor your contacts, nor your photos.</li>
 				<li><strong>Usage statistics</strong> with no identifier (levels played, videos, purchases…) go to our own server, in Germany.</li>
 				<li>Optional <strong>in-app purchases</strong> (coins, unlimited hearts), paid through Google Play or the App Store.</li>
 				<li>You can <strong>delete your account</strong> at any time from the app's Settings.</li>
@@ -153,10 +153,10 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 							<td>Unity (LevelPlay, Unity Ads, ironSource Ads), which shares them with advertisers</td>
 						</tr>
 						<tr>
-							<td>Your choice about ads and its date</td>
-							<td>Remember it for six months, then ask you again; pass it on to Unity</td>
+							<td>Your choice about ads and its date; on iPhone, your answer to Apple's tracking question</td>
+							<td>Remember it for six months, then ask you again (on iPhone, iOS keeps your answer to Apple); pass it on to Unity</td>
 							<td>Legal obligation</td>
-							<td>Your phone; Unity; Umami counts the yeses and noes, with no identifier (see §8)</td>
+							<td>Your phone; Unity; Umami counts the yeses and noes, with no identifier (on iPhone, only the yeses; see §8)</td>
 						</tr>
 						<tr>
 							<td>Product bought, store receipt, transaction number</td>
@@ -205,15 +205,28 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				account, nor your name, nor your progress.
 			</p>
 			<p>
-				<strong>Your consent.</strong> Before the first video, the game asks whether you accept Unity's video ads
+				<strong>Your consent on Android</strong> (and on an iPhone before iOS 14). Before the first video, the game asks whether you accept Unity's video ads
 				("Accept" or "Refuse"); it also links to the <a href="/en/publicite/societes/">list of the companies
 				involved</a>. Unity's module starts only after "Accept". After "Refuse", Unity receives nothing: rewards
 				come through videos of our other games and apps, downloaded from our site, and the game offers once per
 				session to turn Unity's videos on; "Turn ads on" then counts as "Accept". Your choice holds for six
-				months, then the game asks you again. You can change your mind at any time: Settings › "Ad choices". On
-				iPhone, after "Accept" or "Turn ads on", Apple asks for your permission to track; without it, the iPhone's advertising id is not used and the
-				videos are not tailored to your interests, which for Unity also opts you out of the sale of your data
-				under US state laws. You can also reset or delete the advertising id in your phone's settings. To learn
+				months, then the game asks you again. You can change your mind at any time: Settings › "Ad choices".
+			</p>
+			<p>
+				<strong>Your consent on iPhone</strong> (iOS 14 or later, since version 1.3.0). The only question is
+				Apple's, which asks whether you allow the game to track your activity; its text names Unity Ads,
+				ironSource and their partners. If you allow it, an "Ads" note tells you once, with a single OK button,
+				what these companies do, with a link to the <a href="/en/publicite/societes/">list of the companies
+				involved</a> and to this policy, and where to change your mind; Unity's videos start after OK. If you
+				refuse, or if tracking is restricted on your iPhone, the game shows no window about ads, Unity's module
+				does not start and receives nothing: rewards come through videos of our other games and apps, and the
+				"Ad choices" row does not appear in the game's Settings. With no answer to Apple's question, no Unity
+				video, and the question comes back at the next launch. You change your mind in the iPhone's Settings ›
+				Privacy &amp; Security › Tracking, by turning Dragon Gems Swipe on or off; while tracking is allowed,
+				"Ad choices" shows the note again.
+			</p>
+			<p>
+				You can also reset or delete the advertising id in your phone's settings. To learn
 				more: <a href="https://unity.com/legal/game-player-and-app-user-privacy-policy" target="_blank" rel="noopener">Unity's privacy policy</a>.
 			</p>
 			<p>
@@ -256,7 +269,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><code>continue_buy</code>, <code>breath_buy</code>, <code>coins_spend</code>, <code>coins_short</code> — coins are spent (on what, how many, mode, level) or are short (in which range, and whether a video is offered);</li>
 				<li><code>shop_open</code>, <code>iap_tap</code>, <code>iap_buy</code>, <code>iap_result</code>, <code>iap_restore</code> — the shop opens (from which screen), a purchase with money is requested, succeeds, is cancelled, pending or fails (product, Google Play or App Store, short error code), a restore of purchases (result, number of purchases restored);</li>
 				<li><code>daily_gift</code> (and <code>daily_claim</code>) — the daily gift is received (day of the streak);</li>
-				<li><code>reminders</code> (and <code>reminders_answer</code>), <code>ad_consent</code> — your answer about reminders and about ads (yes or no), with, for ads, when you gave it (first launch, settings or when asking for a reward) and, on an iPhone, your answer to Apple's tracking question;</li>
+				<li><code>reminders</code> (and <code>reminders_answer</code>), <code>ad_consent</code> — your answer about reminders and about ads (yes or no), with, for ads, when you gave it (first launch, settings or when asking for a reward) and, on an iPhone, your answer to Apple's tracking question (since version 1.3.0, on iPhone, only a yes, when you allowed tracking and read the note; nothing after a refusal);</li>
 				<li><code>update_prompt</code>, <code>update_tapped</code> (and <code>update_shown</code>, <code>update_tap</code>) — the update prompt is shown or tapped (optional or required);</li>
 				<li><code>theme</code> — you change the theme or dark mode (which one);</li>
 				<li><code>sign_in_offer</code>, <code>sign_in</code>, <code>sign_out</code>, <code>account_delete</code> — the game offers you to sign in (at which moment), a sign-in (Google or Apple; succeeded, cancelled, failed or put off), a sign-out, an account deletion (succeeded or not).</li>
@@ -376,7 +389,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			<h2>14. Children</h2>
 			<p>
 				The game is not meant for children under 13 and is played without an account. If you are under 15,
-				ask your parents before answering "Accept" to videos, before a purchase and before signing in
+				ask your parents before accepting video ads (on iPhone, before allowing tracking), before a purchase and before signing in
 				with an account. Pick a name that is not your real name. If you are a parent and want an account or a
 				name removed, write to us: we will delete it.
 			</p>
