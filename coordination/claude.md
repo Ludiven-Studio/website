@@ -4093,6 +4093,7 @@
   du mot de Raphaël pour pousser.
 - 07:46 : commité et poussé à la demande de Raphaël tapée ici (« Pousse la correction du menu des pages de test ») :
   mes 2 fichiers et cette section seulement. Statut : terminé. Réservations libérées.
+
 ## 2026-11-26 — Dominoland : pages produit, téléchargement, confidentialité, CGU (×5), version.json (session DominoWorld)
 - Statut : en cours (2026-11-26T23:34+01:00). Demande de l'utilisateur : Producer (décision de Raphaël, 2026-11-26 :
   1.0 sans pub, sans achat, sans compte ; exception au gel pour les liens légaux et les pages du site) : faire les
@@ -4115,3 +4116,12 @@
   image de tête dans public/assets/dominoland/stage.webp. Build complet OK (268 pages, précache 441, liens OK).
 - 00:08 : commité sur la branche dominoland-pages du worktree website-worktrees/dominoland-pages, pas poussé : le push
   attend le mot de Raphaël. Mes fichiers et cette section seulement. Statut : terminé. Réservations libérées.
+- 07:47 : Reprise (Producer, décision de Raphaël : submitAnalytics: 0 dans Dominoland) : confidentialité ×5, les
+  statistiques matérielles de Unity sont coupées ; rebase sur origin/main. Mêmes fichiers, même worktree.
+- 07:48 : Lancement du build complet (écrit dist/, .astro/, public/vendor/ de mon worktree)…
+- 07:52 : Confidentialité ×5 : les statistiques matérielles de Unity sont coupées (§5, l'essentiel, la liste des
+  destinataires), date 27 novembre. Rebase sur origin/main 3abcbac (siteNav.ts : version d'origin gardée, elle couvre
+  déjà Dominoland). eslint OK, vitest 123 fichiers / 2123 tests OK, build complet OK (astro check 0 erreur, 268 pages,
+  précache 441, liens OK).
+- 07:52 : commité sur la branche dominoland-pages (worktree website-worktrees/dominoland-pages), pas poussé : le
+  Producer pousse. Mes fichiers et cette section seulement. Statut : terminé. Réservations libérées.
