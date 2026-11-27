@@ -31,7 +31,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			This policy covers <strong>the Pétanque Meet mobile app</strong>
 			(<code>com.ludivenstudio.petanquemeet</code>) and the meet-up map it shares with the website
 			(<a href="/en/petanque-meet/">ludiven-studio.fr/petanque-meet</a>). The rest of the website has its
-			<a href="/confidentialite/">own policy</a>. Last updated: 25 November 2026 (when you made your ad choice and, on an iPhone, your answer to Apple's tracking question, counted in the statistics).
+			<a href="/confidentialite/">own policy</a>. Last updated: 27 November 2026 (version 1.1.6: on an iPhone, Apple's tracking question as the only question about advertising; when you made your ad choice and, on an iPhone, your answer to Apple's tracking question, counted in the statistics).
 		</p>
 		<p class="updated">
 			This is a courtesy translation. In case of discrepancy, the
@@ -44,7 +44,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li>Looking at the map needs <strong>no account</strong>. To publish, join or report a game, you sign in with <strong>Google or Apple</strong>.</li>
 				<li>What you publish is <strong>visible to everyone</strong>: the first name you enter, the pitch, the time, and for a tournament the club's information. Your email address, however, is never shown.</li>
 				<li>Your GPS location is used to centre the map and to compute distances, on your phone. <strong>It is never sent to us.</strong></li>
-				<li>An <strong>advertising banner</strong>, served by Unity LevelPlay (ironSource Ads and Unity Ads), funds the app. The ad networks receive nothing <strong>without your consent</strong>, requested at first launch. No data is resold.</li>
+				<li>An <strong>advertising banner</strong>, served by Unity LevelPlay (ironSource Ads and Unity Ads), funds the app. The ad networks receive nothing <strong>without your consent</strong>, requested at first launch (on an iPhone, since version 1.1.6, through Apple's tracking question). No data is resold.</li>
 				<li>You can <strong>delete your account</strong> at any time from the app.</li>
 			</ul>
 		</div>
@@ -297,14 +297,17 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				Up to version 0.1.6, this banner only presents Pétanque Scan.
 			</p>
 			<p>
-				<strong>Your consent.</strong> At first launch, the app asks whether you accept advertising from these
+				<strong>Your consent on Android</strong> (and on an iPhone before iOS 14). At first launch, the app asks whether you accept advertising from these
 				partners, with two identical buttons, "Accept" and "Refuse". Your choice is kept on your phone and you are
 				asked again after 6 months. Since versions 1.0.6 (beta) and 1.1.0, it is also counted, with no identifier, in our usage statistics (see §8). When you made your choice (first launch, settings or when asking for a reward) and, on an iPhone, your answer to Apple's tracking question are counted too, still with no identifier. <strong>If you refuse, no advertising module is started</strong> and
 				nothing is sent to them: only our banner for our other apps is shown. You can change your mind at any
 				time: "Account and help" → "Ad choices". If you withdraw your consent, our partners' banner disappears
-				at once and the app reports the withdrawal to Unity LevelPlay. On iPhone, after an "Accept", the app
+				at once and the app reports the withdrawal to Unity LevelPlay. Up to version 1.1.5, on iPhone, after an "Accept", the app
 				also asks for Apple's tracking permission; without it, the iPhone's advertising identifier is not used
 				and the ads are not personalised.
+			</p>
+			<p>
+				<strong>Your consent on iPhone</strong> (iOS 14 or later), since version 1.1.6. The only question is Apple's, which asks whether you allow the app to track your activity; its text names Unity Ads, ironSource and their partners. If you allow it, an "Ads" note tells you once, with a single OK button, what these companies do, with a link to the list of companies and to this policy, and where to change your mind; advertising starts after OK, and this yes is counted, with no identifier, in our usage statistics. If you refuse, or if tracking is restricted on your iPhone, the app shows no window about advertising, <strong>no advertising module starts</strong> and nothing is sent to them: only our banner for our other apps is shown, and "Account and help" does not show "Ad choices". You change your mind in Settings › Privacy &amp; Security › Tracking, by turning Pétanque Meet on or off; while tracking is allowed, "Ad choices" shows the note again.
 			</p>
 			<p>
 				With your consent, to show ads, choose them according to your interests, measure them and fight fraud,
@@ -337,7 +340,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li>your sign-in session and your email address;</li>
 				<li>the first name you entered, the games you joined, the places you saved, the last spot shown on the map, the last number given for a partner search;</li>
 				<li>your preferences: language, theme, hidden organisers, messages already seen;</li>
-				<li>your choice about advertising and, if you accepted it, the data of the ironSource and Unity Ads advertising modules (see §9);</li>
+				<li>your choice about advertising (on an iPhone, since version 1.1.6, the note already seen; your answer to Apple is kept by iOS) and, if you accepted it, the data of the ironSource and Unity Ads advertising modules (see §9);</li>
 				<li>a cache of map tiles and posters, for faster display.</li>
 			</ul>
 			<p>
@@ -363,7 +366,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 			</p>
 			<ul>
 				<li><strong>Supabase</strong> — database, accounts and poster storage. Data hosted in the European Union (Ireland).</li>
-				<li><strong>Google</strong> and <strong>Apple</strong> — signing in to your account and distribution of the app.</li>
+				<li><strong>Google</strong> and <strong>Apple</strong> — signing in to your account and distribution of the app; for Apple, on an iPhone, the tracking question (since version 1.1.6, the only question about advertising).</li>
 				<li><strong>Unity Technologies</strong> and its subsidiary <strong>ironSource</strong> — the advertising banner, with your consent (Unity LevelPlay, ironSource Ads, Unity Ads); their auctions may pass the ad request on to other ad buyers (see §9).</li>
 				<li><strong>Google (AdMob)</strong> — the advertising banner and its consent form, in versions of the app up to 0.1.6.</li>
 				<li><strong>OpenFreeMap</strong> — map tiles (OpenStreetMap data). As for any website, its servers see your phone's IP address, and only the map areas shown; no account data is sent to it.</li>
@@ -398,7 +401,7 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				<li><strong>Anti-abuse counters</strong>: erased after 30 days.</li>
 				<li><strong>Account suspension</strong>: the technical identifier is kept for as long as the suspension lasts.</li>
 				<li><strong>Usage statistics</strong>: kept for <strong>24 months</strong> on our server, then erased; its backups, 14 days. Those Umami Cloud still receives from versions not yet updated are erased there after 6 months.</li>
-				<li><strong>Your choice about advertising</strong>: 6 months on your phone, then you are asked again.</li>
+				<li><strong>Your choice about advertising</strong>: 6 months on your phone, then you are asked again; on an iPhone (iOS 14 or later), since version 1.1.6, your answer to Apple is kept by iOS.</li>
 				<li><strong>Advertising data</strong>: according to the rules of Unity and ironSource (see §9).</li>
 				<li><strong>Account</strong>: until you delete it.</li>
 			</ul>
@@ -435,6 +438,9 @@ import LangSwitch from '../../../components/LangSwitch.astro';
 				Under the GDPR, you have the right of access, rectification, erasure, restriction, objection and
 				portability. To exercise them, or to have a listing, a first name or a sign-up removed, write to
 				<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>. We reply within one month.
+			</p>
+			<p>
+				To withdraw your consent to advertising: "Account and help" → "Ad choices"; on an iPhone (iOS 14 or later), since version 1.1.6, Settings › Privacy &amp; Security › Tracking.
 			</p>
 			<p>
 				If you believe your rights are not being respected, you can lodge a complaint with the French data

@@ -30,7 +30,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			Cette politique concerne <strong>l'application mobile Pétanque Meet</strong>
 			(<code>com.ludivenstudio.petanquemeet</code>) et la carte des rencontres qu'elle partage avec le site
 			(<a href="/petanque-meet/">ludiven-studio.fr/petanque-meet</a>). Le reste du site a sa
-			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 25 novembre 2026 (le moment de ton choix sur la publicité et, sur iPhone, ta réponse à la question de suivi d'Apple, comptés dans les statistiques).
+			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 27 novembre 2026 (version 1.1.6&nbsp;: sur iPhone, la question de suivi d'Apple comme seule question sur la publicité&nbsp;; le moment de ton choix sur la publicité et, sur iPhone, ta réponse à la question de suivi d'Apple, comptés dans les statistiques).
 		</p>
 
 		<div class="summary">
@@ -39,7 +39,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li>Regarder la carte ne demande <strong>aucun compte</strong>. Pour publier, rejoindre ou signaler une partie, tu te connectes avec <strong>Google ou Apple</strong>.</li>
 				<li>Ce que tu publies est <strong>visible de tous</strong>&nbsp;: le prénom que tu saisis, le terrain, l'horaire, et pour un concours les informations du club. Ton adresse mail, elle, n'est jamais montrée.</li>
 				<li>Ta position GPS sert à centrer la carte et à calculer les distances, sur ton téléphone. <strong>Elle ne nous est jamais envoyée.</strong></li>
-				<li>Une <strong>bannière publicitaire</strong>, servie par Unity LevelPlay (ironSource Ads et Unity Ads), finance l'application. Les régies ne reçoivent rien <strong>sans ton accord</strong>, demandé au premier lancement. Aucune revente de données.</li>
+				<li>Une <strong>bannière publicitaire</strong>, servie par Unity LevelPlay (ironSource Ads et Unity Ads), finance l'application. Les régies ne reçoivent rien <strong>sans ton accord</strong>, demandé au premier lancement (sur iPhone, depuis la version 1.1.6, par la question de suivi d'Apple). Aucune revente de données.</li>
 				<li>Tu peux <strong>supprimer ton compte</strong> à tout moment depuis l'application.</li>
 			</ul>
 		</div>
@@ -294,15 +294,18 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				ou touchée (voir §8). Jusqu'à la version 0.1.6, cette bannière ne présente que Pétanque Scan.
 			</p>
 			<p>
-				<strong>Ton accord.</strong> Au premier lancement, l'application te demande si tu acceptes la publicité
+				<strong>Ton accord sur Android</strong> (et sur un iPhone avant iOS 14). Au premier lancement, l'application te demande si tu acceptes la publicité
 				de ces partenaires, avec deux boutons identiques, «&nbsp;Accepter&nbsp;» et «&nbsp;Refuser&nbsp;». Ton
 				choix est gardé sur ton téléphone et t'est redemandé au bout de 6 mois. Depuis les versions 1.0.6 (bêta) et 1.1.0, il est aussi compté, sans identifiant, dans nos statistiques d'usage (voir §8). Le moment de ton choix (premier lancement, réglages ou en demandant une récompense) et, sur iPhone, ta réponse à la question de suivi d'Apple y sont comptés aussi, toujours sans identifiant. <strong>Si tu refuses, aucun module
 				publicitaire n'est démarré</strong> et rien ne leur est envoyé&nbsp;: seule notre bannière pour nos
 				autres applications s'affiche. Tu peux changer d'avis à tout moment&nbsp;: «&nbsp;Compte et aide&nbsp;» →
 				«&nbsp;Choix publicitaires&nbsp;». Si tu retires ton accord, la bannière de nos partenaires disparaît aussitôt et
-				l'application signale ce retrait à Unity LevelPlay. Sur iPhone, après un «&nbsp;Accepter&nbsp;», l'application te demande
+				l'application signale ce retrait à Unity LevelPlay. Jusqu'à la version 1.1.5, sur iPhone, après un «&nbsp;Accepter&nbsp;», l'application te demande
 				aussi l'autorisation de suivi d'Apple&nbsp;; sans elle, l'identifiant publicitaire de l'iPhone n'est pas
 				utilisé et les annonces ne sont pas personnalisées.
+			</p>
+			<p>
+				<strong>Ton accord sur iPhone</strong> (iOS 14 ou plus récent), depuis la version 1.1.6. La seule question est celle d'Apple, qui te demande si tu autorises l'application à suivre tes activités&nbsp;; son texte nomme Unity Ads, ironSource et leurs partenaires. Si tu l'autorises, une note «&nbsp;Publicités&nbsp;» te dit une fois, avec un seul bouton OK, ce que font ces sociétés, avec un lien vers la liste des sociétés et vers cette politique, et où changer d'avis&nbsp;; la publicité démarre après OK, et ce oui est compté, sans identifiant, dans nos statistiques d'usage. Si tu refuses, ou si le suivi est restreint sur ton iPhone, l'application n'affiche aucune fenêtre sur la publicité, <strong>aucun module publicitaire ne démarre</strong> et rien ne leur est envoyé&nbsp;: seule notre bannière pour nos autres applications s'affiche, et «&nbsp;Compte et aide&nbsp;» ne montre pas «&nbsp;Choix publicitaires&nbsp;». Tu changes d'avis dans Réglages › Confidentialité et sécurité › Suivi, en activant ou en coupant Pétanque Meet&nbsp;; tant que le suivi est autorisé, «&nbsp;Choix publicitaires&nbsp;» remontre la note.
 			</p>
 			<p>
 				Avec ton accord, pour afficher les annonces, les choisir selon tes centres d'intérêt, les mesurer et
@@ -337,7 +340,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li>ta session de connexion et ton adresse mail&nbsp;;</li>
 				<li>le prénom que tu as saisi, les parties rejointes, les lieux que tu as enregistrés, le dernier endroit affiché sur la carte, le dernier numéro donné pour une recherche de partenaires&nbsp;;</li>
 				<li>tes préférences&nbsp;: langue, thème, organisateurs masqués, messages déjà vus&nbsp;;</li>
-				<li>ton choix sur la publicité et, si tu l'as acceptée, les données des modules publicitaires d'ironSource et de Unity Ads (voir §9)&nbsp;;</li>
+				<li>ton choix sur la publicité (sur iPhone, depuis la version 1.1.6, la note déjà vue&nbsp;; ta réponse à Apple est gardée par iOS) et, si tu l'as acceptée, les données des modules publicitaires d'ironSource et de Unity Ads (voir §9)&nbsp;;</li>
 				<li>un cache des fonds de carte et des affiches, pour un affichage plus rapide.</li>
 			</ul>
 			<p>
@@ -363,7 +366,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 			</p>
 			<ul>
 				<li><strong>Supabase</strong> — base de données, comptes et stockage des affiches. Données hébergées dans l'Union européenne (Irlande).</li>
-				<li><strong>Google</strong> et <strong>Apple</strong> — connexion à ton compte et distribution de l'application.</li>
+				<li><strong>Google</strong> et <strong>Apple</strong> — connexion à ton compte et distribution de l'application&nbsp;; pour Apple, sur iPhone, la question de suivi (depuis la version 1.1.6, la seule question sur la publicité).</li>
 				<li><strong>Unity Technologies</strong> et sa filiale <strong>ironSource</strong> — la bannière publicitaire, avec ton accord (Unity LevelPlay, ironSource Ads, Unity Ads)&nbsp;; leurs enchères peuvent transmettre la demande d'annonce à d'autres acheteurs de publicité (voir §9).</li>
 				<li><strong>Google (AdMob)</strong> — la bannière publicitaire et son formulaire de consentement, dans les versions de l'application jusqu'à la 0.1.6.</li>
 				<li><strong>OpenFreeMap</strong> — fonds de carte (données d'OpenStreetMap). Comme pour tout site web, ses serveurs voient l'adresse IP de ton téléphone, et seulement les zones de la carte affichées&nbsp;; aucune donnée de compte ne lui est envoyée.</li>
@@ -399,7 +402,7 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				<li><strong>Compteurs anti-abus</strong>&nbsp;: effacés au bout de 30 jours.</li>
 				<li><strong>Suspension d'un compte</strong>&nbsp;: l'identifiant technique est conservé tant que la suspension dure.</li>
 				<li><strong>Statistiques d'usage</strong>&nbsp;: gardées <strong>24 mois</strong> sur notre serveur, puis effacées&nbsp;; ses sauvegardes, 14 jours. Celles que reçoit encore Umami Cloud, depuis les versions pas encore à jour, y sont effacées au bout de 6 mois.</li>
-				<li><strong>Ton choix sur la publicité</strong>&nbsp;: 6 mois sur ton téléphone, puis il t'est redemandé.</li>
+				<li><strong>Ton choix sur la publicité</strong>&nbsp;: 6 mois sur ton téléphone, puis il t'est redemandé&nbsp;; sur iPhone (iOS 14 ou plus récent), depuis la version 1.1.6, ta réponse à Apple est gardée par iOS.</li>
 				<li><strong>Données publicitaires</strong>&nbsp;: selon les règles de Unity et d'ironSource (voir §9).</li>
 				<li><strong>Compte</strong>&nbsp;: jusqu'à ce que tu le supprimes.</li>
 			</ul>
@@ -439,6 +442,9 @@ import LangSwitch from '../../components/LangSwitch.astro';
 				d'opposition et de portabilité. Pour les exercer, ou pour faire retirer une annonce, un prénom ou une
 				inscription, écris à <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>. Nous
 				répondons sous un mois.
+			</p>
+			<p>
+				Pour retirer ton accord pour la publicité&nbsp;: «&nbsp;Compte et aide&nbsp;» → «&nbsp;Choix publicitaires&nbsp;»&nbsp;; sur iPhone (iOS 14 ou plus récent), depuis la version 1.1.6, Réglages › Confidentialité et sécurité › Suivi.
 			</p>
 			<p>
 				Si tu estimes que tes droits ne sont pas respectés, tu peux adresser une réclamation à la CNIL
