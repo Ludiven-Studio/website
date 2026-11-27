@@ -4144,3 +4144,35 @@
 - 23:12 : commité et poussé à la demande de l'utilisateur (« Oui, pousse la carte Nino Rush … et Déploie stats-admin
   avec les avis quand c est pret ») : c7d8306 et 537533c, mes fichiers et cette section seulement. Statut : terminé.
   Réservations libérées.
+
+## 2026-11-27 — Pétanque Game 1.0.20 : pages légales (confidentialité, CGU, sociétés de pub) (session website)
+- Statut : en cours (2026-11-27T19:36+01:00). Demande de l'utilisateur : Producer (décision de Raphaël) : mettre à jour
+  en 5 langues la politique de confidentialité, les CGU et la page des sociétés de pub de Pétanque Game pour la 1.0.20
+  (AdMob, défi de tir payant), sur la branche pg-1020-societes, sans pousser vers main
+- Réservations actives : `src/pages/{,en/,es/,de/,it/}petanque-game/{confidentialite,cgu}.astro`,
+  `src/pages/{,en/,es/,de/,it/}publicite/societes.astro` (worktree website-worktrees/pg-1020-societes).
+- Ressources : serveur de dev sur le port 4391 ; eslint, `astro check`. Build annoncé ici avant.
+- 19:40 : Page des sociétés en 5 langues : iPhone (question d'Apple seule, note d'information puis régies, AdMob hors
+  EEE/RU/Suisse ; refus = aucune régie, nos vidéos), Android (formulaire de Google, notre fenêtre là où Google ne
+  demande rien) ; eslint OK, astro check 0 erreur, captures sans erreur console. Lancement du build complet du worktree
+  pg-1020-societes (écrit son dist/, .astro/, public/vendor/)…
+- 19:42 : Build complet OK (268 pages, précache 441, liens OK). Page des sociétés commitée sur la branche
+  pg-1020-societes (677e659) et poussée sur origin/pg-1020-societes, pas sur main. Confidentialité et CGU : en attente
+  des textes « Déclarations 1.0.20 » de la session Pétanque Game. Réservations gardées.
+- 19:49 : Textes de PetanqueGame 4acdc1b (docs/store.md, Déclarations 1.0.20) repris : politique et CGU en 5 langues
+  (AdMob, formulaire de Google sur Android, question d'Apple seule sur iPhone, défi de tir payant, présence toutes les
+  5 min), intro de la page des sociétés ; eslint OK. Lancement du build complet du worktree pg-1020-societes (écrit son
+  dist/, .astro/, public/vendor/)…
+- 19:55 : Build complet OK (268 pages, précache 441, liens OK), captures sans erreur console. Commité sur la branche
+  pg-1020-societes (2989fd2 §5 des sociétés, 204d5a0 politique, CGU et intro des sociétés) et poussé sur
+  origin/pg-1020-societes, pas sur main : mise en ligne juste avant la sortie de la 1.0.20, sur le mot de Raphaël.
+  Réservations gardées jusque-là.
+- 00:14 : Reprise (Producer : 1.0.20 Android peut-être déjà sur Play, mise en ligne aujourd'hui sur le mot de Raphaël)
+  : pg-1020-societes rebasée sur origin/main acbbfa3, date du 28 novembre (15 pages), et sur iPhone le fonctionnement
+  jusqu'à la 1.0.19 rappelé (notre fenêtre d'abord, pas d'AdMob) tant que la 1.0.20 iPhone n'est pas sortie ; 5
+  langues. Lancement du build complet (écrit dist/, .astro/, public/vendor/ du worktree pg-1020-societes)…
+- 00:25 : Build complet OK (269 pages, précache 443, liens OK), eslint, captures sans erreur console ; commit a2fadab
+  (date du 28 novembre, iPhone jusqu'à la 1.0.19).
+- 00:25 : commité et poussé à la demande de l'utilisateur (« Pousse les pages légales de Pétanque Game 1.0.20 sur le
+  site ») : d51c88f, 2d6fda3, 8558f7b, ba4328f, a2fadab ; mes fichiers et cette section seulement. Statut : terminé.
+  Réservations libérées.
