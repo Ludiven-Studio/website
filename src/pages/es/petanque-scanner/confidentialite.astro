@@ -18,7 +18,7 @@ import Hero from '../../../components/Hero.astro';
 		<p class="updated">
 			Esta política se refiere a <strong>la aplicación móvil Pétanque Scan</strong>
 			(antes llamada Pétanque Scanner, <code>com.raphbenpro.petanquear</code>), y no al sitio web ludiven-studio.fr, que tiene su
-			<a href="/confidentialite/">propia política</a>. Última actualización: 27 de noviembre de 2026 (versión 1.2.20: en iPhone, la pregunta de seguimiento de Apple como única pregunta sobre la publicidad; el momento de tu elección sobre la publicidad y, en iPhone, tu respuesta a la pregunta de seguimiento de Apple, contados en las estadísticas; versión 1.2.15: cada pantalla abierta y tu elección sobre la publicidad se cuentan en las estadísticas, los eventos toman los nombres comunes a nuestras aplicaciones y los escaneos indican su modo, 3D o foto; nuestros vídeos propios tienen un enlace «Denunciar este vídeo»; versión 1.2.14: nuestros anuncios propios, leídos en nuestro sitio, sustituyen a la franja y al vídeo de Pétanque Meet; tras un rechazo, «¿Activar los anuncios?» se propone una vez por sesión cuando pides un vídeo; la publicidad pasa de Google AdMob a Unity LevelPlay, con nuestra propia ventana de consentimiento; en iPhone, sin la autorización de seguimiento de Apple, la publicidad no es personalizada; la retirada de tu consentimiento se transmite a las redes publicitarias; se retira Google Firebase; 10 escaneos gratis al día en lugar de 3).
+			<a href="/confidentialite/">propia política</a>. Última actualización: 27 de noviembre de 2026 (versión 1.2.20: Google AdMob vuelve a las redes publicitarias, a través de Unity LevelPlay; en Android, el formulario de consentimiento de Google; se te vuelve a preguntar tu elección sobre la publicidad; en iPhone, la pregunta de seguimiento de Apple como única pregunta sobre la publicidad; el momento de tu elección sobre la publicidad y, en iPhone, tu respuesta a la pregunta de seguimiento de Apple, contados en las estadísticas; versión 1.2.15: cada pantalla abierta y tu elección sobre la publicidad se cuentan en las estadísticas, los eventos toman los nombres comunes a nuestras aplicaciones y los escaneos indican su modo, 3D o foto; nuestros vídeos propios tienen un enlace «Denunciar este vídeo»; versión 1.2.14: nuestros anuncios propios, leídos en nuestro sitio, sustituyen a la franja y al vídeo de Pétanque Meet; tras un rechazo, «¿Activar los anuncios?» se propone una vez por sesión cuando pides un vídeo; la publicidad pasa de Google AdMob a Unity LevelPlay, con nuestra propia ventana de consentimiento; en iPhone, sin la autorización de seguimiento de Apple, la publicidad no es personalizada; la retirada de tu consentimiento se transmite a las redes publicitarias; se retira Google Firebase; 10 escaneos gratis al día en lugar de 3).
 		</p>
 		<p class="updated">
 			Esta es una traducción de cortesía. En caso de discrepancia, prevalece la
@@ -30,7 +30,7 @@ import Hero from '../../../components/Hero.astro';
 			<ul>
 				<li><strong>Las imágenes de tu cámara nunca salen de tu dispositivo.</strong> La detección de las bolas se calcula localmente en el móvil. Ninguna foto, ningún vídeo ni ninguna imagen se envía a un servidor ni se guarda de forma duradera, tampoco en el modo foto, donde la imagen tomada al disparar se queda en la memoria RAM.</li>
 				<li>No hay <strong>ninguna cuenta de usuario</strong>. No conocemos ni tu nombre, ni tu correo electrónico, ni tu ubicación. Nuestro único servidor es el de las estadísticas de uso (ver §5).</li>
-				<li>La publicidad solo se pone en marcha <strong>con tu consentimiento</strong>: en el primer inicio, en nuestra ventana; en iPhone, desde la versión 1.2.20, autorizando el seguimiento cuando Apple te lo pide. Sin él, la aplicación funciona igual, sin los anuncios de nuestros socios. Puedes cambiar de opinión en cualquier momento. Las estadísticas de uso, sin cookies ni identificador, no dependen de esta elección (ver §5).</li>
+				<li>La publicidad solo se pone en marcha <strong>con tu consentimiento</strong>: en el primer inicio, en Android en el formulario de Google o en nuestra ventana; en iPhone, desde la versión 1.2.20, autorizando el seguimiento cuando Apple te lo pide. Sin él, la aplicación funciona igual, sin los anuncios de nuestros socios. Puedes cambiar de opinión en cualquier momento. Las estadísticas de uso, sin cookies ni identificador, no dependen de esta elección (ver §5).</li>
 				<li>La compra <strong>Premium elimina la publicidad</strong> y, en ese caso, el SDK publicitario ni siquiera se inicia.</li>
 			</ul>
 		</div>
@@ -100,7 +100,7 @@ import Hero from '../../../components/Hero.astro';
 							<td>Identificador publicitario del dispositivo (GAID en Android, IDFA en iOS si autorizas el seguimiento), otros identificadores del dispositivo, dirección IP, interacciones con los anuncios, información técnica (ver §4)</td>
 							<td>Mostrar anuncios, elegidos según tus intereses, medirlos, luchar contra el fraude (ver §4)</td>
 							<td>Consentimiento (art. 6.1.a RGPD): sin él, no se pone en marcha nada; en iPhone, desde la versión 1.2.20, la autorización de seguimiento de Apple</td>
-							<td>Unity Technologies y su filial ironSource (Unity LevelPlay, ironSource Ads, Unity Ads); a través de sus subastas, otros compradores de publicidad (ver §4)</td>
+							<td>Unity Technologies y su filial ironSource (Unity LevelPlay, ironSource Ads, Unity Ads), Google (Google AdMob, desde la versión 1.2.20; en iPhone, fuera del Espacio Económico Europeo, el Reino Unido y Suiza); a través de sus subastas, otros compradores de publicidad (ver §4)</td>
 						</tr>
 						<tr>
 							<td>Eventos de uso de la aplicación y pantallas abiertas (ver §5), acompañados de: plataforma (Android o iOS), versión de la aplicación y del sistema, modelo del dispositivo, idioma del móvil, resolución de la pantalla, tipo de versión (publicada o de prueba)</td>
@@ -109,10 +109,10 @@ import Hero from '../../../components/Hero.astro';
 							<td>Umami, en nuestro propio servidor (Hetzner Online GmbH, Alemania)</td>
 						</tr>
 						<tr>
-							<td>Tu respuesta a la ventana «Publicidad» (aceptar o rechazar), su fecha y la versión del texto</td>
+							<td>Tu respuesta sobre la publicidad: a la ventana «Publicidad» (aceptar o rechazar), con su fecha y la versión del texto; en Android, desde la versión 1.2.20, al formulario de Google</td>
 							<td>Recordar tu decisión, volver a preguntarte a los 6 meses, poder demostrar tu elección</td>
 							<td>Obligación legal</td>
-							<td>Guardada solo en tu dispositivo; Umami cuenta los sí y los no, sin identificador (ver §5)</td>
+							<td>Guardada en tu dispositivo; Umami cuenta los sí y los no, sin identificador (ver §5); Google recibe y cuenta las respuestas a su formulario</td>
 						</tr>
 						<tr>
 							<td>Prueba de compra («recibo») del Premium</td>
@@ -160,24 +160,28 @@ import Hero from '../../../components/Hero.astro';
 				La aplicación es gratuita y se financia con un banner publicitario, así como con un vídeo opcional
 				que puedes elegir ver para recargar tus escaneos gratuitos. Desde la versión 1.2.14, la publicidad
 				la sirve <strong>Unity LevelPlay</strong> con las redes <strong>ironSource Ads</strong> y
-				<strong>Unity Ads</strong> (Unity Technologies y su filial ironSource). Google ya no interviene ni
-				en la publicidad ni en tu consentimiento. Las versiones anteriores, mientras no se actualicen,
-				siguen usando Google AdMob y su ventana de consentimiento (Google UMP).
+				<strong>Unity Ads</strong> (Unity Technologies y su filial ironSource). Desde la versión 1.2.20,
+				<strong>Google AdMob</strong> (Google) también sirve anuncios a través de las subastas de LevelPlay, salvo en
+				iPhone en el Espacio Económico Europeo, el Reino Unido y Suiza. Las versiones anteriores a la 1.2.14,
+				mientras no se actualicen, siguen usando Google AdMob y su ventana de consentimiento (Google UMP).
 			</p>
 			<p>
-				<strong>Tu consentimiento.</strong> En el primer inicio, una ventana
-				«Publicidad» te pregunta si aceptas que nuestros socios publicitarios (Unity Ads e ironSource) usen
+				<strong>Tu consentimiento en Android</strong> (desde la versión 1.2.20). En cada inicio, antes de cualquier anuncio, la aplicación pregunta al servicio de consentimiento de Google (Google User Messaging Platform) si hay que hacerte la pregunta. Para ello, Google recibe la dirección IP del teléfono (que le da tu país o tu región), el identificador de la aplicación e información técnica sobre el teléfono, pero no su identificador publicitario. Si hace falta, aparece el formulario de Google: presenta las empresas publicitarias, entre ellas Google, ironSource y Unity Ads, y sus finalidades, y te deja consentir, rechazar o ajustar cada opción. Tu respuesta se guarda en el teléfono en el formato estándar del sector (IAB TCF), donde la leen los módulos publicitarios; Google también cuenta las respuestas a su formulario. Las redes publicitarias solo se inician si aceptas al menos el almacenamiento de información en tu teléfono. Donde Google no pregunta nada, la pregunta la hace nuestra ventana «Publicidad» (más abajo). «Gestionar mi consentimiento publicitario», en los ajustes de la aplicación, vuelve a abrir el formulario de Google.
+			</p>
+			<p>
+				<strong>Tu consentimiento en nuestra ventana.</strong> En el primer inicio, una ventana
+				«Publicidad» te pregunta si aceptas que nuestros socios publicitarios (Unity Ads, ironSource y, desde la versión 1.2.20, Google) usen
 				un identificador de tu teléfono para elegir los anuncios y medir su rendimiento. «Aceptar» y
-				«Rechazar» tienen el mismo peso. En iPhone, desde la versión 1.2.20, esta ventana solo aparece con iOS 13 o anterior (ver más abajo).
+				«Rechazar» tienen el mismo peso. Desde la versión 1.2.20, solo aparece en Android donde Google no pregunta nada, y en un iPhone con iOS 13 o anterior (ver más abajo).
 			</p>
 			<p>
-				<strong>Tu consentimiento en iPhone</strong> (iOS 14 o posterior, desde la versión 1.2.20). La única pregunta es la de Apple, que te pregunta si autorizas a la aplicación a rastrear tu actividad; su texto nombra a Unity Ads, ironSource y sus socios. Si lo autorizas, una nota «Anuncios» te dice, con un solo botón OK, qué hacen estas empresas con el identificador publicitario de tu iPhone, con un enlace a la lista de empresas y a esta política, y dónde cambiar de opinión; la publicidad empieza tras OK. Si lo rechazas, o si el seguimiento está restringido en tu iPhone, la aplicación no muestra ninguna ventana sobre la publicidad, no se pone en marcha ningún módulo publicitario y no se les envía nada: solo muestra nuestros anuncios propios. Mientras no hayas respondido a Apple, no empieza ningún anuncio de nuestros socios, y la pregunta vuelve en el siguiente inicio.
+				<strong>Tu consentimiento en iPhone</strong> (iOS 14 o posterior, desde la versión 1.2.20). La única pregunta es la de Apple, que te pregunta si autorizas a la aplicación a rastrear tu actividad; su texto nombra a Unity Ads, ironSource, Google AdMob y sus socios. Si lo autorizas, una nota «Anuncios» te dice, con un solo botón OK, qué hacen estas empresas con el identificador publicitario de tu iPhone, con un enlace a la lista de empresas y a esta política, y dónde cambiar de opinión; la publicidad empieza tras OK. Si lo rechazas, o si el seguimiento está restringido en tu iPhone, la aplicación no muestra ninguna ventana sobre la publicidad, no se pone en marcha ningún módulo publicitario y no se les envía nada: solo muestra nuestros anuncios propios. Mientras no hayas respondido a Apple, no empieza ningún anuncio de nuestros socios, y la pregunta vuelve en el siguiente inicio.
 			</p>
 			<ul>
 				<li><strong>Si aceptas</strong>: Unity LevelPlay se pone en marcha y muestra el banner y los vídeos. Cuando no tiene ningún anuncio que mostrar, nuestros anuncios propios ocupan su lugar, tanto en el banner como en el vídeo.</li>
 				<li><strong>Si rechazas</strong>: no se pone en marcha ningún módulo publicitario. La aplicación funciona igual, sin los anuncios de nuestros socios: en su lugar, una franja muestra por turnos nuestros anuncios propios, de nuestras otras aplicaciones (hoy Pétanque Meet y, en Android, Pétanque Game), y un vídeo corto de una de ellas también recarga tus escaneos. Nuestros anuncios propios no pasan por ninguna red publicitaria y no te rastrean (ver §5 y §8).</li>
 				<li><strong>Tras un rechazo</strong>, cuando pides un vídeo para recargar tus escaneos, la aplicación te propone una vez por sesión activar la publicidad: «Activar anuncios» equivale a un «Aceptar», «Ver un vídeo de nuestras apps» mantiene tu rechazo y muestra uno de nuestros vídeos. En iPhone (iOS 14 o posterior), desde la versión 1.2.20, esta pregunta ya no existe: tras rechazar el seguimiento, el vídeo es uno de los nuestros.</li>
-				<li><strong>Tu respuesta</strong>, su fecha y la versión del texto se quedan en tu teléfono. La aplicación te vuelve a preguntar a los 6 meses, tanto si aceptaste como si rechazaste, o antes si cambian nuestros socios publicitarios. En iPhone (iOS 14 o posterior), es Apple quien guarda tu respuesta a su pregunta. Tu elección (sí o no) también se cuenta, sin identificador, en nuestras estadísticas de uso, en cada inicio (ver §5).</li>
+				<li><strong>Tu respuesta</strong>, su fecha y la versión del texto se quedan en tu teléfono. La aplicación te vuelve a preguntar a los 6 meses, tanto si aceptaste como si rechazaste, o antes si cambian nuestros socios publicitarios (es el caso de la versión 1.2.20, que añade Google AdMob: se pregunta de nuevo a todo el mundo). Tu respuesta al formulario de Google se queda en tu teléfono hasta que Google la vuelva a pedir. En iPhone (iOS 14 o posterior), es Apple quien guarda tu respuesta a su pregunta. Tu elección (sí o no) también se cuenta, sin identificador, en nuestras estadísticas de uso, en cada inicio (ver §5).</li>
 				<li><strong>Si retiras tu consentimiento</strong> en los ajustes de la aplicación (ver §12): la publicidad de nuestros socios se detiene enseguida, y la aplicación comunica esa retirada a Unity LevelPlay, que la transmite a las redes publicitarias.</li>
 				<li><strong>En iPhone</strong>, si más tarde desactivas el seguimiento en Ajustes › Privacidad y seguridad › Rastreo, la aplicación lo tiene en cuenta en su siguiente inicio: la publicidad de nuestros socios ya no se pone en marcha y solo quedan nuestros anuncios propios. Las versiones anteriores a la 1.2.20 pedían la autorización de seguimiento tras un «Aceptar» y, sin ella, mostraban anuncios no personalizados.</li>
 				<li><strong>Las estadísticas de uso</strong> (ver §5) se envían tanto si aceptas como si no: no contienen ni identificador publicitario, ni cookies, ni identificador del dispositivo.</li>
@@ -185,9 +189,9 @@ import Hero from '../../../components/Hero.astro';
 			</ul>
 			<p>
 				<strong>Si has aceptado</strong>, para mostrar los anuncios, elegirlos, medirlos y luchar contra el
-				fraude, los módulos de ironSource y de Unity Ads reciben el <strong>identificador
+				fraude, los módulos de ironSource, de Unity Ads y de Google reciben el <strong>identificador
 				publicitario</strong> de tu teléfono y otros identificadores del
-				dispositivo, tu <strong>dirección
+				dispositivo (en Android, también el identificador de conjunto de apps y, en su caso, identificadores ligados a las cuentas del teléfono), tu <strong>dirección
 				IP</strong> (que da una ubicación aproximada, a escala de ciudad), tus interacciones con los
 				anuncios, tu tiempo de uso, información técnica (rendimiento, cierres inesperados) y, según Unity
 				Ads, las compras hechas en la aplicación. Sus subastas pueden transmitir la solicitud de anuncio a
@@ -196,7 +200,7 @@ import Hero from '../../../components/Hero.astro';
 			<p>
 				Para saber más, y para los socios de ironSource y de Unity Ads: la <a
 				href="https://unity.com/legal/game-player-and-app-user-privacy-policy" target="_blank"
-				rel="noopener">política de privacidad de Unity</a>, que cubre Unity Ads, LevelPlay e ironSource.
+				rel="noopener">política de privacidad de Unity</a>, que cubre Unity Ads, LevelPlay e ironSource. Para Google: <a href="https://policies.google.com/technologies/partner-sites" target="_blank" rel="noopener">cómo usa Google los datos de las apps asociadas</a>.
 			</p>
 		</section>
 
@@ -341,8 +345,8 @@ import Hero from '../../../components/Hero.astro';
 			<p>
 				Tu respuesta a la ventana «Publicidad», con su fecha y la versión del texto, también se
 				guarda en las preferencias de la aplicación, para saber cuándo volver a preguntarte. Si has aceptado
-				la publicidad, los módulos de LevelPlay, ironSource y Unity Ads también guardan sus propios datos en
-				el teléfono. Por último, la aplicación guarda una copia del catálogo de nuestros anuncios propios y
+				la publicidad, los módulos de LevelPlay, ironSource, Unity Ads y Google también guardan sus propios datos en
+				el teléfono. En Android, desde la versión 1.2.20, tu respuesta al formulario de Google se guarda en formato IAB TCF o GPP. Por último, la aplicación guarda una copia del catálogo de nuestros anuncios propios y
 				de sus imágenes, para mostrarlos sin esperar a la red; no contiene nada sobre ti.
 			</p>
 			<p>
@@ -362,6 +366,7 @@ import Hero from '../../../components/Hero.astro';
 				<li><strong>Unity Technologies</strong> — publicidad (Unity LevelPlay, Unity Ads), si la has aceptado.</li>
 				<li><strong>ironSource</strong>, filial de Unity Technologies — publicidad (ironSource Ads), si la has aceptado. Las subastas de ironSource y de Unity Ads pueden transmitir la solicitud de anuncio a otros compradores de publicidad (ver §4).</li>
 				<li><strong>Google LLC</strong> — Servicios de Google Play para RA (ARCore), en Android, en todas las versiones (ver §2).</li>
+				<li><strong>Google Ireland Limited / Google LLC</strong> — desde la versión 1.2.20: en Android, el formulario de consentimiento para la publicidad (Google User Messaging Platform), en cada inicio; si la has aceptado, la publicidad (Google AdMob, a través de Unity LevelPlay; en iPhone, fuera del Espacio Económico Europeo, el Reino Unido y Suiza).</li>
 				<li><strong>Google Ireland Limited / Google LLC</strong> — solo para las versiones anteriores a la 1.2.14, mientras no se actualicen: publicidad (AdMob), gestión del consentimiento (UMP), medición de audiencia (Firebase Analytics), notificaciones (Firebase Cloud Messaging) y hora de referencia (Firebase Realtime Database), si las habías aceptado.</li>
 				<li><strong>Hetzner Online GmbH</strong> (Alemania) — alojamiento de nuestro servidor de medición de audiencia Umami. Las versiones de la aplicación aún no actualizadas siguen enviando estas mediciones a <strong>Umami Software, Inc.</strong> (sociedad estadounidense), a través del servicio Umami Cloud.</li>
 				<li><strong>GitHub, Inc.</strong> — alojamiento de nuestro sitio, que se lee para la propuesta de actualización, el catálogo de nuestros anuncios propios, sus imágenes y vídeos (ver §8).</li>
@@ -382,8 +387,8 @@ import Hero from '../../../components/Hero.astro';
 				<li><strong>Datos de medición de audiencia — Firebase (versiones anteriores a la 1.2.14)</strong>: Firebase Analytics los conserva <strong>14 meses como máximo</strong>, según el plazo configurado en la consola de Firebase. Los informes agregados (que no pueden vincularse a un dispositivo) pueden conservarse más tiempo.</li>
 				<li><strong>Datos de medición de audiencia — Umami</strong>: se conservan en forma de estadísticas de eventos <strong>24 meses</strong> en nuestro servidor y luego se borran; sus copias de seguridad se guardan 14 días. Las que aún recibe Umami Cloud de las versiones no actualizadas se borran allí al cabo de 6 meses. Estos datos no están vinculados a ningún identificador de dispositivo y no permiten reconstruir el recorrido de una persona.</li>
 				<li><strong>Contador de escaneos</strong>: se reinicia cada día.</li>
-				<li><strong>Datos publicitarios</strong>: según las normas de Unity y de ironSource.</li>
-				<li><strong>Tu respuesta sobre la publicidad</strong>: 6 meses en el teléfono; después, la aplicación te vuelve a preguntar. En iPhone (iOS 14 o posterior), iOS guarda tu respuesta a Apple.</li>
+				<li><strong>Datos publicitarios</strong>: según las normas de Unity, de ironSource y de Google.</li>
+				<li><strong>Tu respuesta sobre la publicidad</strong>: en nuestra ventana, 6 meses en el teléfono; después, la aplicación te vuelve a preguntar. En el formulario de Google (Android), en el teléfono hasta que Google la vuelva a pedir o desinstales la aplicación. En iPhone (iOS 14 o posterior), iOS guarda tu respuesta a Apple.</li>
 				<li><strong>Indicador de Premium</strong>: se conserva en el dispositivo hasta la desinstalación (en iOS, el Llavero puede guardarlo, ver §9).</li>
 				<li>Los e-mails enviados con «Denunciar este vídeo» se conservan el tiempo necesario para tratar la denuncia y luego se borran, como máximo al cabo de 12 meses.</li>
 			</ul>
@@ -397,10 +402,10 @@ import Hero from '../../../components/Hero.astro';
 			</p>
 			<p><strong>En la práctica:</strong></p>
 			<ul>
-				<li><strong>Retirar o modificar tu consentimiento</strong>: en Android, y en un iPhone con iOS 13 o anterior, pulsa «Gestionar mi consentimiento publicitario» en los ajustes de la aplicación: vuelve la ventana «Publicidad». Si rechazas, la publicidad de nuestros socios se detiene enseguida, y la aplicación comunica esa retirada a Unity LevelPlay, que la transmite a las redes publicitarias. En un iPhone con iOS 14 o posterior, desde la versión 1.2.20: Ajustes › Privacidad y seguridad › Rastreo, activando o desactivando Pétanque Scan; la línea de los ajustes de la aplicación solo aparece mientras el seguimiento está autorizado, y vuelve a mostrar la nota (ver §4).</li>
+				<li><strong>Retirar o modificar tu consentimiento</strong>: en Android, y en un iPhone con iOS 13 o anterior, pulsa «Gestionar mi consentimiento publicitario» en los ajustes de la aplicación: vuelve el formulario de Google (en Android, desde la versión 1.2.20), o la ventana «Publicidad» donde Google no pregunta nada. Si rechazas, la publicidad de nuestros socios se detiene enseguida, y la aplicación comunica esa retirada a Unity LevelPlay, que la transmite a las redes publicitarias. En un iPhone con iOS 14 o posterior, desde la versión 1.2.20: Ajustes › Privacidad y seguridad › Rastreo, activando o desactivando Pétanque Scan; la línea de los ajustes de la aplicación solo aparece mientras el seguimiento está autorizado, y vuelve a mostrar la nota (ver §4).</li>
 				<li><strong>Borrar los datos locales</strong>: desinstala la aplicación o borra sus datos desde los ajustes del móvil.</li>
 				<li><strong>Restablecer tu identificador publicitario</strong>: Android → Ajustes › Google › Anuncios; iOS → Ajustes › Privacidad y seguridad › Rastreo.</li>
-				<li><strong>Borrar los datos publicitarios</strong>: los tiene Unity (ironSource, Unity Ads); pídele que los borre por los medios indicados en su política de privacidad (enlace en el §4).</li>
+				<li><strong>Borrar los datos publicitarios</strong>: los tienen Unity (ironSource, Unity Ads) y, desde la versión 1.2.20, Google (AdMob); pídeles que los borren por los medios indicados en sus políticas de privacidad (enlaces en el §4).</li>
 				<li><strong>Ejercer tus derechos ante nosotros</strong>: escribe a <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>. Respondemos en el plazo de un mes. Ten en cuenta que, al no existir cuenta de usuario ni identificador que nos permita reconocerte, nos resulta materialmente imposible encontrar datos que te conciernan en nuestras estadísticas: están agregadas y no vinculadas a una persona identificable por nuestra parte.</li>
 			</ul>
 			<p>
