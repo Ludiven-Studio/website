@@ -25,8 +25,11 @@ export interface NavText {
 	follow: (name: string) => string;
 }
 
-// The apps' own pages count as the « games » part of the site.
-const APPS = /^\/(?:(?:en|es|de|it)\/)?(?:dragons-gems|nino-rush|petanque-game|petanque-meet|petanque-scanner|petanque)(?:\/|$)/;
+// The apps' own pages count as the « games » part of the site, their testers' pages too, even those under /jeux/.
+const APP_PAGES = String.raw`(?:dragons-gems|dominoland|drone-battle|nino-rush|petanque-game|petanque-meet|petanque-scanner|petanque|tests|jeux\/[^/]+\/test)(?:\/|$)`;
+const APPS = new RegExp(String.raw`^\/(?:(?:en|es|de|it)\/)?` + APP_PAGES);
+/** The mini-games: everything under /jeux/ but the apps' testers' pages. */
+const MINI = /^\/jeux\/(?![^/]+\/test\/)/;
 
 export const NAV: Record<Lang, NavText> = {
 	fr: {
@@ -35,7 +38,7 @@ export const NAV: Record<Lang, NavText> = {
 		language: 'Langue',
 		links: [
 			{ label: 'Jeux', href: '/', also: APPS },
-			{ label: 'Mini-jeux', href: '/jeux/', also: /^\/jeux\// },
+			{ label: 'Mini-jeux', href: '/jeux/', also: MINI },
 			{ label: 'Le studio', href: '/prestations/', also: /^\/(?:prestations|services|partenariats|contact|labo)\// },
 			{ label: 'Projets', href: '/work/', also: /^\/(?:work|cap-etoile)\// },
 			{ label: 'À propos', href: '/about/' },
@@ -133,8 +136,8 @@ export const DAILY = {
 
 /** The phone tab bar of French pages: the games, the mini-games, the daily challenge, the studio. */
 export const TABS: { id: 'games' | 'mini' | 'daily' | 'studio'; label: string; href: string; match: RegExp }[] = [
-	{ id: 'games', label: 'Jeux', href: '/', match: /^\/$|^\/(?:dragons-gems|nino-rush|petanque-game|petanque-meet|petanque-scanner|petanque)(?:\/|$)/ },
-	{ id: 'mini', label: 'Mini-jeux', href: '/jeux/', match: /^\/jeux\/(?!defi\/)/ },
+	{ id: 'games', label: 'Jeux', href: '/', match: new RegExp(String.raw`^\/$|^\/` + APP_PAGES) },
+	{ id: 'mini', label: 'Mini-jeux', href: '/jeux/', match: /^\/jeux\/(?!defi\/|[^/]+\/test\/)/ },
 	{ id: 'daily', label: 'Défi du jour', href: '/jeux/defi/', match: /^\/jeux\/defi\// },
 	{ id: 'studio', label: 'Studio', href: '/prestations/', match: /^\/(?:prestations|services|partenariats|contact|work|about|labo)(?:\/|$)/ },
 ];

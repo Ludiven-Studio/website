@@ -4079,3 +4079,17 @@
 - 00:07 : latest_android et latest_ios 1.2.18 → 1.2.19, min inchangé, JSON valide, identique à celui de la session
   PetanqueScan ; pas de build (fichier statique hors précache). Commité et poussé à la demande de l'utilisateur, tapée
   dans cette session : mon fichier et cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-27 — Menu : les pages de test des applis allument « Jeux » (session website)
+- Statut : en cours (2026-11-27T00:15+01:00). Demande de l'utilisateur : Relais de la session petanquegame : sur
+  /jeux/petanque/test/ le menu allume « Mini-jeux » au lieu de « Jeux » (pousser sur le mot de Raphaël)
+- Réservations actives : `src/data/siteNav.ts`, `src/data/siteNav.test.ts` (nouveau).
+- Ressources : serveur de dev sur le port 4561 ; eslint, `astro check`. Build annoncé ici avant.
+- 00:18 : testers' pages /jeux/*/test/, Dominoland, Drone Battle et /tests/ allument « Jeux » (menu et barre du
+  téléphone), mini-jeux inchangés ; vitest siteNav 3/3 (l'ancien fichier allume Mini-jeux ou rien), eslint OK, astro
+  check 0 erreur, captures bureau et téléphone sans erreur console. Lancement du build complet (écrit dist/, .astro/,
+  public/vendor/)…
+- 00:19 : build complet OK : astro check 0 erreur, 246 pages, précache 419 entrées, liens OK. Non commité : en attente
+  du mot de Raphaël pour pousser.
+- 07:46 : commité et poussé à la demande de Raphaël tapée ici (« Pousse la correction du menu des pages de test ») :
+  mes 2 fichiers et cette section seulement. Statut : terminé. Réservations libérées.
