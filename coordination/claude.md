@@ -4125,3 +4125,22 @@
   précache 441, liens OK).
 - 07:52 : commité sur la branche dominoland-pages (worktree website-worktrees/dominoland-pages), pas poussé : le
   Producer pousse. Mes fichiers et cette section seulement. Statut : terminé. Réservations libérées.
+
+## 2026-11-27 — Admin : carte Nino Rush de /admin/revenus/ et avis des stores (/admin/avis/) (session website)
+- Statut : en cours (2026-11-27T22:59+01:00). Demande de l'utilisateur : Raphaël (tapé ici) : « Oui, pousse la carte
+  Nino Rush de /admin/revenus/ sur le site et Déploie stats-admin avec les avis quand c est pret » ; temps 1 : iTunes
+  lookup + bucket Play
+- Réservations actives : `src/components/admin/`, `src/lib/{income,statsAdmin,appColors,reviews}*`, `src/pages/admin/`,
+  `supabase/functions/stats-admin/`, `supabase/functions/_shared/{statsAdmin,storeReviews}*`, `scripts/snap-admin.mjs`
+  (worktree website-worktrees/admin-avis).
+- Ressources : serveur de dev sur le port 4393 ; eslint, `astro check`. Build annoncé ici avant.
+- 23:07 : Code écrit dans le worktree admin-avis : carte des applis sans pub (Nino Rush) sur /admin/revenus/, action
+  reviews de stats-admin (_shared/storeReviews.mjs), page /admin/avis/, ★ dans /admin/versions/, tuile Avis de
+  l'accueil ; vitest 95/95 sur les fichiers admin, eslint, astro check 0 erreur. Captures en cours (port 4393).
+- 23:10 : Captures clair, sombre, téléphone vues (avis, revenus, versions, accueil ; Google fermé aussi), sans erreur
+  console. Lancement du build complet (écrit dist/, .astro/, public/vendor/ du worktree admin-avis)…
+- 23:12 : Build complet OK (269 pages, précache 443, liens OK), vitest complet 2134 OK. stats-admin déployé sur la
+  phrase de Raphaël tapée dans cette session (403 sans compte : il tourne).
+- 23:12 : commité et poussé à la demande de l'utilisateur (« Oui, pousse la carte Nino Rush … et Déploie stats-admin
+  avec les avis quand c est pret ») : c7d8306 et 537533c, mes fichiers et cette section seulement. Statut : terminé.
+  Réservations libérées.
