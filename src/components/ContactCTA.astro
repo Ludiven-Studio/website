@@ -35,7 +35,7 @@ const t = lang === 'en'
 		gap: 2rem;
 		width: calc(100% - 2rem);
 		max-width: 73rem;
-		margin-inline: auto;
+		margin: 0 auto 4rem;
 		padding: 3rem 1.5rem;
 		border-radius: 1.75rem;
 		background: var(--sc-night-surface);
@@ -64,6 +64,8 @@ const t = lang === 'en'
 		h2 {
 			font-size: var(--text-3xl);
 			text-align: left;
+			/* Room for the longer Italian and Spanish titles on one line, as the French one. */
+			max-width: 22ch;
 		}
 	}
 </style>
