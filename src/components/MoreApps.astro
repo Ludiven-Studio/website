@@ -123,6 +123,10 @@ const games = HOME_GAMES.filter((g) => g.id !== current)
 			grid-template-columns: repeat(4, minmax(0, 1fr));
 			gap: 1.25rem;
 		}
+		/* Five apps fill one row rather than leave one alone on a second. */
+		.ma ul:has(> :nth-child(5):last-child) {
+			grid-template-columns: repeat(5, minmax(0, 1fr));
+		}
 		.ma strong {
 			font-size: 1.0625rem;
 		}
