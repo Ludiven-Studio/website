@@ -4239,3 +4239,6 @@
 - 11:06 : Itération 9 : fc9b71f bande plus sombre sous le titre des héros d'applis sur téléphone (pire pixel Dragon's
   Gems 2,99 → 5,86:1, mesuré contre le fond réel), 4412785 noms d'applis coupés naturellement (l'équilibrage donnait «
   Dragon / Gems Swipe »). Build complet OK. Poussé sur la branche, pas sur main.
+- 11:38 : Revue Codex de la branche contre main (3 constats, tous vérifiés et réels) : afeff50 URL versionnées des
+  images remplacées (?v=1215, ?v=2), 14193e7 pastilles Meet : libellé sur le marqueur focalisable, décalage et cadrage
+  à leur taille. Tests rencontres 63/63, astro check 0 erreur, build complet OK. Poussé sur la branche, pas sur main.
