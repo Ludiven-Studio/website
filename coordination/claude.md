@@ -4207,3 +4207,7 @@
 - 09:09 : Build complet OK (270 pages, précache 444, liens OK), eslint, astro check 0 erreur. Itération 1 commitée sur
   la branche we-2026-11-28-design (1778db8, 97e7a03, bcf2cf2, 08743e8, ea20e79), poussée comme branche, pas sur main.
   Réservations gardées pour les itérations suivantes.
+- 09:19 : Itération 2 : corrections 5e1b19b (texte des cartes 17 px), dc0ce22 (titre « Nos autres jeux » à la taille
+  des sections) ; propositions à choisir par Raphaël, commits séparés en fin de branche : 9e85462 (ordre de la page
+  Pétanque Game), 75b4391 (un seul bouton en haut de page), 23d6987 (bande « Le studio » sombre). Build complet OK (270
+  pages, précache 444, liens OK), astro check 0 erreur. Poussé sur la branche we-2026-11-28-design, pas sur main.
