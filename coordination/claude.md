@@ -4228,3 +4228,7 @@
   lecture seule) avec leurs légendes, 8efd575 pages portfolio Scan recalées, proposition 374c295 (groupes de la carte
   Meet en pastilles). Tests rencontres 63/63, build complet OK (270 pages, précache 444, liens OK). Poussé sur la
   branche, pas sur main.
+- 10:40 : Itération 7 : a56e69f engagements des mini-jeux en texte simple, 8d59af8 appli Meet à 15 px et espace avant
+  le pied de page ; essai sur les raccords de tuiles Meet retiré (Leaflet 1.9 les traite déjà par plus-lighter, la
+  trace vient du rendu sans écran). Passe finale : 0 échec de contraste sur 15 pages × clair/sombre × bureau/téléphone
+  (17 avant). Build complet OK. Poussé sur la branche, pas sur main.
