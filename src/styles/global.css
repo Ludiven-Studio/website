@@ -144,9 +144,10 @@
 
 :root.theme-dark {
 	--sc-ground: #0e0b1f;
-	--sc-surface: #1a1533;
-	--sc-surface-2: #241d45;
-	--sc-line: #3a3166;
+	/* Cards a step above the ground (1.24:1) with a firmer rim, so blocks separate from the page. */
+	--sc-surface: #241e45;
+	--sc-surface-2: #2e2657;
+	--sc-line: #4a3f80;
 	--sc-ink: #f4f1ff;
 	--sc-ink-2: #d8d2f0;
 	--sc-muted: #bdb6da;
