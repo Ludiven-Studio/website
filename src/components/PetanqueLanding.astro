@@ -81,21 +81,6 @@ const jsonLd = [
 
 	<main class="wrapper stack gap-15">
 
-		{t.news && (
-			<section class="stack gap-4">
-				<h2 class="section-title">{t.news.title}</h2>
-				{t.news.intro && <p class="lead">{t.news.intro}</p>}
-				<div class="box grid-2">
-					{t.news.items.map((n) => (
-						<div>
-							<h3>{n.title}</h3>
-							<p>{n.body}</p>
-						</div>
-					))}
-				</div>
-			</section>
-		)}
-
 		<section class="stack gap-4">
 			<h2 class="section-title">{t.stepsTitle}</h2>
 			<div class="box steps">
@@ -186,6 +171,21 @@ const jsonLd = [
 				))}
 			</div>
 		</section>
+
+		{t.news && (
+			<section class="stack gap-4">
+				<h2 class="section-title">{t.news.title}</h2>
+				{t.news.intro && <p class="lead">{t.news.intro}</p>}
+				<div class="box grid-2">
+					{t.news.items.map((n) => (
+						<div>
+							<h3>{n.title}</h3>
+							<p>{n.body}</p>
+						</div>
+					))}
+				</div>
+			</section>
+		)}
 
 		{t.makingOfTitle && (
 			<section class="stack gap-4">
