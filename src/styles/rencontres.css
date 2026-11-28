@@ -2,8 +2,10 @@
    and a generic name here repaints unrelated pages. */
 
 .re-root {
+	/* The small size of this app is the 15 px floor for older readers (24 rules use it). */
+	--text-sm: 0.9375rem;
 	max-width: 780px;
-	margin: 0 auto;
+	margin: 0 auto 4rem;
 	display: flex;
 	flex-direction: column;
 	gap: 1rem;
