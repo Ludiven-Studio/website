@@ -285,9 +285,9 @@ const jsonLd = [
 		font-size: 1.0625rem;
 		line-height: 1.55;
 	}
-
-	.screens {
-		text-align: center;
+	/* A full-width card stops its lines at a readable length. */
+	.box > p {
+		max-width: 68ch;
 	}
 
 	.screens-grid {
@@ -367,11 +367,12 @@ const jsonLd = [
 		font-size: 0.9375rem;
 	}
 
-	/* A store not open yet: the badge faded, its tag on top at full strength. */
+	/* A store not open yet: the badge faded, its tag above it at full strength, clear of the badge's words. */
 	.soon {
 		position: relative;
 		display: block;
 		flex: none;
+		margin-top: 1.1rem;
 	}
 
 	.soon img {
@@ -381,8 +382,8 @@ const jsonLd = [
 
 	.soon-tag {
 		position: absolute;
-		top: -0.85rem;
-		right: -0.5rem;
+		top: -1.55rem;
+		right: -0.25rem;
 		padding: 0.15rem 0.6rem;
 		border-radius: 999px;
 		background: var(--sc-accent);

@@ -165,6 +165,10 @@ const jsonLd = [
 		font-size: 1.0625rem;
 		line-height: 1.55;
 	}
+	/* A full-width card stops its lines at a readable length. */
+	.box > p {
+		max-width: 68ch;
+	}
 
 	.section-title {
 		font-size: var(--text-xl);
@@ -182,10 +186,6 @@ const jsonLd = [
 	.grid-3 h3 {
 		font-size: var(--text-lg);
 		color: var(--sc-ink);
-	}
-
-	.screens {
-		text-align: center;
 	}
 
 	.screens-grid {

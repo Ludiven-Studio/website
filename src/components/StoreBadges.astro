@@ -54,11 +54,12 @@ const alt = ALT[lang];
 )}
 
 <style>
-	/* A store not open yet: the badge faded, its tag on top at full strength. */
+	/* A store not open yet: the badge faded, its tag above it at full strength, clear of the badge's words. */
 	.soon {
 		position: relative;
 		display: block;
 		flex: none;
+		margin-top: 1.1rem;
 	}
 
 	.soon img {
@@ -68,8 +69,8 @@ const alt = ALT[lang];
 
 	.soon-tag {
 		position: absolute;
-		top: -0.85rem;
-		right: -0.5rem;
+		top: -1.55rem;
+		right: -0.25rem;
 		padding: 0.15rem 0.6rem;
 		border-radius: 999px;
 		background: var(--soon-bg, var(--accent-regular));
