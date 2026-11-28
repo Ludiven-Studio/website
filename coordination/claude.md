@@ -4219,3 +4219,8 @@
   rangée orpheline, 62a506d retrait des questions et titres d'étapes ; propositions 082ae0d (bloc final identique) et
   f09d395 (cartes sombres plus claires). Contraste : 0 échec sur 8 pages en sombre. Build complet OK (270 pages,
   précache 444, liens OK). Poussé sur la branche, pas sur main.
+- 10:12 : Itération 5 (nouvelle critique sur 52 captures) : 0aa7dea vidéo DG à la hauteur des captures, 0c34600 puis
+  890af39 diapo Scan « 3 scans » remplacée par la 08 des stores 1.2.15 (« 10 scans », copiée en lecture seule depuis
+  Petanque AR/Marketings), a456366 espaces insécables (2 000, 0 mm, 6,99 €), d5bcfbe air avant le pied de page, 8bac305
+  cinq applis sur une rangée. Build complet OK (270 pages, précache 444, liens OK). Poussé sur la branche, pas sur
+  main.
