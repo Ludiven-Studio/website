@@ -288,8 +288,14 @@ table, th, td {
 	border-width: 0;
 }
 
+/* 76rem minus its padding = the 73rem of the menu, the app heroes and the footer: one left edge. */
 .wrapper {
 	width: 100%;
+	max-width: 76rem;
+	margin-inline: auto;
+	padding-inline: 1.5rem;
+}
+.wrapper.game-page {
 	max-width: 83rem;
 	margin-inline: auto;
 	padding-inline: 1.5rem;
