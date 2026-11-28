@@ -74,7 +74,6 @@ const jsonLd = [
 			{soon && t.soon && <p class="soon-note">{t.soon}</p>}
 			<div class="as-actions">
 				<a class="sc-btn" href={download}>{DOWNLOAD[lang]} <Icon icon="arrow-right" size="1.1em" /></a>
-				<ShareButton id={app.id} title={app.name} kind={app.id === 'game' ? 'game' : 'app'} lang={lang} />
 			</div>
 		</AppStage>
 	</div>
@@ -214,7 +213,7 @@ const jsonLd = [
 				)))}
 			</div>
 			{soon && t.soon && <p class="soon-note">{t.soon}</p>}
-			<p><a class="sc-btn" href={download}>{DOWNLOAD[lang]} <Icon icon="arrow-right" size="1.1em" /></a></p>
+			<p class="closing-actions"><a class="sc-btn" href={download}>{DOWNLOAD[lang]} <Icon icon="arrow-right" size="1.1em" /></a> <ShareButton id={app.id} title={app.name} kind={app.id === 'game' ? 'game' : 'app'} lang={lang} /></p>
 			<p class="legal" id="support">
 				{t.support} <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>
 			</p>
@@ -349,6 +348,14 @@ const jsonLd = [
 	.making-of-cta a:hover,
 	.making-of-cta a:focus {
 		text-decoration-color: currentColor;
+	}
+
+	.closing-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.75rem 1rem;
+		align-items: center;
+		justify-content: center;
 	}
 
 	.closing {
