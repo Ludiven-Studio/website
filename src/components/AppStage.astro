@@ -91,7 +91,8 @@ const { lang, name, icon, kicker, tagline, lead, art, alt = '' } = Astro.props;
 		content: '';
 		position: absolute;
 		inset: 0;
-		background: linear-gradient(180deg, rgb(26 21 51 / 0) 35%, rgb(26 21 51 / 0.95) 100%);
+		/* A darker band where the title sits: white stays at 4.5:1 over the brightest art (Dragon's Gems' gems). */
+		background: linear-gradient(180deg, rgb(26 21 51 / 0) 25%, rgb(26 21 51 / 0.6) 58%, rgb(26 21 51 / 0.95) 100%);
 	}
 
 	.as-head {
