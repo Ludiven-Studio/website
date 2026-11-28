@@ -65,11 +65,18 @@ export function gameCard(e: MeetupEvent, slot: Slot | undefined, lang: Lang): L.
 		're-pin--event', GAME_W, GAME_H, slot);
 }
 
-/** Several games: a round badge with their number; the words go to its tooltip and screen readers. */
-export function gameClusterCard(count: number, lang: Lang): L.DivIcon {
-	const label = lang === 'en' ? `${count} games, tap to zoom in` : `${count} parties, touche pour zoomer`;
+/** What a count badge says to a screen reader and in its tooltip: the badge itself shows only the number. */
+export function clusterLabel(kind: 'game' | 'tournament' | 'spot', count: number, lang: Lang): string {
+	const words = lang === 'en'
+		? { game: 'games', tournament: 'tournaments', spot: 'pitches' }
+		: { game: 'parties', tournament: 'concours', spot: 'terrains' };
+	return `${count} ${words[kind]}, ${lang === 'en' ? 'tap to zoom in' : 'touche pour zoomer'}`;
+}
+
+/** Several games: a round badge with their number. The marker carries clusterLabel. */
+export function gameClusterCard(count: number): L.DivIcon {
 	return board(
-		`<div class="re-cp re-cp--count re-cp--count-game" title="${label}" aria-label="${label}"><span class="re-cp-badge">${BOULE}</span><b>${count}</b></div>`,
+		`<div class="re-cp re-cp--count re-cp--count-game"><span class="re-cp-badge">${BOULE}</span><b>${count}</b></div>`,
 		're-pin--event re-pin--cluster', COUNT_W, COUNT_H);
 }
 
@@ -128,10 +135,9 @@ export function tournamentCard(t: MeetupTournament, slot: Slot | undefined, lang
 		're-pin--tournament', T_W, T_H, slot);
 }
 
-export function tournamentClusterCard(count: number, slot: Slot | undefined, lang: Lang): L.DivIcon {
-	const label = lang === 'en' ? `${count} tournaments, tap to zoom in` : `${count} concours, touche pour zoomer`;
+export function tournamentClusterCard(count: number, slot: Slot | undefined): L.DivIcon {
 	return board(
-		`<div class="re-cp re-cp--count re-cp--count-tournament" title="${label}" aria-label="${label}"><span class="re-cp-badge">${TROPHY}</span><b>${count}</b></div>`,
+		`<div class="re-cp re-cp--count re-cp--count-tournament"><span class="re-cp-badge">${TROPHY}</span><b>${count}</b></div>`,
 		're-pin--tournament re-pin--cluster', COUNT_W, COUNT_H, slot);
 }
 

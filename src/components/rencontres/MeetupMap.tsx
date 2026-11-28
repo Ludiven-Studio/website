@@ -5,7 +5,7 @@ import type { Place } from '../../lib/meetupPlaces';
 import type { MeetupTournament } from '../../lib/meetups';
 import { centreOf, clusterBoxes, clusterPoints, liftOver } from '../../lib/mapClusters';
 import {
-	GAME_H, GAME_W, gameCard, gameClusterCard, ME_ICON, placeIcon, T_H, T_W, tournamentCard, tournamentClusterCard,
+	clusterLabel, COUNT_H, COUNT_W, GAME_H, GAME_W, gameCard, gameClusterCard, ME_ICON, placeIcon, T_H, T_W, tournamentCard, tournamentClusterCard,
 	type Slot,
 } from './mapCards';
 import { pick, useLang } from './i18n';
@@ -191,24 +191,27 @@ export default function MeetupMap({
 
 	/** At zoom `z`, the slot that lifts a poster standing on a point over the game cards
 	 *  it would cover, the game cards placed as the event layer draws them. */
-	const liftAt = (z: number): ((at: { lat: number; lng: number }, slot?: Slot) => Slot) => {
+	const liftAt = (z: number): ((at: { lat: number; lng: number }, slot?: Slot, w?: number, h?: number) => Slot) => {
 		const map = mapRef.current;
 		if (!map) return (_, slot = [0, 0]) => slot;
 		const games = cardGroupsOf(events, GAME_W, GAME_H, false, z).map((g) => {
 			const c = g.length > 1 ? centreOf(g, (i) => events[i]) : events[g[0]];
 			return map.project([c.lat, c.lng], z);
 		});
-		return (at, slot = [0, 0]) => liftOver(map.project([at.lat, at.lng], z), slot, T_W, T_H, games, GAME_W, GAME_H, FAN_GAP);
+		// A count badge is lifted by its own size, not a poster's: lifted as a poster it could leave the map.
+		return (at, slot = [0, 0], w = T_W, h = T_H) => liftOver(map.project([at.lat, at.lng], z), slot, w, h, games, GAME_W, GAME_H, FAN_GAP);
 	};
 
 	/** A count pin: a tap zooms in two levels on the members' average. */
 	const addCluster = <T extends { lat: number; lng: number }>(
-		layer: L.LayerGroup, items: readonly T[], members: number[], icon: L.DivIcon,
+		layer: L.LayerGroup, items: readonly T[], members: number[], icon: L.DivIcon, label: string, zIndexOffset = 0,
 	): void => {
 		const c = centreOf(members, (i) => items[i]);
-		L.marker([c.lat, c.lng], { icon, title: `${members.length}` })
+		const m = L.marker([c.lat, c.lng], { icon, title: label, zIndexOffset })
 			.on('click', () => mapRef.current?.flyTo([c.lat, c.lng], Math.min(19, zoom + 2), { duration: 0.6 }))
 			.addTo(layer);
+		// The badge shows only the number: the focusable marker gets the words.
+		m.getElement()?.setAttribute('aria-label', label);
 	};
 
 	useImperativeHandle(handle, () => ({
@@ -234,13 +237,18 @@ export default function MeetupMap({
 					box.extend(L.point(p.x + dx - w / 2, p.y - up - h)).extend(L.point(p.x + dx + w / 2, p.y - up));
 				};
 				for (const g of cardGroupsOf(events, GAME_W, GAME_H, false, z)) {
-					if (g.some((i) => nearest.has(events[i]))) card(g.length > 1 ? centreOf(g, (i) => events[i]) : events[g[0]], GAME_W, GAME_H);
+					if (!g.some((i) => nearest.has(events[i]))) continue;
+					// Below NO_CLUSTER_ZOOM a group is a count badge: frame it at its own size.
+					if (g.length > 1) card(centreOf(g, (i) => events[i]), COUNT_W, COUNT_H);
+					else card(events[g[0]], GAME_W, GAME_H);
 				}
 				const lift = liftAt(z);
 				for (const g of cardGroupsOf(tournaments, T_W, T_H, true, z)) {
 					if (!g.some((i) => nearest.has(tournaments[i]))) continue;
-					const at = g.length > 1 ? centreOf(g, (i) => tournaments[i]) : tournaments[g[0]];
-					card(at, T_W, T_H, lift(at));
+					if (g.length > 1) {
+						const at = centreOf(g, (i) => tournaments[i]);
+						card(at, COUNT_W, COUNT_H, lift(at, undefined, COUNT_W, COUNT_H));
+					} else card(tournaments[g[0]], T_W, T_H, lift(tournaments[g[0]]));
 				}
 				const size = box.getSize();
 				if (size.x <= room.x && size.y <= room.y) {
@@ -289,7 +297,7 @@ export default function MeetupMap({
 		const free = zoom >= SPOTS_MIN_ZOOM ? spots.filter((s) => !busy.has(s.id)) : [];
 		for (const g of groupsOf(free)) {
 			if (g.length > 1) {
-				addCluster(layer, free, g, clusterIcon('re-pin--spot', '#c2c8cf', '#86909b', g.length));
+				addCluster(layer, free, g, clusterIcon('re-pin--spot', '#c2c8cf', '#86909b', g.length), clusterLabel('spot', g.length, lang));
 				continue;
 			}
 			const s = free[g[0]];
@@ -315,7 +323,7 @@ export default function MeetupMap({
 		const slots = zoom >= NO_CLUSTER_ZOOM ? fanSlots(events, GAME_W, GAME_H) : null;
 		for (const g of cardGroupsOf(events, GAME_W, GAME_H)) {
 			if (g.length > 1) {
-				addCluster(layer, events, g, gameClusterCard(g.length, lang));
+				addCluster(layer, events, g, gameClusterCard(g.length), clusterLabel('game', g.length, lang));
 				continue;
 			}
 			const e = events[g[0]];
@@ -356,9 +364,7 @@ export default function MeetupMap({
 				add(tournaments[g[0]], tournaments[g[0]]);
 			} else if (!fan) {
 				const c = centreOf(g, (i) => tournaments[i]);
-				L.marker([c.lat, c.lng], { icon: tournamentClusterCard(g.length, lift(c), lang), title: `${g.length}`, zIndexOffset: 500 })
-					.on('click', () => mapRef.current?.flyTo([c.lat, c.lng], Math.min(19, zoom + 2), { duration: 0.6 }))
-					.addTo(layer);
+				addCluster(layer, tournaments, g, tournamentClusterCard(g.length, lift(c, undefined, COUNT_W, COUNT_H)), clusterLabel('tournament', g.length, lang), 500);
 			} else {
 				// No zoom can split them any more: side by side around their centre, soonest first.
 				const c = centreOf(g, (i) => tournaments[i]);
