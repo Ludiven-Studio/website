@@ -53,7 +53,7 @@ const games = HOME_GAMES.filter((g) => g.id !== current)
 		color: var(--sc-ink);
 		font-family: var(--font-brand);
 		font-weight: 600;
-		font-size: 1.75rem;
+		font-size: var(--text-xl);
 	}
 	.ma ul {
 		display: grid;
@@ -119,9 +119,6 @@ const games = HOME_GAMES.filter((g) => g.id !== current)
 	}
 
 	@media (min-width: 56em) {
-		.ma h2 {
-			font-size: 2.125rem;
-		}
 		.ma ul {
 			grid-template-columns: repeat(4, minmax(0, 1fr));
 			gap: 1.25rem;
