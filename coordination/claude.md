@@ -4232,3 +4232,7 @@
   le pied de page ; essai sur les raccords de tuiles Meet retiré (Leaflet 1.9 les traite déjà par plus-lighter, la
   trace vient du rendu sans écran). Passe finale : 0 échec de contraste sur 15 pages × clair/sombre × bureau/téléphone
   (17 avant). Build complet OK. Poussé sur la branche, pas sur main.
+- 10:58 : Itération 8 (pages de téléchargement, 9 pages × 4 vues) : e987435 vignette Meet anglaise sans le fragment «
+  ou », 288ca6a 5 captures sur une rangée (DG), 274568e points du carrousel et pause à 44 px, textes à 15 px, « : » et
+  « · » collés (Scan, Meet, Nino). Contraste : 0 échec sur fonds unis. Build complet OK. Poussé sur la branche, pas sur
+  main.
