@@ -108,7 +108,7 @@ const logoImg = await getImage({ src: logo, width: 520, format: 'webp' });
 </section>
 
 <style>
-	/* A daylight band in both themes: its colours are fixed. */
+	/* A daylight band in the light theme; the dark theme gives it the night surface (below). */
 	.studio {
 		margin-top: 4rem;
 		background: #ebe4fa;
@@ -116,7 +116,24 @@ const logoImg = await getImage({ src: logo, width: 520, format: 'webp' });
 		scroll-margin-top: 1rem;
 	}
 	:global(.theme-dark) .studio {
-		background: #f5f2fc;
+		background: var(--sc-surface);
+		color: var(--sc-ink);
+		border-block: 1px solid var(--sc-line);
+	}
+	:global(.theme-dark) .studio h2 {
+		color: var(--sc-ink);
+	}
+	:global(.theme-dark) .studio-kicker,
+	:global(.theme-dark) .studio-link,
+	:global(.theme-dark) .studio-mail a {
+		color: var(--sc-link);
+	}
+	:global(.theme-dark) .studio-lead {
+		color: var(--sc-muted);
+	}
+	:global(.theme-dark) .studio-chips li {
+		border-color: var(--sc-line);
+		color: var(--sc-ink-2);
 	}
 
 	.studio-in {
