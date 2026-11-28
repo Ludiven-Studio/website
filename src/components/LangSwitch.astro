@@ -81,8 +81,8 @@ const all = [{ lang, href: undefined as string | undefined }, ...others]
 		box-shadow: 0 0 0 2px var(--accent-regular);
 	}
 
+	/* The page's own language keeps its colours: a grey flag read as broken. A ring marks it instead. */
 	.lang-switch.current {
-		filter: grayscale(1);
-		opacity: 0.45;
+		box-shadow: 0 0 0 2px var(--sc-ground, transparent), 0 0 0 4px var(--sc-accent);
 	}
 </style>
