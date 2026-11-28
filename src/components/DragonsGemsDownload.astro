@@ -114,7 +114,7 @@ const options = [
 
 	.option small {
 		color: var(--sc-night-muted);
-		font-size: var(--text-sm);
+		font-size: 0.9375rem;
 	}
 
 	.shots {
@@ -145,6 +145,10 @@ const options = [
 	@media (min-width: 50em) {
 		.shots {
 			grid-template-columns: repeat(4, 1fr);
+		}
+		/* Five shots in one row rather than four and one alone. */
+		.shots:has(> :nth-child(5):last-child) {
+			grid-template-columns: repeat(5, 1fr);
 		}
 	}
 </style>
