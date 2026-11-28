@@ -24,15 +24,15 @@ gallery:
   - src: /assets/petanque-ar/screen-01-fr.webp
     alt: "Scan 3D en cours — quatre boules verrouillées, la distance au cochonnet affichée au-dessus de chacune"
   - src: /assets/petanque-ar/screen-02-fr.webp
-    alt: "Visée du cochonnet, deuxième tir sur trois"
+    alt: "Visée du cochonnet : on tourne autour du jeu, il se place tout seul"
   - src: /assets/petanque-ar/screen-03-fr.webp
     alt: "Le téléphone au-dessus d'une boule : la mesure se verrouille, un cadenas l'indique"
-  - src: /assets/petanque-ar/screen-04-fr.webp
-    alt: "Le résultat vu du dessus, boules classées de la plus proche à la plus éloignée"
   - src: /assets/petanque-ar/screen-05-fr.webp
-    alt: "Mode photo — une seule photo prise d'en haut, la boule la plus proche cerclée de vert"
+    alt: "Le résultat vu du dessus, boules classées de la plus proche à la plus éloignée"
   - src: /assets/petanque-ar/screen-06-fr.webp
-    alt: "Écran Premium — il reste trois scans gratuits aujourd'hui, ou Premium à vie sans abonnement"
+    alt: "Mode photo — une seule photo prise d'en haut, la boule la plus proche cerclée de vert"
+  - src: /assets/petanque-ar/screen-08-fr.webp
+    alt: "Écran Premium — dix scans gratuits par jour, une courte pub les recharge, ou Premium à vie sans pub"
   - src: /assets/petanque-ar/premium.webp
     alt: "Visuel Premium à vie — mesures illimitées, sans publicité"
 ---

@@ -24,15 +24,15 @@ gallery:
   - src: /assets/petanque-ar/screen-01-en.webp
     alt: "3D scan in progress — four boules locked, each one's distance to the jack shown above it"
   - src: /assets/petanque-ar/screen-02-en.webp
-    alt: "Aiming at the jack, second shot of three"
+    alt: "Aiming at the jack: walk round the game and it places itself"
   - src: /assets/petanque-ar/screen-03-en.webp
     alt: "Phone held above a boule: the measure locks, a padlock shows it"
-  - src: /assets/petanque-ar/screen-04-en.webp
-    alt: "The result seen from above, boules ranked from nearest to farthest"
   - src: /assets/petanque-ar/screen-05-en.webp
-    alt: "Photo mode — a single shot taken from above, the closest boule circled in green"
+    alt: "The result seen from above, boules ranked from nearest to farthest"
   - src: /assets/petanque-ar/screen-06-en.webp
-    alt: "Premium screen — three free scans left today, or lifetime Premium with no subscription"
+    alt: "Photo mode — a single shot taken from above, the closest boule circled in green"
+  - src: /assets/petanque-ar/screen-08-en.webp
+    alt: "Premium screen — ten free scans a day, a short ad refills them, or lifetime Premium with no ads"
 ---
 <p>
   This page covers the <strong>engineering behind</strong> Pétanque Scan. If you're after the app
