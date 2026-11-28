@@ -4236,3 +4236,6 @@
   ou », 288ca6a 5 captures sur une rangée (DG), 274568e points du carrousel et pause à 44 px, textes à 15 px, « : » et
   « · » collés (Scan, Meet, Nino). Contraste : 0 échec sur fonds unis. Build complet OK. Poussé sur la branche, pas sur
   main.
+- 11:06 : Itération 9 : fc9b71f bande plus sombre sous le titre des héros d'applis sur téléphone (pire pixel Dragon's
+  Gems 2,99 → 5,86:1, mesuré contre le fond réel), 4412785 noms d'applis coupés naturellement (l'équilibrage donnait «
+  Dragon / Gems Swipe »). Build complet OK. Poussé sur la branche, pas sur main.
