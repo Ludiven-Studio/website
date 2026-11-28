@@ -140,12 +140,9 @@ const top = (await topPlayed([...byId.keys()], SHORTLIST, POPULAR_DAYS)).map((id
 		font-size: var(--text-3xl);
 		color: #fff;
 	}
+	/* Plain words with their icon: a rim would make them read as buttons. */
 	.games-promise li {
-		background: var(--sc-night-surface-2);
-		border: 1px solid var(--sc-night-line);
-		border-radius: 999px;
-		padding: 5px 13px;
-		font-size: 0.9375rem;
+		font-size: 1rem;
 		font-weight: 600;
 		color: var(--sc-night-ink);
 	}
@@ -176,10 +173,6 @@ const top = (await topPlayed([...byId.keys()], SHORTLIST, POPULAR_DAYS)).map((id
 		font-weight: 800;
 		font-size: var(--text-md);
 		color: var(--sc-night-ink);
-		background: rgb(255 201 77 / 0.14);
-		border: 1px solid rgb(255 201 77 / 0.5);
-		border-radius: 999px;
-		padding: 7px 18px;
 	}
 	.games-streak .games-streak-note {
 		font-weight: 600;
@@ -203,7 +196,7 @@ const top = (await topPlayed([...byId.keys()], SHORTLIST, POPULAR_DAYS)).map((id
 		list-style: none;
 		display: flex;
 		flex-wrap: wrap;
-		gap: 8px;
+		gap: 6px 20px;
 		justify-content: center;
 		padding: 0;
 		margin: 0.25rem 0 0;
