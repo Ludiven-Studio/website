@@ -191,7 +191,7 @@ import { PROTOTYPES } from '../../data/prototypes';
 	}
 	.test-tag,
 	.test-meta {
-		font-size: var(--text-sm);
+		font-size: 0.9375rem;
 		margin: 0;
 	}
 	.test-meta strong {
@@ -200,7 +200,7 @@ import { PROTOTYPES } from '../../data/prototypes';
 	.test-notes {
 		margin: 0;
 		padding-inline-start: 1.1rem;
-		font-size: var(--text-sm);
+		font-size: 0.9375rem;
 		display: grid;
 		gap: 0.3rem;
 	}
@@ -217,20 +217,20 @@ import { PROTOTYPES } from '../../data/prototypes';
 		gap: 0.4rem;
 		padding: 0.6rem 1.1rem;
 		border-radius: 999px;
-		background: var(--accent-regular);
-		color: var(--accent-text-over);
+		background: var(--sc-accent);
+		color: var(--sc-accent-ink);
 		font-weight: 600;
 		text-decoration: none;
 	}
 	.test-install:hover,
 	.test-install:focus-visible {
-		background: var(--accent-dark);
+		filter: brightness(1.12);
 	}
 	.test-page-link {
 		display: inline-flex;
 		align-items: center;
 		gap: 0.3rem;
-		font-size: var(--text-sm);
+		font-size: 0.9375rem;
 	}
 	.tests-protos {
 		width: 100%;
@@ -274,5 +274,6 @@ import { PROTOTYPES } from '../../data/prototypes';
 	}
 	.protos-mini small {
 		color: var(--sc-muted);
+		font-size: 0.9375rem;
 	}
 </style>
