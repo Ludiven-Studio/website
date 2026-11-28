@@ -4224,3 +4224,7 @@
   Petanque AR/Marketings), a456366 espaces insécables (2 000, 0 mm, 6,99 €), d5bcfbe air avant le pied de page, 8bac305
   cinq applis sur une rangée. Build complet OK (270 pages, précache 444, liens OK). Poussé sur la branche, pas sur
   main.
+- 10:29 : Itération 6 : e658f8a marge de 24 px partout sur téléphone, 8416cf4 les 8 visuels Scan 1.2.15 (copiés en
+  lecture seule) avec leurs légendes, 8efd575 pages portfolio Scan recalées, proposition 374c295 (groupes de la carte
+  Meet en pastilles). Tests rencontres 63/63, build complet OK (270 pages, précache 444, liens OK). Poussé sur la
+  branche, pas sur main.
