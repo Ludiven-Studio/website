@@ -4215,3 +4215,7 @@
   et notes des mini-jeux à 15 px, c930759 formulaire au tu, 444434a galeries à gauche + lignes à 68ch + pastille «
   Bientôt » au-dessus du badge, c0d70db titres équilibrés. Contraste : 0 échec sur ces 7 pages. Build complet OK (270
   pages, précache 444, liens OK). Poussé sur la branche, pas sur main.
+- 09:48 : Itération 4 : b2ea6fe équilibrage des titres limité à h1/h2 (il coupait « au-dessus »), f2281d3 galeries sans
+  rangée orpheline, 62a506d retrait des questions et titres d'étapes ; propositions 082ae0d (bloc final identique) et
+  f09d395 (cartes sombres plus claires). Contraste : 0 échec sur 8 pages en sombre. Build complet OK (270 pages,
+  précache 444, liens OK). Poussé sur la branche, pas sur main.
