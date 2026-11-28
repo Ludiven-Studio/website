@@ -95,6 +95,23 @@ const year = new Date().getFullYear();
 		padding: 0;
 	}
 
+	/* Phone: each footer link is a 44 px tap target; the padding replaces the row gap. */
+	@media (max-width: 63.99em) {
+		.sf-in {
+			gap: 0.5rem;
+		}
+		.sf-copy,
+		.sf-links,
+		.sf-socials {
+			row-gap: 0;
+		}
+		.sf a {
+			display: inline-flex;
+			align-items: center;
+			min-height: 44px;
+		}
+	}
+
 	.sf-socials a {
 		display: inline-flex;
 		align-items: center;
