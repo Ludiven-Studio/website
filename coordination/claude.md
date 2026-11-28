@@ -4192,3 +4192,18 @@
 - 00:42 : Build complet OK (270 pages, précache 444, liens OK) ; la page n'est ni dans le sitemap ni dans le précache.
   Commité sur la branche tt-test-page, pas poussé : la mise en ligne attend le mot de Raphaël. Réservations gardées
   jusque-là.
+
+## 2026-11-28 — Site : revue du design du week-end (session website)
+- Statut : en cours (2026-11-28T08:49+01:00). Demande de l'utilisateur : Producer (Raphaël absent du week-end) : revoir
+  et corriger le design des pages publiques sur la branche we-2026-11-28-design, rien sur main
+- Réservations actives : branche `we-2026-11-28-design` seulement (worktree website-worktrees/we-design) :
+  `src/styles/`, composants et pages publiques touchés, listés à chaque note.
+- Ressources : serveur de dev sur le port 4421 ; eslint, `astro check`. Build annoncé ici avant.
+- 09:04 : Itération 1 dans le worktree we-design : contrastes (Meet sombre date 1,5→7 et places, étapes en sombre, «
+  Nouveau », crédit de la carte), même bord gauche que le menu (.wrapper 76rem, jeux inchangés), légendes au plancher
+  de 15 px, drapeau de la langue en cours en couleurs. Fichiers : src/styles/global.css, src/styles/rencontres.css,
+  src/components/{PetanqueLanding,MoreApps,AppStage,HomeStage,Footer,TabBar,LangSwitch}.astro,
+  src/pages/tests/index.astro. Lancement du build complet (écrit dist/, .astro/, public/vendor/ du worktree we-design)…
+- 09:09 : Build complet OK (270 pages, précache 444, liens OK), eslint, astro check 0 erreur. Itération 1 commitée sur
+  la branche we-2026-11-28-design (1778db8, 97e7a03, bcf2cf2, 08743e8, ea20e79), poussée comme branche, pas sur main.
+  Réservations gardées pour les itérations suivantes.
