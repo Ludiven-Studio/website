@@ -309,4 +309,17 @@ const jsonLd = [
 			gap: 1.75rem;
 		}
 	}
+	@media (min-width: 64em) {
+		/* Full rows only, whatever the number of shots: 6 or 7 in one row, 8 in two rows of 4. */
+		.screens-grid:has(> :nth-child(6):last-child) {
+			grid-template-columns: repeat(6, minmax(0, 1fr));
+		}
+		.screens-grid:has(> :nth-child(7):last-child) {
+			grid-template-columns: repeat(7, minmax(0, 1fr));
+			gap: 1.25rem;
+		}
+		.screens-grid:has(> :nth-child(8):last-child) {
+			grid-template-columns: repeat(4, minmax(0, 1fr));
+		}
+	}
 </style>
