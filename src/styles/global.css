@@ -245,6 +245,11 @@ h5 {
 	font-family: var(--font-brand);
 	font-weight: 600;
 	color: var(--gray-100);
+}
+
+/* Big titles only: on a short card title, balancing broke « au-dessus » at its hyphen. */
+h1,
+h2 {
 	text-wrap: balance;
 }
 
