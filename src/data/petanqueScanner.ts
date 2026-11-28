@@ -46,7 +46,7 @@ export const HERO = '/assets/petanque-ar/hero-fr.avif?v=1213';
 
 /** The store visuals carry their caption and the app's own UI, so each language gets its set. */
 const screens = (suffix: string) =>
-	[1, 2, 3, 4, 5, 6].map((n) => `/assets/petanque-ar/screen-0${n}${suffix}.webp`);
+	[1, 2, 3, 4, 5, 6, 7, 8].map((n) => `/assets/petanque-ar/screen-0${n}${suffix}.webp`);
 export const SCREENS: Record<LandingLang, string[]> = {
 	fr: screens('-fr'),
 	en: screens('-en'),
@@ -701,11 +701,13 @@ export const download: Record<LandingLang, DownloadCopy> = {
 		kicker: 'Réalité augmentée',
 		shots: [
 			'Qui a le point ? L’écart de chaque boule, jusqu’au millimètre.',
-			'Vise le cochonnet. 3 visées, il est placé.',
-			'Passe au-dessus. Chaque boule se verrouille toute seule.',
+			'Vise le cochonnet. Tourne autour du jeu, il se place tout seul.',
+			'Passe au-dessus. Suis la flèche dorée : chaque boule se verrouille.',
+			'Toutes les distances. Bord à bord, calibre de chaque boule compris.',
 			'Le verdict d’en haut. Boules classées, écarts affichés.',
 			'Pas d’AR ? Une photo suffit. Le mode photo marche sur tous les téléphones.',
-			'10 scans gratuits par jour. Une courte pub les recharge. Premium à vie : illimité, sans pub.',
+			'Deux façons de mesurer. Scan 3D pour la précision, photo pour aller vite.',
+			'10 scans gratuits par jour. Une courte pub les recharge. Premium à vie : illimité, sans pub.',
 		],
 		pause: 'Mettre l’animation en pause',
 		videoTitle: 'En vidéo',
@@ -716,10 +718,12 @@ export const download: Record<LandingLang, DownloadCopy> = {
 		kicker: 'Augmented reality',
 		shots: [
 			'Who has the point? Each boule’s gap, down to the millimetre.',
-			'Aim at the jack. 3 shots and it is placed.',
-			'Hold it above. Each boule locks by itself.',
+			'Aim at the jack. Walk round the game, it places itself.',
+			'Hold it above. Follow the gold arrow: each boule locks.',
+			'Every distance. Edge to edge, each boule’s size included.',
 			'The verdict from above. Boules ranked, gaps shown.',
 			'No AR? One photo will do. Photo mode works on every phone.',
+			'Two ways to measure. 3D scan for precision, photo for speed.',
 			'10 free scans a day. A short ad refills them. Lifetime Premium: unlimited, no ads.',
 		],
 		pause: 'Pause the animation',
@@ -731,10 +735,12 @@ export const download: Record<LandingLang, DownloadCopy> = {
 		kicker: 'Realidad aumentada',
 		shots: [
 			'¿Quién tiene el punto? La distancia de cada bola, hasta el milímetro.',
-			'Apunta al boliche. 3 tomas y queda situado.',
-			'Colócate encima. Cada bola se bloquea sola.',
+			'Apunta al boliche. Rodea el juego, se coloca solo.',
+			'Colócate encima. Sigue la flecha dorada: cada bola se bloquea.',
+			'Todas las distancias. Borde a borde, con el calibre de cada bola.',
 			'El veredicto desde arriba. Bolas clasificadas, distancias a la vista.',
 			'¿Sin AR? Basta una foto. El modo foto funciona en todos los móviles.',
+			'Dos formas de medir. Escaneo 3D para la precisión, foto para ir rápido.',
 			'10 escaneos gratis al día. Un anuncio corto los recarga. Premium de por vida: ilimitado, sin anuncios.',
 		],
 		pause: 'Pausar la animación',
@@ -746,10 +752,12 @@ export const download: Record<LandingLang, DownloadCopy> = {
 		kicker: 'Erweiterte Realität',
 		shots: [
 			'Wer hat den Punkt? Der Abstand jeder Kugel, bis auf den Millimeter.',
-			'Ziel auf die Zielkugel. 3 Aufnahmen, schon ist sie platziert.',
-			'Halte es darüber. Jede Kugel rastet von selbst ein.',
+			'Ziel auf die Zielkugel. Geh ums Spiel herum, sie platziert sich selbst.',
+			'Halte es darüber. Folge dem goldenen Pfeil: Jede Kugel rastet ein.',
+			'Alle Abstände. Rand zu Rand, mit dem Kaliber jeder Kugel.',
 			'Das Urteil von oben. Kugeln gewertet, Abstände sichtbar.',
 			'Kein AR? Ein Foto reicht. Der Fotomodus läuft auf jedem Handy.',
+			'Zwei Wege zu messen. 3D-Scan für Präzision, Foto für Tempo.',
 			'10 Gratis-Scans pro Tag. Kurze Werbung lädt sie auf. Premium auf Lebenszeit: unbegrenzt, ohne Werbung.',
 		],
 		pause: 'Animation anhalten',
@@ -761,10 +769,12 @@ export const download: Record<LandingLang, DownloadCopy> = {
 		kicker: 'Realtà aumentata',
 		shots: [
 			'Chi ha il punto? La distanza di ogni boccia, fino al millimetro.',
-			'Inquadra il pallino. 3 scatti ed è posizionato.',
-			'Tienilo sopra. Ogni boccia si blocca da sola.',
+			'Inquadra il pallino. Gira intorno al gioco, si posiziona da solo.',
+			'Tienilo sopra. Segui la freccia dorata: ogni boccia si blocca.',
+			'Tutte le distanze. Bordo a bordo, con il calibro di ogni boccia.',
 			'Il verdetto dall’alto. Bocce in classifica, distanze in vista.',
 			'Niente AR? Basta una foto. La modalità foto funziona su ogni telefono.',
+			'Due modi per misurare. Scansione 3D per la precisione, foto per la velocità.',
 			'10 scansioni gratis al giorno. Un breve annuncio le ricarica. Premium a vita: illimitato, senza pubblicità.',
 		],
 		pause: 'Metti in pausa l’animazione',
