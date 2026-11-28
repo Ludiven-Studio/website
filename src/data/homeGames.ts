@@ -120,7 +120,7 @@ export const HOME_GAMES: HomeGame[] = [
 		type: 'app',
 		icon: '/assets/petanque-meet/icon.webp',
 		// Its header art holds the app's map on a phone, in each language.
-		art: { src: each((l) => `/assets/home/stage-petanque-meet-${l}.webp`), w: 1000, h: 1125, desk: '60% 50%', phone: '55% 25%' },
+		art: { src: each((l) => `/assets/home/stage-petanque-meet-${l}.webp${l === 'en' ? '?v=2' : ''}`), w: 1000, h: 1125, desk: '60% 50%', phone: '55% 25%' },
 		kicker: each((l) => `App · ${PETANQUE[l]}`),
 		pitch: {
 			fr: 'Parties et concours de pétanque près de chez toi. Pose la tienne en un geste.',

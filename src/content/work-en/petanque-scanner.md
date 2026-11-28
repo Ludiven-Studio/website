@@ -21,17 +21,17 @@ tags:
 galleryTitle: The app in use
 galleryLayout: phone
 gallery:
-  - src: /assets/petanque-ar/screen-01-en.webp
+  - src: /assets/petanque-ar/screen-01-en.webp?v=1215
     alt: "3D scan in progress — four boules locked, each one's distance to the jack shown above it"
-  - src: /assets/petanque-ar/screen-02-en.webp
+  - src: /assets/petanque-ar/screen-02-en.webp?v=1215
     alt: "Aiming at the jack: walk round the game and it places itself"
-  - src: /assets/petanque-ar/screen-03-en.webp
+  - src: /assets/petanque-ar/screen-03-en.webp?v=1215
     alt: "Phone held above a boule: the measure locks, a padlock shows it"
-  - src: /assets/petanque-ar/screen-05-en.webp
+  - src: /assets/petanque-ar/screen-05-en.webp?v=1215
     alt: "The result seen from above, boules ranked from nearest to farthest"
-  - src: /assets/petanque-ar/screen-06-en.webp
+  - src: /assets/petanque-ar/screen-06-en.webp?v=1215
     alt: "Photo mode — a single shot taken from above, the closest boule circled in green"
-  - src: /assets/petanque-ar/screen-08-en.webp
+  - src: /assets/petanque-ar/screen-08-en.webp?v=1215
     alt: "Premium screen — ten free scans a day, a short ad refills them, or lifetime Premium with no ads"
 ---
 <p>

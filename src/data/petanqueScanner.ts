@@ -46,7 +46,7 @@ export const HERO = '/assets/petanque-ar/hero-fr.avif?v=1213';
 
 /** The store visuals carry their caption and the app's own UI, so each language gets its set. */
 const screens = (suffix: string) =>
-	[1, 2, 3, 4, 5, 6, 7, 8].map((n) => `/assets/petanque-ar/screen-0${n}${suffix}.webp`);
+	[1, 2, 3, 4, 5, 6, 7, 8].map((n) => `/assets/petanque-ar/screen-0${n}${suffix}.webp?v=1215`);
 export const SCREENS: Record<LandingLang, string[]> = {
 	fr: screens('-fr'),
 	en: screens('-en'),
