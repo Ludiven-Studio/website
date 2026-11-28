@@ -235,6 +235,12 @@ const jsonLd = [
 		background: var(--sc-surface-2);
 	}
 
+	/* The clip is 16:9 tall, the shots 19.5:9: crop its sides so the row lines up. */
+	.screens-grid video {
+		aspect-ratio: 540 / 1170;
+		object-fit: cover;
+	}
+
 	.faq {
 		display: grid;
 		gap: 0.25rem;
