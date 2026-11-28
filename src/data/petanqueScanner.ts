@@ -44,9 +44,10 @@ export const APP_NAME = 'Pétanque Scan';
 export const OG_IMAGE = '/assets/work/og/petanque-scanner.jpg';
 export const HERO = '/assets/petanque-ar/hero-fr.avif?v=1213';
 
-/** The store visuals carry their caption and the app's own UI, so each language gets its set. */
+/** The store visuals carry their caption and the app's own UI, so each language gets its set.
+    Visual 6 stays out: it still says 3 free scans a day, and the app gives 10 since 1.2.14. */
 const screens = (suffix: string) =>
-	[1, 2, 3, 4, 5, 6].map((n) => `/assets/petanque-ar/screen-0${n}${suffix}.webp`);
+	[1, 2, 3, 4, 5].map((n) => `/assets/petanque-ar/screen-0${n}${suffix}.webp`);
 export const SCREENS: Record<LandingLang, string[]> = {
 	fr: screens('-fr'),
 	en: screens('-en'),
@@ -705,7 +706,6 @@ export const download: Record<LandingLang, DownloadCopy> = {
 			'Passe au-dessus. Chaque boule se verrouille toute seule.',
 			'Le verdict d’en haut. Boules classées, écarts affichés.',
 			'Pas d’AR ? Une photo suffit. Le mode photo marche sur tous les téléphones.',
-			'10 scans gratuits par jour. Premium à vie : illimité, sans pub, sans abonnement.',
 		],
 		pause: 'Mettre l’animation en pause',
 		videoTitle: 'En vidéo',
@@ -720,7 +720,6 @@ export const download: Record<LandingLang, DownloadCopy> = {
 			'Hold it above. Each boule locks by itself.',
 			'The verdict from above. Boules ranked, gaps shown.',
 			'No AR? One photo will do. Photo mode works on every phone.',
-			'10 free scans a day. Lifetime Premium: unlimited, no ads, no subscription.',
 		],
 		pause: 'Pause the animation',
 		videoTitle: 'On video',
@@ -735,7 +734,6 @@ export const download: Record<LandingLang, DownloadCopy> = {
 			'Colócate encima. Cada bola se bloquea sola.',
 			'El veredicto desde arriba. Bolas clasificadas, distancias a la vista.',
 			'¿Sin AR? Basta una foto. El modo foto funciona en todos los móviles.',
-			'10 escaneos gratis al día. Premium de por vida: ilimitado, sin anuncios ni suscripción.',
 		],
 		pause: 'Pausar la animación',
 		videoTitle: 'En vídeo',
@@ -750,7 +748,6 @@ export const download: Record<LandingLang, DownloadCopy> = {
 			'Halte es darüber. Jede Kugel rastet von selbst ein.',
 			'Das Urteil von oben. Kugeln gewertet, Abstände sichtbar.',
 			'Kein AR? Ein Foto reicht. Der Fotomodus läuft auf jedem Handy.',
-			'10 Gratis-Scans pro Tag. Premium auf Lebenszeit: unbegrenzt, ohne Werbung, ohne Abo.',
 		],
 		pause: 'Animation anhalten',
 		videoTitle: 'Im Video',
@@ -765,7 +762,6 @@ export const download: Record<LandingLang, DownloadCopy> = {
 			'Tienilo sopra. Ogni boccia si blocca da sola.',
 			'Il verdetto dall’alto. Bocce in classifica, distanze in vista.',
 			'Niente AR? Basta una foto. La modalità foto funziona su ogni telefono.',
-			'10 scansioni gratis al giorno. Premium a vita: illimitato, senza pubblicità né abbonamento.',
 		],
 		pause: 'Metti in pausa l’animazione',
 		videoTitle: 'In video',
