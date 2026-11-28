@@ -4242,3 +4242,7 @@
 - 11:38 : Revue Codex de la branche contre main (3 constats, tous vérifiés et réels) : afeff50 URL versionnées des
   images remplacées (?v=1215, ?v=2), 14193e7 pastilles Meet : libellé sur le marqueur focalisable, décalage et cadrage
   à leur taille. Tests rencontres 63/63, astro check 0 erreur, build complet OK. Poussé sur la branche, pas sur main.
+- 13:32 : Itération 11 (accueil + /tests/, critique fraîche) : 67d6a46 /tests/ notes 17 px, Installer 48 px, Page de
+  test 44 px, grille 4 px, rayon 16 px ; dd08da3 accueil téléphone, voile du titre (pire pixel 2,72 → 5,98) ; 996f9a7
+  pied de page téléphone, liens de 44 px. Contraste : 0 échec (seul le libellé sr-only « Dark theme », invisible).
+  eslint, astro check 0 erreur, build 270 pages, précache 444, liens OK. Planches : shots/we-2026-11-28-design/it11/.
