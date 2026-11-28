@@ -140,10 +140,8 @@ const jsonLd = [
 
 		<section class="stack gap-4 closing">
 			<h2 class="section-title">{ty(t.closing)}</h2>
-			<div class="dg-ctas">
-				<a class="sc-btn" href={DOWNLOAD_PATHS[lang]}>{t.download} <Icon icon="arrow-right" size="1.1em" /></a>
-				<a class="sc-link" href={WEB_GAME}>{t.playWeb} <Icon icon="arrow-right" size="1em" /></a>
-			</div>
+			<DragonsGemsBadges lang={lang} />
+			<a class="sc-link" href={WEB_GAME}>{t.playWeb} <Icon icon="arrow-right" size="1em" /></a>
 			<p class="legal" id="support">{ty(t.support)} <a href={CONTACT[lang]}>{t.supportLink}</a> · <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a></p>
 			<p class="legal"><a href={PRIVACY[lang]}>{t.privacy}</a> · <a href={TERMS[lang]}>{t.terms}</a></p>
 		</section>

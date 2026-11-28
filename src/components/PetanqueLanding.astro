@@ -213,7 +213,7 @@ const jsonLd = [
 				)))}
 			</div>
 			{soon && t.soon && <p class="soon-note">{t.soon}</p>}
-			<p class="closing-actions"><a class="sc-btn" href={download}>{DOWNLOAD[lang]} <Icon icon="arrow-right" size="1.1em" /></a> <ShareButton id={app.id} title={app.name} kind={app.id === 'game' ? 'game' : 'app'} lang={lang} /></p>
+			<p class="closing-actions"><ShareButton id={app.id} title={app.name} kind={app.id === 'game' ? 'game' : 'app'} lang={lang} /></p>
 			<p class="legal" id="support">
 				{t.support} <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>
 			</p>
