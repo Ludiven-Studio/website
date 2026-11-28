@@ -65,12 +65,16 @@ export function gameCard(e: MeetupEvent, slot: Slot | undefined, lang: Lang): L.
 		're-pin--event', GAME_W, GAME_H, slot);
 }
 
+/** Several games: a round badge with their number; the words go to its tooltip and screen readers. */
 export function gameClusterCard(count: number, lang: Lang): L.DivIcon {
-	const [games, zoom] = lang === 'en' ? ['games', 'zoom in'] : ['parties', 'zoomer'];
+	const label = lang === 'en' ? `${count} games, tap to zoom in` : `${count} parties, touche pour zoomer`;
 	return board(
-		`<div class="re-cp re-cp--game">${BOULE}<span class="re-cp-txt"><b>${count} ${games}</b><small>${zoom}</small></span></div>`,
-		're-pin--event re-pin--cluster', GAME_W, GAME_H);
+		`<div class="re-cp re-cp--count re-cp--count-game" title="${label}" aria-label="${label}"><span class="re-cp-badge">${BOULE}</span><b>${count}</b></div>`,
+		're-pin--event re-pin--cluster', COUNT_W, COUNT_H);
 }
+
+export const COUNT_W = 52;
+export const COUNT_H = 60;
 
 export const T_W = 78;
 export const T_H = 136;
@@ -125,11 +129,10 @@ export function tournamentCard(t: MeetupTournament, slot: Slot | undefined, lang
 }
 
 export function tournamentClusterCard(count: number, slot: Slot | undefined, lang: Lang): L.DivIcon {
-	const [tournaments, zoom] = lang === 'en' ? ['tournaments', 'zoom in'] : ['concours', 'zoomer'];
+	const label = lang === 'en' ? `${count} tournaments, tap to zoom in` : `${count} concours, touche pour zoomer`;
 	return board(
-		`<div class="re-cp re-cp--tournament re-cp--stack"><span class="re-cp-badge">${TROPHY}</span>`
-		+ `<span class="re-cp-poster"><span class="re-cp-title">${count} ${tournaments}</span></span><span class="re-cp-date">${zoom}</span></div>`,
-		're-pin--tournament re-pin--cluster', T_W, T_H, slot);
+		`<div class="re-cp re-cp--count re-cp--count-tournament" title="${label}" aria-label="${label}"><span class="re-cp-badge">${TROPHY}</span><b>${count}</b></div>`,
+		're-pin--tournament re-pin--cluster', COUNT_W, COUNT_H, slot);
 }
 
 export function placeIcon(p: Place): L.DivIcon {

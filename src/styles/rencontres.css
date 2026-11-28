@@ -471,6 +471,20 @@
 	border: 2px solid #fff;
 }
 .re-cp--stack { box-shadow: 4px -4px 0 -1px #f5dc7a, 0 2px 6px rgba(0, 0, 0, 0.3); }
+/* Several markers in one place: a round badge with their number, the kind in its corner. */
+.re-cp--count {
+	width: 52px;
+	height: 52px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 50%;
+	font: 800 19px/1 system-ui, sans-serif;
+}
+.re-cp--count .re-cp-badge { top: -6px; right: -6px; }
+.re-cp--count .re-cp-badge svg { width: 14px; height: 14px; }
+.re-cp--count-game { background: #ffe1c2; border: 2px solid #f2ae6b; color: #6b3e12; }
+.re-cp--count-tournament { background: #fff1b8; border: 2px solid #e6c24a; color: #5a4708; }
 .re-cp--home {
 	max-width: 150px;
 	height: 32px;
