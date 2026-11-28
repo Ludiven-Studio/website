@@ -131,6 +131,8 @@ const { lang, name, icon, kicker, tagline, lead, art, alt = '' } = Astro.props;
 		font-size: 2.375rem;
 		line-height: 1.05;
 		color: #fff;
+		/* An app name breaks where it naturally would: balancing gave « Dragon / Gems Swipe ». */
+		text-wrap: wrap;
 	}
 
 	.as-rest {
