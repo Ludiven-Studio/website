@@ -17,7 +17,7 @@ export const STORES = {
 // Raise the version and size by hand at each new one.
 export const APK_URL = 'https://github.com/Ludiven-Studio/website/releases/download/nino-rush-dev/NinoRush-test.apk';
 export const APK_VERSION = '1.0.25';
-export const APK_SIZE = '80,3 Mo';
+export const APK_SIZE = '80,3 Mo';
 
 export const LANDING_PATHS: Record<Lang, string> = {
 	fr: '/nino-rush/',

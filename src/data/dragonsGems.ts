@@ -117,7 +117,7 @@ export const copy: Record<Lang, Copy> = {
 		priceTitle: 'Gratuit',
 		price: [
 			'Le jeu est gratuit. Tu as cinq cœurs : un niveau perdu en coûte un, et il en revient un toutes les 30 minutes.',
-			'Des vidéos, toujours à ton choix, offrent un cœur, une partie qui continue ou des pièces. La boutique vend les cœurs illimités pour toujours (6,99 €) et des pièces : 2 000 pour 1,99 €, 6 000 pour 4,99 €, 15 000 pour 9,99 €.',
+			'Des vidéos, toujours à ton choix, offrent un cœur, une partie qui continue ou des pièces. La boutique vend les cœurs illimités pour toujours (6,99 €) et des pièces : 2 000 pour 1,99 €, 6 000 pour 4,99 €, 15 000 pour 9,99 €.',
 		],
 		faqTitle: 'Questions',
 		faq: [
@@ -243,7 +243,7 @@ export const copy: Record<Lang, Copy> = {
 		priceTitle: 'Gratis',
 		price: [
 			'El juego es gratis. Tienes cinco corazones: un nivel perdido cuesta uno, y recuperas uno cada 30 minutos.',
-			'Los vídeos, siempre a tu elección, dan un corazón, una partida que continúa o monedas. La tienda vende corazones ilimitados para siempre (6,99 €) y monedas: 2.000 por 1,99 €, 6.000 por 4,99 €, 15.000 por 9,99 €.',
+			'Los vídeos, siempre a tu elección, dan un corazón, una partida que continúa o monedas. La tienda vende corazones ilimitados para siempre (6,99 €) y monedas: 2.000 por 1,99 €, 6.000 por 4,99 €, 15.000 por 9,99 €.',
 		],
 		faqTitle: 'Preguntas',
 		faq: [
@@ -306,7 +306,7 @@ export const copy: Record<Lang, Copy> = {
 		priceTitle: 'Kostenlos',
 		price: [
 			'Das Spiel ist kostenlos. Du hast fünf Herzen: Ein verlorenes Level kostet eins, und alle 30 Minuten kommt eins zurück.',
-			'Videos, immer freiwillig, bringen ein Herz, ein Level, das weitergeht, oder Münzen. Im Shop gibt es unbegrenzte Herzen für immer (6,99 €) und Münzen: 2.000 für 1,99 €, 6.000 für 4,99 €, 15.000 für 9,99 €.',
+			'Videos, immer freiwillig, bringen ein Herz, ein Level, das weitergeht, oder Münzen. Im Shop gibt es unbegrenzte Herzen für immer (6,99 €) und Münzen: 2.000 für 1,99 €, 6.000 für 4,99 €, 15.000 für 9,99 €.',
 		],
 		faqTitle: 'Fragen',
 		faq: [
@@ -369,7 +369,7 @@ export const copy: Record<Lang, Copy> = {
 		priceTitle: 'Gratis',
 		price: [
 			'Il gioco è gratuito. Hai cinque cuori: un livello perso ne costa uno, e ne torna uno ogni 30 minuti.',
-			'I video, sempre a tua scelta, danno un cuore, una partita che continua o monete. Il negozio vende cuori illimitati per sempre (6,99 €) e monete: 2.000 per 1,99 €, 6.000 per 4,99 €, 15.000 per 9,99 €.',
+			'I video, sempre a tua scelta, danno un cuore, una partita che continua o monete. Il negozio vende cuori illimitati per sempre (6,99 €) e monete: 2.000 per 1,99 €, 6.000 per 4,99 €, 15.000 per 9,99 €.',
 		],
 		faqTitle: 'Domande',
 		faq: [

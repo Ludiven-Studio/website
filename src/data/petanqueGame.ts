@@ -134,7 +134,7 @@ const copy: Record<LandingLang, AppCopy> = {
 				},
 				{
 					title: 'Des pièces pour les meilleurs',
-					body: 'Un classement mondial du jour et un de la semaine. Chaque jour : 500 pièces au premier, 300 au deuxième, 200 au troisième, puis de 150 à 60 du 4e au 10e. Chaque semaine : 2 000 pièces au premier, 1 200 au deuxième, 800 au troisième, 400 du 4e au 10e, 200 du 11e au 20e, 100 du 21e au 50e. Pour entrer au classement, il faut un compte.',
+					body: 'Un classement mondial du jour et un de la semaine. Chaque jour : 500 pièces au premier, 300 au deuxième, 200 au troisième, puis de 150 à 60 du 4e au 10e. Chaque semaine : 2 000 pièces au premier, 1 200 au deuxième, 800 au troisième, 400 du 4e au 10e, 200 du 11e au 20e, 100 du 21e au 50e. Pour entrer au classement, il faut un compte.',
 				},
 				{
 					title: 'Une leçon pour bien commencer',
@@ -142,7 +142,7 @@ const copy: Record<LandingLang, AppCopy> = {
 				},
 				{
 					title: "S'entraîner seul",
-					body: "Personne en face : tu lances toutes les boules, et le tableau dit à quelle distance du bouchon est ta meilleure. Une boule collée au bouchon le « touche », au lieu d'être à « 0 mm ».",
+					body: "Personne en face : tu lances toutes les boules, et le tableau dit à quelle distance du bouchon est ta meilleure. Une boule collée au bouchon le « touche », au lieu d'être à « 0 mm ».",
 				},
 				{
 					title: 'Sans compte',
@@ -204,7 +204,7 @@ const copy: Record<LandingLang, AppCopy> = {
 			},
 			{
 				title: 'Des boules de caractère',
-				body: "14 modèles, de 650 à 790 g et de 71 à 79 mm, tendres ou dures. Une lourde résiste aux cailloux, une tendre colle au sol, une dure roule plus loin : aucune n'est meilleure partout.",
+				body: "14 modèles, de 650 à 790 g et de 71 à 79 mm, tendres ou dures. Une lourde résiste aux cailloux, une tendre colle au sol, une dure roule plus loin : aucune n'est meilleure partout.",
 			},
 			{
 				title: 'Ton joueur, ton équipe',
@@ -310,7 +310,7 @@ const copy: Record<LandingLang, AppCopy> = {
 				},
 				{
 					title: 'Practice alone',
-					body: 'Nobody on the other side: you throw every boule, and the board tells you how far your best one is from the jack. A boule right against the jack is now “touching”, not at “0 mm”.',
+					body: 'Nobody on the other side: you throw every boule, and the board tells you how far your best one is from the jack. A boule right against the jack is now “touching”, not at “0 mm”.',
 				},
 				{
 					title: 'No account needed',
@@ -372,7 +372,7 @@ const copy: Record<LandingLang, AppCopy> = {
 			},
 			{
 				title: 'Boules with character',
-				body: '14 models, from 650 to 790 g and 71 to 79 mm, soft or hard. A heavy one resists stones, a soft one sticks where it lands, a hard one runs on: none is better everywhere.',
+				body: '14 models, from 650 to 790 g and 71 to 79 mm, soft or hard. A heavy one resists stones, a soft one sticks where it lands, a hard one runs on: none is better everywhere.',
 			},
 			{
 				title: 'Your player, your team',
@@ -478,7 +478,7 @@ const copy: Record<LandingLang, AppCopy> = {
 				},
 				{
 					title: 'Entrenar a solas',
-					body: 'Nadie enfrente: lanzas todas las bolas, y el marcador te dice a qué distancia del boliche está la mejor. Una bola pegada al boliche ahora lo «toca», en vez de estar a «0 mm».',
+					body: 'Nadie enfrente: lanzas todas las bolas, y el marcador te dice a qué distancia del boliche está la mejor. Una bola pegada al boliche ahora lo «toca», en vez de estar a «0 mm».',
 				},
 				{
 					title: 'Sin cuenta',
@@ -540,7 +540,7 @@ const copy: Record<LandingLang, AppCopy> = {
 			},
 			{
 				title: 'Bolas con carácter',
-				body: '14 modelos, de 650 a 790 g y de 71 a 79 mm, blandas o duras. Una pesada resiste mejor las piedras, una blanda se queda donde cae, una dura rueda más lejos: ninguna gana en todo.',
+				body: '14 modelos, de 650 a 790 g y de 71 a 79 mm, blandas o duras. Una pesada resiste mejor las piedras, una blanda se queda donde cae, una dura rueda más lejos: ninguna gana en todo.',
 			},
 			{
 				title: 'Tu jugador, tu equipo',
@@ -646,7 +646,7 @@ const copy: Record<LandingLang, AppCopy> = {
 				},
 				{
 					title: 'Allein üben',
-					body: 'Niemand auf der anderen Seite: Du wirfst alle Kugeln, und die Tafel zeigt, wie weit deine beste von der Zielkugel liegt. Eine Kugel direkt an der Zielkugel „berührt“ sie jetzt, statt bei „0 mm“ zu liegen.',
+					body: 'Niemand auf der anderen Seite: Du wirfst alle Kugeln, und die Tafel zeigt, wie weit deine beste von der Zielkugel liegt. Eine Kugel direkt an der Zielkugel „berührt“ sie jetzt, statt bei „0 mm“ zu liegen.',
 				},
 				{
 					title: 'Ohne Konto',
@@ -708,7 +708,7 @@ const copy: Record<LandingLang, AppCopy> = {
 			},
 			{
 				title: 'Kugeln mit Charakter',
-				body: '14 Modelle, von 650 bis 790 g und von 71 bis 79 mm, weich oder hart. Eine schwere hält besser gegen Steine, eine weiche bleibt liegen, wo sie landet, eine harte rollt weiter: Keine ist überall im Vorteil.',
+				body: '14 Modelle, von 650 bis 790 g und von 71 bis 79 mm, weich oder hart. Eine schwere hält besser gegen Steine, eine weiche bleibt liegen, wo sie landet, eine harte rollt weiter: Keine ist überall im Vorteil.',
 			},
 			{
 				title: 'Deine Figur, dein Team',
@@ -814,7 +814,7 @@ const copy: Record<LandingLang, AppCopy> = {
 				},
 				{
 					title: 'Allenarsi da solo',
-					body: "Nessuno dall'altra parte: lanci tutte le bocce, e il tabellone ti dice quanto dista dal pallino la migliore. Una boccia attaccata al pallino ora lo «tocca», invece di stare a «0 mm».",
+					body: "Nessuno dall'altra parte: lanci tutte le bocce, e il tabellone ti dice quanto dista dal pallino la migliore. Una boccia attaccata al pallino ora lo «tocca», invece di stare a «0 mm».",
 				},
 				{
 					title: 'Senza account',
@@ -876,7 +876,7 @@ const copy: Record<LandingLang, AppCopy> = {
 			},
 			{
 				title: 'Bocce con carattere',
-				body: '14 modelli, da 650 a 790 g e da 71 a 79 mm, tenere o dure. Una pesante resiste meglio ai sassi, una tenera resta dove cade, una dura rotola più lontano: nessuna vince ovunque.',
+				body: '14 modelli, da 650 a 790 g e da 71 a 79 mm, tenere o dure. Una pesante resiste meglio ai sassi, una tenera resta dove cade, una dura rotola più lontano: nessuna vince ovunque.',
 			},
 			{
 				title: 'Il tuo giocatore, la tua squadra',
