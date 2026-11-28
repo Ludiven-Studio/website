@@ -347,7 +347,7 @@ const first = t.screens[0];
 
 	.free {
 		margin-top: 0.85rem;
-		font-size: var(--text-sm);
+		font-size: 0.9375rem;
 		font-weight: 700;
 		color: var(--clay-dark);
 	}
@@ -426,7 +426,7 @@ const first = t.screens[0];
 	}
 
 	.caption span {
-		font-size: var(--text-sm);
+		font-size: 0.9375rem;
 		color: var(--clay-dark);
 	}
 
@@ -441,12 +441,13 @@ const first = t.screens[0];
 	}
 
 	.dot {
+		position: relative;
 		width: 0.65rem;
 		height: 0.65rem;
 		padding: 0;
 		border: 0;
 		border-radius: 999px;
-		background: rgb(30 34 51 / 0.25);
+		background-color: rgb(30 34 51 / 0.25);
 		cursor: pointer;
 		transition:
 			width 0.3s ease,
@@ -455,14 +456,21 @@ const first = t.screens[0];
 
 	.dot[aria-pressed='true'] {
 		width: 1.75rem;
-		background: var(--clay);
+		background-color: var(--clay);
+	}
+
+	/* The dot stays small; a transparent ring makes its tap area 44 px tall. */
+	.dot::after {
+		content: '';
+		position: absolute;
+		inset: -1.05rem -0.25rem;
 	}
 
 	.pause {
 		display: grid;
 		place-items: center;
-		width: 2rem;
-		height: 2rem;
+		width: 2.75rem;
+		height: 2.75rem;
 		margin-left: 0.35rem;
 		padding: 0;
 		border: 0;
@@ -614,7 +622,7 @@ const first = t.screens[0];
 	}
 
 	.guide p {
-		font-size: var(--text-sm);
+		font-size: 0.9375rem;
 		color: var(--sc-muted);
 	}
 
@@ -653,7 +661,7 @@ const first = t.screens[0];
 
 	.after {
 		text-align: center;
-		font-size: var(--text-sm);
+		font-size: 0.9375rem;
 		color: var(--sc-muted);
 	}
 
