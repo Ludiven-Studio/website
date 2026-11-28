@@ -273,8 +273,14 @@ const jsonLd = [
 		color: var(--sc-ink);
 	}
 
+	.steps h3 {
+		padding-left: 1.6em;
+		text-indent: -1.6em;
+	}
+
 	.step-n {
 		display: inline-block;
+		text-indent: 0;
 		min-width: 1.6em;
 		color: var(--sc-link);
 		font-variant-numeric: tabular-nums;
@@ -323,6 +329,9 @@ const jsonLd = [
 
 	.faq summary {
 		cursor: pointer;
+		/* A wrapped question lines up under its first word, not under the triangle. */
+		padding-left: 1.1em;
+		text-indent: -1.1em;
 		color: var(--sc-ink);
 		font-family: var(--font-brand);
 		font-size: var(--text-md);
